@@ -32,6 +32,8 @@
 | Playwright / axe-core Playwright | 1.64.1 / 4.14.0 | Apache-2.0 / MPL-2.0; dev-only browser and scoped accessibility checks |
 | reflect-metadata / rxjs | 0.2.2 / 7.8.2 | Nest dependencies; exact lock |
 
-Discovered but NOT adopted: Crawl4AI 0.9.5 (PyPI Apache-2.0), Docling 2.141.0 (PyPI MIT). Inspect attribution/model weights/transitives before install. Fabric, FFmpeg codec/build licensing, pgvector, OpenTelemetry and production object storage remain to pin at adoption. Langfuse, Portkey, GrowthBook optional; MinIO not deployed.
+Adopted for bounded document extraction: docling-slim 2.141.0 and docling-core 2.103.1 (MIT), docling-parse 7.22.3 (MIT), pypdfium2 5.14.0 (BSD-3-Clause/Apache-2.0 plus bundled dependency notices), python-pptx 1.0.2 (MIT), lxml 6.1.3 (BSD-3-Clause), Pillow 12.3.0 (MIT-CMU); exact distribution metadata inspected locally. ReportLab 4.4.10 is test-only (BSD). Python image 3.12-slim@sha256:a6e34c598f2467ed0e9a8d349809fcd8b5c603269512df273a0bb1784edc11b1; full transitive/container vulnerability and bundled native notice review remain pending. Lock hashes are in apps/ingestion. No model weights are downloaded by the native path.
+
+Discovered but NOT adopted: Crawl4AI 0.9.5 (PyPI Apache-2.0). Fabric, FFmpeg codec/build licensing, pgvector, OpenTelemetry and production object storage remain to pin at adoption. Langfuse, Portkey, GrowthBook optional; MinIO not deployed.
 
 M1 npm audit reports zero known vulnerabilities in the current locked npm tree (see generated docs/evidence/npm-audit.json). This is not Python/container/security clearance. Updates require exact lock changes, contract/security reruns and invalidation of prior live evidence. Never follow main/latest automatically in production.

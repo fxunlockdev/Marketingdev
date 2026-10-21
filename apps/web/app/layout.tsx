@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./v5.css";
 export const metadata: Metadata = {
-  title: "Desvio · Your brand workspace",
-  description: "A focused home for your clients, brands and creative work.",
+  title: "Desvio · Your businesses, beautifully connected",
+  description: "Your businesses, brand knowledge and creative work in one place.",
   robots: { index: false, follow: false },
 };
 export const dynamic = "force-dynamic";

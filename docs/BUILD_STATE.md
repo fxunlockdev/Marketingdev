@@ -1,6 +1,6 @@
 # Desvio build state
 
-Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers remain and initial M1 workspace backend is implemented locally. Prior goal turns implemented client/workspace/brand accounts and invitations. This session adds the backed customer account/client/brand/team/file interface; the full generation/revision/publication goal remains active.
+Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers remain and initial M1 workspace backend is implemented locally. Prior goal turns implemented client/workspace/brand accounts and invitations. This session adds real document evidence and the owner-corrected V5 business experience; the full generation/revision/publication goal remains active.
 
 ## Owner decisions
 
@@ -13,7 +13,7 @@ Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers rema
 
 ## Code and evidence
 
-Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-04-customer-workspaces, stacked on codex/pr-03-private-assets-jobs. Draft PR-00: https://github.com/fxunlockdev/Marketingdev/pull/1. Original specs, archive and repository manifest retained.
+Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-05-brand-evidence, stacked on codex/pr-04-customer-workspaces. Draft PR-00: https://github.com/fxunlockdev/Marketingdev/pull/1. Original specs, archive and repository manifest retained.
 
 - scripts/skill_audit.py: safe archive validation, immutable file/skill digests, preserve MIT notice.
 - scripts/skill_probe.py: actual Deep Agents middleware discovery with per-run read-only mount.
@@ -24,7 +24,18 @@ Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch 
 
 Previous account session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 24 actual local HTTP/PostgreSQL/SMTP tests plus 6 audit/guard tests (41 tests total). release-gate exits nonzero as intended. verify-live was NOT run; no real emails, paid providers or social accounts were contacted. npm audit reports zero known vulnerabilities in the locked npm tree; this is not full security clearance. Machine evidence identifies implementation commit e190596 and the source fingerprint.
 
-## Current customer-experience session
+## Current V5 correction and document-evidence session
+
+- Owner explicitly replaced the client-first UI with one account and up to three businesses, exact eleven-item navigation and the supplied cream/ink/terracotta/sage HTML reference. Architecture remains unchanged: existing organizations/accounts, brands/businesses, Nest/Next/Better Auth/Postgres/Temporal/S3/Docling/Crawl4AI/Deep Agents/OpenAI/Higgsfield/Postiz/Fabric/FFmpeg.
+- Owner narrowed onboarding to three short steps and specifically requires AI pre-filled goals from scraped/uploaded evidence, with user review/adjustment. That semantic/crawl/recommendation path is NOT implemented; current UI labels manual/default fallback explicitly and never implies an AI analysis occurred.
+- Original V5 documents copied unchanged; manifest verifies archive/standalone agreement. docs/IMPLEMENTATION_STATUS.md maps actual code and missing workflows. docs/UI_CONTROL_MATRIX.csv tracks all 143 supplied controls with truthful status.
+- Migration 004, brand-brain.ts, document-parser.ts, document-jobs.ts and apps/ingestion implement actual bounded Docling native PDF/PPTX extraction, page/slide provenance, literal/manual findings, Correct/Wrong/Edit, concurrency-safe review and immutable approved Brand Brain. Real local tests pass for PDF/PPTX/50-page coverage, inert injection text, parser failures, tenant/worker denial, cancellation and saved-file preservation. OCR/vision and production parser sandbox deployment remain incomplete.
+- Migrations 005–006 and businesses.ts add idempotent account initialization, server-enforced configurable business cap (default 3), selected-business read grants/RLS, actual business listing and saved onboarding goals/checkpoints. Concurrent fourth-business denial passed locally. Full V5 roles/invitations, account lifecycle and paid entitlements remain unfinished. Legacy client UI URLs redirect to business routes; existing APIs/data are retained.
+- apps/web/components/businesses.tsx and app/v5.css implement the warm reference-based shell, business selector, Brands/Overview, saved three-step manual fallback, source review, approved Memory, actual allowance, identity/password recovery and explicit unavailable destinations. No sample business, metric, invoice, social connection or provider result is injected into real accounts.
+- Current browser verification is in progress. First run passed 5/8 and exposed a missing mobile select name plus two test locator issues; fixed these and rerunning. Source changes invalidate earlier machine gate evidence until the final suite. Do not claim any live provider capability.
+- Docs ADR0006 records source contracts, exact parser pins, production sandbox requirements and V5 boundaries. No paid provider/social test, external email, production release or merge performed this session.
+
+## Previous customer-experience session
 
 - apps/web implements Next.js/React screens for sign-up/verification/sign-in/recovery, client/brand switching, brand details, team/invitations/role management and private file upload/status/download/cancel.
 - apps/api/src/assets.ts now includes the scoped job ID/cancel status in saved asset lists so UI controls work after reload. Existing server authorization/RLS remains authoritative.
@@ -80,8 +91,10 @@ Postiz source SHA 651876e24317c2d8e717262cf98267ec6f699180 is Oct 20; pinned off
 
 These do not prevent independent M1 implementation. The local workspace_auth capability is machine-reported ADAPTER_READY after the scoped security suite; the wider tenant_runtime and provider journeys remain incomplete. No feature is LIVE_VERIFIED or LAUNCH_READY.
 
-## Next implementation work — backed M1 UI, then brand intake
+## Next implementation work — complete AI-assisted V5 onboarding and Canvas
 
 Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Account verification/recovery/invitation backends are now implemented; PR-02 is a stacked draft on PR-01: https://github.com/fxunlockdev/Marketingdev/pull/3. Private storage and asset-validation Temporal dispatch are implemented locally in PR-03; machine evidence passes at its local scope; PR-03 is a stacked draft on PR #3: https://github.com/fxunlockdev/Marketingdev/pull/4. Broader API quotas/observability and production storage remain pending. Account/team/workspace/files UI now has real local browser coverage in PR-04; evidence is complete locally; PR-04 is a stacked draft on PR #4 at https://github.com/fxunlockdev/Marketingdev/pull/5. Proceed directly to website/document intake and approved Brand Brain. External sender/deployment validation remains open. Extend negative tests across jobs/assets and restart boundaries. Then continue website/PDF/PPTX intake, Correct/Wrong/Edit findings and immutable approved Brand Brain. PR numbering has expanded to keep the M1 account work reviewable; the later onboarding scope is unchanged. Full creative revision, approval and real social publishing goal remains intact.
 
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.
+
+V5 next task: complete SSRF-safe website crawling and persisted semantic/goal recommendations from actual source evidence, then finalize the three-step review-first onboarding (including OCR/visual analysis and conflict handling). Continue into genuine skill-driven Canvas generation/revisions and the rest of the end-to-end flow. The current manual fallback is not the requested final onboarding experience. Production sandbox execution, selected-business role administration and live verification remain release blockers.

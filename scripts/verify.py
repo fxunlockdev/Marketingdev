@@ -7,6 +7,7 @@ import subprocess
 import sys
 
 from scripts.skill_audit import ROOT, main as audit_skills
+from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
@@ -25,7 +26,7 @@ def source_hash():
     files = {}
     for directory in ["scripts", "tests", "contracts", "apps", "database"]:
         for path in sorted((ROOT / directory).rglob("*")):
-            if path.is_file() and not set(path.parts).intersection({"__pycache__", ".next", "node_modules"}) and not path.name.endswith(".tsbuildinfo"):
+            if path.is_file() and not set(path.parts).intersection({"__pycache__", ".next", "node_modules", ".venv"}) and not path.name.endswith(".tsbuildinfo"):
                 files[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
     for name in ["package.json", "package-lock.json", "pyproject.toml", "uv.lock", "Makefile", "tsconfig.json"]:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
@@ -59,6 +60,14 @@ def write_status():
     integrations["customer_workspace_ui"] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/browser.json", "docs/evidence/security.json"],
         "blocked_reason": "Real local browser account/client/brand/team/upload flows only. Deployed ingress/CORS, email delivery, intake, generation, editor and publishing UI remain incomplete."}
+    for capability in ["docling", "brand_evidence", "business_accounts"]:
+        integrations[capability] = {"state": "ADAPTER_READY" if foundation_passed else "NOT_IMPLEMENTED", "live_test": False,
+            "evidence": ["docs/evidence/security.json"],
+            "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Crawling, AI goal prefill, full business roles, deployed sandbox and live provider journey remain incomplete."}
+    integrations["v5_business_ui"] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
+        "evidence": ["docs/evidence/security.json", "docs/evidence/browser.json"],
+        "blocked_reason": "Business navigation, scoped records, manual/document review and saved goals only. AI-assisted scrape/prefill/plan and the creative/social workflows remain incomplete; unavailable controls are labeled honestly."}
+    update_matrix(ROOT, foundation_passed and browser_passed)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
               "checked_at": now(), "integrations": integrations,
@@ -73,11 +82,11 @@ def run_suite(name):
         audit_skills()
     results = []
     for command in SUITES[name]:
-        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=600)
         log = result.stdout + result.stderr
         print(log, end="")
         results.append({"command": command, "exit_code": result.returncode, "output": log})
-    scopes = {"browser": "Actual Chromium through Next.js UI to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; no external provider or deployed generation-worker proof"}
+    scopes = {"browser": "Actual Chromium through V5 business UI to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; manual onboarding/approved memory, scope, quota, recovery and accessibility; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; no external provider or deployed generation-worker proof"}
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": source_hash(), "results": results, "passed": all(x["exit_code"] == 0 for x in results), "live_calls": False}
     (EVIDENCE / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")

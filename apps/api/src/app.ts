@@ -13,6 +13,8 @@ import { TenantDatabase } from './database.js';
 import { Workspaces } from './workspaces.js';
 import { MailQueue,MailWorker } from './mail.js';
 import { Team } from './team.js';
+import {Businesses} from './businesses.js';
+import {BrandBrain} from './brand-brain.js';
 import {Assets} from './assets.js';
 import {ObjectStore} from './object-store.js';
 
@@ -39,6 +41,19 @@ class SafeErrors implements ExceptionFilter {
     const status = error instanceof HttpException ? error.getStatus() : parserType === 'entity.too.large' ? 413 : parserType === 'entity.parse.failed' ? 400 : 503;
     response.status(status).json({ error: error instanceof HttpException ? error.message : status === 413 ? 'This request is too large' : status === 400 ? 'Invalid request body' : 'Unable to save or load your work. Please try again.', traceId: request.traceId });
   }
+}
+
+@Controller('api/v1')
+@UseGuards(SessionGuard)
+class BusinessController {
+ constructor(@Inject(Businesses) private readonly service:Businesses){}
+ @Post('accounts/current/initialize') initialize(@Req() r:AuthRequest){return this.service.initialize(r.actorId);}
+ @Get('accounts/current/entitlements') entitlements(@Req() r:AuthRequest){return this.service.entitlements(r.actorId);}
+ @Get('businesses') list(@Req() r:AuthRequest){return this.service.list(r.actorId);}
+ @Post('businesses') create(@Req() r:AuthRequest,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,body,key);}
+ @Get('businesses/:id/onboarding') onboarding(@Req() r:AuthRequest,@Param('id') id:string){return this.service.onboarding(r.actorId,id);}
+ @Patch('businesses/:id/onboarding') saveOnboarding(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.onboarding(r.actorId,id,body);}
+ @Get('businesses/:id') resolve(@Req() r:AuthRequest,@Param('id') id:string){return this.service.resolve(r.actorId,id);}
 }
 
 @Controller('api/v1/workspaces')
@@ -75,12 +90,25 @@ class InvitationController {
 class AssetController {
   constructor(@Inject(Assets) private readonly assets:Assets){}
   @Post('uploads') reserve(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.assets.reserve(r.actorId,o,b,body,key);}
+  @Post('assets/:id/extract') extract(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string,@Headers('idempotency-key') key:unknown){return this.assets.extract(r.actorId,o,b,id,key);}
   @Post('assets/:id/abandon') abandon(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.abandon(r.actorId,o,b,id);}
   @Get('assets') list(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string){return this.assets.list(r.actorId,o,b);}
   @Post('assets/:id/complete') complete(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.complete(r.actorId,o,b,id);}
   @Post('assets/:id/download') download(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.download(r.actorId,o,b,id);}
   @Get('jobs/:id') job(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.job(r.actorId,o,b,id);}
   @Post('jobs/:id/cancel') cancel(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.job(r.actorId,o,b,id,true);}
+}
+
+@Controller('api/v1/workspaces/:org/brands/:brand/brain')
+@UseGuards(SessionGuard)
+class BrainController {
+ constructor(@Inject(BrandBrain) private readonly brain:BrandBrain){}
+ @Get() read(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string){return this.brain.read(r.actorId,o,b);}
+ @Get('sources/:id') source(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.brain.source(r.actorId,o,b,id);}
+ @Post('findings') manual(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.brain.manual(r.actorId,o,b,body,key);}
+ @Patch('findings/:id') review(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string,@Body() body:unknown){return this.brain.review(r.actorId,o,b,id,body);}
+ @Post('approve') approve(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Body() body:unknown){return this.brain.approve(r.actorId,o,b,body);}
+ @Get('versions/:id') version(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.brain.version(r.actorId,o,b,id);}
 }
 
 export async function createApplication(config: Config) {
@@ -140,8 +168,8 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [WorkspaceController,InvitationController,AssetController], providers: [SessionGuard,
-      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)}] })
+    @Module({ controllers: [WorkspaceController,InvitationController,AssetController,BrainController,BusinessController], providers: [SessionGuard,
+      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());

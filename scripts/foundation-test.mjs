@@ -8,6 +8,7 @@ import { Pool } from 'pg';
 import { getMigrations } from 'better-auth/db/migration';
 import { authOptions } from '../dist/auth.js';
 import { migrate } from './migrate.mjs';
+import {prepareDocumentImage} from './document-test-image.mjs';
 import {startAssetServices} from './storage-test-services.mjs';
 
 const IMAGE = 'postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73';
@@ -64,8 +65,9 @@ try {
     await migrate(pool); // Reapply must be a verified no-op.
     const version = (await pool.query('SHOW server_version')).rows[0].server_version;
     console.log(`Disposable PostgreSQL ${version}; image ${IMAGE}; migration replay passed`);
-    const browserSuite=process.argv.includes('--web');
-    const code = browserSuite?0:await new Promise((resolve,reject) => {
+    const browserSuite=process.argv.includes('--web'),intakeOnly=process.argv.includes('--intake');
+    if(!browserSuite)process.env.DOCUMENT_PARSER_IMAGE=prepareDocumentImage();
+    const code = browserSuite||intakeOnly?0:await new Promise((resolve,reject) => {
       const child = spawn(process.execPath,['--test','--test-concurrency=1','tests/foundation/tenancy.test.mjs'], {
         stdio:'inherit', env:{...process.env, DESVIO_TEST_CONFIG:JSON.stringify(config), DESVIO_TEST_ADMIN_URL:url('postgres',password), DESVIO_TEST_CONTAINER:container} });
       child.on('error',reject); child.on('exit', code=>resolve(code ?? 1));
@@ -73,7 +75,7 @@ try {
     process.exitCode=code;
     if(code===0){
       services=await startAssetServices();Object.assign(config,{storage:services.storage,scanner:services.scanner});config.jobs.address=services.address;
-      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',browserSuite?'tests/browser/customer.test.mjs':'tests/foundation/assets.test.mjs'],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
+      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',...(browserSuite?['tests/browser/customer.test.mjs']:intakeOnly?['tests/foundation/brand-brain.test.mjs']:['tests/foundation/assets.test.mjs','tests/foundation/brand-brain.test.mjs'])],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
     }
   }
 } finally {

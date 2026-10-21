@@ -1,0 +1,8 @@
+[project]
+name = "desvio-ingestion"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+dependencies = ["docling-slim[convert-core,format-pdf,format-pptx]==2.141.0", "docling-core==2.103.1"]
+
+[dependency-groups]
+test = ["reportlab==4.4.10"]

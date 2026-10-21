@@ -24,13 +24,14 @@ function teamError(error:unknown):never {
 }
 export class Team {
   constructor(readonly database:TenantDatabase,readonly mail:MailQueue,readonly origin:string) {}
+  private async accountScope(db:PoolClient,user:string,org:string){const member=(await db.query('SELECT business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[org,user])).rows[0];if(member?.business_scope!=='all')throw new ForbiddenException('Account-wide team access is restricted');}
   private async admin(db:PoolClient,user:string,org:string) {
-    const {rows:[member]}=await db.query('SELECT role FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[org,user]);
-    if(!member || !['owner','admin'].includes(member.role)) throw new ForbiddenException('Only workspace owners and admins can manage invitations');
+    const {rows:[member]}=await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[org,user]);
+    if(!member || member.business_scope!=='all' || !['owner','admin'].includes(member.role)) throw new ForbiddenException('Only workspace owners and admins can manage invitations');
     return member.role as string;
   }
   list(user:string,organizationId:string) {
-    return this.database.transaction(user,uuid(organizationId),false,async db=>({members:(await db.query('SELECT * FROM app.team_members()')).rows})).catch(teamError);
+    return this.database.transaction(user,uuid(organizationId),false,async db=>{await this.accountScope(db,user,organizationId);return {members:(await db.query('SELECT * FROM app.team_members()')).rows};}).catch(teamError);
   }
   invitations(user:string,organizationId:string) {
     const org=uuid(organizationId);
@@ -81,14 +82,14 @@ export class Team {
   }
   revoke(user:string,organizationId:string,id:string) {
     return this.database.transaction(user,uuid(organizationId),true,async db=>{
-      await db.query('SELECT app.revoke_invitation($1)',[uuid(id)]);return{status:'revoked'};
+      await this.accountScope(db,user,organizationId);await db.query('SELECT app.revoke_invitation($1)',[uuid(id)]);return{status:'revoked'};
     }).catch(teamError);
   }
   change(user:string,organizationId:string,target:string,input:unknown) {
     const value=object(input,['role','active']);
     if(typeof value.role!=='string' || !['owner','admin','editor','viewer'].includes(value.role) || typeof value.active!=='boolean') throw new BadRequestException('A valid role and active status are required');
     return this.database.transaction(user,uuid(organizationId),true,async db=>{
-      await db.query('SELECT app.change_member($1,$2,$3)',[uuid(target),value.role,value.active]);return{user_id:target,role:value.role,active:value.active};
+      await this.accountScope(db,user,organizationId);await db.query('SELECT app.change_member($1,$2,$3)',[uuid(target),value.role,value.active]);return{user_id:target,role:value.role,active:value.active};
     }).catch(teamError);
   }
 }
