@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "bc8bd3c4b92cce887e5250932b2a9138b9a695b9",
-  "checked_at": "2026-10-21T02:29:16.220990+00:00",
+  "code_commit": "99828c04a1630519ba7f46a6c5d9e0b8bb9a4410",
+  "checked_at": "2026-10-21T02:50:38.422626+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -13,7 +13,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "docling": {
       "state": "NOT_IMPLEMENTED",
@@ -23,7 +23,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "deepagents": {
       "state": "NOT_IMPLEMENTED",
@@ -33,7 +33,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "openai_images": {
       "state": "NOT_IMPLEMENTED",
@@ -43,7 +43,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "higgsfield_video": {
       "state": "NOT_IMPLEMENTED",
@@ -53,7 +53,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "creative_editor": {
       "state": "NOT_IMPLEMENTED",
@@ -63,7 +63,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "postiz_publish": {
       "state": "NOT_IMPLEMENTED",
@@ -73,7 +73,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "performance_learning": {
       "state": "NOT_IMPLEMENTED",
@@ -83,7 +83,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "tenant_runtime": {
       "state": "NOT_IMPLEMENTED",
@@ -93,7 +93,15 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+      "blocked_reason": "Auth/workspace/brand API and RLS are implemented locally; private storage, worker authorization, invitations, external email verification and deployed tenant journey are incomplete."
+    },
+    "workspace_auth": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "Local HTTP/PostgreSQL foundation tests only. External deployment, verified email/recovery, invitation UX and broader tenant runtime remain blocked/incomplete."
     }
   },
   "security": {

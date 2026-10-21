@@ -22,14 +22,14 @@ Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch 
 - scripts/verify.py and release_gate.py: actual audit-suite evidence; product status stays NOT_IMPLEMENTED.
 - docs/adr/0001-reuse-decisions.md, POSTIZ_API_MATRIX.md, PROVIDER_CAPABILITIES.md, SKILL_AUDIT.md, THIRD_PARTY_LOCK.md, SECURITY_THREAT_MODEL.md, PRODUCT_EXPERIENCE.md.
 
-Observed tests: verify-offline 3 passed, verify-contracts 8 passed, verify-security 6 passed. Scope is M0 audit only; no product E2E/RLS/SSRF claim. release-gate exits nonzero as intended. verify-live was NOT run. npm audit reports no known vulnerabilities for its 30 audit packages only.
+Final session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 14 real local HTTP/PostgreSQL foundation tests plus 6 audit/guard tests (31 tests total). release-gate exits nonzero as intended. verify-live was NOT run. npm audit reports zero known vulnerabilities in the locked npm tree; this is not Python/container or full security clearance. Machine evidence identifies implementation commit 99828c0 and the source fingerprint.
 
 ## M1 progress this session
 
 - apps/api/src/: NestJS + Better Auth, genuine cookie sessions, client workspace ownership, brand list/create/read/edit, strict origin/body checks, database-backed auth throttle and safe errors.
 - database/migrations/: generated pinned-auth schema and product schema; separate least-privilege roles, forced RLS, limited bootstrap function, immutable audit records, idempotent creates and pending outbox events.
 - scripts/migrate.mjs: transactional, checksum-verified/replay-safe migrations.
-- tests/foundation/tenancy.test.mjs and scripts/foundation-test.mjs: disposable pinned PostgreSQL + actual HTTP integration tests. 14 passed at the last direct run, including restart recovery; final verification rerun pending after PATCH field-preservation improvement.
+- tests/foundation/tenancy.test.mjs and scripts/foundation-test.mjs: disposable pinned PostgreSQL + actual HTTP integration tests. 14 passed in the final verify-security run, including partial PATCH preservation/clearing, cross-brand scope and restart recovery. Test containers were removed after completion.
 - docs/adr/0002-auth-and-tenancy.md records source contracts, actual routes and threat boundaries.
 - Session revocation and client/brand isolation are demonstrated for these local paths only. No private storage/worker/provider authorization claim.
 - External auth activation intentionally fails closed pending email verification/recovery. No customer UI, invitations or dispatched jobs yet; outbox events are persisted, not processed.
@@ -51,10 +51,10 @@ Postiz source SHA 651876e24317c2d8e717262cf98267ec6f699180 is Oct 20; pinned off
 3. Complete SDK negative/malformed/poll contract coverage and full constrained agent execution experiment; current probe only discovers/reads skills.
 4. Complete all adopted container/Python vulnerability/license pins. Commercial Postiz license sufficiency remains owner/legal decision; no supplied commercial grant.
 
-These do not prevent independent M1 implementation. No feature is ADAPTER_READY/LIVE_VERIFIED/LAUNCH_READY.
+These do not prevent independent M1 implementation. The local workspace_auth capability is machine-reported ADAPTER_READY after the scoped security suite; the wider tenant_runtime and provider journeys remain incomplete. No feature is LIVE_VERIFIED or LAUNCH_READY.
 
 ## Next implementation work — finish M1, then PR-02
 
-Complete verification and save PR-01 as a stacked draft. Next implement verified email/password recovery and secure invitations, private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Extend negative tests across jobs/assets and restart boundaries. Then build the minimal backed sign-in/workspace/brand UI and continue PR-02 intake/findings/Correct-Wrong-Edit/immutable approved Brand Brain. Full creative revision, approval and real social publishing goal remains intact.
+Verification passed within the scopes above; PR-01 is being saved as a stacked draft. Next implement verified email/password recovery and secure invitations, private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Extend negative tests across jobs/assets and restart boundaries. Then build the minimal backed sign-in/workspace/brand UI and continue PR-02 intake/findings/Correct-Wrong-Edit/immutable approved Brand Brain. Full creative revision, approval and real social publishing goal remains intact.
 
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.
