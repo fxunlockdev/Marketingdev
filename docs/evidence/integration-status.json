@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "99828c04a1630519ba7f46a6c5d9e0b8bb9a4410",
-  "checked_at": "2026-10-21T02:50:38.422626+00:00",
+  "code_commit": "e1905966b8bddcd49556fdea6d6c5ce7cc10cc08",
+  "checked_at": "2026-10-21T03:13:15.899255+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -93,7 +93,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Auth/workspace/brand API and RLS are implemented locally; private storage, worker authorization, invitations, external email verification and deployed tenant journey are incomplete."
+      "blocked_reason": "Auth/workspace/brand/team APIs and RLS are implemented locally; private media storage, generation-worker authorization and deployed tenant journey remain incomplete."
     },
     "workspace_auth": {
       "state": "ADAPTER_READY",
@@ -101,7 +101,15 @@
       "evidence": [
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Local HTTP/PostgreSQL foundation tests only. External deployment, verified email/recovery, invitation UX and broader tenant runtime remain blocked/incomplete."
+      "blocked_reason": "Local HTTP/PostgreSQL/SMTP foundation tests only. External deployment, actual sender/delivery validation, invitation UX and broader tenant runtime remain incomplete."
+    },
+    "account_email": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "Encrypted queue, verification/reset/invitations and SMTP error paths tested against a local server only. Real sender credentials, deliverability, UI and operator retry/monitoring remain unverified/incomplete."
     }
   },
   "security": {

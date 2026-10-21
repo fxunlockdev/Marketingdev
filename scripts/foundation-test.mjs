@@ -34,14 +34,17 @@ try {
     try { await pool.query('SELECT 1'); ready=true; break; } catch { await setTimeout(200); }
   }
   if (!ready) throw new Error('Disposable PostgreSQL did not start');
-  const appPass=randomBytes(32).toString('hex'), authPass=randomBytes(32).toString('hex');
+  const appPass=randomBytes(32).toString('hex'), authPass=randomBytes(32).toString('hex'),mailPass=randomBytes(32).toString('hex');
   // Passwords are hex generated here, never operator-controlled SQL input.
   await pool.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;
     CREATE ROLE desvio_app LOGIN PASSWORD '${appPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
     CREATE ROLE desvio_auth LOGIN PASSWORD '${authPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
-    CREATE ROLE desvio_bootstrap NOLOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;`);
+    CREATE ROLE desvio_bootstrap NOLOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
+    CREATE ROLE desvio_mail LOGIN PASSWORD '${mailPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+    CREATE ROLE desvio_access NOLOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;`);
   const config = { mode:'test', origin:'http://127.0.0.1:3100', authSecret:randomBytes(32).toString('hex'),
-    authDatabaseUrl:url('desvio_auth',authPass), appDatabaseUrl:url('desvio_app',appPass) };
+    authDatabaseUrl:url('desvio_auth',authPass), appDatabaseUrl:url('desvio_app',appPass),mailDatabaseUrl:url('desvio_mail',mailPass),
+    mailEncryptionKey:randomBytes(32).toString('hex'),smtp:{host:'127.0.0.1',port:1,secure:false,from:'accounts@desvio.test'} };
   if (process.argv.includes('--generate-auth')) {
     await pool.query('CREATE SCHEMA auth');
     authMigrationPool = new Pool({ connectionString:url('postgres',password), options:'-c search_path=auth' });

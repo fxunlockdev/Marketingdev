@@ -11,6 +11,8 @@ import { createAuth, type Auth } from './auth.js';
 import type { Config } from './config.js';
 import { TenantDatabase } from './database.js';
 import { Workspaces } from './workspaces.js';
+import { MailQueue,MailWorker } from './mail.js';
+import { Team } from './team.js';
 
 type AuthRequest = Request & { actorId: string; traceId: string };
 const AUTH = Symbol('auth');
@@ -21,7 +23,7 @@ class SessionGuard implements CanActivate {
   async canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest<AuthRequest>();
     const session = await this.auth.api.getSession({ headers: fromNodeHeaders(request.headers), query: { disableCookieCache: true } });
-    if (!session) throw new UnauthorizedException('Sign in to continue');
+    if (!session || !session.user.emailVerified) throw new UnauthorizedException('Sign in with a verified email to continue');
     request.actorId = session.user.id;
     return true;
   }
@@ -40,7 +42,7 @@ class SafeErrors implements ExceptionFilter {
 @Controller('api/v1/workspaces')
 @UseGuards(SessionGuard)
 class WorkspaceController {
-  constructor(@Inject(Workspaces) private readonly service: Workspaces) {}
+  constructor(@Inject(Workspaces) private readonly service: Workspaces,@Inject(Team) private readonly team:Team) {}
   @Get() list(@Req() req: AuthRequest) { return this.service.list(req.actorId); }
   @Post() create(@Req() req: AuthRequest, @Body() body: unknown) { return this.service.create(req.actorId, body); }
   @Get(':org/brands') brands(@Req() req: AuthRequest, @Param('org') org: string) { return this.service.brands(req.actorId, org); }
@@ -53,10 +55,21 @@ class WorkspaceController {
   @Patch(':org/brands/:brand') update(@Req() req: AuthRequest, @Param('org') org: string, @Param('brand') brand: string, @Body() body: unknown) {
     return this.service.updateBrand(req.actorId, org, brand, body);
   }
+  @Get(':org/members') members(@Req() req:AuthRequest,@Param('org') org:string) {return this.team.list(req.actorId,org);}
+  @Patch(':org/members/:user') changeMember(@Req() req:AuthRequest,@Param('org') org:string,@Param('user') user:string,@Body() body:unknown) {return this.team.change(req.actorId,org,user,body);}
+  @Get(':org/invitations') invitations(@Req() req:AuthRequest,@Param('org') org:string) {return this.team.invitations(req.actorId,org);}
+  @Post(':org/invitations') invite(@Req() req:AuthRequest,@Param('org') org:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown) {return this.team.invite(req.actorId,org,body,key);}
+  @Post(':org/invitations/:id/revoke') revoke(@Req() req:AuthRequest,@Param('org') org:string,@Param('id') id:string) {return this.team.revoke(req.actorId,org,id);}
+}
+@Controller('api/v1/invitations')
+@UseGuards(SessionGuard)
+class InvitationController {
+  constructor(@Inject(Team) private readonly team:Team) {}
+  @Post('accept') accept(@Req() req:AuthRequest,@Body() body:unknown) {return this.team.accept(req.actorId,body);}
 }
 
 export async function createApplication(config: Config) {
-  if (!['development', 'test'].includes(config.mode)) throw new Error('External auth launch blocked pending email verification/recovery');
+  if(config.mode==='production') throw new Error('Production launch blocked pending the complete release gate');
   const authPool = new Pool({ connectionString: config.authDatabaseUrl, options: '-c search_path=auth', max: 5, connectionTimeoutMillis: 5000 });
   const pool = new Pool({ connectionString: config.appDatabaseUrl, max: 10, connectionTimeoutMillis: 5000,
     options: '-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000' });
@@ -64,16 +77,21 @@ export async function createApplication(config: Config) {
   // handle the event so it doesn't crash the server. Active queries still fail visibly.
   pool.on('error', () => {});
   authPool.on('error', () => {});
+  const mailPool=new Pool({connectionString:config.mailDatabaseUrl,max:3,connectionTimeoutMillis:5000});
+  mailPool.on('error',()=>{});
   const database = new TenantDatabase(pool);
   try {
     await database.assertRuntimeRole();
     const { rows: [role] } = await authPool.query('SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user');
     if (role.name !== 'desvio_auth' || role.rolsuper || role.rolbypassrls) throw new Error('Unsafe authentication database role');
-    const auth = createAuth(authPool, config), workspaces = new Workspaces(database);
+    const mail=new MailQueue(config.origin,config.mailEncryptionKey),mailWorker=new MailWorker(mailPool,mail,config);
+    await mailWorker.assertRole();
+    const auth = createAuth(authPool, config,mail), workspaces = new Workspaces(database),team=new Team(database,mail,config.origin);
     const server = express();
     server.disable('x-powered-by');
     server.use((req: Request, res: Response, next: NextFunction) => {
       (req as AuthRequest).traceId = randomUUID();
+      req.headers['x-desvio-trace-id']=(req as AuthRequest).traceId;
       req.headers['x-desvio-peer-ip'] = req.socket.remoteAddress ?? '127.0.0.1';
       res.setHeader('X-Request-Id', (req as AuthRequest).traceId);
       res.setHeader('Cache-Control', 'no-store');
@@ -102,13 +120,17 @@ export async function createApplication(config: Config) {
         traceId: (req as AuthRequest).traceId,
       });
     });
-    server.all('/api/auth/{*path}', toNodeHandler(auth));
-    @Module({ controllers: [WorkspaceController], providers: [SessionGuard,
-      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces }] })
+    server.all('/api/auth/{*path}', toNodeHandler(async request=>{
+      const unavailable=()=>globalThis.Response.json({error:'Account service is temporarily unavailable. Please try again.',traceId:request.headers.get('x-desvio-trace-id')},{status:503});
+      try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
+      catch {return unavailable();}
+    }));
+    @Module({ controllers: [WorkspaceController,InvitationController], providers: [SessionGuard,
+      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());
     await app.init();
-    return { app, database, auth, async close() { await app.close(); await Promise.all([pool.end(), authPool.end()]); } };
-  } catch (error) { await Promise.all([pool.end(), authPool.end()]); throw error; }
+    return { app, database, auth,mailWorker, async close() { await app.close();mailWorker.close(); await Promise.all([pool.end(), authPool.end(),mailPool.end()]); } };
+  } catch (error) { await Promise.all([pool.end(), authPool.end(),mailPool.end()]); throw error; }
 }

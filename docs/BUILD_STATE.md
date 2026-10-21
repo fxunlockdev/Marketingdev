@@ -1,6 +1,6 @@
 # Desvio build state
 
-Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers remain and initial M1 workspace backend is implemented locally. Prior goal turn was progress: audit PR #1 was created and temporary infrastructure access was cleaned up.
+Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers remain and initial M1 workspace backend is implemented locally. Prior goal turn was progress: PR #2 implemented and verified the real client/workspace/brand foundation. This session continues M1 with verified accounts and invitations.
 
 ## Owner decisions
 
@@ -13,7 +13,7 @@ Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers rema
 
 ## Code and evidence
 
-Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-01-tenant-foundation, stacked on codex/pr-00-integration-audit. Draft PR-00: https://github.com/fxunlockdev/Marketingdev/pull/1. Original specs, archive and repository manifest retained.
+Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-02-account-access, stacked on codex/pr-01-tenant-foundation. Draft PR-00: https://github.com/fxunlockdev/Marketingdev/pull/1. Original specs, archive and repository manifest retained.
 
 - scripts/skill_audit.py: safe archive validation, immutable file/skill digests, preserve MIT notice.
 - scripts/skill_probe.py: actual Deep Agents middleware discovery with per-run read-only mount.
@@ -22,17 +22,22 @@ Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch 
 - scripts/verify.py and release_gate.py: actual audit-suite evidence; product status stays NOT_IMPLEMENTED.
 - docs/adr/0001-reuse-decisions.md, POSTIZ_API_MATRIX.md, PROVIDER_CAPABILITIES.md, SKILL_AUDIT.md, THIRD_PARTY_LOCK.md, SECURITY_THREAT_MODEL.md, PRODUCT_EXPERIENCE.md.
 
-Final session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 14 real local HTTP/PostgreSQL foundation tests plus 6 audit/guard tests (31 tests total). release-gate exits nonzero as intended. verify-live was NOT run. npm audit reports zero known vulnerabilities in the locked npm tree; this is not Python/container or full security clearance. Machine evidence identifies implementation commit 99828c0 and the source fingerprint.
+Final session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 24 actual local HTTP/PostgreSQL/SMTP tests plus 6 audit/guard tests (41 tests total). release-gate exits nonzero as intended. verify-live was NOT run; no real emails, paid providers or social accounts were contacted. npm audit reports zero known vulnerabilities in the locked npm tree; this is not full security clearance. Machine evidence identifies implementation commit e190596 and the source fingerprint.
 
 ## M1 progress this session
 
 - apps/api/src/: NestJS + Better Auth, genuine cookie sessions, client workspace ownership, brand list/create/read/edit, strict origin/body checks, database-backed auth throttle and safe errors.
 - database/migrations/: generated pinned-auth schema and product schema; separate least-privilege roles, forced RLS, limited bootstrap function, immutable audit records, idempotent creates and pending outbox events.
 - scripts/migrate.mjs: transactional, checksum-verified/replay-safe migrations.
-- tests/foundation/tenancy.test.mjs and scripts/foundation-test.mjs: disposable pinned PostgreSQL + actual HTTP integration tests. 14 passed in the final verify-security run, including partial PATCH preservation/clearing, cross-brand scope and restart recovery. Test containers were removed after completion.
+- tests/foundation/tenancy.test.mjs and scripts/foundation-test.mjs: disposable pinned PostgreSQL + actual HTTP integration tests. The expanded suite now passes 24 tests, retaining partial PATCH preservation/clearing, cross-brand scope and restart recovery coverage. Test containers were removed after completion.
 - docs/adr/0002-auth-and-tenancy.md records source contracts, actual routes and threat boundaries.
 - Session revocation and client/brand isolation are demonstrated for these local paths only. No private storage/worker/provider authorization claim.
-- External auth activation intentionally fails closed pending email verification/recovery. No customer UI, invitations or dispatched jobs yet; outbox events are persisted, not processed.
+- apps/api/src/mail.ts: AES-GCM email queue, dedicated SMTP worker with leases, bounded retry after explicit rejection and unknown state after ambiguous send/worker loss. Actual local SMTP tests; no external email sent.
+- apps/api/src/team.ts and migration 002_mail_and_invitations.sql: scoped, recipient-bound invitations; hashed tokens; idempotency; sender-role recheck; replacement/revocation; race-safe owner and role rules; daily invite cap.
+- auth.ts now requires email verification, uses transactional password reset with session revocation, and contains raw upstream errors. Account flows use the genuine pinned library and actual local SMTP.
+- docs/adr/0003-account-email-and-team-access.md records contracts, server settings and limits.
+- Final foundation suite passed 24 tests, including daily-cap races, SMTP uncertainty, reset rollback and sanitized error logging. No customer account/team UI yet. Production activation still fails closed; staging sender/ingress/deployment remain unverified.
+- Mail queue dispatch is implemented. Brand outbox / Temporal generation jobs are still pending, not processed.
 
 ## Railway
 
@@ -55,6 +60,6 @@ These do not prevent independent M1 implementation. The local workspace_auth cap
 
 ## Next implementation work — finish M1, then PR-02
 
-Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Next implement verified email/password recovery and secure invitations, private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Extend negative tests across jobs/assets and restart boundaries. Then build the minimal backed sign-in/workspace/brand UI and continue PR-02 intake/findings/Correct-Wrong-Edit/immutable approved Brand Brain. Full creative revision, approval and real social publishing goal remains intact.
+Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Account verification/recovery/invitation backends are now implemented; PR-02 is a stacked draft on PR-01: https://github.com/fxunlockdev/Marketingdev/pull/3. Next implement private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Finish the custom account/team UI and external sender validation alongside the minimal backed workspace experience. Extend negative tests across jobs/assets and restart boundaries. Then continue website/PDF/PPTX intake, Correct/Wrong/Edit findings and immutable approved Brand Brain. PR numbering has expanded to keep the M1 account work reviewable; the later onboarding scope is unchanged. Full creative revision, approval and real social publishing goal remains intact.
 
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.
