@@ -13,7 +13,7 @@ EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
     "offline": [["npm", "run", "build"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/offline", "-v"]],
     "browser": [["npm", "run", "build"], ["npm", "run", "test:browser"]],
-    "contracts": [["node", "--test", "tests/contracts/sdk.test.mjs"]],
+    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs"]],
     "security": [["npm", "run", "build"], ["npm", "run", "test:foundation"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/security", "-v"]],
 }
 
@@ -67,6 +67,10 @@ def write_status():
     integrations["v5_business_ui"] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/security.json", "docs/evidence/browser.json"],
         "blocked_reason": "Business navigation, scoped records, manual/document review and saved goals only. AI-assisted scrape/prefill/plan and the creative/social workflows remain incomplete; unavailable controls are labeled honestly."}
+    for capability in ["crawl4ai", "website_visual_evidence", "ai_brand_onboarding"]:
+        integrations[capability] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
+            "evidence": ["docs/evidence/security.json", "docs/evidence/contracts.json", "docs/evidence/browser.json"],
+            "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill browser fixture. Real public HTTP smoke is separately scoped. Deployed broker, visual model interpretation, paid model evidence and full end-to-end product remain incomplete."}
     update_matrix(ROOT, foundation_passed and browser_passed)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
@@ -86,7 +90,7 @@ def run_suite(name):
         log = result.stdout + result.stderr
         print(log, end="")
         results.append({"command": command, "exit_code": result.returncode, "output": log})
-    scopes = {"browser": "Actual Chromium through V5 business UI to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; manual onboarding/approved memory, scope, quota, recovery and accessibility; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; no external provider or deployed generation-worker proof"}
+    scopes = {"browser": "Actual Chromium through V5 business UI to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; manual onboarding/approved memory, scope, quota, recovery, accessibility and persisted AI-prefill fixture; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; plus Crawl4AI/Chromium screenshots, private visual storage, SSRF controls and AI reservation/recovery with MOCK model/resource transports; no external model provider or deployed generation-worker proof"}
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": source_hash(), "results": results, "passed": all(x["exit_code"] == 0 for x in results), "live_calls": False}
     (EVIDENCE / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")

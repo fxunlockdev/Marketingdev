@@ -10,6 +10,16 @@ Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers rema
 - Brand-specific OpenAI/Higgsfield generation, revision, approval and social publication required.
 - Working defaults: English, LinkedIn first then Instagram, human approval before publication.
 - No paid/live social tests without explicit staging credentials, budget and exact allowlists.
+- Owner requests deployment to a Railway dev domain after the integrated product journeys are connected and locally tested. This authorizes that later dev deployment; it does not authorize paid model calls or social publication. Use the existing project and an explicitly resolved dev environment, not the supplied environment named production by assumption.
+- Before live verification, ask the owner to add the exact audited OpenAI, Higgsfield, social-app OAuth and external-email credentials through Railway's server-side secret settings, with an explicit test budget and allowlisted test accounts. Never request raw secrets in chat. Provision infrastructure credentials separately. Confirm callback URLs from the deployed dev domain before asking for social-app configuration.
+
+## Deployment handoff clarification — 2026-10-21
+
+Recorded the owner's requested dev deployment and credential handoff. No deployment, provider call or publishing test was performed in this clarification session; the prior 63-test evidence is unchanged and was not rerun for this documentation-only change. The product is not yet integrated end to end. The goal tool currently reports usageLimited, not complete; this does not change any implementation or release status below.
+
+Deployment sequence: finish and locally test website intake/AI recommendation adapters, Canvas generation/editing/version approval, and tenant-scoped publishing/reconciliation; prepare the Railway dev services/domain; request server-side staging credentials and approved test budget/accounts; then prove the real journeys on that dev deployment. Dev availability must not be represented as LIVE_VERIFIED or LAUNCH_READY before their separate evidence gates pass.
+
+Credential handoff preparation must reconcile templates/.env.example with the implemented runtime and scripts/live_guard.py. The inherited template has historical live-budget/allowlist variable names and an unverified Higgsfield placeholder; do not send it to the owner as a verified configuration contract. Exact variable names, destination services and callback URLs must come from the final adapters and deployment.
 
 ## Code and evidence
 
@@ -34,6 +44,16 @@ Previous account session verification: verify-offline compiled the API and passe
 - apps/web/components/businesses.tsx and app/v5.css implement the warm reference-based shell, business selector, Brands/Overview, saved three-step manual fallback, source review, approved Memory, actual allowance, identity/password recovery and explicit unavailable destinations. No sample business, metric, invoice, social connection or provider result is injected into real accounts.
 - Final source-bound verification passed at implementation commit 2207e52: verify-offline (3 skills), verify-contracts (8 MOCK SDK contracts), verify-security (24 account/tenant + 7 assets/worker + 7 document/business + 6 guards), verify-browser (8 actual V5 journeys): 63 tests total. All four source fingerprints match. Initial mobile accessible-name issue and two test locator issues were corrected before the passing run. release-gate remains BLOCKED as required; verify-live was NOT run. No LIVE_VERIFIED/LAUNCH_READY claim. All owned disposable test services were cleaned up.
 - Docs ADR0006 records source contracts, exact parser pins, production sandbox requirements and V5 boundaries. No paid provider/social test, external email, production release or merge performed this session. Stacked draft PR #6: https://github.com/fxunlockdev/Marketingdev/pull/6 (base PR #5).
+
+## Website and AI onboarding session — 2026-10-21
+
+- Resumed the owner's end-to-end goal on codex/pr-06-website-onboarding. Owner additionally requires rendered page understanding, visual identity and creative inspiration; text/palette-only discovery is insufficient.
+- Migrations 007–008, safe-web.ts, intake.ts/intake-jobs.ts, brand-analysis.ts, website-parser.ts, visual-crawler.ts and ingestion website.py/visual.py add scoped website/model jobs, SSRF-safe DNS-pinned public fetching, robots handling, genuine Crawl4AI parsing and isolated Chromium desktop/mobile rendering. Screenshots, loaded image/logo candidates, backgrounds, declared/actual typography, layout and JSON-LD observations are source-backed evidence, not automatically approved identity.
+- Private screenshot storage/downloads, coverage warnings and a 256 MiB/business visual cap are implemented. Full-page captures are bounded to 16000px high and five prioritised site pages; render failures/cropping/missing resources remain explicit. Production isolated execution on Railway is still unresolved; no nested-Docker claim.
+- Official OpenAI structured analysis adapter persists source-quoted findings and recommended goals. Human review remains required. Operator-only model/rate/budget grants and conservative reservations precede paid calls; unresolved requests block resubmission. No provider credentials or paid test calls have been used.
+- Onboarding retains three steps, automatically starts website discovery, resumes saved work and pre-fills fresh goals from persisted AI suggestions. Saved user edits take priority; corrected source facts invalidate stale suggestions. Current AI receives text/computed design observations; model vision interpretation of screenshots and approved visual reference selection are still required.
+- Targeted tests currently pass for actual Crawl4AI/Chromium rendering, source/tenant isolation, mocked model contracts, spending guards, unknown outcomes and prefill edit protection. Full source-bound suites, private screenshot test and browser regression are running; final evidence/count will be recorded after completion. A real public example.org text crawl passed separately (work/public-crawl-evidence.json); it is not a full product live test.
+- Next: complete multimodal brand interpretation and identity/reference approval, then skill-driven Canvas generation/editing, review/publishing/reconciliation, Higgsfield and learning. Keep the requested Railway dev deployment and secret-setting handoff after integrated local verification. No feature or product launch readiness is claimed.
 
 ## Previous customer-experience session
 

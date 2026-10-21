@@ -113,7 +113,7 @@ export class BrandBrain {
       ).rows[0];
       const sources = (
         await db.query(
-          "SELECT id,asset_id,kind,sha256,parser_version,coverage,captured_at FROM app.brand_sources WHERE organization_id=$1 AND brand_id=$2 ORDER BY captured_at,id LIMIT 100",
+          "SELECT id,asset_id,website_url,kind,sha256,parser_version,coverage,captured_at FROM app.brand_sources WHERE organization_id=$1 AND brand_id=$2 ORDER BY captured_at,id LIMIT 100",
           [org, brand],
         )
       ).rows;

@@ -11,3 +11,8 @@ type DocumentActivities={extract(scope:JobScope):Promise<string>;failDocument(sc
 const documents=proxyActivities<DocumentActivities>({startToCloseTimeout:'150 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
 const documentFinalization=proxyActivities<DocumentActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
 export async function extractDocumentWorkflow(scope:JobScope){try{return await documents.extract(scope);}catch{return await documentFinalization.failDocument(scope);}}
+
+type IntakeActivities={processIntake(scope:JobScope):Promise<string>;failIntake(scope:JobScope):Promise<string>};
+const intake=proxyActivities<IntakeActivities>({startToCloseTimeout:"15 minutes",heartbeatTimeout:"5 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"10 seconds",maximumAttempts:3}});
+const intakeFinalization=proxyActivities<IntakeActivities>({startToCloseTimeout:"20 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"1 minute"}});
+export async function processIntakeWorkflow(scope:JobScope){try{return await intake.processIntake(scope);}catch{return await intakeFinalization.failIntake(scope);}}

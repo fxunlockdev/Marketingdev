@@ -24,4 +24,4 @@ SDK webhook options include secret, but inspected `dist/v2/client.js` does not t
 
 This proves discovery, not authenticated tenancy or a real marketing agent. M3 must execute actual skill selection, record hashes, validate output JSON and enforce typed tool grants outside model instructions. [Official skills docs](https://docs.langchain.com/oss/python/deepagents/skills).
 
-Crawl4AI, Docling, Fabric/FFmpeg, application storage/tenancy, analytics and learning remain NOT_IMPLEMENTED. Their exact adoption pins/contracts are required before feature code.
+Crawl4AI 0.9.5 and Docling 2.141.0 now have scoped local implementations, along with application tenancy/private storage. See ADR0006 and ADR0007 for contracts and limitations. OpenAI structured onboarding uses responses.create with strict text.format, bounded output, store:false and zero automatic retries; model tests are MOCKED. Model vision interpretation, Fabric/FFmpeg creative workflows, analytics and learning remain incomplete. Read generated evidence for current scoped readiness; no provider is implicitly live verified.

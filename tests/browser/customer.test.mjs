@@ -7,6 +7,7 @@ import { mkdir } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { Pool } from "pg";
+import { randomUUID } from "node:crypto";
 import { S3Client, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
 import { createApplication } from "../../dist/app.js";
@@ -290,7 +291,7 @@ test("three-step manual fallback saves evidence, corrections, goals and immutabl
     alice.getByRole("heading", { name: "Review your direction" }),
   ).toBeVisible();
   await expect(
-    alice.getByText("AI recommendations are not available in this build.", {
+    alice.getByText("No AI recommendations yet.", {
       exact: true,
     }),
   ).toBeVisible();
@@ -369,11 +370,9 @@ test("failed and stale fact edits preserve entered corrections and require expli
   ).toBeVisible();
   const second = await alice.context().newPage();
   await second.goto(brandUrl);
-  const secondCard = second
-    .locator(".finding-card")
-    .filter({
-      has: second.getByRole("heading", { name: "offering", exact: true }),
-    });
+  const secondCard = second.locator(".finding-card").filter({
+    has: second.getByRole("heading", { name: "offering", exact: true }),
+  });
   await secondCard.getByRole("button", { name: "Edit", exact: true }).click();
   await secondCard.getByLabel("Edit offering").fill("Unsaved alternate");
   await alice
@@ -593,4 +592,89 @@ test("warm business UI passes scoped desktop/mobile accessibility and contains n
       break;
   }
   await expect(alice.getByLabel("Email address")).toBeFocused();
+});
+
+test("saved AI recommendation pre-fills step three and user changes survive reload (explicit database fixture, no live model)", async () => {
+  const list = await (
+    await alice.request.get(base + "/api/v1/businesses")
+  ).json();
+  const target = list.businesses.find(
+    (b) => b.id !== firstBusiness && b.id !== secondBusiness,
+  );
+  const user = (
+    await admin.query('SELECT id FROM auth."user" WHERE email=$1', [email])
+  ).rows[0];
+  const fact = await alice.request.post(
+    `${base}/api/v1/workspaces/${target.organization_id}/brands/${target.id}/brain/findings`,
+    {
+      headers: { origin: base, "idempotency-key": randomUUID() },
+      data: {
+        field: "offering",
+        value: "Appointment software for dental practices",
+      },
+    },
+  );
+  assert.equal(fact.status(), 201);
+  const chunk = (
+    await admin.query("SELECT id FROM app.brand_chunks WHERE brand_id=$1", [
+      target.id,
+    ])
+  ).rows[0];
+  const job = randomUUID();
+  await admin.query(
+    "INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'brand.analyze','succeeded')",
+    [job, target.organization_id, target.id, user.id],
+  );
+  await admin.query(
+    "INSERT INTO app.onboarding_recommendations(id,organization_id,brand_id,job_id,review_revision,model,recommendation) VALUES($1,$2,$3,$4,1,$5,$6)",
+    [
+      randomUUID(),
+      target.organization_id,
+      target.id,
+      job,
+      "BROWSER FIXTURE ONLY",
+      JSON.stringify({
+        goal: "leads",
+        audience: "Dental practices",
+        channels: ["linkedin"],
+        cadence: 4,
+        reason: "Appointment software is offered to dental practices.",
+        chunk_ids: [chunk.id],
+      }),
+    ],
+  );
+  await alice.goto(`${base}/b/${target.id}/onboarding`);
+  await alice
+    .getByRole("button", { name: "Save & continue to goals →" })
+    .click();
+  await expect(
+    alice.getByText("AI-prepared direction · yours to adjust"),
+  ).toBeVisible();
+  await expect(alice.getByLabel("Primary goal")).toHaveValue("leads");
+  await expect(alice.getByLabel("Posts per week")).toHaveValue("4");
+  await alice.getByText("Why these suggestions?", { exact: true }).click();
+  await expect(
+    alice.getByText("Appointment software for dental practices", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await alice.getByLabel("Primary goal").selectOption("sales");
+  await alice.getByRole("button", { name: "Save goals", exact: true }).click();
+  await alice.reload();
+  await expect(alice.getByLabel("Primary goal")).toHaveValue("sales");
+  const denied = await bob.request.get(
+    `${base}/api/v1/businesses/${target.id}/intake`,
+  );
+  assert.equal(denied.status(), 404);
+  const accessibility = await new AxeBuilder({ page: alice })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  assert.deepEqual(
+    accessibility.violations.map((v) => v.id),
+    [],
+  );
+  await alice.screenshot({
+    path: "work/browser/v5-ai-prefill.png",
+    fullPage: true,
+  });
 });

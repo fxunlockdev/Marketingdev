@@ -1,0 +1,36 @@
+# Website evidence, rendered references and AI onboarding
+
+2026-10-21. Implements the next part of the existing Crawl4AI → Brand Brain → review architecture; does not replace it. Owner clarification: website discovery must capture visual identity and creative inspiration, not merely text and colours.
+
+## Contracts and pins
+
+- Crawl4AI 0.9.5 (`LXMLWebScrapingStrategy.scrap`, `AsyncWebCrawler.arun`, `on_page_context_created`, `before_return_html` hooks), exact package hashes in apps/ingestion/uv.lock and requirements.lock. [Official hooks](https://docs.crawl4ai.com/advanced/hooks-auth/) and [scraping strategy](https://docs.crawl4ai.com/migration/webscraping-strategy-migration/) were checked against the installed source. The package retains Apache-2.0 and requests attribution; see THIRD_PARTY_NOTICES.md.
+- Python Playwright 1.64.0, Chromium/headless shell 156.0.8078.4 revision 1248, selected by that pinned package's browsers.json. Browser installation is part of the ingestion image. Exact resulting local image digest is recorded by test output. Debian/browser/native dependency vulnerability clearance remains a release prerequisite.
+- robots-parser 3.0.1, MIT, actual `isAllowed` and `getCrawlDelay` contracts.
+- Existing OpenAI Node 7.39.0: `responses.create` → POST /v1/responses; strict `text.format.json_schema`, `store:false`, maximum 4000 output tokens, zero SDK retries, no tools. [Official structured outputs](https://developers.openai.com/api/docs/guides/structured-outputs/) and local SDK implementation checked. The SDK derives output_text only for a response with object='response'; fixtures reflect this contract. No model identifier or price invented: operator grant selects the exact eligible model and audited rates.
+
+## Fetching and rendering
+
+`safe-web.ts` permits public HTTP(S) business sites, rejects credentials/nonstandard ports/IP-literal/private/special destinations, validates every DNS answer and pins the actual socket lookup. Every redirect is checked. Site pages stay within the supplied hostname/www pair, respect robots rules and crawl delays, and are bounded to five pages, 18 page/robots requests and 2 MiB/page. About/product/service pages are prioritised. Login/cart/checkout/account/search navigation is excluded. Query-bearing asset URLs are permitted only through the same public-address checks.
+
+`website.py` extracts real Crawl4AI source text. `visual.py` additionally renders with real Chromium in a non-root, read-only, capability-dropped container with **no kernel network access, mounted secrets or application credentials**. Every supported browser GET is fulfilled over a bounded stdio broker; unhandled network transports cannot bypass the network namespace. POST, media streams, extra navigation and cross-origin data API requests are blocked. Static public CDN scripts/styles/images/fonts are allowed through the checked broker. No stealth, CAPTCHA solving or account authentication is attempted.
+
+Desktop 1440×1000 and mobile 390×844 captures scroll up to twelve steps, wait for images/fonts within limits, freeze animations and save full-page JPEGs capped at 16000px high. Evidence includes image/currentSrc/alt/loaded state/bounding boxes, inline mark candidates, CSS background imagery, declared typography and actual platform fonts when available, observed colours, section geometry, source links and bounded JSON-LD product/organization information. Counts are observations, not a declaration of approved brand colours/logos or usage rights. Missing resources, cropping and incomplete visual capture are explicit coverage data. Screenshot dimensions and SHA256 are verified before storage.
+
+Resource broker limits: 120 requests, four simultaneous transfers, 2 MiB/resource and a 20 MiB accepted-content budget (bounded in-flight requests may add network bytes); 120-second sandbox wall timeout, 1 GiB memory, one CPU, PID and scratch-space limits. These are bounded first-pass capabilities, not exhaustive-site or universal-rendering guarantees.
+
+## Persistent workflows and tenancy
+
+Migrations 007–008 add website/analysis jobs without fake assets, per-business request keys, operator-only analysis grants, conservative spend reservations, source-linked suggestions, recommendation history, edit protection and private visual evidence. Forced RLS and composite tenant FKs cover every new table. Worker policy separates website ingestion, AI analysis and asset validation; neither app nor worker can grant spending or approve brand facts.
+
+Temporal dispatch uses deterministic workflow IDs and rejects duplicate workflow starts. GET /api/v1/businesses/:id/intake returns saved job/coverage/recommendation/visual metadata. POST submits website.extract or brand.analyze with Idempotency-Key. GET /api/v1/businesses/:id/visuals/:visualId verifies business access before returning a 60-second private signed URL. New visual storage is capped at 256 MiB/business; atomic database insertion preserves source/visual consistency. Blob cleanup after interrupted writes remains an operator/retention task.
+
+Model findings require a valid tenant chunk, exact supporting quote, bounded schema and an unreviewed proposal. Correct/Wrong/Edit remains mandatory; approved profiles are immutable. AI is forbidden to replace already reviewed fields. A draft revision change during a model call rejects application of the outdated result while retaining the provider result. Goals/audience/channels/cadence are persisted **suggestions**, with citations and reasoning. Initial unedited onboarding reads use them automatically; saved user changes win. Later edited/rejected facts or new sources mark prior recommendations stale.
+
+Before any paid request, the worker requires a server key and an enabled, unexpired, operator-provisioned per-business grant with model, audited token rates, budget and approval attribution. A conservative request reservation is recorded **before** submission. All reservations, including unknown/rejected calls, continue counting against the cap. A lost response or interrupted submission becomes unknown; neither workflow retry nor a fresh request can bypass unresolved ambiguity. This is deliberately conservative, not a reconciled billing ledger. Real pricing/account validation and an operator reconciliation UI remain prerequisites.
+
+## Quality and release boundaries
+
+Automated tests use real PostgreSQL/RLS, Crawl4AI/Chromium and private storage, with explicitly MOCKED website resource/model transports where stated. A separate public example.org HTTP/parser smoke exists; it is not a full tenant/model live test. No paid provider call or social publication occurred.
+
+Still required for the owner's complete experience: model vision interpretation of captured imagery, approved logo/product reference selection, deeper coverage/sitemaps and quality benchmarks across real customer sites, OCR, deployed isolated parser/browser execution on Railway, durable orphan cleanup, Canvas skill execution/generation/editing, social OAuth/publishing, learning and full production hardening. Current AI extraction receives textual evidence and computed design observations; it must not claim to have visually interpreted screenshots. Dev deployment remains deferred until the integrated journeys are tested, followed by explicit credentials/budget/test-account handoff.

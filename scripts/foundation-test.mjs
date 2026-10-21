@@ -74,8 +74,8 @@ try {
     });
     process.exitCode=code;
     if(code===0){
-      services=await startAssetServices();Object.assign(config,{storage:services.storage,scanner:services.scanner});config.jobs.address=services.address;
-      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',...(browserSuite?['tests/browser/customer.test.mjs']:intakeOnly?['tests/foundation/brand-brain.test.mjs']:['tests/foundation/assets.test.mjs','tests/foundation/brand-brain.test.mjs'])],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
+      if(!intakeOnly){services=await startAssetServices();Object.assign(config,{storage:services.storage,scanner:services.scanner});config.jobs.address=services.address;}
+      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',...(browserSuite?['tests/browser/customer.test.mjs']:intakeOnly?['tests/foundation/intake.test.mjs']:['tests/foundation/assets.test.mjs','tests/foundation/brand-brain.test.mjs','tests/foundation/intake.test.mjs'])],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
     }
   }
 } finally {

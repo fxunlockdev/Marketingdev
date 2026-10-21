@@ -14,6 +14,7 @@ import { Workspaces } from './workspaces.js';
 import { MailQueue,MailWorker } from './mail.js';
 import { Team } from './team.js';
 import {Businesses} from './businesses.js';
+import {Intake} from './intake.js';
 import {BrandBrain} from './brand-brain.js';
 import {Assets} from './assets.js';
 import {ObjectStore} from './object-store.js';
@@ -46,7 +47,10 @@ class SafeErrors implements ExceptionFilter {
 @Controller('api/v1')
 @UseGuards(SessionGuard)
 class BusinessController {
- constructor(@Inject(Businesses) private readonly service:Businesses){}
+ constructor(@Inject(Businesses) private readonly service:Businesses,@Inject(Intake) private readonly intake:Intake){}
+ @Get('businesses/:id/visuals/:visualId') visualReference(@Req() r:AuthRequest,@Param('id') id:string,@Param('visualId') visualId:string){return this.intake.visual(r.actorId,id,visualId);}
+ @Get('businesses/:id/intake') intakeStatus(@Req() r:AuthRequest,@Param('id') id:string){return this.intake.read(r.actorId,id);}
+ @Post('businesses/:id/intake') submitIntake(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.intake.submit(r.actorId,id,body,key);}
  @Post('accounts/current/initialize') initialize(@Req() r:AuthRequest){return this.service.initialize(r.actorId);}
  @Get('accounts/current/entitlements') entitlements(@Req() r:AuthRequest){return this.service.entitlements(r.actorId);}
  @Get('businesses') list(@Req() r:AuthRequest){return this.service.list(r.actorId);}
@@ -169,7 +173,7 @@ export async function createApplication(config: Config) {
       catch {return unavailable();}
     }));
     @Module({ controllers: [WorkspaceController,InvitationController,AssetController,BrainController,BusinessController], providers: [SessionGuard,
-      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)}] })
+      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());
