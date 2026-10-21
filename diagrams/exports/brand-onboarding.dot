@@ -1,0 +1,15 @@
+digraph ONBOARD {
+ graph [rankdir=LR, bgcolor="white", pad=0.30, nodesep=0.35, ranksep=0.5, splines=polyline, fontname="DejaVu Sans", fontsize=18, label="CUSTOMER FLOW — BRAND ONBOARDING TO LIVE CONTENT", labelloc=t];
+ node [shape=box,style="rounded,filled",fontname="DejaVu Sans",fontsize=10,penwidth=1.1,color="#94a3b8", fillcolor="#f8fafc",margin="0.16,0.15"];
+ edge [color="#64748b",arrowsize=0.6, penwidth=1.2];
+ web [label="1. Website + Files\nCrawl4AI / Docling",fillcolor="#dbeafe",color="#2563eb"];
+ verified [label="2. AI Draft + Evidence\nCorrect / Wrong / Edit",fillcolor="#dbeafe",color="#2563eb"];
+ brain [label="3. Approved Brand Brain\nVersioned Truth",fillcolor="#dcfce7",color="#16a34a"];
+ skill [label="4. Marketing Skills\nDeep Agents + OpenAI",fillcolor="#dcfce7",color="#16a34a"];
+ media [label="5. Images / Videos\nGPT Images + Higgsfield",fillcolor="#fef3c7",color="#d97706"];
+ approve [label="6. Edit + Approve\nFabric.js / FFmpeg",fillcolor="#dcfce7",color="#16a34a"];
+ post [label="7. Publish\nPostiz Adapter",fillcolor="#fef3c7",color="#d97706"];
+ learn [label="8. Measure + Learn\nEvidence-linked insights",fillcolor="#dcfce7",color="#16a34a"];
+ web -> verified -> brain -> skill -> media -> approve -> post -> learn;
+ learn -> skill [constraint=false,style=dashed,color="#0e7490",label="improve next draft",fontsize=8];
+}

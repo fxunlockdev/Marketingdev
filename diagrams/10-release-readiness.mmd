@@ -1,0 +1,17 @@
+flowchart TB
+  code[Feature code and UI] --> contract[Typed adapter and real upstream contract]
+  contract --> local[Offline tests and durable state]
+  local --> key{Real permitted staging credentials?}
+  key -->|No| blocked[ADAPTER_READY: BLOCKED for launch]
+  key -->|Yes| live[Cost-capped allowlisted live smoke test]
+  live --> result{Provider result persisted and traceable?}
+  result -->|No| blocked
+  result -->|Yes| secure[Two-tenant tests, secret scans, failure recovery]
+  secure --> pass{All safety and ops checks pass?}
+  pass -->|No| blocked
+  pass -->|Yes| ready[LAUNCH_READY: scoped capability]
+  ready --> deploy[Enable in custom Marketing OS UI]
+  classDef red fill:#fff1f2,stroke:#be123c,color:#9f1239;
+  classDef green fill:#eaf7ee,stroke:#15803d,color:#14532d;
+  class blocked red;
+  class ready,deploy green;

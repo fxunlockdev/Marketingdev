@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "generated_by": "python -m scripts.verify",
+  "environment": "offline_dev",
+  "code_commit": "uncommitted-M0",
+  "checked_at": "2026-10-21T02:15:14.070203+00:00",
+  "integrations": {
+    "crawl4ai": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "docling": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "deepagents": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "openai_images": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "higgsfield_video": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "creative_editor": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "postiz_publish": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "performance_learning": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    },
+    "tenant_runtime": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/offline.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "M0 audit only; product adapter, persistence and authorized staging journey are not implemented."
+    }
+  },
+  "security": {
+    "tenant_isolation_passed": false,
+    "secret_scan_passed": false
+  },
+  "overall_release_state": "BLOCKED"
+}

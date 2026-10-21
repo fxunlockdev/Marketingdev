@@ -1,0 +1,33 @@
+digraph MARKETING_OS {
+  graph [rankdir=TB, bgcolor="white", pad=0.3, nodesep=0.33, ranksep=0.48, fontname="DejaVu Sans", splines=polyline, label="MARKETING OS — SYSTEM ARCHITECTURE", labelloc=t, fontsize=20, fontcolor="#1f2937"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10, penwidth=1.15, color="#cbd5e1", fillcolor="#f8fafc", fontcolor="#111827", margin="0.20,0.14"];
+  edge [arrowsize=0.65, color="#64748b", penwidth=1.2];
+  ui [label="YOUR CUSTOM MARKETING OS UI\nOnboarding · Creative Studio · Calendar · Analytics",fillcolor="#e0f2fe", color="#0284c7", fontsize=13];
+  api [label="Application API / BFF\nAuth · Tenant Permissions · Credits · Jobs",fillcolor="#dcfce7",color="#16a34a"];
+  brand [label="Brand Brain\nPostgreSQL + pgvector\nVerified facts & guidelines",fillcolor="#dcfce7",color="#16a34a"];
+  agent [label="Deep Agents + 52 Skills\nBrand context + typed tool adapters",fillcolor="#dcfce7",color="#16a34a"];
+  workflows [label="Temporal\nDurable Workflows & Queues",fillcolor="#dcfce7",color="#16a34a"];
+  image [label="GPT Images API\nGenerate / Edit",fillcolor="#fef3c7",color="#d97706"];
+  video [label="Higgsfield API\nAsync Video Jobs",fillcolor="#fef3c7",color="#d97706"];
+  edit [label="Fabric.js + FFmpeg\nEditable Layouts / Render",fillcolor="#dcfce7",color="#16a34a"];
+  storage [label="Private Object Storage",fillcolor="#dcfce7",color="#16a34a"];
+  publish [label="Tenant-Safe Postiz Adapter\nReview · Approval · Scheduling",fillcolor="#dcfce7",color="#16a34a"];
+  postiz [label="Postiz (Headless)\nSocial OAuth / Organic Publishing",fillcolor="#fef3c7",color="#d97706"];
+  social [label="Social Platforms",fillcolor="#fef3c7",color="#d97706"];
+  learn [label="Analytics + Learning\nReal metrics · Evidence-based improvements",fillcolor="#dcfce7",color="#16a34a"];
+  ui -> api;
+  api -> brand;
+  api -> agent;
+  api -> workflows;
+  workflows -> image;
+  workflows -> video;
+  workflows -> edit;
+  { rank=same; image; video; edit; }
+  brand -> agent [style=dotted];
+  image -> storage; video -> storage; edit -> storage;
+  storage -> publish;
+  api -> publish;
+  publish -> postiz -> social;
+  social -> learn;
+  learn -> brand [style=dashed, label="proposals, not facts",fontsize=9];
+}

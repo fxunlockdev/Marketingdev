@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "generated_by": "release-gate-test-runner",
+  "environment": "staging",
+  "code_commit": "REPLACE_WITH_GIT_SHA",
+  "checked_at": "2026-10-21T00:00:00Z",
+  "integrations": {
+    "brand_crawler": {"state": "NOT_IMPLEMENTED", "live_test": false, "evidence": [], "blocked_reason": "sample file only"},
+    "document_parser": {"state": "NOT_IMPLEMENTED", "live_test": false, "evidence": [], "blocked_reason": "sample file only"},
+    "skills_runtime": {"state": "NOT_IMPLEMENTED", "live_test": false, "evidence": [], "blocked_reason": "sample file only"},
+    "openai_images": {"state": "NOT_IMPLEMENTED", "live_test": false, "evidence": [], "blocked_reason": "requires implementation + test key"},
+    "higgsfield_video": {"state": "NOT_IMPLEMENTED", "live_test": false, "evidence": [], "blocked_reason": "requires implementation + test key"},
+    "postiz_social": {"state": "NOT_IMPLEMENTED", "live_test": false, "evidence": [], "blocked_reason": "requires implementation + authorized test account"}
+  },
+  "security": {"tenant_isolation_passed": false, "secret_scan_passed": false},
+  "overall_release_state": "BLOCKED"
+}

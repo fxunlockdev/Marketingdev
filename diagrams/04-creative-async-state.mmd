@@ -1,0 +1,25 @@
+stateDiagram-v2
+  [*] --> Draft
+  Draft --> Queued: Validated + credits reserved
+  Queued --> Running: Dispatch to GPT Images / Higgsfield
+  Running --> ProviderPending: Video provider returned job ID
+  ProviderPending --> ProviderPending: Poll / verified webhook
+  Running --> AssetCopying: Image result
+  ProviderPending --> AssetCopying: Video completed
+  AssetCopying --> Rendering: Persist originals privately
+  Rendering --> QualityCheck: Fabric project / FFmpeg export
+  QualityCheck --> ReviewPending: Pass QA
+  QualityCheck --> NeedsRevision: Rework requested
+  NeedsRevision --> Queued: New version + explicit retry
+  ReviewPending --> Approved: Human approves
+  ReviewPending --> NeedsRevision: Human edits / rejects
+  Queued --> Failed: Terminal error
+  Running --> Failed: Terminal error
+  ProviderPending --> Failed: Terminal provider error
+  Failed --> Queued: Operator-approved retry
+  Approved --> [*]
+  note right of ProviderPending
+    Never blindly retry a paid request
+    if submission outcome is ambiguous.
+    Reconcile using provider job IDs.
+  end note

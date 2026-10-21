@@ -1,0 +1,40 @@
+erDiagram
+  ORGANIZATION ||--o{ BRAND : owns
+  BRAND ||--o{ BRAND_PROFILE_VERSION : versions
+  BRAND ||--o{ BRAND_SOURCE : ingests
+  BRAND_SOURCE ||--o{ BRAND_FINDING : evidences
+  BRAND ||--o{ CAMPAIGN : plans
+  CAMPAIGN ||--o{ CREATIVE : generates
+  CREATIVE ||--o{ CREATIVE_VERSION : revisions
+  CREATIVE_VERSION ||--o{ ASSET : exports
+  CREATIVE_VERSION ||--o{ PUBLISH_REQUEST : submits
+  PUBLISH_REQUEST ||--o{ PERFORMANCE_SNAPSHOT : observes
+  BRAND ||--o{ LEARNING_INSIGHT : remembers
+  CREATIVE_VERSION ||--o{ SKILL_RUN : traces
+  ORGANIZATION ||--o{ PROVIDER_CREDENTIAL_REFERENCE : configures
+  ORGANIZATION {
+    uuid id PK
+  }
+  BRAND {
+    uuid id PK
+    uuid organization_id FK
+  }
+  BRAND_PROFILE_VERSION {
+    uuid id PK
+    uuid brand_id FK
+    string status
+  }
+  CREATIVE_VERSION {
+    uuid id PK
+    string skill_digest
+    string model_id
+  }
+  PUBLISH_REQUEST {
+    uuid id PK
+    string remote_post_id
+    string state
+  }
+  PROVIDER_CREDENTIAL_REFERENCE {
+    uuid id PK
+    string secret_manager_ref
+  }

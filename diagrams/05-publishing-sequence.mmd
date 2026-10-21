@@ -1,0 +1,28 @@
+sequenceDiagram
+  autonumber
+  actor U as Brand Owner
+  participant UI as Our Calendar / Approval UI
+  participant API as Marketing API
+  participant DB as Approval and Publish Ledger
+  participant PUB as Tenant-Safe Postiz Adapter
+  participant P as Self-hosted Postiz
+  participant SOC as Social Provider
+  U->>UI: Approve creative + schedule time
+  UI->>API: Request schedule with idempotency key
+  API->>DB: Check org, role, brand, asset approval
+  alt Not allowed / wrong tenant
+    DB-->>API: DENY
+    API-->>UI: Error; no publish
+  else Approved
+    API->>DB: Reserve unique publication operation
+    API->>PUB: Tenant-scoped schedule request
+    PUB->>P: Upload asset and create post (verified API)
+    P-->>PUB: Remote post ID / scheduled status
+    PUB->>DB: Map tenant + account + remote ID
+    DB-->>UI: Scheduled; final publishing not implied
+    P->>SOC: Publish at requested time
+    SOC-->>P: Publish result
+    P-->>PUB: Webhook or polling result
+    PUB->>DB: Reconcile actual publish status
+    API-->>UI: Published / failed / unknown
+  end

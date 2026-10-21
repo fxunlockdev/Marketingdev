@@ -1,0 +1,23 @@
+{
+  "suite": "security",
+  "scope": "M0 audit probes only; no product E2E or authenticated tenant proof",
+  "checked_at": "2026-10-21T02:15:14.064067+00:00",
+  "source_sha256": "a8087b4d23cd878a1fe759eb67ffe3052e3e629e096619870525ec96770be2c1",
+  "results": [
+    {
+      "command": [
+        "/Users/viloljoshi/Documents/Codex/2026-10-21/i-want-you-to-design-blaze-2/work/Marketingdev/.venv/bin/python3",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "tests/security",
+        "-v"
+      ],
+      "exit_code": 0,
+      "output": "test_checksum_mismatch_rejected (test_audit_boundaries.AuditBoundaryTests.test_checksum_mismatch_rejected) ... ok\ntest_run_mounts_do_not_share_brand_context (test_audit_boundaries.AuditBoundaryTests.test_run_mounts_do_not_share_brand_context) ... ok\ntest_traversal_and_symlink_rejected (test_audit_boundaries.AuditBoundaryTests.test_traversal_and_symlink_rejected) ... ok\ntest_default_denies_live_operations (test_live_gate.GateTests.test_default_denies_live_operations) ... ok\ntest_manual_green_flags_cannot_unlock_launch (test_live_gate.GateTests.test_manual_green_flags_cannot_unlock_launch) ... ok\ntest_nan_and_wildcard_budget_allowlists_rejected (test_live_gate.GateTests.test_nan_and_wildcard_budget_allowlists_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.832s\n\nOK\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}
