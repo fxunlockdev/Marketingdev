@@ -22,7 +22,7 @@ Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch 
 - scripts/verify.py and release_gate.py: actual audit-suite evidence; product status stays NOT_IMPLEMENTED.
 - docs/adr/0001-reuse-decisions.md, POSTIZ_API_MATRIX.md, PROVIDER_CAPABILITIES.md, SKILL_AUDIT.md, THIRD_PARTY_LOCK.md, SECURITY_THREAT_MODEL.md, PRODUCT_EXPERIENCE.md.
 
-Final session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 14 real local HTTP/PostgreSQL foundation tests plus 6 audit/guard tests (31 tests total). release-gate exits nonzero as intended. verify-live was NOT run. npm audit reports zero known vulnerabilities in the locked npm tree; this is not Python/container or full security clearance. Machine evidence identifies implementation commit 99828c0 and the source fingerprint.
+Final session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 24 actual local HTTP/PostgreSQL/SMTP tests plus 6 audit/guard tests (41 tests total). release-gate exits nonzero as intended. verify-live was NOT run; no real emails, paid providers or social accounts were contacted. npm audit reports zero known vulnerabilities in the locked npm tree; this is not full security clearance. Machine evidence identifies implementation commit e190596 and the source fingerprint.
 
 ## M1 progress this session
 
@@ -36,7 +36,7 @@ Final session verification: verify-offline compiled the API and passed 3 skill t
 - apps/api/src/team.ts and migration 002_mail_and_invitations.sql: scoped, recipient-bound invitations; hashed tokens; idempotency; sender-role recheck; replacement/revocation; race-safe owner and role rules; daily invite cap.
 - auth.ts now requires email verification, uses transactional password reset with session revocation, and contains raw upstream errors. Account flows use the genuine pinned library and actual local SMTP.
 - docs/adr/0003-account-email-and-team-access.md records contracts, server settings and limits.
-- Latest direct suite passed 23 tests; the final suite rerun is pending after daily-cap coverage and final error-boundary changes. No customer account/team UI yet. Production activation still fails closed; staging sender/ingress/deployment remain unverified.
+- Final foundation suite passed 24 tests, including daily-cap races, SMTP uncertainty, reset rollback and sanitized error logging. No customer account/team UI yet. Production activation still fails closed; staging sender/ingress/deployment remain unverified.
 - Mail queue dispatch is implemented. Brand outbox / Temporal generation jobs are still pending, not processed.
 
 ## Railway
@@ -60,6 +60,6 @@ These do not prevent independent M1 implementation. The local workspace_auth cap
 
 ## Next implementation work — finish M1, then PR-02
 
-Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Account verification/recovery/invitation backends are now implemented and being saved as PR-02. Next implement private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Finish the custom account/team UI and external sender validation alongside the minimal backed workspace experience. Extend negative tests across jobs/assets and restart boundaries. Then continue website/PDF/PPTX intake, Correct/Wrong/Edit findings and immutable approved Brand Brain. PR numbering has expanded to keep the M1 account work reviewable; the later onboarding scope is unchanged. Full creative revision, approval and real social publishing goal remains intact.
+Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Account verification/recovery/invitation backends are now implemented; PR-02 is being saved as a stacked draft on PR-01. Next implement private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Finish the custom account/team UI and external sender validation alongside the minimal backed workspace experience. Extend negative tests across jobs/assets and restart boundaries. Then continue website/PDF/PPTX intake, Correct/Wrong/Edit findings and immutable approved Brand Brain. PR numbering has expanded to keep the M1 account work reviewable; the later onboarding scope is unchanged. Full creative revision, approval and real social publishing goal remains intact.
 
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.

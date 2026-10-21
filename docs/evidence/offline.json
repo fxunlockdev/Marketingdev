@@ -1,8 +1,8 @@
 {
   "suite": "offline",
   "scope": "TypeScript build and M0 skill archive/middleware probes",
-  "checked_at": "2026-10-21T02:50:31.364910+00:00",
-  "source_sha256": "f44af514614dfee16717562336dfda5984a64a51061603e62372d8a11815ee3c",
+  "checked_at": "2026-10-21T03:13:05.044890+00:00",
+  "source_sha256": "174d9d55775475041c996fab79205688f4ac664594a2326fa7fb7c5a96cc5f55",
   "results": [
     {
       "command": [
@@ -24,7 +24,7 @@
         "-v"
       ],
       "exit_code": 0,
-      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\n\n----------------------------------------------------------------------\nRan 3 tests in 1.248s\n\nOK\n"
+      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\n\n----------------------------------------------------------------------\nRan 3 tests in 1.242s\n\nOK\n"
     }
   ],
   "passed": true,
