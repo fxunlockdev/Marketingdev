@@ -12,9 +12,9 @@ READY = {
     'BR-01': ('BusinessesIndex', 'GET /api/v1/businesses', 'app.brands + brand_brain_versions', 'zero/three actual businesses; no fabricated channels/completeness'),
     'BR-02': ('NewBusiness', 'POST /api/v1/businesses', 'app.account_entitlements + brands + idempotency', 'server quota/replay/concurrency'),
     'BR-03': ('BrandOnboarding', 'GET /api/v1/businesses/:id/onboarding', 'app.business_onboarding + brand evidence', 'actual saved onboarding'),
-    'ON1-02': ('NewBusiness', 'POST /api/v1/businesses', 'app.brands', 'website optional; manual/document fallback, crawling unavailable'),
+    'ON1-02': ('NewBusiness', 'POST /api/v1/businesses', 'app.brands', 'website optional; manual/document fallback and scoped website intake'),
     'ON1-05': ('BrandOnboarding', 'GET/PATCH /api/v1/businesses/:id/onboarding', 'app.business_onboarding', 'saved steps/preferences across reload'),
-    'ON2-01': ('Finding', 'PATCH /api/v1/workspaces/:org/brands/:brand/brain/findings/:id', 'app.brand_findings + audit_events', 'literal/manual facts only; semantic inference unfinished'),
+    'ON2-01': ('Finding', 'PATCH /api/v1/workspaces/:org/brands/:brand/brain/findings/:id', 'app.brand_findings + audit_events', 'source-backed literal/manual/AI suggestions; actual AI quality unverified'),
     'ON2-02': ('Finding', 'PATCH /api/v1/workspaces/:org/brands/:brand/brain/findings/:id', 'app.brand_findings + audit_events', 'saved correction, stale/network errors preserve entries'),
     'ON3-02': ('BrandOnboarding', 'PATCH /api/v1/businesses/:id/onboarding', 'app.business_onboarding', 'preferences never imply OAuth connection'),
     'ON3-03': ('BrandOnboarding', 'PATCH /api/v1/businesses/:id/onboarding', 'app.business_onboarding', 'valid IANA timezone and cadence persisted; no scheduling claim'),
@@ -40,4 +40,4 @@ def update_matrix(root: Path, ready: bool):
                 automated_test='tests/browser/customer.test.mjs; tests/foundation/brand-brain.test.mjs',
                 implementation_evidence=f'Fresh local browser/security evidence required; {scope}. No LIVE_VERIFIED or LAUNCH_READY.')
     with path.open('w',newline='') as stream:
-        writer=csv.DictWriter(stream,fieldnames=fields);writer.writeheader();writer.writerows(rows)
+        writer=csv.DictWriter(stream,fieldnames=fields,lineterminator="\n");writer.writeheader();writer.writerows(rows)

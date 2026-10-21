@@ -82,7 +82,7 @@ export class JobDispatcher {
       RETURNING job_id,organization_id,brand_id,kind`,[lease]);
     if(!row)return false;
     try{
-      try{if(!['asset.validate','document.extract'].includes(row.kind))throw new Error('JOB_KIND_DENIED');await this.client.workflow.start(row.kind==='document.extract'?'extractDocumentWorkflow':'validateAssetWorkflow',{workflowId:`desvio-${row.kind==='document.extract'?'document':'asset'}-${row.job_id}`,workflowIdReusePolicy:WorkflowIdReusePolicy.REJECT_DUPLICATE,
+      try{if(!['asset.validate','document.extract','website.extract','brand.analyze'].includes(row.kind))throw new Error('JOB_KIND_DENIED');await this.client.workflow.start(row.kind==='document.extract'?'extractDocumentWorkflow':row.kind==='asset.validate'?'validateAssetWorkflow':'processIntakeWorkflow',{workflowId:`desvio-${row.kind==='document.extract'?'document':row.kind==='asset.validate'?'asset':'intake'}-${row.job_id}`,workflowIdReusePolicy:WorkflowIdReusePolicy.REJECT_DUPLICATE,
         taskQueue:this.taskQueue,args:[{organizationId:row.organization_id,brandId:row.brand_id,jobId:row.job_id}]});}
       catch(error){if(!(error instanceof WorkflowExecutionAlreadyStartedError))throw error;}
       await this.pool.query('UPDATE app.job_dispatch SET dispatched_at=now(),leased_until=NULL,last_error=NULL WHERE job_id=$1 AND lease_id=$2',[row.job_id,lease]);

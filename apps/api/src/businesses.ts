@@ -107,18 +107,52 @@ export class Businesses {
             [business.organization_id, id],
           )
         ).rows[0];
-        if (input === undefined)
-          return (
-            prior ?? {
-              step: 2,
-              revision: 0,
-              goal: "awareness",
-              timezone: "UTC",
-              cadence: 3,
-              channels: [],
-              must_avoid: "",
-            }
-          );
+        if (input === undefined) {
+          const saved = prior ?? {
+            step: 2,
+            revision: 0,
+            goal: "awareness",
+            timezone: "UTC",
+            cadence: 3,
+            channels: [],
+            must_avoid: "",
+            preferences_edited: false,
+          };
+          const recommendation =
+            (
+              await db.query(
+                `SELECT r.*,EXISTS(SELECT 1 FROM app.brand_findings f WHERE f.organization_id=r.organization_id AND f.brand_id=r.brand_id AND f.status IN ('wrong','edited') AND f.reviewed_at>r.created_at) OR EXISTS(SELECT 1 FROM app.brand_sources s WHERE s.organization_id=r.organization_id AND s.brand_id=r.brand_id AND s.captured_at>r.created_at) AS stale FROM app.onboarding_recommendations r WHERE r.organization_id=$1 AND r.brand_id=$2 ORDER BY r.created_at DESC LIMIT 1`,
+                [business.organization_id, id],
+              )
+            ).rows[0] ?? null;
+          if (recommendation)
+            recommendation.evidence = (
+              await db.query(
+                "SELECT c.id,c.text,c.page,s.website_url FROM app.brand_chunks c JOIN app.brand_sources s ON s.id=c.source_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND c.id=ANY($3::uuid[])",
+                [
+                  business.organization_id,
+                  id,
+                  recommendation.recommendation.chunk_ids,
+                ],
+              )
+            ).rows;
+          const suggested =
+            recommendation && !recommendation.stale && !saved.preferences_edited
+              ? recommendation.recommendation
+              : null;
+          return {
+            ...saved,
+            ...(suggested
+              ? {
+                  goal: suggested.goal,
+                  cadence: suggested.cadence,
+                  channels: suggested.channels,
+                }
+              : {}),
+            recommendation,
+            prefilled: !!suggested,
+          };
+        }
         const value = object(input, [
           "revision",
           "step",
@@ -127,8 +161,11 @@ export class Businesses {
           "cadence",
           "channels",
           "must_avoid",
+          "preferences_edited",
         ]);
         if (
+          (value.preferences_edited !== undefined &&
+            typeof value.preferences_edited !== "boolean") ||
           !Number.isInteger(value.revision) ||
           !["awareness", "traffic", "leads", "sales"].includes(
             String(value.goal),
@@ -169,7 +206,7 @@ export class Businesses {
           );
         const row = (
           await db.query(
-            `INSERT INTO app.business_onboarding(organization_id,brand_id,step,goal,timezone,cadence,channels,must_avoid) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(organization_id,brand_id) DO UPDATE SET step=EXCLUDED.step,goal=EXCLUDED.goal,timezone=EXCLUDED.timezone,cadence=EXCLUDED.cadence,channels=EXCLUDED.channels,must_avoid=EXCLUDED.must_avoid,revision=business_onboarding.revision+1,updated_at=now() RETURNING *`,
+            `INSERT INTO app.business_onboarding(organization_id,brand_id,step,goal,timezone,cadence,channels,must_avoid,preferences_edited) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(organization_id,brand_id) DO UPDATE SET step=EXCLUDED.step,goal=EXCLUDED.goal,timezone=EXCLUDED.timezone,cadence=EXCLUDED.cadence,channels=EXCLUDED.channels,must_avoid=EXCLUDED.must_avoid,preferences_edited=business_onboarding.preferences_edited OR EXCLUDED.preferences_edited,revision=business_onboarding.revision+1,updated_at=now() RETURNING *`,
             [
               business.organization_id,
               id,
@@ -179,6 +216,7 @@ export class Businesses {
               value.cadence,
               JSON.stringify(value.channels),
               value.must_avoid,
+              value.preferences_edited ?? true,
             ],
           )
         ).rows[0];

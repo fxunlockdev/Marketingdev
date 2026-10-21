@@ -128,79 +128,95 @@ export class DocumentParser {
       throw new DocumentError("DOCUMENT_LIMIT_EXCEEDED");
     if (!["pdf", "pptx"].includes(kind))
       throw new DocumentError("UNSUPPORTED_DOCUMENT");
-    const name = `desvio-parser-${randomUUID()}`;
-    try {
-      const raw = await new Promise<string>((resolve, reject) => {
-        let output = "",
-          length = 0,
-          settled = false;
-        const child = spawn(
-          "docker",
-          [
-            "run",
-            "--rm",
-            "-i",
-            "--name",
-            name,
-            "--label",
-            "desvio.purpose=document-sandbox",
-            "--network",
-            "none",
-            "--read-only",
-            "--cap-drop",
-            "ALL",
-            "--security-opt",
-            "no-new-privileges",
-            "--pids-limit",
-            "64",
-            "--memory",
-            "1g",
-            "--memory-swap",
-            "1g",
-            "--cpus",
-            "1",
-            "--tmpfs",
-            "/tmp:rw,noexec,nosuid,size=96m",
-            this.image!,
-            kind,
-          ],
-          { stdio: ["pipe", "pipe", "ignore"] },
-        );
-        const finish = (error?: Error) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          if (error) {
-            child.kill("SIGKILL");
-            reject(error);
-          } else resolve(output);
-        };
-        const timer = setTimeout(
-          () => finish(new DocumentError("DOCUMENT_PARSE_TIMEOUT")),
-          120000,
-        );
-        child.on("error", () =>
-          finish(new Error("DOCUMENT_SANDBOX_UNAVAILABLE")),
-        );
-        child.stdout.on("data", (chunk: Buffer) => {
-          length += chunk.length;
-          if (length > 2 * 1024 * 1024) finish(invalid());
-          else output += chunk.toString("utf8");
-        });
-        child.stdin.on("error", () => {});
-        child.stdin.end(bytes);
-        child.on("close", (code) => {
-          if (code === 0 || code === 2) finish();
-          else finish(new Error("DOCUMENT_SANDBOX_UNAVAILABLE"));
-        });
+    return parseDocumentOutput(
+      await runIntakeSandbox(this.image, bytes, kind),
+      bytes,
+      kind,
+    );
+  }
+}
+export async function runIntakeSandbox(
+  image: string,
+  bytes: Buffer,
+  kind: "pdf" | "pptx" | "website",
+) {
+  if (
+    !/^sha256:[a-f0-9]{64}$/.test(image) ||
+    !["pdf", "pptx", "website"].includes(kind)
+  )
+    throw new Error("INVALID_SANDBOX_CONFIG");
+  const name = `desvio-parser-${randomUUID()}`;
+  try {
+    const raw = await new Promise<string>((resolve, reject) => {
+      let output = "",
+        length = 0,
+        settled = false;
+      const child = spawn(
+        "docker",
+        [
+          "run",
+          "--rm",
+          "-i",
+          "--name",
+          name,
+          "--label",
+          "desvio.purpose=document-sandbox",
+          "--network",
+          "none",
+          "--read-only",
+          "--cap-drop",
+          "ALL",
+          "--security-opt",
+          "no-new-privileges",
+          "--pids-limit",
+          "64",
+          "--memory",
+          "1g",
+          "--memory-swap",
+          "1g",
+          "--cpus",
+          "1",
+          "--tmpfs",
+          "/tmp:rw,noexec,nosuid,size=96m",
+          image,
+          kind,
+        ],
+        { stdio: ["pipe", "pipe", "ignore"] },
+      );
+      const finish = (error?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (error) {
+          child.kill("SIGKILL");
+          reject(error);
+        } else resolve(output);
+      };
+      const timer = setTimeout(
+        () => finish(new DocumentError("DOCUMENT_PARSE_TIMEOUT")),
+        120000,
+      );
+      child.on("error", () =>
+        finish(new Error("DOCUMENT_SANDBOX_UNAVAILABLE")),
+      );
+      child.stdout.on("data", (chunk: Buffer) => {
+        length += chunk.length;
+        if (length > 2 * 1024 * 1024) finish(invalid());
+        else output += chunk.toString("utf8");
       });
-      return parseDocumentOutput(raw, bytes, kind);
-    } finally {
-      try {
-        await promisify(execFile)("docker", ["rm", "-f", name], {
-          timeout: 10000,
-        });
-      } catch {}
-    }
+      child.stdin.on("error", () => {});
+      child.stdin.end(bytes);
+      child.on("close", (code) => {
+        if (code === 0 || code === 2) finish();
+        else finish(new Error("DOCUMENT_SANDBOX_UNAVAILABLE"));
+      });
+    });
+    return raw;
+  } finally {
+    try {
+      await promisify(execFile)("docker", ["rm", "-f", name], {
+        timeout: 10000,
+      });
+    } catch {}
   }
 }

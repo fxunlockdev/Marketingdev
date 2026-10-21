@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { api } from "./api";
 import { Wordmark, Loading, Notice, Field } from "./primitives";
 import { BrandFiles } from "./uploads";
+import { BrandIntake } from "./intake";
 import { useUnsavedChanges } from "./unsaved";
 type Business = {
   id: string;
@@ -467,7 +468,7 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
           </Field>
           <Field
             label="Website (optional)"
-            hint="No website? Leave this blank and add your brand facts or documents in the next step. Website analysis is not available in this build."
+            hint="We’ll read your public website to prepare your brand. No website? Add documents or facts in the next step."
           >
             {(id, hint) => (
               <input
@@ -773,21 +774,29 @@ export function BrandOnboarding({ business }: { business: Business }) {
     setBusy(true);
     setError(undefined);
     try {
+      const direction = dirty
+        ? state
+        : await api(`/api/v1/businesses/${business.id}/onboarding`);
       const fields = {
         revision: state.revision,
         step,
-        goal: state.goal,
-        timezone: state.timezone,
-        cadence: state.cadence,
-        channels: state.channels,
-        must_avoid: state.must_avoid,
+        goal: direction.goal,
+        timezone: direction.timezone,
+        cadence: direction.cadence,
+        channels: direction.channels,
+        must_avoid: direction.must_avoid,
+        preferences_edited: dirty || state.preferences_edited || approve,
       };
       const saved = await api(
         `/api/v1/businesses/${business.id}/onboarding`,
         fields,
         "PATCH",
       );
-      setState(saved);
+      setState({
+        ...saved,
+        recommendation: direction.recommendation,
+        prefilled: direction.prefilled,
+      });
       setDirty(false);
       if (approve) {
         const current = await api(path + "/brain");
@@ -870,12 +879,49 @@ export function BrandOnboarding({ business }: { business: Business }) {
         <section className="v5-panel onboarding-form">
           <h2>Review your direction</h2>
           <div className="availability-card">
-            <strong>AI recommendations are not available in this build.</strong>
-            <p>
-              The completed flow will pre-fill these from your website,
-              documents and confirmed brand facts. For now, these are editable
-              defaults, not AI analysis.
-            </p>
+            {state.recommendation ? (
+              <>
+                <strong>
+                  {state.recommendation.stale
+                    ? "Your evidence changed. Review these earlier suggestions."
+                    : "AI-prepared direction · yours to adjust"}
+                </strong>
+                <p>{state.recommendation.recommendation.reason}</p>
+                <p>
+                  Suggested audience:{" "}
+                  {state.recommendation.recommendation.audience}
+                </p>
+                <details>
+                  <summary>Why these suggestions?</summary>
+                  {state.recommendation.evidence?.map((e: any) => (
+                    <div key={e.id}>
+                      {e.website_url && (
+                        <a
+                          href={e.website_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Source website
+                        </a>
+                      )}
+                      <blockquote>{e.text}</blockquote>
+                    </div>
+                  ))}
+                </details>
+                <p className="hint">
+                  Suggestions based on your saved evidence. Your edits take
+                  priority.
+                </p>
+              </>
+            ) : (
+              <>
+                <strong>No AI recommendations yet.</strong>
+                <p>
+                  Run brand analysis after adding website or document evidence.
+                  These editable defaults have not been prepared by AI.
+                </p>
+              </>
+            )}
           </div>
           <p>
             These preferences do not connect channels or authorize publication.
@@ -1071,6 +1117,7 @@ function BrandReview({
   }
   return (
     <>
+      <BrandIntake business={business} onComplete={() => void load()} />
       <section className="v5-panel">
         <div className="section-heading">
           <div>
@@ -1281,7 +1328,12 @@ function Finding({
         <p>{f.value}</p>
       )}
       <details>
-        <summary>Source · page {f.page}</summary>
+        <summary>
+          {f.extraction_type === "ai_suggestion"
+            ? "AI suggestion · supporting evidence"
+            : `Source · page ${f.page}`}
+        </summary>
+        {f.evidence_quote && <blockquote>{f.evidence_quote}</blockquote>}
         <blockquote>{f.evidence}</blockquote>
       </details>
       <Notice error={error} />

@@ -2,3 +2,6 @@
 !Dockerfile
 !requirements.lock
 !extract.py
+
+!website.py
+!visual.py
