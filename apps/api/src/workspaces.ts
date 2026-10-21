@@ -39,6 +39,7 @@ export class Workspaces {
   create(user: string, input: unknown) {
     const workspaceName = name(object(input, ['name']).name);
     return this.database.transaction(user, undefined, true, async db => {
+      if((await db.query('SELECT organization_id FROM app.personal_accounts WHERE user_id=$1',[user])).rowCount)throw new ConflictException('Your account is already set up. Add a business from Brands.');
       const { rows: [result] } = await db.query('SELECT app.create_organization($1) AS id', [workspaceName]);
       return { id: result.id, name: workspaceName, role: 'owner' };
     });

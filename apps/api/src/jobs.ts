@@ -25,8 +25,10 @@ export class AssetJobs {
   }
   async permitted(db:PoolClient,job:any){
     if(job.cancel_requested)return false;
-    const {rows:[member]}=await db.query('SELECT role FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[job.organization_id,job.requested_by]);
-    return !!member && member.role!=='viewer';
+    const {rows:[member]}=await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[job.organization_id,job.requested_by]);
+    if(!member||member.role==='viewer')return false;
+    if(member.business_scope==='selected'){const grant=(await db.query('SELECT role FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3 AND active',[job.organization_id,job.brand_id,job.requested_by])).rows[0];return !!grant&&grant.role!=='viewer';}
+    return true;
   }
   async finish(db:PoolClient,job:any,status:string,code:string|null=null,scanner:string|null=null,etag:string|null=null){
     await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[job.id,status,code]);
@@ -35,6 +37,7 @@ export class AssetJobs {
   }
   async validate(scope:JobScope):Promise<string>{
     const asset=await this.transaction(scope,async(db,job)=>{
+      if(job.kind!=='asset.validate')throw new Error('JOB_KIND_DENIED');
       if(terminal.has(job.status))return null;
       if(!await this.permitted(db,job)){await this.finish(db,job,'canceled','ACCESS_REVOKED_OR_CANCELED');return null;}
       await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,error_code=NULL,updated_at=now() WHERE id=$1",[job.id]);
@@ -68,7 +71,7 @@ export class AssetJobs {
       if(status==='retrying')throw new Error(code);return status;
     }
   }
-  fail(scope:JobScope){return this.transaction(scope,async(db,job)=>terminal.has(job.status)?job.status:this.finish(db,job,'failed','VALIDATION_RETRIES_EXHAUSTED'));}
+  fail(scope:JobScope){return this.transaction(scope,async(db,job)=>{if(job.kind!=='asset.validate')throw new Error('JOB_KIND_DENIED');return terminal.has(job.status)?job.status:this.finish(db,job,'failed','VALIDATION_RETRIES_EXHAUSTED');});}
 }
 export class JobDispatcher {
   constructor(readonly pool:Pool,readonly client:Client,readonly taskQueue:string){}
@@ -76,10 +79,10 @@ export class JobDispatcher {
     const lease=randomUUID();
     const {rows:[row]}=await this.pool.query(`UPDATE app.job_dispatch SET lease_id=$1,leased_until=now()+interval '30 seconds',attempts=attempts+1
       WHERE job_id=(SELECT job_id FROM app.job_dispatch WHERE dispatched_at IS NULL AND (leased_until IS NULL OR leased_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
-      RETURNING job_id,organization_id,brand_id`,[lease]);
+      RETURNING job_id,organization_id,brand_id,kind`,[lease]);
     if(!row)return false;
     try{
-      try{await this.client.workflow.start('validateAssetWorkflow',{workflowId:`desvio-asset-${row.job_id}`,workflowIdReusePolicy:WorkflowIdReusePolicy.REJECT_DUPLICATE,
+      try{if(!['asset.validate','document.extract'].includes(row.kind))throw new Error('JOB_KIND_DENIED');await this.client.workflow.start(row.kind==='document.extract'?'extractDocumentWorkflow':'validateAssetWorkflow',{workflowId:`desvio-${row.kind==='document.extract'?'document':'asset'}-${row.job_id}`,workflowIdReusePolicy:WorkflowIdReusePolicy.REJECT_DUPLICATE,
         taskQueue:this.taskQueue,args:[{organizationId:row.organization_id,brandId:row.brand_id,jobId:row.job_id}]});}
       catch(error){if(!(error instanceof WorkflowExecutionAlreadyStartedError))throw error;}
       await this.pool.query('UPDATE app.job_dispatch SET dispatched_at=now(),leased_until=NULL,last_error=NULL WHERE job_id=$1 AND lease_id=$2',[row.job_id,lease]);

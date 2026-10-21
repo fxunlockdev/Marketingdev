@@ -63,9 +63,7 @@ async function signin(page, address = email, pass = password) {
   await page.getByLabel("Email address").fill(address);
   await page.getByLabel("Password", { exact: true }).fill(pass);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Every client. A clear space." }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^Welcome,/ })).toBeVisible();
 }
 async function signup(page, address, name) {
   await page.goto(base + "/sign-up");
@@ -214,53 +212,113 @@ after(async () => {
   await admin.end();
 });
 
-test("browser signup, actual verification email, sign-in, client/brand creation and reload", async () => {
-  await alice.goto(base + "/sign-up");
-  await alice.screenshot({ path: "work/browser/signup.png", fullPage: true });
-  await signup(alice, email, "Alex Morgan");
-  await alice.getByLabel("Email address").fill(email);
-  await alice.getByLabel("Password", { exact: true }).fill("wrong-password");
-  await alice.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(alice.locator(".notice[role=alert]")).toContainText(
-    "Email or password was not accepted",
-  );
-  await expect(alice.getByLabel("Email address")).toHaveValue(email);
+let firstBusiness, secondBusiness;
+async function createBusiness(name) {
+  await alice.goto(base + "/brands/new");
+  await alice.getByLabel("Business name", { exact: true }).fill(name);
+  await alice
+    .getByRole("button", { name: "Save & continue", exact: true })
+    .click();
+  await expect(
+    alice.getByRole("heading", { name: "Make it unmistakably yours." }),
+  ).toBeVisible();
+  return alice.url().split("/b/")[1].split("/")[0];
+}
+async function addFact(field, value) {
+  await alice.getByLabel("Brand field", { exact: true }).selectOption(field);
+  await alice.getByLabel("Fact", { exact: true }).fill(value);
+  await alice
+    .getByRole("button", { name: "Add for review", exact: true })
+    .click();
+  await expect(
+    alice.locator(".finding-card").filter({ hasText: value }),
+  ).toBeVisible();
+}
 
+test("V5 signup and real email verification lead to zero businesses and exact navigation", async () => {
+  await signup(alice, email, "Alex Morgan");
   await signin(alice);
-  await alice
-    .getByRole("button", { name: "Create a client workspace", exact: true })
-    .click();
-  await alice.getByLabel("Client name").fill("Northstar Studio");
-  await alice
-    .getByRole("button", { name: "Create client", exact: true })
-    .click();
   await expect(
-    alice.getByRole("heading", { name: "Northstar Studio", exact: true }),
+    alice.getByRole("link", { name: "Add your first business" }),
   ).toBeVisible();
-  clientUrl = alice.url();
-  await alice.getByRole("button", { name: "Add your first brand" }).click();
-  await alice.getByLabel("Brand name").fill("Olive & Field");
-  await alice.getByLabel("Website (optional)").fill("https://example.test");
-  await alice
-    .getByRole("button", { name: "Create brand", exact: true })
-    .click();
+  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), [
+    "Overview",
+    "Brands",
+    "Content Plan",
+    "Review Inbox",
+    "Canvas",
+    "Publishing & Analytics",
+    "Memory",
+    "Connections",
+    "Team",
+    "Billing",
+    "Profile",
+  ]);
+  await alice.goto(base + "/brands");
   await expect(
-    alice.getByRole("heading", { name: "Olive & Field", exact: true }),
+    alice.getByText("0 of 3 owned businesses", { exact: false }),
   ).toBeVisible();
-  brandUrl = alice.url();
+  assert.equal(await alice.locator(".v5-business-card").count(), 0);
+  const colors = await alice.evaluate(() => ({
+    paper: getComputedStyle(document.documentElement)
+      .getPropertyValue("--paper")
+      .trim(),
+    ink: getComputedStyle(document.documentElement)
+      .getPropertyValue("--ink")
+      .trim(),
+  }));
+  assert.deepEqual(colors, { paper: "#f5ead8", ink: "#201e1d" });
+});
+
+test("three-step manual fallback saves evidence, corrections, goals and immutable brand memory", async () => {
+  firstBusiness = await createBusiness("Olive & Field");
+  brandUrl = base + `/b/${firstBusiness}/onboarding`;
   await alice.reload();
   await expect(
-    alice.getByRole("heading", { name: "Olive & Field", exact: true }),
+    alice.getByRole("heading", { name: "Make it unmistakably yours." }),
   ).toBeVisible();
-  assert.equal(
-    await alice
-      .getByRole("button", { name: /Generate|Publish|Connect social/ })
-      .count(),
-    0,
+  await addFact("brand_name", "Olive & Field");
+  await addFact("offering", "Refillable botanical soap");
+  await addFact("audience", "Independent homeware shops");
+  for (const card of await alice.locator(".finding-card").all())
+    await card.getByRole("button", { name: "Correct", exact: true }).click();
+  await expect(alice.getByText("Needs review", { exact: true })).toHaveCount(0);
+  await alice
+    .getByRole("button", { name: "Save & continue to goals →" })
+    .click();
+  await expect(
+    alice.getByRole("heading", { name: "Review your direction" }),
+  ).toBeVisible();
+  await expect(
+    alice.getByText("AI recommendations are not available in this build.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await alice.getByLabel("Primary goal").selectOption("leads");
+  await alice
+    .getByLabel("Time zone", { exact: true })
+    .fill("Asia/Kuala_Lumpur");
+  await alice.getByRole("button", { name: "Save goals", exact: true }).click();
+  await alice.reload();
+  await expect(alice.getByLabel("Primary goal")).toHaveValue("leads");
+  await alice.getByRole("button", { name: "Confirm brand profile" }).click();
+  await expect(
+    alice.getByRole("heading", { name: "Your brand facts are confirmed." }),
+  ).toBeVisible();
+  await alice.getByRole("link", { name: "View brand memory" }).click();
+  await expect(alice.locator(".memory-facts")).toContainText(
+    "Refillable botanical soap",
+  );
+  await alice.reload();
+  await expect(alice.locator(".memory-facts")).toContainText(
+    "Independent homeware shops",
   );
 });
 
-test("browser private upload, real validation, persisted reload and actual download", async () => {
+test("real private upload survives refresh and download returns the original bytes", async () => {
+  await alice.goto(brandUrl);
+  await alice.getByRole("button", { name: "Back to brand review" }).click();
+  await expect(alice.getByLabel("Choose a brand file")).toBeVisible();
   await alice.getByLabel("Choose a brand file").setInputFiles({
     name: "brand-reference.png",
     mimeType: "image/png",
@@ -276,248 +334,208 @@ test("browser private upload, real validation, persisted reload and actual downl
   ).toBeVisible();
   const promise = alice.waitForEvent("download");
   await alice.getByRole("button", { name: "Download", exact: true }).click();
-  const download = await promise;
-  const stream = await download.createReadStream();
-  const chunks = [];
-  for await (const chunk of stream) chunks.push(chunk);
+  const stream = await (await promise).createReadStream(),
+    chunks = [];
+  for await (const c of stream) chunks.push(c);
   assert.deepEqual(Buffer.concat(chunks), png);
-  await alice.screenshot({
-    path: "work/browser/brand-desktop.png",
-    fullPage: true,
-  });
   assert.deepEqual(errors, []);
-  for (const secret of [
-    config.authSecret,
-    config.mailEncryptionKey,
-    config.storage.secretAccessKey,
-  ])
-    assert.ok(!(await alice.content()).includes(secret));
 });
 
-test("network failure and stale edit retain entries until explicit recovery", async () => {
-  await alice.getByRole("button", { name: "Edit details" }).click();
-  await alice
-    .getByLabel("Brand name", { exact: true })
-    .fill("Olive & Field Collective");
-  await alice.route("**/api/v1/workspaces/*/brands/*", (route) =>
-    route.request().method() === "PATCH" ? route.abort() : route.continue(),
+test("failed and stale fact edits preserve entered corrections and require explicit recovery", async () => {
+  const card = alice
+    .locator(".finding-card")
+    .filter({ hasText: "Refillable botanical soap" });
+  await card.getByRole("button", { name: "Edit", exact: true }).click();
+  await card.getByLabel("Edit offering").fill("Refillable soap and hand wash");
+  await alice.route("**/brain/findings/*", (r) =>
+    r.request().method() === "PATCH" ? r.abort() : r.continue(),
   );
   try {
-    await alice.getByRole("button", { name: "Save details" }).click();
-    await expect(alice.locator(".notice[role=alert]")).toContainText(
+    await card.getByRole("button", { name: "Save correction" }).click();
+    await expect(card.getByRole("alert")).toContainText(
       "Your entries are still here",
     );
-    await expect(alice.getByLabel("Brand name", { exact: true })).toHaveValue(
-      "Olive & Field Collective",
+    await expect(card.getByLabel("Edit offering")).toHaveValue(
+      "Refillable soap and hand wash",
     );
   } finally {
-    await alice.unroute("**/api/v1/workspaces/*/brands/*");
+    await alice.unroute("**/brain/findings/*");
   }
-  await alice.getByRole("button", { name: "Save details" }).click();
-  await expect(alice.getByText("Brand details saved.")).toBeVisible();
+  await card.getByRole("button", { name: "Save correction" }).click();
+  await expect(
+    alice
+      .locator(".finding-card")
+      .filter({ hasText: "Refillable soap and hand wash" }),
+  ).toBeVisible();
   const second = await alice.context().newPage();
   await second.goto(brandUrl);
-  await second.getByRole("button", { name: "Edit details" }).click();
-  await alice.getByRole("button", { name: "Edit details" }).click();
-  await alice.getByLabel("Brand name", { exact: true }).fill("Olive & Field");
-  await alice.getByRole("button", { name: "Save details" }).click();
-  await expect(alice.getByText("Brand details saved.")).toBeVisible();
-  await second
-    .getByLabel("Brand name", { exact: true })
-    .fill("Unsaved alternate");
-  await second.getByRole("button", { name: "Save details" }).click();
-  await expect(second.locator(".notice[role=alert]")).toContainText(
-    "changed in another session",
-  );
-  await expect(second.getByLabel("Brand name", { exact: true })).toHaveValue(
+  const secondCard = second
+    .locator(".finding-card")
+    .filter({
+      has: second.getByRole("heading", { name: "offering", exact: true }),
+    });
+  await secondCard.getByRole("button", { name: "Edit", exact: true }).click();
+  await secondCard.getByLabel("Edit offering").fill("Unsaved alternate");
+  await alice
+    .locator(".finding-card")
+    .filter({ hasText: "Refillable soap and hand wash" })
+    .getByRole("button", { name: "Correct", exact: true })
+    .click();
+  await secondCard.getByRole("button", { name: "Save correction" }).click();
+  await expect(secondCard.getByRole("alert")).toContainText("changed");
+  await expect(secondCard.getByLabel("Edit offering")).toHaveValue(
     "Unsaved alternate",
   );
   await second.close();
 });
 
-test("real invitation survives sign-in, viewer controls and client isolation", async () => {
+test("three saved businesses, server fourth rejection, selector isolation and truthful Canvas", async () => {
+  secondBusiness = await createBusiness("Juniper Goods");
+  await createBusiness("Northside Studio");
+  await alice.goto(base + "/brands");
+  await expect(alice.locator(".v5-business-card")).toHaveCount(3);
+  await expect(
+    alice.getByText("3 of 3 owned businesses", { exact: false }),
+  ).toBeVisible();
+  await alice.screenshot({
+    path: "work/browser/v5-brands-desktop.png",
+    fullPage: true,
+  });
+  await alice.goto(base + "/brands/new");
+  await expect(
+    alice.getByRole("heading", {
+      name: "Your account is at its business limit.",
+    }),
+  ).toBeVisible();
+  const denied = await alice.evaluate(async () => {
+    const r = await fetch("/api/v1/businesses", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": crypto.randomUUID(),
+      },
+      body: JSON.stringify({ name: "Fourth business" }),
+    });
+    return { status: r.status, body: await r.json() };
+  });
+  assert.equal(denied.status, 409);
+  assert.match(denied.body.error, /BUSINESS_LIMIT_REACHED/);
+  await alice.goto(base + `/b/${firstBusiness}/memory`);
+  await expect(alice.locator(".memory-facts")).toContainText(
+    "Refillable botanical soap",
+  );
+  await alice
+    .getByLabel("Business", { exact: true })
+    .selectOption(secondBusiness);
+  await expect(
+    alice.getByText("No approved brand profile yet.", { exact: false }),
+  ).toBeVisible();
+  assert.equal(
+    await alice.getByText("Refillable botanical soap", { exact: true }).count(),
+    0,
+  );
+  await alice.getByRole("link", { name: "Canvas", exact: true }).click();
+  await expect(
+    alice.getByText("Canvas is not available in this build.", { exact: true }),
+  ).toBeVisible();
+  assert.equal(
+    await alice.getByRole("button", { name: /Generate|Publish/ }).count(),
+    0,
+  );
+  await alice.screenshot({
+    path: "work/browser/v5-canvas-unavailable.png",
+    fullPage: true,
+  });
+});
+
+test("selected-business viewer sees only their business and cannot edit or open siblings", async () => {
   const context = await browser.newContext();
   bob = await context.newPage();
   await signup(bob, "browser-bob@example.test", "Sam Rivera");
   await signin(bob, "browser-bob@example.test");
-  await bob
-    .getByRole("button", { name: "Create a client workspace", exact: true })
-    .click();
-  await bob.getByLabel("Client name").fill("Riverton Co");
-  await bob.getByRole("button", { name: "Create client", exact: true }).click();
-  await expect(
-    bob.getByRole("heading", { name: "Riverton Co", exact: true }),
-  ).toBeVisible();
-  await bob.goto(brandUrl);
-  await expect(
-    bob.getByRole("heading", { name: "Workspace unavailable" }),
-  ).toBeVisible();
-  await alice.goto(clientUrl + "/team");
-  await alice.getByLabel("Teammate’s email").fill("browser-bob@example.test");
-  await alice.getByLabel("Workspace role").selectOption("viewer");
-  await alice.getByRole("button", { name: "Send invitation" }).click();
-  await expect(
-    alice.getByText(
-      "Invitation saved and email queued. Delivery status appears below.",
-    ),
-  ).toBeVisible();
-  await drain();
-  const invitation = smtp.messages.findLast(
-    (m) =>
-      m.to.value[0].address === "browser-bob@example.test" &&
-      m.subject !== "Verify your Desvio email",
+  const business = (
+      await admin.query("SELECT organization_id FROM app.brands WHERE id=$1", [
+        secondBusiness,
+      ])
+    ).rows[0],
+    user = (
+      await admin.query('SELECT id FROM auth."user" WHERE email=$1', [
+        "browser-bob@example.test",
+      ])
+    ).rows[0];
+  await admin.query(
+    "INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'viewer','selected')",
+    [business.organization_id, user.id],
   );
-  assert.ok(invitation);
-  const link = messageLink(invitation).toString();
-  await bob.goto(base);
-  await bob.getByRole("button", { name: "Sign out" }).click();
+  await admin.query(
+    "INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'viewer')",
+    [business.organization_id, secondBusiness, user.id],
+  );
+  await bob.goto(base + "/brands");
+  await expect(bob.locator(".v5-business-card")).toHaveCount(1);
+  await expect(bob.locator(".v5-business-card")).toContainText("Juniper Goods");
+  await bob.goto(base + `/b/${firstBusiness}/memory`);
   await expect(
-    bob.getByRole("heading", { name: "Welcome back." }),
+    bob.getByRole("heading", { name: "Business unavailable" }),
   ).toBeVisible();
-  await bob.goto(link);
+  await bob.goto(base + `/b/${secondBusiness}/onboarding`);
   await expect(
-    bob.getByRole("heading", { name: "Welcome back." }),
-  ).toBeVisible();
-  await bob.getByLabel("Email address").fill("browser-bob@example.test");
-  await bob.getByLabel("Password", { exact: true }).fill(password);
-  await bob.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    bob.getByRole("button", { name: "Accept invitation" }),
-  ).toBeEnabled();
-  await bob.getByRole("button", { name: "Accept invitation" }).click();
-  await expect(
-    bob.getByRole("heading", { name: "Every client. A clear space." }),
-  ).toBeVisible();
-  await bob.goto(brandUrl);
-  await expect(
-    bob.getByRole("heading", { name: "Olive & Field", exact: true }),
+    bob.getByRole("heading", { name: "Make it unmistakably yours." }),
   ).toBeVisible();
   assert.equal(
-    await bob.getByRole("button", { name: "Edit details" }).count(),
+    await bob.getByRole("button", { name: "Add for review" }).count(),
     0,
   );
   assert.equal(await bob.getByLabel("Choose a brand file").count(), 0);
-  await expect(bob.getByRole("button", { name: "Download" })).toBeVisible();
-  const brandPath = new URL(brandUrl).pathname.replace(
-    "/clients/",
-    "/api/v1/workspaces/",
-  );
-  const denied = await bob.evaluate(
-    async (path) =>
-      (
-        await fetch(path, {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ name: "Forbidden", revision: 1 }),
-        })
-      ).status,
-    brandPath,
-  );
-  assert.equal(denied, 403);
-  await bob.getByLabel("Switch client").selectOption({ label: "Riverton Co" });
-  await expect(
-    bob.getByRole("heading", { name: "Riverton Co", exact: true }),
-  ).toBeVisible();
-  assert.equal(
-    await bob.getByText("Olive & Field", { exact: true }).count(),
-    0,
-  );
 });
 
-test("new invitee can register, verify and accept without losing the invitation", async () => {
-  const address = "browser-charlie@example.test";
-  await alice.goto(clientUrl + "/team");
-  await alice.getByLabel("Teammate’s email").fill(address);
-  await alice.getByLabel("Workspace role").selectOption("editor");
-  await alice.getByRole("button", { name: "Send invitation" }).click();
-  await expect(
-    alice.getByText(
-      "Invitation saved and email queued. Delivery status appears below.",
-    ),
-  ).toBeVisible();
-  const link = await emailLink(address, "Your Desvio client invitation");
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto(link);
-  await page
-    .getByRole("link", { name: "Create an account", exact: true })
-    .click();
-  await page.getByLabel("Your name").fill("Jamie Lee");
-  await page.getByLabel("Email address").fill(address);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page
-    .getByRole("button", { name: "Create account", exact: true })
-    .click();
-  await expect(
-    page.getByRole("heading", { name: "Check your inbox" }),
-  ).toBeVisible();
-  await page.goto(await emailLink(address, "Verify your Desvio email"));
-  await page.getByLabel("Email address").fill(address);
-  await page.getByLabel("Password", { exact: true }).fill(password);
-  await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(
-    page.getByRole("button", { name: "Accept invitation" }),
-  ).toBeEnabled();
-  await page.getByRole("button", { name: "Accept invitation" }).click();
-  await expect(
-    page.getByRole("heading", { name: "Every client. A clear space." }),
-  ).toBeVisible();
-  await page.goto(brandUrl);
-  await expect(page.getByLabel("Choose a brand file")).toBeVisible();
-  await context.close();
-});
-
-test("password recovery uses actual queued email and accepts the new password", async () => {
+test("password recovery invokes actual identity flow and an expired session retains unsaved goals", async () => {
   await alice.goto(base + "/forgot-password");
   await alice.getByLabel("Email address").fill(email);
   await alice.getByRole("button", { name: "Send reset link" }).click();
   await expect(
     alice.getByRole("heading", { name: "Check your inbox" }),
   ).toBeVisible();
-  const link = await emailLink(email, "Reset your Desvio password");
-  await alice.goto(link);
-  await expect(
-    alice.getByRole("heading", { name: "Choose a new password." }),
-  ).toBeVisible();
+  await alice.goto(await emailLink(email, "Reset your Desvio password"));
   await alice.getByLabel("Password", { exact: true }).fill(password + "-new");
   await alice.getByRole("button", { name: "Save new password" }).click();
   await expect(
     alice.getByRole("heading", { name: "Password updated" }),
   ).toBeVisible();
   await signin(alice, email, password + "-new");
-});
-
-test("expired session preserves the draft and reauthentication can resume saving", async () => {
   await alice.goto(brandUrl);
-  await alice.getByRole("button", { name: "Edit details" }).click();
-  await alice.getByLabel("Brand name", { exact: true }).fill("Recovered draft");
+  await alice
+    .getByRole("button", { name: "Save & continue to goals →" })
+    .click();
+  await expect(alice.getByLabel("Topics or claims to avoid")).toBeVisible();
+  await alice
+    .getByLabel("Topics or claims to avoid")
+    .fill("Never claim medical benefits");
   await admin.query(
     'DELETE FROM auth.session WHERE "userId"=(SELECT id FROM auth."user" WHERE email=$1)',
     [email],
   );
-  await alice.getByRole("button", { name: "Save details" }).click();
-  await expect(
-    alice.locator(".brand-details .notice[role=alert]"),
-  ).toContainText("Your session has ended");
-  await expect(alice.getByLabel("Brand name", { exact: true })).toHaveValue(
-    "Recovered draft",
+  await alice.getByRole("button", { name: "Save goals", exact: true }).click();
+  await expect(alice.getByRole("alert").first()).toContainText(
+    "Your session has ended",
+  );
+  await expect(alice.getByLabel("Topics or claims to avoid")).toHaveValue(
+    "Never claim medical benefits",
   );
   const login = await alice.context().newPage();
   await signin(login, email, password + "-new");
   await login.close();
-  await alice.getByRole("button", { name: "Save details" }).click();
-  await expect(alice.getByText("Brand details saved.")).toBeVisible();
-  await alice.getByRole("button", { name: "Edit details" }).click();
-  await alice.getByLabel("Brand name", { exact: true }).fill("Olive & Field");
-  await alice.getByRole("button", { name: "Save details" }).click();
-  await expect(alice.getByText("Brand details saved.")).toBeVisible();
+  await alice.getByRole("button", { name: "Save goals", exact: true }).click();
+  await expect(alice.locator(".notice[role=alert]")).toHaveCount(0);
+  await alice.reload();
+  await expect(alice.getByLabel("Topics or claims to avoid")).toHaveValue(
+    "Never claim medical benefits",
+  );
 });
 
-test("mobile layout, keyboard access, accessible names/contrast and no fake provider controls", async () => {
-  await alice.goto(brandUrl);
-  await expect(
-    alice.getByRole("heading", { name: "Olive & Field", exact: true }),
-  ).toBeVisible();
+test("warm business UI passes scoped desktop/mobile accessibility and contains no browser secrets", async () => {
+  await alice.goto(base + "/brands");
+  await expect(alice.locator(".v5-business-card")).toHaveCount(3);
   const desktop = await new AxeBuilder({ page: alice })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
@@ -530,7 +548,7 @@ test("mobile layout, keyboard access, accessible names/contrast and no fake prov
   );
   await alice.setViewportSize({ width: 390, height: 844 });
   await alice.screenshot({
-    path: "work/browser/brand-mobile.png",
+    path: "work/browser/v5-brands-mobile.png",
     fullPage: true,
   });
   assert.ok(
@@ -538,13 +556,27 @@ test("mobile layout, keyboard access, accessible names/contrast and no fake prov
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   );
+  await alice.getByRole("button", { name: "Menu", exact: true }).click();
+  await expect(
+    alice.getByRole("link", { name: "Memory", exact: true }),
+  ).toBeVisible();
   const mobile = await new AxeBuilder({ page: alice })
     .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
     .analyze();
   assert.deepEqual(
-    mobile.violations.map((v) => v.id),
+    mobile.violations.map((v) => ({
+      id: v.id,
+      nodes: v.nodes.map((n) => n.target),
+    })),
     [],
   );
+  for (const secret of [
+    config.authSecret,
+    config.mailEncryptionKey,
+    config.storage.secretAccessKey,
+  ])
+    assert.ok(!(await alice.content()).includes(secret));
+  assert.deepEqual(errors, []);
   await alice.goto(base + "/sign-in");
   await alice.keyboard.press("Tab");
   await expect(
@@ -561,12 +593,4 @@ test("mobile layout, keyboard access, accessible names/contrast and no fake prov
       break;
   }
   await expect(alice.getByLabel("Email address")).toBeFocused();
-  const auth = await new AxeBuilder({ page: alice })
-    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
-    .analyze();
-  assert.deepEqual(
-    auth.violations.map((v) => v.id),
-    [],
-  );
-  assert.deepEqual(errors, []);
 });

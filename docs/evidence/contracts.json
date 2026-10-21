@@ -1,8 +1,8 @@
 {
   "suite": "contracts",
   "scope": "Pinned OpenAI/Higgsfield SDKs with MOCK transports",
-  "checked_at": "2026-10-21T04:07:23.107703+00:00",
-  "source_sha256": "48c424465ab213cf4321d581d8c610d901be1e94eaf0385c5c8f701aa920e827",
+  "checked_at": "2026-10-21T12:38:10.863539+00:00",
+  "source_sha256": "a6e53dc3e1c4795b435d020dd9b79bb2e03ae2173ce0846fdcd4d88c9c1860bc",
   "results": [
     {
       "command": [
@@ -11,7 +11,7 @@
         "tests/contracts/sdk.test.mjs"
       ],
       "exit_code": 0,
-      "output": "\u2714 OpenAI generate: exact route, request serialization, base64 response (7.358709ms)\n\u2714 OpenAI edit uses multipart image and prompt (1.922917ms)\n\u2714 OpenAI 401 surfaces error without paid-call retry (0.787334ms)\n\u2714 OpenAI 403 surfaces error without paid-call retry (0.621333ms)\n\u2714 OpenAI 429 surfaces error without paid-call retry (0.762542ms)\n\u2714 OpenAI 500 surfaces error without paid-call retry (0.503166ms)\n\u2714 OpenAI ambiguous network failure is not automatically resubmitted (0.487375ms)\n\u2714 Higgsfield V2 submit exposes remote ID without automatic polling (30.667417ms)\n\u2139 tests 8\n\u2139 suites 0\n\u2139 pass 8\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 194.354333\n"
+      "output": "\u2714 OpenAI generate: exact route, request serialization, base64 response (3.570791ms)\n\u2714 OpenAI edit uses multipart image and prompt (1.291791ms)\n\u2714 OpenAI 401 surfaces error without paid-call retry (0.529834ms)\n\u2714 OpenAI 403 surfaces error without paid-call retry (0.2765ms)\n\u2714 OpenAI 429 surfaces error without paid-call retry (0.315333ms)\n\u2714 OpenAI 500 surfaces error without paid-call retry (0.246625ms)\n\u2714 OpenAI ambiguous network failure is not automatically resubmitted (0.307667ms)\n\u2714 Higgsfield V2 submit exposes remote ID without automatic polling (14.702125ms)\n\u2139 tests 8\n\u2139 suites 0\n\u2139 pass 8\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 176.851375\n"
     }
   ],
   "passed": true,

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "6dc225ae4a31eb5c61cc1a8a62c446946bd5c15c",
-  "checked_at": "2026-10-21T04:09:27.710577+00:00",
+  "code_commit": "2207e52d6babc3bce562a3d2c6e3413184ba0815",
+  "checked_at": "2026-10-21T12:41:08.196814+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -17,15 +17,12 @@
       "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "docling": {
-      "state": "NOT_IMPLEMENTED",
+      "state": "ADAPTER_READY",
       "live_test": false,
       "evidence": [
-        "docs/evidence/offline.json",
-        "docs/evidence/browser.json",
-        "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
+      "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Crawling, AI goal prefill, full business roles, deployed sandbox and live provider journey remain incomplete."
     },
     "deepagents": {
       "state": "NOT_IMPLEMENTED",
@@ -144,6 +141,31 @@
         "docs/evidence/security.json"
       ],
       "blocked_reason": "Real local browser account/client/brand/team/upload flows only. Deployed ingress/CORS, email delivery, intake, generation, editor and publishing UI remain incomplete."
+    },
+    "brand_evidence": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Crawling, AI goal prefill, full business roles, deployed sandbox and live provider journey remain incomplete."
+    },
+    "business_accounts": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Crawling, AI goal prefill, full business roles, deployed sandbox and live provider journey remain incomplete."
+    },
+    "v5_business_ui": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json",
+        "docs/evidence/browser.json"
+      ],
+      "blocked_reason": "Business navigation, scoped records, manual/document review and saved goals only. AI-assisted scrape/prefill/plan and the creative/social workflows remain incomplete; unavailable controls are labeled honestly."
     }
   },
   "security": {

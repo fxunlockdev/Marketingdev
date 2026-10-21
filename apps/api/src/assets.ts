@@ -36,7 +36,7 @@ export class Assets {
       return {id:asset.id,state:asset.state,upload:{url:await this.store.uploadURL(asset.quarantine_key,asset.expected_bytes,asset.content_type),method:'PUT',headers:{'content-type':asset.content_type,'content-length':String(asset.expected_bytes)},expiresIn:120}};
     },brand);
   }
-  list(user:string,org:string,brand:string){org=uuid(org);brand=uuid(brand);return this.database.transaction(user,org,false,async db=>{await this.brand(db,org,brand);return {assets:(await db.query(`SELECT ${PUBLIC.split(',').map(column=>'a.'+column).join(',')},j.id AS job_id,j.cancel_requested FROM app.assets a LEFT JOIN app.jobs j ON j.asset_id=a.id AND j.organization_id=a.organization_id AND j.brand_id=a.brand_id WHERE a.organization_id=$1 AND a.brand_id=$2 ORDER BY a.created_at DESC LIMIT 100`,[org,brand])).rows};},brand);}
+  list(user:string,org:string,brand:string){org=uuid(org);brand=uuid(brand);return this.database.transaction(user,org,false,async db=>{await this.brand(db,org,brand);return {assets:(await db.query(`SELECT ${PUBLIC.split(',').map(column=>'a.'+column).join(',')},j.id AS job_id,j.cancel_requested FROM app.assets a LEFT JOIN app.jobs j ON j.asset_id=a.id AND j.organization_id=a.organization_id AND j.brand_id=a.brand_id AND j.kind='asset.validate' WHERE a.organization_id=$1 AND a.brand_id=$2 ORDER BY a.created_at DESC LIMIT 100`,[org,brand])).rows};},brand);}
   abandon(user:string,org:string,brand:string,id:string){org=uuid(org);brand=uuid(brand);id=uuid(id);return this.database.transaction(user,org,true,async db=>{
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`asset:${id}`]);
     const {rows:[asset]}=await db.query('SELECT id,state FROM app.assets WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[id,org,brand]);
@@ -49,7 +49,7 @@ export class Assets {
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`asset:${id}`]);
     const {rows:[asset]}=await db.query('SELECT id,state FROM app.assets WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[id,org,brand]);
     if(!asset)throw new NotFoundException('Asset not found');
-    const {rows:[existing]}=await db.query('SELECT id,status FROM app.jobs WHERE asset_id=$1',[id]);if(existing)return existing;
+    const {rows:[existing]}=await db.query("SELECT id,status FROM app.jobs WHERE asset_id=$1 AND kind='asset.validate'",[id]);if(existing)return existing;
     if(asset.state!=='awaiting_upload')throw new ConflictException('This upload cannot be submitted');
     const job=randomUUID();await db.query(`UPDATE app.assets SET state='queued',updated_at=now() WHERE id=$1`,[id]);
     await db.query(`INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind) VALUES($1,$2,$3,$4,$5,'asset.validate')`,[job,org,brand,id,user]);
@@ -61,6 +61,26 @@ export class Assets {
     if(cancel)await db.query("UPDATE app.jobs SET cancel_requested=true WHERE id=$1 AND organization_id=$2 AND brand_id=$3 AND status IN ('queued','running','retrying')",[id,org,brand]);
     const {rows:[job]}=await db.query('SELECT id,asset_id,status,cancel_requested,attempt,error_code FROM app.jobs WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[id,org,brand]);if(!job)throw new NotFoundException('Job not found');return job;
   },brand);}
+  extract(user:string,org:string,brand:string,id:string,key:unknown){org=uuid(org);brand=uuid(brand);id=uuid(id);
+    if(typeof key!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('An Idempotency-Key is required');
+    return this.database.transaction(user,org,true,async db=>{
+      await this.brand(db,org,brand);await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`document-limit:${org}:${brand}`]);
+      const operation=`document.extract:${brand}`,hash=createHash('sha256').update(id).digest('hex');
+      const prior=(await db.query('SELECT request_hash,response FROM app.idempotency WHERE organization_id=$1 AND operation=$2 AND key=$3',[org,operation,key])).rows[0];
+      if(prior){if(prior.request_hash!==hash)throw new ConflictException('This request key was used for another document');return prior.response;}
+      const asset=(await db.query('SELECT * FROM app.assets WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[id,org,brand])).rows[0];
+      if(!asset)throw new NotFoundException('Asset not found');
+      if(asset.state!=='ready')throw new ConflictException('Wait for file validation before extracting brand evidence');
+      if(!['application/pdf','application/vnd.openxmlformats-officedocument.presentationml.presentation'].includes(asset.content_type))throw new BadRequestException('Choose a PDF or PPTX document');
+      const usage=(await db.query("SELECT count(*) FILTER(WHERE created_at>now()-interval '24 hours')::int AS daily,count(*) FILTER(WHERE status IN ('queued','running','retrying'))::int AS pending FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='document.extract'",[org,brand])).rows[0];
+      if(usage.daily>=50||usage.pending>=3)throw new ConflictException('This brand has reached its document processing limit');
+      const job=randomUUID(),result={id:job,status:'queued'};
+      await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind) VALUES($1,$2,$3,$4,$5,'document.extract')",[job,org,brand,id,user]);
+      await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'document.extract')",[job,org,brand]);
+      await db.query('INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response) VALUES($1,$2,$3,$4,$5)',[org,operation,key,hash,JSON.stringify(result)]);
+      await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'document.submitted',$4)",[org,brand,user,job]);return result;
+    },brand);
+  }
   download(user:string,org:string,brand:string,id:string){org=uuid(org);brand=uuid(brand);id=uuid(id);return this.database.transaction(user,org,false,async db=>{
     const {rows:[asset]}=await db.query('SELECT id,state,canonical_key,content_type FROM app.assets WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[id,org,brand]);
     if(!asset)throw new NotFoundException('Asset not found');if(asset.state!=='ready')throw new ConflictException('This file has not passed validation');

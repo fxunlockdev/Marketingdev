@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api, type Workspace } from "./api";
 import { Wordmark, Loading, Notice, Field } from "./primitives";
+import { BusinessApp } from "./businesses";
 import { AuthScreen } from "./auth";
 import { WorkspaceHome, BrandHome } from "./workspaces";
 import { TeamScreen } from "./team";
@@ -19,7 +20,9 @@ export function Desvio() {
     ].includes(mode)
   )
     return <AuthScreen key={mode} mode={mode} />;
-  return <Session key={pathname} pathname={pathname} />;
+  if(pathname.startsWith("/clients"))return <LegacyBusinessLink pathname={pathname}/>;
+  if(pathname==="/accept-invitation")return <Session key={pathname} pathname={pathname} />;
+  return <BusinessApp key={pathname} pathname={pathname} />;
 }
 function Session({ pathname }: { pathname: string }) {
   const router = useRouter(),
@@ -225,3 +228,5 @@ function AcceptInvitation() {
     </main>
   );
 }
+
+function LegacyBusinessLink({pathname}:{pathname:string}){const router=useRouter();useEffect(()=>{const parts=pathname.split('/');router.replace(parts[3]==='brands'&&parts[4]?`/b/${parts[4]}/onboarding`:'/brands');},[pathname,router]);return <main id="main" className="standalone"><Loading/></main>;}

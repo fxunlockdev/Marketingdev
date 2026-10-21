@@ -1,3 +1,13 @@
+# Desvio experience direction — owner V5 correction
+
+The 21 October 2026 owner correction supersedes the earlier navigation and visual decisions below. Use DESVIO_UI_V5_PRODUCT_SPEC.md and NEW_NAV_AND_UX_HANDOFF.md, mapped to existing services through IMPLEMENTATION_STATUS.md. Keep the existing architecture.
+
+One account owns up to three businesses by standard entitlement, with business-scoped access. The user sees businesses directly. Navigation: Overview → Brands → Content Plan → Review Inbox → Canvas → Publishing & Analytics → Memory → Connections → Team → Billing → Profile. Use the supplied warm cream/ink/terracotta/sage reference, not the previous blue/white palette.
+
+Onboarding is exactly three short steps: Your business → Confirm your brand → Review goals & finish. AI must pre-fill the final recommendations from real scraped/uploaded/confirmed context; the user reviews/adjusts rather than completes a blank configuration form. Recommendations need evidence and honest uncertainty. Team/social connection setup can come later. Persist progress. No fake scrape or recommendation result.
+
+## Historical direction — superseded where conflicting
+
 # Desvio experience direction
 
 Owner decisions: multiple client tenants; Desvio identity; brand-specific OpenAI/Higgsfield creatives, revisions and social publishing; end-to-end product goal. Working defaults: English, LinkedIn first then Instagram, explicit human approval. This is planned behavior, not shipped UI.
