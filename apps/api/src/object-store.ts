@@ -2,14 +2,14 @@ import {S3Client,GetObjectCommand,PutObjectCommand,DeleteObjectCommand} from '@a
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
 import {createHash} from 'node:crypto';
 import type {Readable} from 'node:stream';
-import type {Config} from './config.js';
+import type {StorageConfig} from './config.js';
 
 export const MAX_UPLOAD_BYTES=20*1024*1024;
 export const digest=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 export class InvalidAsset extends Error {constructor(readonly code:string){super(code);}}
 export class ObjectStore {
   readonly client:S3Client;
-  constructor(readonly config:Config['storage']) {
+  constructor(readonly config:StorageConfig) {
     this.client=new S3Client({endpoint:config.endpoint,region:config.region,forcePathStyle:true,maxAttempts:1,
       credentials:{accessKeyId:config.accessKeyId,secretAccessKey:config.secretAccessKey},requestChecksumCalculation:'WHEN_REQUIRED',responseChecksumValidation:'WHEN_REQUIRED'});
   }

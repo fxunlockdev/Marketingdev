@@ -1,3 +1,6 @@
+export type StorageConfig={endpoint:string;region:string;bucket:string;accessKeyId:string;secretAccessKey:string};
+export type ScannerConfig={host:string;port:number};
+export type JobsConfig={workerDatabaseUrl:string;dispatcherDatabaseUrl:string;address:string;namespace:string;taskQueue:string};
 export type Config = {
   mode: 'development' | 'test' | 'staging' | 'production';
   origin: string;
@@ -7,9 +10,7 @@ export type Config = {
   mailDatabaseUrl: string;
   mailEncryptionKey: string;
   smtp: {host:string;port:number;secure:boolean;user?:string;password?:string;from:string};
-  storage: {endpoint:string;region:string;bucket:string;accessKeyId:string;secretAccessKey:string};
-  scanner: {host:string;port:number};
-  jobs: {workerDatabaseUrl:string;dispatcherDatabaseUrl:string;address:string;namespace:string;taskQueue:string};
+  storage: StorageConfig;
 };
 
 export function configFromEnv(env = process.env): Config {
@@ -35,14 +36,27 @@ export function configFromEnv(env = process.env): Config {
   if(env.SMTP_SECURE!==undefined && !['true','false'].includes(env.SMTP_SECURE)) throw new Error('SMTP_SECURE must be true or false');
   if(!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(smtp.from)) throw new Error('SMTP_FROM must be a single email address');
   if(mode==='staging' && (!smtp.user || !smtp.password)) throw new Error('Authenticated SMTP required for staging');
+  const storage=storageFromEnv(env);
+  return { mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+    authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
+    mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
+}
+
+function envReader(env:NodeJS.ProcessEnv){return (key:string)=>{if(!env[key])throw new Error(`${key} is required`);return env[key]!;};}
+function storageFromEnv(env:NodeJS.ProcessEnv):StorageConfig{
+  const required=envReader(env);
   const endpoint=new URL(required('S3_ENDPOINT'));
   if(endpoint.username || endpoint.password || !['http:','https:'].includes(endpoint.protocol)
     || (endpoint.protocol==='http:' && !['localhost','127.0.0.1','[::1]'].includes(endpoint.hostname))) throw new Error('S3 requires HTTPS or local test storage');
   const storage={endpoint:endpoint.toString(),region:required('S3_REGION'),bucket:required('S3_BUCKET'),accessKeyId:required('S3_ACCESS_KEY_ID'),secretAccessKey:required('S3_SECRET_ACCESS_KEY')};
+  return storage;
+}
+// Worker processes do not require or read authentication, application DB or SMTP credentials.
+export function workerConfigFromEnv(env=process.env){
+  const required=envReader(env),mode=required('APP_MODE');
+  if(!['test','development','staging'].includes(mode))throw new Error('Worker production launch blocked pending the complete release gate');
   const scanner={host:required('CLAMD_HOST'),port:Number(required('CLAMD_PORT'))};
   if(!Number.isInteger(scanner.port)||scanner.port<1||scanner.port>65535)throw new Error('Invalid scanner port');
   const jobs={workerDatabaseUrl:required('WORKER_DATABASE_URL'),dispatcherDatabaseUrl:required('DISPATCHER_DATABASE_URL'),address:required('TEMPORAL_ADDRESS'),namespace:required('TEMPORAL_NAMESPACE'),taskQueue:required('TEMPORAL_TASK_QUEUE')};
-  return { mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
-    authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
-    mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage,scanner,jobs };
+  return {storage:storageFromEnv(env),scanner,jobs};
 }

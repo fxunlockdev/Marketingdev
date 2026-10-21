@@ -32,7 +32,7 @@ Prefix: `/api/v1/workspaces/:org/brands/:brand`.
 
 Migration `003_assets_jobs.sql` adds forced-RLS assets, jobs and job_dispatch. It requires separate NOBYPASSRLS NOINHERIT login roles `desvio_worker` and `desvio_dispatcher`; use secrets-manager passwords. The runtime refuses privileged roles. Migration 000–002 are unchanged.
 
-API storage configuration is S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY. Worker additionally uses WORKER_DATABASE_URL, DISPATCHER_DATABASE_URL, CLAMD_HOST/PORT, TEMPORAL_ADDRESS/NAMESPACE/TASK_QUEUE. `npm run start:worker` runs actual validation and dispatch. Clamd has no authentication: place it on a private network; never expose it publicly. Current Temporal connection is for a private engineering network; production TLS/auth configuration remains a release blocker.
+API and worker config readers are separate: API does not require worker/dispatcher database credentials, and workers do not require authentication/application database or SMTP credentials. API storage configuration is S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY. Worker additionally uses WORKER_DATABASE_URL, DISPATCHER_DATABASE_URL, CLAMD_HOST/PORT, TEMPORAL_ADDRESS/NAMESPACE/TASK_QUEUE. `npm run start:worker` runs actual validation and dispatch. Clamd has no authentication: place it on a private network; never expose it publicly. Current Temporal connection is for a private engineering network; production TLS/auth configuration remains a release blocker.
 
 ## Verification and dependency sources
 

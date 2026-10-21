@@ -2,7 +2,7 @@ import {createConnection} from 'node:net';
 import sharp from 'sharp';
 import yauzl from 'yauzl';
 import {InvalidAsset} from './object-store.js';
-import type {Config} from './config.js';
+import type {ScannerConfig} from './config.js';
 
 export const TYPES:Record<string,string>={'image/png':'.png','image/jpeg':'.jpg','image/webp':'.webp','application/pdf':'.pdf',
   'application/vnd.openxmlformats-officedocument.presentationml.presentation':'.pptx'};
@@ -42,7 +42,7 @@ export async function validateFormat(bytes:Buffer,type:string) {
 }
 
 export class MalwareScanner {
-  constructor(readonly config:Config['scanner']) {}
+  constructor(readonly config:ScannerConfig) {}
   private command(command:string,body?:Buffer):Promise<string> {
     return new Promise((resolve,reject)=>{
       const socket=createConnection({host:this.config.host,port:this.config.port});let output=Buffer.alloc(0),done=false;
