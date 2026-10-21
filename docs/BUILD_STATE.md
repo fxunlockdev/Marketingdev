@@ -55,6 +55,6 @@ These do not prevent independent M1 implementation. The local workspace_auth cap
 
 ## Next implementation work — finish M1, then PR-02
 
-Verification passed within the scopes above; PR-01 is being saved as a stacked draft. Next implement verified email/password recovery and secure invitations, private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Extend negative tests across jobs/assets and restart boundaries. Then build the minimal backed sign-in/workspace/brand UI and continue PR-02 intake/findings/Correct-Wrong-Edit/immutable approved Brand Brain. Full creative revision, approval and real social publishing goal remains intact.
+Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Next implement verified email/password recovery and secure invitations, private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Extend negative tests across jobs/assets and restart boundaries. Then build the minimal backed sign-in/workspace/brand UI and continue PR-02 intake/findings/Correct-Wrong-Edit/immutable approved Brand Brain. Full creative revision, approval and real social publishing goal remains intact.
 
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.
