@@ -8,3 +8,8 @@ __pycache__/
 work/
 
 dist/
+
+.next/
+*.tsbuildinfo
+playwright-report/
+test-results/

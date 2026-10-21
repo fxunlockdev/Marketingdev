@@ -36,7 +36,7 @@ export class Assets {
       return {id:asset.id,state:asset.state,upload:{url:await this.store.uploadURL(asset.quarantine_key,asset.expected_bytes,asset.content_type),method:'PUT',headers:{'content-type':asset.content_type,'content-length':String(asset.expected_bytes)},expiresIn:120}};
     },brand);
   }
-  list(user:string,org:string,brand:string){org=uuid(org);brand=uuid(brand);return this.database.transaction(user,org,false,async db=>{await this.brand(db,org,brand);return {assets:(await db.query(`SELECT ${PUBLIC} FROM app.assets WHERE organization_id=$1 AND brand_id=$2 ORDER BY created_at DESC LIMIT 100`,[org,brand])).rows};},brand);}
+  list(user:string,org:string,brand:string){org=uuid(org);brand=uuid(brand);return this.database.transaction(user,org,false,async db=>{await this.brand(db,org,brand);return {assets:(await db.query(`SELECT ${PUBLIC.split(',').map(column=>'a.'+column).join(',')},j.id AS job_id,j.cancel_requested FROM app.assets a LEFT JOIN app.jobs j ON j.asset_id=a.id AND j.organization_id=a.organization_id AND j.brand_id=a.brand_id WHERE a.organization_id=$1 AND a.brand_id=$2 ORDER BY a.created_at DESC LIMIT 100`,[org,brand])).rows};},brand);}
   abandon(user:string,org:string,brand:string,id:string){org=uuid(org);brand=uuid(brand);id=uuid(id);return this.database.transaction(user,org,true,async db=>{
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`asset:${id}`]);
     const {rows:[asset]}=await db.query('SELECT id,state FROM app.assets WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[id,org,brand]);

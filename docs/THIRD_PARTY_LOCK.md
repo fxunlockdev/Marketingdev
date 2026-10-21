@@ -28,6 +28,8 @@
 | Garage test storage | 2.4.1, sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020 | AGPL-3.0; isolated local service, not adopted for production hosting |
 | ClamAV scanner image | 1.5.4, sha256:b5fffca589275b71a4c610afc69d32a8d9c6cf4454c6d06529ddb08da17d0c30 | GPL-2.0; official full signature database 28157 (Oct 18); amd64 test image |
 | sharp / yauzl | 0.35.5 / 3.4.0 | Apache-2.0 / MIT; libvips/transitive native license obligations also apply |
+| Next.js / React / React DOM | 16.4.2 / 19.3.1 / 19.3.1 | MIT; production build exercised through actual Chromium browser |
+| Playwright / axe-core Playwright | 1.64.1 / 4.14.0 | Apache-2.0 / MPL-2.0; dev-only browser and scoped accessibility checks |
 | reflect-metadata / rxjs | 0.2.2 / 7.8.2 | Nest dependencies; exact lock |
 
 Discovered but NOT adopted: Crawl4AI 0.9.5 (PyPI Apache-2.0), Docling 2.141.0 (PyPI MIT). Inspect attribution/model weights/transitives before install. Fabric, FFmpeg codec/build licensing, pgvector, OpenTelemetry and production object storage remain to pin at adoption. Langfuse, Portkey, GrowthBook optional; MinIO not deployed.
