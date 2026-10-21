@@ -37,7 +37,7 @@ def write_status():
     integrations = {name: {"state": "NOT_IMPLEMENTED", "live_test": False, "evidence": refs,
                            "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."}
                     for name in ["crawl4ai", "docling", "deepagents", "openai_images", "higgsfield_video", "creative_editor", "postiz_publish", "performance_learning", "tenant_runtime"]}
-    integrations["tenant_runtime"]["blocked_reason"] = "Auth/workspace/brand/team APIs and RLS are implemented locally; private media storage, generation-worker authorization and deployed tenant journey remain incomplete."
+    integrations["tenant_runtime"]["blocked_reason"] = "Auth/workspace/brand/team APIs and RLS are implemented locally; deployed private storage, generation-worker authorization and deployed tenant journey remain incomplete."
     security_path = EVIDENCE / "security.json"
     security = json.loads(security_path.read_text()) if security_path.exists() else {}
     foundation_passed = (security.get("passed") is True and security.get("source_sha256") == source_hash()
@@ -48,6 +48,10 @@ def write_status():
     integrations["account_email"] = {"state": "ADAPTER_READY" if foundation_passed else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/security.json"],
         "blocked_reason": "Encrypted queue, verification/reset/invitations and SMTP error paths tested against a local server only. Real sender credentials, deliverability, UI and operator retry/monitoring remain unverified/incomplete."}
+    for capability in ["private_assets", "durable_asset_jobs"]:
+        integrations[capability] = {"state": "ADAPTER_READY" if foundation_passed else "NOT_IMPLEMENTED", "live_test": False,
+            "evidence": ["docs/evidence/security.json"],
+            "blocked_reason": "Actual local Garage/ClamAV/Temporal tests only. Production IAM/CORS/TLS, retention, cleanup, UI, intake sandbox and deployed/provider workflows remain incomplete."}
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
               "checked_at": now(), "integrations": integrations,
@@ -62,11 +66,11 @@ def run_suite(name):
         audit_skills()
     results = []
     for command in SUITES[name]:
-        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=180)
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=300)
         log = result.stdout + result.stderr
         print(log, end="")
         results.append({"command": command, "exit_code": result.returncode, "output": log})
-    scopes = {"offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; no external provider/private-media/generation-worker tenant proof"}
+    scopes = {"offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; no external provider or deployed generation-worker proof"}
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": source_hash(), "results": results, "passed": all(x["exit_code"] == 0 for x in results), "live_calls": False}
     (EVIDENCE / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")

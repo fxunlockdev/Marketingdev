@@ -8,12 +8,13 @@ import { Pool } from 'pg';
 import { getMigrations } from 'better-auth/db/migration';
 import { authOptions } from '../dist/auth.js';
 import { migrate } from './migrate.mjs';
+import {startAssetServices} from './storage-test-services.mjs';
 
 const IMAGE = 'postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73';
 const container = `desvio-foundation-${randomUUID()}`;
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'], timeout: 60000 }).trim();
 const password = randomBytes(32).toString('hex');
-let pool, authMigrationPool;
+let pool, authMigrationPool,services;
 let started = false;
 try {
   // Docker can reassign an automatically published port on restart. Reserve an explicit
@@ -34,16 +35,21 @@ try {
     try { await pool.query('SELECT 1'); ready=true; break; } catch { await setTimeout(200); }
   }
   if (!ready) throw new Error('Disposable PostgreSQL did not start');
+  const workerPass=randomBytes(32).toString('hex'),dispatchPass=randomBytes(32).toString('hex');
   const appPass=randomBytes(32).toString('hex'), authPass=randomBytes(32).toString('hex'),mailPass=randomBytes(32).toString('hex');
   // Passwords are hex generated here, never operator-controlled SQL input.
   await pool.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;
     CREATE ROLE desvio_app LOGIN PASSWORD '${appPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
     CREATE ROLE desvio_auth LOGIN PASSWORD '${authPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+    CREATE ROLE desvio_worker LOGIN PASSWORD '${workerPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+    CREATE ROLE desvio_dispatcher LOGIN PASSWORD '${dispatchPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
     CREATE ROLE desvio_bootstrap NOLOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;
     CREATE ROLE desvio_mail LOGIN PASSWORD '${mailPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
     CREATE ROLE desvio_access NOLOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;`);
   const config = { mode:'test', origin:'http://127.0.0.1:3100', authSecret:randomBytes(32).toString('hex'),
     authDatabaseUrl:url('desvio_auth',authPass), appDatabaseUrl:url('desvio_app',appPass),mailDatabaseUrl:url('desvio_mail',mailPass),
+    storage:{endpoint:'http://127.0.0.1:1',region:'garage',bucket:'desvio-test',accessKeyId:'test',secretAccessKey:'test'},scanner:{host:'127.0.0.1',port:1},
+    jobs:{workerDatabaseUrl:url('desvio_worker',workerPass),dispatcherDatabaseUrl:url('desvio_dispatcher',dispatchPass),address:'127.0.0.1:1',namespace:'desvio-test',taskQueue:'assets'},
     mailEncryptionKey:randomBytes(32).toString('hex'),smtp:{host:'127.0.0.1',port:1,secure:false,from:'accounts@desvio.test'} };
   if (process.argv.includes('--generate-auth')) {
     await pool.query('CREATE SCHEMA auth');
@@ -64,8 +70,13 @@ try {
       child.on('error',reject); child.on('exit', code=>resolve(code ?? 1));
     });
     process.exitCode=code;
+    if(code===0){
+      services=await startAssetServices();Object.assign(config,{storage:services.storage,scanner:services.scanner});config.jobs.address=services.address;
+      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1','tests/foundation/assets.test.mjs'],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
+    }
   }
 } finally {
+  await services?.close();
   await authMigrationPool?.end(); await pool?.end();
   if (started) docker('rm','-f',container);
 }

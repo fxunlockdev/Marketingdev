@@ -13,6 +13,8 @@ import { TenantDatabase } from './database.js';
 import { Workspaces } from './workspaces.js';
 import { MailQueue,MailWorker } from './mail.js';
 import { Team } from './team.js';
+import {Assets} from './assets.js';
+import {ObjectStore} from './object-store.js';
 
 type AuthRequest = Request & { actorId: string; traceId: string };
 const AUTH = Symbol('auth');
@@ -68,6 +70,19 @@ class InvitationController {
   @Post('accept') accept(@Req() req:AuthRequest,@Body() body:unknown) {return this.team.accept(req.actorId,body);}
 }
 
+@Controller('api/v1/workspaces/:org/brands/:brand')
+@UseGuards(SessionGuard)
+class AssetController {
+  constructor(@Inject(Assets) private readonly assets:Assets){}
+  @Post('uploads') reserve(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.assets.reserve(r.actorId,o,b,body,key);}
+  @Post('assets/:id/abandon') abandon(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.abandon(r.actorId,o,b,id);}
+  @Get('assets') list(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string){return this.assets.list(r.actorId,o,b);}
+  @Post('assets/:id/complete') complete(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.complete(r.actorId,o,b,id);}
+  @Post('assets/:id/download') download(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.download(r.actorId,o,b,id);}
+  @Get('jobs/:id') job(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.job(r.actorId,o,b,id);}
+  @Post('jobs/:id/cancel') cancel(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.assets.job(r.actorId,o,b,id,true);}
+}
+
 export async function createApplication(config: Config) {
   if(config.mode==='production') throw new Error('Production launch blocked pending the complete release gate');
   const authPool = new Pool({ connectionString: config.authDatabaseUrl, options: '-c search_path=auth', max: 5, connectionTimeoutMillis: 5000 });
@@ -79,7 +94,7 @@ export async function createApplication(config: Config) {
   authPool.on('error', () => {});
   const mailPool=new Pool({connectionString:config.mailDatabaseUrl,max:3,connectionTimeoutMillis:5000});
   mailPool.on('error',()=>{});
-  const database = new TenantDatabase(pool);
+  const database = new TenantDatabase(pool),store=new ObjectStore(config.storage);
   try {
     await database.assertRuntimeRole();
     const { rows: [role] } = await authPool.query('SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user');
@@ -125,12 +140,12 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [WorkspaceController,InvitationController], providers: [SessionGuard,
-      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team}] })
+    @Module({ controllers: [WorkspaceController,InvitationController,AssetController], providers: [SessionGuard,
+      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());
     await app.init();
-    return { app, database, auth,mailWorker, async close() { await app.close();mailWorker.close(); await Promise.all([pool.end(), authPool.end(),mailPool.end()]); } };
-  } catch (error) { await Promise.all([pool.end(), authPool.end(),mailPool.end()]); throw error; }
+    return { app, database, auth,mailWorker, async close() { await app.close();mailWorker.close();store.close(); await Promise.all([pool.end(), authPool.end(),mailPool.end()]); } };
+  } catch (error) { store.close();await Promise.all([pool.end(), authPool.end(),mailPool.end()]); throw error; }
 }

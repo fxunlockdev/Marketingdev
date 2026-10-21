@@ -1,6 +1,6 @@
 # Desvio build state
 
-Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers remain and initial M1 workspace backend is implemented locally. Prior goal turn was progress: PR #2 implemented and verified the real client/workspace/brand foundation. This session continues M1 with verified accounts and invitations.
+Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers remain and initial M1 workspace backend is implemented locally. Prior goal turns implemented client/workspace/brand accounts and invitations. This session implements private asset uploads and durable validation jobs; the full generation/revision/publication goal remains active.
 
 ## Owner decisions
 
@@ -13,7 +13,7 @@ Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers rema
 
 ## Code and evidence
 
-Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-02-account-access, stacked on codex/pr-01-tenant-foundation. Draft PR-00: https://github.com/fxunlockdev/Marketingdev/pull/1. Original specs, archive and repository manifest retained.
+Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-03-private-assets-jobs, stacked on codex/pr-02-account-access. Draft PR-00: https://github.com/fxunlockdev/Marketingdev/pull/1. Original specs, archive and repository manifest retained.
 
 - scripts/skill_audit.py: safe archive validation, immutable file/skill digests, preserve MIT notice.
 - scripts/skill_probe.py: actual Deep Agents middleware discovery with per-run read-only mount.
@@ -22,22 +22,33 @@ Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch 
 - scripts/verify.py and release_gate.py: actual audit-suite evidence; product status stays NOT_IMPLEMENTED.
 - docs/adr/0001-reuse-decisions.md, POSTIZ_API_MATRIX.md, PROVIDER_CAPABILITIES.md, SKILL_AUDIT.md, THIRD_PARTY_LOCK.md, SECURITY_THREAT_MODEL.md, PRODUCT_EXPERIENCE.md.
 
-Final session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 24 actual local HTTP/PostgreSQL/SMTP tests plus 6 audit/guard tests (41 tests total). release-gate exits nonzero as intended. verify-live was NOT run; no real emails, paid providers or social accounts were contacted. npm audit reports zero known vulnerabilities in the locked npm tree; this is not full security clearance. Machine evidence identifies implementation commit e190596 and the source fingerprint.
+Previous account session verification: verify-offline compiled the API and passed 3 skill tests; verify-contracts passed 8 mocked SDK tests; verify-security passed 24 actual local HTTP/PostgreSQL/SMTP tests plus 6 audit/guard tests (41 tests total). release-gate exits nonzero as intended. verify-live was NOT run; no real emails, paid providers or social accounts were contacted. npm audit reports zero known vulnerabilities in the locked npm tree; this is not full security clearance. Machine evidence identifies implementation commit e190596 and the source fingerprint.
 
-## M1 progress this session
+## Current private-assets session
+
+- Migration 003 adds assets/jobs/dispatch with forced RLS, a dedicated scoped worker login and a separate dispatcher login. Existing migrations are unchanged.
+- apps/api/src/assets.ts and app.ts implement authenticated reserve/list/complete/download/abandon/job-status/cancel routes. Signed uploads are quarantined; strict size/type/hash checks, pending/daily/storage quotas and idempotent submission are backed by transactions.
+- object-store.ts and file-validation.ts use the actual pinned S3 SDK, ClamAV protocol and image decoder. PDF/PPTX checks are structural; document extraction/sandboxing is NOT implemented.
+- jobs.ts, asset-workflow.ts and worker-main.ts implement real Temporal dispatch, bounded validation retries, cancellation, permission rechecks and saved failure status. Actual worker-process death recovered successfully in local tests.
+- tests/foundation/assets.test.mjs and scripts/storage-test-services.mjs use real local Garage, ClamAV with full official signatures and Temporal server. Six new tests passed alongside all 24 existing account tests. A seventh temporary-scanner-outage test is added for final verification. Final machine gate results are pending this checkpoint.
+- Garage was observed to ignore conditional PUT headers. Canonical keys now include the verified hash; the writer checks key/hash/bytes identity and existing bytes. Corrected the EICAR fixture to its standard standalone test string. Neither issue was masked with a passing flag.
+- docs/adr/0004-private-assets-and-durable-validation.md records storage contracts, bearer-link expiry, cleanup/retention limits, local-only proof and configuration. Production provisioning, private IAM/CORS/TLS, orphan cleanup, customer UI and intake remain unfinished.
+- No paid providers, external sender or social-account tests performed. No LIVE_VERIFIED / LAUNCH_READY claim.
+
+## Earlier M1 progress
 
 - apps/api/src/: NestJS + Better Auth, genuine cookie sessions, client workspace ownership, brand list/create/read/edit, strict origin/body checks, database-backed auth throttle and safe errors.
 - database/migrations/: generated pinned-auth schema and product schema; separate least-privilege roles, forced RLS, limited bootstrap function, immutable audit records, idempotent creates and pending outbox events.
 - scripts/migrate.mjs: transactional, checksum-verified/replay-safe migrations.
 - tests/foundation/tenancy.test.mjs and scripts/foundation-test.mjs: disposable pinned PostgreSQL + actual HTTP integration tests. The expanded suite now passes 24 tests, retaining partial PATCH preservation/clearing, cross-brand scope and restart recovery coverage. Test containers were removed after completion.
 - docs/adr/0002-auth-and-tenancy.md records source contracts, actual routes and threat boundaries.
-- Session revocation and client/brand isolation are demonstrated for these local paths only. No private storage/worker/provider authorization claim.
+- Session revocation and client/brand isolation are demonstrated for these local paths only. This earlier suite did not establish private storage/worker/provider authorization; current local asset-worker evidence is scoped separately above.
 - apps/api/src/mail.ts: AES-GCM email queue, dedicated SMTP worker with leases, bounded retry after explicit rejection and unknown state after ambiguous send/worker loss. Actual local SMTP tests; no external email sent.
 - apps/api/src/team.ts and migration 002_mail_and_invitations.sql: scoped, recipient-bound invitations; hashed tokens; idempotency; sender-role recheck; replacement/revocation; race-safe owner and role rules; daily invite cap.
 - auth.ts now requires email verification, uses transactional password reset with session revocation, and contains raw upstream errors. Account flows use the genuine pinned library and actual local SMTP.
 - docs/adr/0003-account-email-and-team-access.md records contracts, server settings and limits.
 - Final foundation suite passed 24 tests, including daily-cap races, SMTP uncertainty, reset rollback and sanitized error logging. No customer account/team UI yet. Production activation still fails closed; staging sender/ingress/deployment remain unverified.
-- Mail queue dispatch is implemented. Brand outbox / Temporal generation jobs are still pending, not processed.
+- Mail queue dispatch is implemented. Brand-event outbox / paid Temporal generation jobs are still pending; the new asset-validation dispatch is separate.
 
 ## Railway
 
@@ -60,6 +71,6 @@ These do not prevent independent M1 implementation. The local workspace_auth cap
 
 ## Next implementation work — finish M1, then PR-02
 
-Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Account verification/recovery/invitation backends are now implemented; PR-02 is a stacked draft on PR-01: https://github.com/fxunlockdev/Marketingdev/pull/3. Next implement private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Finish the custom account/team UI and external sender validation alongside the minimal backed workspace experience. Extend negative tests across jobs/assets and restart boundaries. Then continue website/PDF/PPTX intake, Correct/Wrong/Edit findings and immutable approved Brand Brain. PR numbering has expanded to keep the M1 account work reviewable; the later onboarding scope is unchanged. Full creative revision, approval and real social publishing goal remains intact.
+Verification passed within the scopes above; PR-01 is a stacked draft at https://github.com/fxunlockdev/Marketingdev/pull/2 (base PR-00). Account verification/recovery/invitation backends are now implemented; PR-02 is a stacked draft on PR-01: https://github.com/fxunlockdev/Marketingdev/pull/3. Private storage and asset-validation Temporal dispatch are implemented locally in PR-03; finalize its machine evidence and draft review. Broader API quotas/observability and production storage remain pending. Finish the custom account/team UI and external sender validation alongside the minimal backed workspace experience. Extend negative tests across jobs/assets and restart boundaries. Then continue website/PDF/PPTX intake, Correct/Wrong/Edit findings and immutable approved Brand Brain. PR numbering has expanded to keep the M1 account work reviewable; the later onboarding scope is unchanged. Full creative revision, approval and real social publishing goal remains intact.
 
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.

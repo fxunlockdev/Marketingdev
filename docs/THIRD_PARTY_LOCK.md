@@ -22,8 +22,14 @@
 | Express | 5.3.0 | MIT; bounded JSON parser including auth, exact origin policy |
 | PostgreSQL test image | postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73 | Runtime reports 17.11; local disposable database only, PostgreSQL license |
 | TypeScript | 7.0.2 | Apache-2.0; compiler; Node types 26.6.5, pg types 8.23.1, Express types 5.0.6 |
+| AWS S3 SDK / request presigner | 3.1154.0 | Apache-2.0; actual local signed-object tests |
+| Temporal client / worker / workflow / activity / testing | 1.24.0 | MIT; exact npm lock, actual local workflow service |
+| Temporal CLI test server | 1.9.1, server 1.32.0 | MIT; platform archive SHA-256s verified before extraction |
+| Garage test storage | 2.4.1, sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6d7d3d811a4b12d0d020 | AGPL-3.0; isolated local service, not adopted for production hosting |
+| ClamAV scanner image | 1.5.4, sha256:b5fffca589275b71a4c610afc69d32a8d9c6cf4454c6d06529ddb08da17d0c30 | GPL-2.0; official full signature database 28157 (Oct 18); amd64 test image |
+| sharp / yauzl | 0.35.5 / 3.4.0 | Apache-2.0 / MIT; libvips/transitive native license obligations also apply |
 | reflect-metadata / rxjs | 0.2.2 / 7.8.2 | Nest dependencies; exact lock |
 
-Discovered but NOT adopted: Crawl4AI 0.9.5 (PyPI Apache-2.0), Docling 2.141.0 (PyPI MIT). Inspect attribution/model weights/transitives before install. Fabric, FFmpeg codec/build licensing, pgvector, Temporal SDKs, OpenTelemetry and production object storage remain to pin at adoption. Langfuse, Portkey, GrowthBook optional; MinIO not deployed.
+Discovered but NOT adopted: Crawl4AI 0.9.5 (PyPI Apache-2.0), Docling 2.141.0 (PyPI MIT). Inspect attribution/model weights/transitives before install. Fabric, FFmpeg codec/build licensing, pgvector, OpenTelemetry and production object storage remain to pin at adoption. Langfuse, Portkey, GrowthBook optional; MinIO not deployed.
 
 M1 npm audit reports zero known vulnerabilities in the current locked npm tree (see generated docs/evidence/npm-audit.json). This is not Python/container/security clearance. Updates require exact lock changes, contract/security reruns and invalidation of prior live evidence. Never follow main/latest automatically in production.
