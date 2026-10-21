@@ -2,14 +2,15 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "862c944e48b75eab4c0135388211187def68111b",
-  "checked_at": "2026-10-21T03:43:53.759136+00:00",
+  "code_commit": "6dc225ae4a31eb5c61cc1a8a62c446946bd5c15c",
+  "checked_at": "2026-10-21T04:09:27.710577+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -20,6 +21,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -30,6 +32,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -40,6 +43,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -50,6 +54,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -60,6 +65,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -70,6 +76,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -80,6 +87,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -90,6 +98,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/offline.json",
+        "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
@@ -126,6 +135,15 @@
         "docs/evidence/security.json"
       ],
       "blocked_reason": "Actual local Garage/ClamAV/Temporal tests only. Production IAM/CORS/TLS, retention, cleanup, UI, intake sandbox and deployed/provider workflows remain incomplete."
+    },
+    "customer_workspace_ui": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/browser.json",
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "Real local browser account/client/brand/team/upload flows only. Deployed ingress/CORS, email delivery, intake, generation, editor and publishing UI remain incomplete."
     }
   },
   "security": {

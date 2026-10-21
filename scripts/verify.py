@@ -11,6 +11,7 @@ from scripts.skill_audit import ROOT, main as audit_skills
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
     "offline": [["npm", "run", "build"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/offline", "-v"]],
+    "browser": [["npm", "run", "build"], ["npm", "run", "test:browser"]],
     "contracts": [["node", "--test", "tests/contracts/sdk.test.mjs"]],
     "security": [["npm", "run", "build"], ["npm", "run", "test:foundation"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/security", "-v"]],
 }
@@ -24,7 +25,7 @@ def source_hash():
     files = {}
     for directory in ["scripts", "tests", "contracts", "apps", "database"]:
         for path in sorted((ROOT / directory).rglob("*")):
-            if path.is_file() and "__pycache__" not in path.parts:
+            if path.is_file() and not set(path.parts).intersection({"__pycache__", ".next", "node_modules"}) and not path.name.endswith(".tsbuildinfo"):
                 files[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
     for name in ["package.json", "package-lock.json", "pyproject.toml", "uv.lock", "Makefile", "tsconfig.json"]:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
@@ -52,6 +53,12 @@ def write_status():
         integrations[capability] = {"state": "ADAPTER_READY" if foundation_passed else "NOT_IMPLEMENTED", "live_test": False,
             "evidence": ["docs/evidence/security.json"],
             "blocked_reason": "Actual local Garage/ClamAV/Temporal tests only. Production IAM/CORS/TLS, retention, cleanup, UI, intake sandbox and deployed/provider workflows remain incomplete."}
+    browser_path = EVIDENCE / "browser.json"
+    browser = json.loads(browser_path.read_text()) if browser_path.exists() else {}
+    browser_passed = browser.get("passed") is True and browser.get("source_sha256") == source_hash()
+    integrations["customer_workspace_ui"] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
+        "evidence": ["docs/evidence/browser.json", "docs/evidence/security.json"],
+        "blocked_reason": "Real local browser account/client/brand/team/upload flows only. Deployed ingress/CORS, email delivery, intake, generation, editor and publishing UI remain incomplete."}
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
               "checked_at": now(), "integrations": integrations,
@@ -70,7 +77,7 @@ def run_suite(name):
         log = result.stdout + result.stderr
         print(log, end="")
         results.append({"command": command, "exit_code": result.returncode, "output": log})
-    scopes = {"offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; no external provider or deployed generation-worker proof"}
+    scopes = {"browser": "Actual Chromium through Next.js UI to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; no external provider or deployed generation-worker proof"}
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": source_hash(), "results": results, "passed": all(x["exit_code"] == 0 for x in results), "live_calls": False}
     (EVIDENCE / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")

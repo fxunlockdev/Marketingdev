@@ -16,7 +16,7 @@ def gate_errors(status):
     checked = datetime.fromisoformat(status["checked_at"].replace("Z", "+00:00"))
     if checked.tzinfo is None or not timedelta(0) <= datetime.now(timezone.utc) - checked <= timedelta(hours=24):
         errors.append("Evidence stale or future dated")
-    for name in ["offline", "contracts", "security"]:
+    for name in ["offline", "contracts", "security", "browser"]:
         path = ROOT / f"docs/evidence/{name}.json"
         if not path.exists():
             errors.append(f"Missing {name} evidence")
