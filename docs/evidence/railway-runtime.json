@@ -15,5 +15,6 @@
   "ssh_probe_result": "Host key verification failed; host checking was not disabled",
   "source_image_equivalence_verified": false,
   "social_accounts_connected": 0,
-  "live_provider_tests_run": false
+  "live_provider_tests_run": false,
+  "temporary_ssh_key_cleanup": "Task public-key registration removed after unsuccessful host-verification probe"
 }
