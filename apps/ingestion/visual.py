@@ -99,9 +99,15 @@ async def render(initial):
     async def capture(page, **kwargs):
         for viewport in [{"width": 1440, "height": 1000}, {"width": 390, "height": 844}]:
             await page.set_viewport_size(viewport)
-            for step in range(12):
-                await page.evaluate("y=>window.scrollTo(0,y)", step*viewport["height"])
+            for step in range(26):
+                # Overlapping scrolls trigger lazy images through the full capture
+                # height on mobile as well as desktop; stop at the bounded end.
+                y = min(round(step * viewport["height"] * 0.8), 16000)
+                await page.evaluate("y=>window.scrollTo(0,y)", y)
                 await page.wait_for_timeout(120)
+                end = await page.evaluate("Math.min(document.documentElement.scrollHeight,16000)")
+                if y + viewport["height"] >= end:
+                    break
             try:
                 await page.wait_for_function("Array.from(document.images).every(i=>i.complete)", timeout=5000)
             except Exception:
@@ -143,7 +149,7 @@ async def render(initial):
             delay_before_return_html=1.0, word_count_threshold=1, verbose=False))
         if not result.success or len(snapshots)!=2:
             raise ValueError("render failed")
-    emit({"type": "result", "version": "crawl4ai-0.9.5/chromium-1248/desvio-visual-v1", "url": root,
+    emit({"type": "result", "version": "crawl4ai-0.9.5/chromium-1248/desvio-visual-v2", "url": root,
         "snapshots": snapshots, "requests": request_count, "failures": failures[:120], "coverage": "rendered_desktop_mobile"})
 
 

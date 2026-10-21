@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import sharp from "sharp";
 import { SafeWeb, websiteURL, IntakeError } from "./safe-web.js";
 import { digest } from "./object-store.js";
-export const VISUAL_VERSION = "crawl4ai-0.9.5/chromium-1248/desvio-visual-v1";
+export const VISUAL_VERSION = "crawl4ai-0.9.5/chromium-1248/desvio-visual-v2";
 export type VisualCapture = {
   version: string;
   url: string;

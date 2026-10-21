@@ -19,6 +19,7 @@ import {
   type AnalysisInput,
 } from "./brand-analysis.js";
 import { lockReview, bumpReview } from "./brand-brain.js";
+import { prepareVisuals, visualManifest } from "./visual-analysis.js";
 const terminal = new Set([
   "succeeded",
   "rejected",
@@ -321,6 +322,46 @@ export class IntakeJobs {
     });
   }
   async analyze(scope: JobScope) {
+    // Read immutable references under RLS, then decode private pixels outside DB
+    // locks. Recheck access, evidence revision and the operator grant before spend.
+    const visualEvidence = await this.jobs.transaction(scope, async (db, j) => {
+      if (!(await this.jobs.permitted(db, j)))
+        throw new IntakeError("ACCESS_REVOKED_OR_CANCELED");
+      if (
+        (
+          await db.query(
+            "SELECT job_id FROM app.analysis_calls WHERE job_id=$1",
+            [j.id],
+          )
+        ).rowCount
+      )
+        return null;
+      if (!this.analyzer.configured) throw new IntakeError("AI_NOT_CONFIGURED");
+      const rows = (
+        await db.query(
+          `SELECT v.*,s.website_url FROM app.website_visuals v JOIN app.brand_sources s ON s.id=v.source_id
+        WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.job_id=(SELECT x.job_id FROM app.website_visuals x WHERE x.organization_id=$1 AND x.brand_id=$2 ORDER BY x.captured_at DESC LIMIT 1)
+        ORDER BY s.captured_at,v.source_id,v.viewport LIMIT 10`,
+          [j.organization_id, j.brand_id],
+        )
+      ).rows;
+      if (!rows.length) return null;
+      const grant = (
+        await db.query(
+          "SELECT max_tokens_per_image FROM app.analysis_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()",
+          [j.organization_id, j.brand_id],
+        )
+      ).rows[0];
+      if (!grant?.max_tokens_per_image)
+        throw new IntakeError("AI_VISION_APPROVAL_REQUIRED");
+      return {
+        rows,
+        revision: await lockReview(db, j.organization_id, j.brand_id),
+      };
+    });
+    const visuals = visualEvidence
+      ? await prepareVisuals(this.jobs.store, visualEvidence.rows)
+      : [];
     const prepared = await this.jobs.transaction(scope, async (db, j) => {
       const previous = (
         await db.query("SELECT * FROM app.analysis_calls WHERE job_id=$1", [
@@ -342,7 +383,11 @@ export class IntakeJobs {
         return null;
       }
       if (!this.analyzer.configured) throw new IntakeError("AI_NOT_CONFIGURED");
+      if (!(await this.jobs.permitted(db, j)))
+        throw new IntakeError("ACCESS_REVOKED_OR_CANCELED");
       const revision = await lockReview(db, j.organization_id, j.brand_id);
+      if (visualEvidence && revision !== visualEvidence.revision)
+        throw new IntakeError("AI_EVIDENCE_CHANGED");
       const grant = (
         await db.query(
           "SELECT * FROM app.analysis_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()",
@@ -368,8 +413,16 @@ export class IntakeJobs {
           [j.organization_id, j.brand_id],
         )
       ).rows;
-      const input: AnalysisInput = { chunks: selected, reviewed },
-        request = analysisRequest(input, grant.model);
+      const input: AnalysisInput = {
+          chunks: selected,
+          reviewed,
+          ...(visuals.length ? { visuals } : {}),
+        },
+        request = analysisRequest(
+          input,
+          grant.model,
+          grant.max_tokens_per_image,
+        );
       const reserved = Math.ceil(
         request.maxInputTokens * Number(grant.input_micros_per_token) +
           request.maxOutputTokens * Number(grant.output_micros_per_token),
@@ -401,13 +454,21 @@ export class IntakeJobs {
           request.sha256,
         ],
       );
-      return { input, model: grant.model };
+      return {
+        input,
+        model: grant.model,
+        maxTokensPerImage: grant.max_tokens_per_image,
+      };
     });
     if (!prepared) return "finished";
     if (!("cached" in prepared)) {
       let response;
       try {
-        response = await this.analyzer.analyze(prepared.input, prepared.model);
+        response = await this.analyzer.analyze(
+          prepared.input,
+          prepared.model,
+          prepared.maxTokensPerImage,
+        );
       } catch (error) {
         const known =
           error instanceof IntakeError ||
@@ -434,7 +495,10 @@ export class IntakeJobs {
           [
             j.id,
             response.id,
-            JSON.stringify(response.result),
+            JSON.stringify({
+              ...response.result,
+              visual_manifest: visualManifest(prepared.input.visuals ?? []),
+            }),
             JSON.stringify(response.usage),
           ],
         );
@@ -520,6 +584,8 @@ export class IntakeJobs {
             findings: fresh.length,
             missing: call.result.missing,
             recommendationAvailable: !!call.result.recommendation,
+            visual_guidance: call.result.visual_guidance ?? [],
+            visual_manifest: call.result.visual_manifest ?? [],
           }),
         ],
       );

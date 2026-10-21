@@ -643,7 +643,56 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
       }),
     ],
   );
+  await admin.query(
+    "INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,result) VALUES($1,$2,$3,$4,'fixture',$5)",
+    [
+      job,
+      target.organization_id,
+      target.id,
+      randomUUID(),
+      JSON.stringify({
+        visual_guidance: [
+          {
+            category: "composition",
+            observation:
+              "BROWSER FIXTURE: generous spacing around the headline.",
+            creative_direction:
+              "BROWSER FIXTURE: consider a spacious campaign layout.",
+            image_ids: ["fixture:overview"],
+          },
+        ],
+        visual_manifest: [
+          {
+            id: "fixture:overview",
+            visual_id: "fixture",
+            viewport: "desktop",
+            view: "overview",
+            website_url: "https://example.org/",
+          },
+        ],
+      }),
+    ],
+  );
   await alice.goto(`${base}/b/${target.id}/onboarding`);
+  await alice
+    .getByText("Visual style & creative inspiration", { exact: true })
+    .click();
+  await expect(
+    alice.getByText("BROWSER FIXTURE: generous spacing around the headline.", {
+      exact: false,
+    }),
+  ).toBeVisible();
+  await expect(
+    alice.getByRole("link", { name: "Source page", exact: true }),
+  ).toHaveAttribute("href", "https://example.org/");
+  const visualAccessibility = await new AxeBuilder({ page: alice })
+    .withTags(["wcag2a", "wcag2aa"])
+    .analyze();
+  assert.deepEqual(
+    visualAccessibility.violations.map((v) => v.id),
+    [],
+  );
+
   await alice
     .getByRole("button", { name: "Save & continue to goals →" })
     .click();

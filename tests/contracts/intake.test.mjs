@@ -7,7 +7,14 @@ import {
   SafeWeb,
   WebsiteReader,
 } from "../../dist/safe-web.js";
-import { BrandAnalyzer, validateAnalysis } from "../../dist/brand-analysis.js";
+import {
+  BrandAnalyzer,
+  validateAnalysis,
+  analysisRequest,
+} from "../../dist/brand-analysis.js";
+import { prepareVisuals } from "../../dist/visual-analysis.js";
+import { digest } from "../../dist/object-store.js";
+import sharp from "sharp";
 const chunk = {
   id: "chunk-1",
   source_id: "source-1",
@@ -35,6 +42,136 @@ const result = {
   },
   missing: ["Brand voice"],
 };
+test("vision uses verified pixels, bounded full-page/detail views and exact visual citations (MOCK provider)", async () => {
+  // Explicit local image fixture; no claim of a crawled/live brand or model result.
+  const bytes = await sharp({
+    create: { width: 1440, height: 4000, channels: 3, background: "#cabbaa" },
+  })
+    .jpeg()
+    .toBuffer();
+  const row = {
+    id: "visual-1",
+    source_id: "source-1",
+    website_url: "https://example.org/",
+    viewport: "desktop",
+    object_key: "private/fixture",
+    sha256: digest(bytes),
+    bytes: bytes.length,
+    width: 1440,
+    height: 4000,
+    observations: {
+      images: [
+        { loaded: true, box: { x: 0, y: 2700, width: 1000, height: 600 } },
+      ],
+    },
+  };
+  const visuals = await prepareVisuals({ read: async () => bytes }, [row]);
+  assert.deepEqual(
+    visuals.map((i) => i.view),
+    ["overview", "hero", "detail"],
+  );
+  assert.equal(visuals[2].crop.y, 2700);
+  assert.equal(visuals[0].height, 2048);
+  assert.ok(visuals.every((i) => i.width <= 1440 && i.height <= 2048));
+  await assert.rejects(
+    prepareVisuals({ read: async () => Buffer.from("corrupted") }, [row]),
+    /INTEGRITY/,
+  );
+  const visionInput = { ...input, visuals };
+  assert.throws(
+    () => analysisRequest(visionInput, "configured"),
+    /AI_VISION_APPROVAL_REQUIRED/,
+  );
+  const low = analysisRequest(visionInput, "configured", 10000),
+    high = analysisRequest(visionInput, "configured", 20000);
+  assert.equal(
+    high.maxInputTokens - low.maxInputTokens,
+    visuals.length * 10000,
+  );
+  const visionResult = {
+    ...result,
+    visual_guidance: [
+      {
+        category: "composition",
+        observation: "Muted background in the fixture.",
+        creative_direction: "Consider a quiet layout, subject to review.",
+        image_ids: [visuals[0].id],
+      },
+    ],
+  };
+  const sdk = new OpenAI({
+    apiKey: "fixture-only",
+    maxRetries: 0,
+    fetch: async (url, init) => {
+      const body = JSON.parse(init.body),
+        content = body.input[0].content,
+        images = content.filter((x) => x.type === "input_image");
+      assert.equal(images.length, 3);
+      assert.ok(
+        images.every(
+          (i) =>
+            i.detail === "high" &&
+            i.image_url.startsWith("data:image/jpeg;base64,"),
+        ),
+      );
+      assert.equal(body.store, false);
+      assert.equal(body.tools, undefined);
+      assert.ok(!JSON.stringify(body).includes("private/fixture"));
+      const manifest = JSON.parse(content[0].text).visual_manifest;
+      assert.ok(manifest.every((m) => !m.image));
+      return Response.json({
+        object: "response",
+        id: "resp_mock_vision",
+        status: "completed",
+        output: [
+          {
+            type: "message",
+            content: [
+              {
+                type: "output_text",
+                text: JSON.stringify(visionResult),
+                annotations: [],
+              },
+            ],
+          },
+        ],
+      });
+    },
+  });
+  assert.deepEqual(
+    (
+      await new BrandAnalyzer(undefined, sdk).analyze(
+        visionInput,
+        "configured",
+        10000,
+      )
+    ).result,
+    visionResult,
+  );
+  const forged = structuredClone(visionResult);
+  forged.visual_guidance[0].image_ids = ["other-tenant:overview"];
+  assert.throws(
+    () => validateAnalysis(forged, visionInput),
+    /AI_OUTPUT_INVALID/,
+  );
+  assert.throws(
+    () => validateAnalysis(visionResult, input),
+    /AI_OUTPUT_INVALID/,
+  );
+  assert.throws(
+    () =>
+      validateAnalysis(
+        {
+          ...visionResult,
+          visual_guidance: [
+            { ...visionResult.visual_guidance[0], category: "approved_logo" },
+          ],
+        },
+        visionInput,
+      ),
+    /AI_OUTPUT_INVALID/,
+  );
+});
 test("crawler blocks nonpublic IPv4/IPv6 and unsafe URL representations", () => {
   for (const ip of [
     "0.0.0.0",

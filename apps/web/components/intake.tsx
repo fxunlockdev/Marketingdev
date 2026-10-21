@@ -8,6 +8,8 @@ const messages: Record<string, string> = {
     "AI setup is still needed. Your website evidence is saved; you can review it or add facts below.",
   AI_STAGING_APPROVAL_REQUIRED:
     "AI testing has not been enabled for this business yet. Your evidence is saved.",
+  AI_VISION_APPROVAL_REQUIRED:
+    "Your website captures are saved. Visual AI analysis still needs an approved model and image budget.",
   AI_BUDGET_EXHAUSTED:
     "The approved AI budget has been reached. Your saved work is safe.",
   AI_EVIDENCE_CHANGED:
@@ -132,7 +134,21 @@ export function BrandIntake({
     }
   }
   const pending = state?.jobs.some(active),
-    recent = state?.jobs[0];
+    recent = state?.jobs[0],
+    visualAnalysis = state?.jobs.find(
+      (j: any) =>
+        j.kind === "brand.analyze" &&
+        j.status === "succeeded" &&
+        j.result?.visual_guidance?.length,
+    ),
+    visualAnalysisStale =
+      visualAnalysis &&
+      state.jobs.some(
+        (j: any) =>
+          j.kind === "website.extract" &&
+          j.status === "succeeded" &&
+          j.created_at > visualAnalysis.created_at,
+      );
   return (
     <section className="v5-panel" aria-busy={busy || !!pending}>
       <h2>Let Desvio get to know your business.</h2>
@@ -193,7 +209,7 @@ export function BrandIntake({
             them.
           </p>
           {state.visuals.map((v: any) => (
-            <article key={v.id} className="v5-panel">
+            <article key={v.id} id={"visual-" + v.id} className="v5-panel">
               <h3>
                 {v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
                 {v.observations.title || "Website reference"}
@@ -255,6 +271,86 @@ export function BrandIntake({
               )}
             </article>
           ))}
+        </details>
+      )}
+      {visualAnalysis && (
+        <details>
+          <summary>Visual style & creative inspiration</summary>
+          <p>
+            AI suggestions based on your captured pages. These are references
+            for review; they do not change your approved brand rules or approve
+            images for reuse.
+          </p>
+          {visualAnalysisStale && (
+            <p role="status">
+              Your website evidence has changed since these suggestions. Run
+              analysis again to update them.
+            </p>
+          )}
+          {visualAnalysis.result.visual_guidance.map(
+            (g: any, index: number) => (
+              <article key={index} className="v5-panel">
+                <h3>
+                  {
+                    (
+                      {
+                        composition: "Layout & composition",
+                        imagery: "Photography & illustration",
+                        typography: "Typography",
+                        palette: "Colour relationships",
+                        logo_candidate: "Possible brand marks",
+                        creative_inspiration: "Creative direction",
+                      } as Record<string, string>
+                    )[g.category]
+                  }
+                </h3>
+                <p>
+                  <strong>Observed:</strong> {g.observation}
+                </p>
+                <p>
+                  <strong>Suggested direction:</strong> {g.creative_direction}
+                </p>
+                <ul aria-label="Supporting visual references">
+                  {g.image_ids.map((id: string) => {
+                    const reference =
+                      visualAnalysis.result.visual_manifest.find(
+                        (v: any) => v.id === id,
+                      );
+                    if (!reference) return null;
+                    return (
+                      <li key={id}>
+                        {state.visuals.some(
+                          (v: any) => v.id === reference.visual_id,
+                        ) ? (
+                          <a
+                            href={"#visual-" + reference.visual_id}
+                            onClick={() => {
+                              document
+                                .getElementById("visual-" + reference.visual_id)
+                                ?.closest("details")
+                                ?.setAttribute("open", "");
+                            }}
+                          >
+                            {reference.viewport} {reference.view}
+                          </a>
+                        ) : (
+                          reference.viewport + " " + reference.view
+                        )}{" "}
+                        ·{" "}
+                        <a
+                          href={reference.website_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Source page
+                        </a>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </article>
+            ),
+          )}
         </details>
       )}
       {writable && (

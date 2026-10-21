@@ -467,6 +467,77 @@ test(
         (s) => s.parser_version === VISUAL_VERSION,
       );
       assert.equal(source.coverage.type, "rendered_desktop_mobile");
+      let calls = 0;
+      const visionAnalyzer = analyzer(async (url, init) => {
+        calls++;
+        const body = JSON.parse(init.body),
+          content = body.input[0].content;
+        const evidence = JSON.parse(content[0].text),
+          images = content.filter((c) => c.type === "input_image");
+        assert.ok(images.length >= 2);
+        assert.ok(
+          images.every((i) =>
+            i.image_url.startsWith("data:image/jpeg;base64,"),
+          ),
+        );
+        assert.ok(
+          evidence.visual_manifest.every((m) =>
+            state.visuals.some((v) => v.id === m.visual_id),
+          ),
+        );
+        return response({
+          findings: [],
+          recommendation: null,
+          missing: [],
+          visual_guidance: [
+            {
+              category: "composition",
+              observation: "TEST interpretation of captured pixels",
+              creative_direction: "TEST suggestion requiring human review",
+              image_ids: [evidence.visual_manifest[0].id],
+            },
+          ],
+        });
+      });
+      const visionHandler = new IntakeJobs(
+        new AssetJobs(worker, store, null),
+        parser,
+        visionAnalyzer,
+        reader,
+      );
+      await grant(10000000);
+      const denied = await submit("brand.analyze");
+      assert.equal(await visionHandler.run(scope(denied)), "rejected");
+      assert.equal(
+        (await row(denied)).error_code,
+        "AI_VISION_APPROVAL_REQUIRED",
+      );
+      assert.equal(calls, 0);
+      await admin.query(
+        "UPDATE app.analysis_grants SET max_tokens_per_image=10000 WHERE organization_id=$1 AND brand_id=$2",
+        [org.id, brand.id],
+      );
+      const analyzed = await submit("brand.analyze");
+      assert.equal(await visionHandler.run(scope(analyzed)), "succeeded");
+      assert.equal(calls, 1);
+      const saved = (await service.read(alice, brand.id)).jobs.find(
+        (j) => j.id === analyzed.id,
+      ).result;
+      assert.equal(saved.visual_guidance.length, 1);
+      assert.ok(saved.visual_manifest.every((v) => !v.image && !v.object_key));
+      assert.ok(
+        (
+          await admin.query(
+            "SELECT reserved_micros FROM app.analysis_calls WHERE job_id=$1",
+            [analyzed.id],
+          )
+        ).rows[0].reserved_micros >=
+          saved.visual_manifest.length * 10000,
+      );
+      assert.equal(await visionHandler.run(scope(analyzed)), "finished");
+      assert.equal(calls, 1);
+      const wrongScope = { ...scope(analyzed), brandId: randomUUID() };
+      await assert.rejects(visionHandler.run(wrongScope), /JOB_SCOPE_DENIED/);
     } finally {
       store.close();
     }

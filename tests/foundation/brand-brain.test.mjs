@@ -688,7 +688,7 @@ test("V5 standard account starts empty, initializes once and concurrent fourth-b
   let state = (await request(jobPath)).body;
   assert.equal(state.revision, 0);
   const body = {
-    ...state,
+    revision: state.revision,
     step: 3,
     goal: "leads",
     timezone: "Asia/Kuala_Lumpur",
