@@ -1,4 +1,4 @@
-"""M0 gate always blocks launch. Future promotions require a trusted live runner."""
+"""Launch stays blocked until the full tenant/provider journey has trusted live evidence."""
 from datetime import datetime, timezone, timedelta
 import json
 import sys
@@ -25,7 +25,7 @@ def gate_errors(status):
         if report.get("passed") is not True or report.get("source_sha256") != source_hash():
             errors.append(f"Failed or stale {name} evidence")
     # No manual LAUNCH_READY flags can bypass this missing live execution proof.
-    errors.append("M0: product E2E, authenticated tenant/RLS and trusted live evidence runner are NOT_IMPLEMENTED")
+    errors.append("Product E2E, private storage/worker tenant isolation and trusted live evidence runner are NOT_IMPLEMENTED; local auth/RLS tests are not launch proof")
     if status["overall_release_state"] != "LAUNCH_READY":
         errors.append("Overall release state is BLOCKED")
     return errors

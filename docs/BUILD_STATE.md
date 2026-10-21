@@ -1,6 +1,6 @@
 # Desvio build state
 
-Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; PR-00/M0 in progress.
+Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; M0 blockers remain and initial M1 workspace backend is implemented locally. Prior goal turn was progress: audit PR #1 was created and temporary infrastructure access was cleaned up.
 
 ## Owner decisions
 
@@ -13,7 +13,7 @@ Updated 2026-10-21 (Asia/Kuala_Lumpur). Active end-to-end goal; PR-00/M0 in prog
 
 ## Code and evidence
 
-Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-00-integration-audit. Original specs, archive and repository manifest retained.
+Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch codex/pr-01-tenant-foundation, stacked on codex/pr-00-integration-audit. Draft PR-00: https://github.com/fxunlockdev/Marketingdev/pull/1. Original specs, archive and repository manifest retained.
 
 - scripts/skill_audit.py: safe archive validation, immutable file/skill digests, preserve MIT notice.
 - scripts/skill_probe.py: actual Deep Agents middleware discovery with per-run read-only mount.
@@ -23,6 +23,16 @@ Repo checkout: this directory (work/Marketingdev in the chat workspace). Branch 
 - docs/adr/0001-reuse-decisions.md, POSTIZ_API_MATRIX.md, PROVIDER_CAPABILITIES.md, SKILL_AUDIT.md, THIRD_PARTY_LOCK.md, SECURITY_THREAT_MODEL.md, PRODUCT_EXPERIENCE.md.
 
 Observed tests: verify-offline 3 passed, verify-contracts 8 passed, verify-security 6 passed. Scope is M0 audit only; no product E2E/RLS/SSRF claim. release-gate exits nonzero as intended. verify-live was NOT run. npm audit reports no known vulnerabilities for its 30 audit packages only.
+
+## M1 progress this session
+
+- apps/api/src/: NestJS + Better Auth, genuine cookie sessions, client workspace ownership, brand list/create/read/edit, strict origin/body checks, database-backed auth throttle and safe errors.
+- database/migrations/: generated pinned-auth schema and product schema; separate least-privilege roles, forced RLS, limited bootstrap function, immutable audit records, idempotent creates and pending outbox events.
+- scripts/migrate.mjs: transactional, checksum-verified/replay-safe migrations.
+- tests/foundation/tenancy.test.mjs and scripts/foundation-test.mjs: disposable pinned PostgreSQL + actual HTTP integration tests. 14 passed at the last direct run, including restart recovery; final verification rerun pending after PATCH field-preservation improvement.
+- docs/adr/0002-auth-and-tenancy.md records source contracts, actual routes and threat boundaries.
+- Session revocation and client/brand isolation are demonstrated for these local paths only. No private storage/worker/provider authorization claim.
+- External auth activation intentionally fails closed pending email verification/recovery. No customer UI, invitations or dispatched jobs yet; outbox events are persisted, not processed.
 
 ## Railway
 
@@ -43,8 +53,8 @@ Postiz source SHA 651876e24317c2d8e717262cf98267ec6f699180 is Oct 20; pinned off
 
 These do not prevent independent M1 implementation. No feature is ADAPTER_READY/LIVE_VERIFIED/LAUNCH_READY.
 
-## Next smallest implementation slice — PR-01
+## Next implementation work — finish M1, then PR-02
 
-Authenticated user → client organization membership → brand creation → durable audit/job record. Implement auth/session validation, least-privilege Postgres migrations and forced RLS, membership/role checks, private storage and Temporal job boundary. Test two users in distinct organizations and multiple brands; deny foreign IDs across reads/writes/jobs/assets. Build only minimal backed workspace UI after tests. Then PR-02 intake/findings/Correct-Wrong-Edit/immutable approved Brand Brain.
+Complete verification and save PR-01 as a stacked draft. Next implement verified email/password recovery and secure invitations, private storage with tenant-scoped signed access, Temporal/outbox dispatch and scoped durable jobs, plus API quotas/observability. Extend negative tests across jobs/assets and restart boundaries. Then build the minimal backed sign-in/workspace/brand UI and continue PR-02 intake/findings/Correct-Wrong-Edit/immutable approved Brand Brain. Full creative revision, approval and real social publishing goal remains intact.
 
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.

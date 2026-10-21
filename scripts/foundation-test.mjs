@@ -1,0 +1,68 @@
+// Disposable local PostgreSQL only. Never accepts an external database URL.
+import { execFileSync, spawn } from 'node:child_process';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+import { setTimeout } from 'node:timers/promises';
+import { createServer } from 'node:net';
+import { Pool } from 'pg';
+import { getMigrations } from 'better-auth/db/migration';
+import { authOptions } from '../dist/auth.js';
+import { migrate } from './migrate.mjs';
+
+const IMAGE = 'postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73';
+const container = `desvio-foundation-${randomUUID()}`;
+const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', stdio: ['ignore','pipe','pipe'], timeout: 60000 }).trim();
+const password = randomBytes(32).toString('hex');
+let pool, authMigrationPool;
+let started = false;
+try {
+  // Docker can reassign an automatically published port on restart. Reserve an explicit
+  // loopback port so recovery tests exercise the database, not a changed endpoint.
+  const reservation=createServer();
+  await new Promise((resolve,reject)=>{reservation.once('error',reject);reservation.listen(0,'127.0.0.1',resolve);});
+  const reservedPort=reservation.address().port;
+  await new Promise(resolve=>reservation.close(resolve));
+  docker('run','--rm','-d','--name',container,'--label','desvio.purpose=isolated-test',
+    '-p',`127.0.0.1:${reservedPort}:5432`,'-e',`POSTGRES_PASSWORD=${password}`,IMAGE);
+  started = true;
+  const port = docker('port',container,'5432/tcp').split(':').at(-1);
+  const url = (user, pass) => `postgresql://${user}:${pass}@127.0.0.1:${port}/postgres`;
+  pool = new Pool({ connectionString: url('postgres',password), connectionTimeoutMillis: 1000 });
+  pool.on('error', () => {});
+  let ready = false;
+  for (let i=0;i<100;i++) {
+    try { await pool.query('SELECT 1'); ready=true; break; } catch { await setTimeout(200); }
+  }
+  if (!ready) throw new Error('Disposable PostgreSQL did not start');
+  const appPass=randomBytes(32).toString('hex'), authPass=randomBytes(32).toString('hex');
+  // Passwords are hex generated here, never operator-controlled SQL input.
+  await pool.query(`REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+    CREATE ROLE desvio_app LOGIN PASSWORD '${appPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+    CREATE ROLE desvio_auth LOGIN PASSWORD '${authPass}' NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT;
+    CREATE ROLE desvio_bootstrap NOLOGIN BYPASSRLS NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT;`);
+  const config = { mode:'test', origin:'http://127.0.0.1:3100', authSecret:randomBytes(32).toString('hex'),
+    authDatabaseUrl:url('desvio_auth',authPass), appDatabaseUrl:url('desvio_app',appPass) };
+  if (process.argv.includes('--generate-auth')) {
+    await pool.query('CREATE SCHEMA auth');
+    authMigrationPool = new Pool({ connectionString:url('postgres',password), options:'-c search_path=auth' });
+    const plan = await getMigrations(authOptions(authMigrationPool,config));
+    const sql = await plan.compileMigrations();
+    await writeFile(new URL('../database/migrations/000_auth.sql',import.meta.url),
+      '-- Generated from pinned Better Auth 1.7.12 authOptions; reviewed before execution.\nCREATE SCHEMA auth;\nREVOKE ALL ON SCHEMA auth FROM PUBLIC;\nSET LOCAL search_path = auth;\n'+sql+'\nSET LOCAL search_path = public;\nGRANT USAGE ON SCHEMA auth TO desvio_auth;\nGRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA auth TO desvio_auth;\n');
+    console.log('Generated auth schema for review; no application migrations or tests run.');
+  } else {
+    await migrate(pool);
+    await migrate(pool); // Reapply must be a verified no-op.
+    const version = (await pool.query('SHOW server_version')).rows[0].server_version;
+    console.log(`Disposable PostgreSQL ${version}; image ${IMAGE}; migration replay passed`);
+    const code = await new Promise((resolve,reject) => {
+      const child = spawn(process.execPath,['--test','--test-concurrency=1','tests/foundation/tenancy.test.mjs'], {
+        stdio:'inherit', env:{...process.env, DESVIO_TEST_CONFIG:JSON.stringify(config), DESVIO_TEST_ADMIN_URL:url('postgres',password), DESVIO_TEST_CONTAINER:container} });
+      child.on('error',reject); child.on('exit', code=>resolve(code ?? 1));
+    });
+    process.exitCode=code;
+  }
+} finally {
+  await authMigrationPool?.end(); await pool?.end();
+  if (started) docker('rm','-f',container);
+}
