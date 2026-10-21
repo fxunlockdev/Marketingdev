@@ -1,0 +1,19 @@
+{
+  "commit": "651876e24317c2d8e717262cf98267ec6f699180",
+  "files": {
+    "LICENSE": "d322fb1066693d8ed25495d11029f443aa793316852749e1389773c1946251b3",
+    "package.json": "b3fef2aa02c5189752288b9c4cf2b68260acc393c8f99c3da283360da8c6c592",
+    "pnpm-lock.yaml": "8834026b11cdcbc08c7ac6a8b5a6998f7ca1798d2a58cfb896ad4ca06bca3226",
+    "docker-compose.yaml": "b4f66639290c3714919c9613414550ebd0baa671826d7d26eb90425e1d66d62a",
+    "apps/backend/src/services/auth/public.auth.middleware.ts": "942df2bde2b70f8e6e19ab69b1f7f176f276104f4ce05bd09d802ce9c689aa2d",
+    "apps/backend/src/public-api/routes/v1/public.integrations.controller.ts": "4f7de083c47e070b7203ebe10fc8cd8be75130031f9ad9d00d6d15310343ce40",
+    "apps/backend/src/api/routes/no.auth.integrations.controller.ts": "d16bd8e96cbc94ad576d44587a6771975cd0d3e301e249136230c7b7b4683285",
+    "apps/backend/src/api/routes/enterprise.controller.ts": "2df7e217879778f70da23b055a5c7597175f4b9c7919103825f4da8f1a11aa3d",
+    "libraries/nestjs-libraries/src/database/prisma/organizations/organization.repository.ts": "cfb2f8f12ee38ad995e598bdad023c1e51d6f34436012419f6e83833bb3aef76",
+    "libraries/nestjs-libraries/src/database/prisma/organizations/organization.service.ts": "1db34ad66956e863648680082467cb637b8098b97c3a77f9caec8f1d824f74bb",
+    "libraries/nestjs-libraries/src/throttler/throttler.provider.ts": "082e9fe3b8373adfeda6fca054038a73291bc763a18d824e0bd209a5cdb06bd5",
+    "libraries/nestjs-libraries/src/temporal/temporal.register.ts": "5326e1c1239806fcb344b821aff4a4a7412dc7a8a900440db0e253bd65f75d4f"
+  },
+  "source_review_only": true,
+  "deployed_image_equivalence_verified": false
+}

@@ -1,0 +1,16 @@
+digraph G {
+  graph [bgcolor="white", rankdir=TB, pad="0.35", nodesep="0.48", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labeljust=l, labelloc=t, fontsize=23, fontcolor="#172554", label="Creative production · no fake output"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=13, fontcolor="#10243b", color="#5b7698", penwidth=1.5, fillcolor="#eef4fb", margin="0.22,0.17"];
+  edge [color="#6b829e", penwidth=1.6, arrowsize=0.8];
+
+  brief [label="Approved brand + structured creative brief",fillcolor="#dbeafe"];
+  job [label="Temporal job + credit reservation",fillcolor="#dcfce7"];
+  img [label="OpenAI GPT image create/edit\nReal provider adapter",fillcolor="#fef3c7"];
+  video [label="Higgsfield async video\nSubmit → job ID → reconcile",fillcolor="#fef3c7"];
+  copy [label="Copy original assets to private storage",fillcolor="#dcfce7"];
+  edit [label="Fabric editable image project\nFFmpeg scene composition",fillcolor="#dcfce7"];
+  qa [label="Automated QA + source/version/cost audit",fillcolor="#dcfce7"];
+  human [label="Human edit + approval before publication",fillcolor="#dbeafe"];
+  brief -> job; job -> img; job -> video; img -> copy; video -> copy; copy -> edit; edit -> qa; qa -> human;
+
+}

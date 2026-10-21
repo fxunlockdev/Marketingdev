@@ -1,0 +1,35 @@
+flowchart LR
+  subgraph browser[UNTRUSTED: Customer Browser]
+    web[Custom Web UI]
+  end
+  subgraph edge[TRUSTED: API Edge]
+    auth[Auth, CSRF / RBAC, Tenant Scope]
+    bff[Application API]
+  end
+  subgraph internal[TRUSTED: Private Network / Workers]
+    vault[Secrets Manager]
+    db[(Brand Data / RLS)]
+    skills[Isolated Skill Runtime]
+    media[Media Workers]
+    pub[Postiz Adapter]
+    postiz[Isolated Postiz Instance(s)]
+  end
+  subgraph outside[EXTERNAL / UNTRUSTED]
+    sites[Brand Websites + Files]
+    models[OpenAI + Higgsfield]
+    social[Social Platform APIs]
+  end
+  web -->|Authenticated API only| auth --> bff
+  bff -->|Tenant-scoped| db
+  bff --> skills
+  bff --> media
+  bff --> pub
+  skills -->|Read-only brand context| db
+  sites -->|Sanitized ingestion; no instruction authority| skills
+  vault -.->|Server only| skills
+  vault -.->|Server only| pub
+  vault -.->|Server only| media
+  media -->|Server-side HTTPS| models
+  pub --> postiz --> social
+  classDef caution fill:#fff3d6,stroke:#c47a0b;
+  class web,sites caution;

@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  actor U as Customer
+  participant UI as Our Creative Studio
+  participant API as Marketing API
+  participant T as Temporal
+  participant A as Deep Agents Runtime
+  participant S as Tenant-Scoped Skill Registry
+  participant B as Approved Brand Brain
+  participant M as Model + Tool Adapters
+  participant Q as QA / Evaluation
+  U->>UI: Create premium LinkedIn ad campaign
+  UI->>API: POST /creative-jobs (idempotency key)
+  API->>T: Reserve credits + enqueue job
+  T->>A: Task, tenant scope, skill allowlist
+  A->>S: Fetch verified skill content by hash
+  S-->>A: social, ad-creative, image references
+  A->>B: Retrieve confirmed facts / approved visuals
+  B-->>A: Versioned, grounded context
+  A->>M: Typed generateCopy / generateImage tools
+  M-->>A: Text, asset IDs, usage, model metadata
+  A->>Q: Brand claims + format QA
+  Q-->>T: Score, revision requests, safety outcomes
+  T->>API: Persist asset, cost, provenance, status
+  API-->>UI: Editable creative + approval queue
+  U->>UI: Modify and approve

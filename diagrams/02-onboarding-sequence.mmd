@@ -1,0 +1,33 @@
+sequenceDiagram
+  autonumber
+  actor U as Brand Owner
+  participant UI as Marketing OS UI
+  participant API as Marketing API
+  participant T as Temporal
+  participant Crawl as Crawl4AI
+  participant Docs as Docling
+  participant Brain as Brand Brain DB
+  U->>UI: Enter website (or skip)
+  UI->>API: POST /brands/onboarding
+  API->>T: Start bounded discovery workflow
+  T->>Crawl: Crawl allowed public pages
+  Crawl-->>T: Pages + source metadata + images
+  T->>Brain: Draft field findings + evidence
+  API-->>UI: Partial draft + crawl coverage
+  U->>UI: Upload PDF/PPTX/other guidelines (optional)
+  UI->>API: Register signed upload
+  API->>T: Parse document job
+  T->>Docs: Parse text, page/slide visuals
+  Docs-->>T: Structured text + evidence pointers
+  T->>Brain: Merge findings; create conflicts
+  UI->>API: GET findings and conflicts
+  API-->>UI: Suggested facts + provenance
+  loop Each high-impact or uncertain field
+    U->>UI: Correct / Wrong / Edit
+    UI->>API: PATCH finding decision
+    API->>Brain: Persist decision + audit event
+  end
+  U->>UI: Approve brand profile
+  UI->>API: POST /brands/{id}/activate
+  API->>Brain: Create immutable approved version
+  API-->>UI: Brand Brain active; ready to create

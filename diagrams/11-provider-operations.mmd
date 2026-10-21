@@ -1,0 +1,32 @@
+sequenceDiagram
+  autonumber
+  actor U as Customer
+  participant UI as Our Creative Studio
+  participant API as Tenant-Safe API
+  participant T as Temporal Worker
+  participant S as Skills + Brand Brain
+  participant O as OpenAI Image Adapter
+  participant H as Higgsfield Video Adapter
+  participant AS as Private Asset Store
+  participant QA as Render + QA
+  U->>UI: Request on-brand static and video ads
+  UI->>API: Submit creative brief and approval policy
+  API->>T: Reserve credits; enqueue immutable job
+  T->>S: Load approved brand and allowed skills
+  S-->>T: Structured prompts and visual constraints
+  par Image production
+    T->>O: Generate image (server-side key)
+    O-->>T: Real asset bytes and usage metadata
+  and Video production
+    T->>H: Submit video model request
+    H-->>T: Provider job ID
+    loop Reconcile by poll or verified callback
+      T->>H: Fetch actual job status
+      H-->>T: Pending / success / failed
+    end
+  end
+  T->>AS: Copy provider media to private storage
+  T->>QA: Build editable project and evaluate
+  QA-->>API: Versioned render, QA and cost
+  API-->>UI: Persisted preview / edit / reject / approve
+  U->>UI: Approve final version

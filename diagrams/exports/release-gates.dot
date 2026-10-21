@@ -1,0 +1,15 @@
+digraph G {
+  graph [bgcolor="white", rankdir=TB, pad="0.35", nodesep="0.48", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labeljust=l, labelloc=t, fontsize=23, fontcolor="#172554", label="Codex release gate · no UI theatre"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=13, fontcolor="#10243b", color="#5b7698", penwidth=1.5, fillcolor="#eef4fb", margin="0.22,0.17"];
+  edge [color="#6b829e", penwidth=1.6, arrowsize=0.8];
+
+  real [label="Code + real backend contract",fillcolor="#dbeafe"];
+  tests [label="Unit/contract + persistence + retry tests",fillcolor="#dcfce7"];
+  keys [label="Permitted staging keys + approved test accounts?",shape=diamond,fillcolor="#fef3c7"];
+  live [label="Real cost-capped smoke test",fillcolor="#dcfce7"];
+  negative [label="Tenant isolation, secrets, failure recovery",fillcolor="#dcfce7"];
+  ready [label="LAUNCH_READY\nEnabled in production",fillcolor="#bbf7d0"];
+  blocked [label="BLOCKED / ADAPTER_READY\nNever claim complete",fillcolor="#ffe4e6"];
+  real -> tests -> keys; keys -> live [label="yes"]; keys -> blocked [label="no"]; live -> negative; negative -> ready [label="passes"]; negative -> blocked [label="fails"];
+
+}

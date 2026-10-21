@@ -1,0 +1,16 @@
+digraph G {
+  graph [bgcolor="white", rankdir=TB, pad="0.35", nodesep="0.48", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labeljust=l, labelloc=t, fontsize=23, fontcolor="#172554", label="Headless Postiz · actual publishing"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=13, fontcolor="#10243b", color="#5b7698", penwidth=1.5, fillcolor="#eef4fb", margin="0.22,0.17"];
+  edge [color="#6b829e", penwidth=1.6, arrowsize=0.8];
+
+  approved [label="Approved creative + exact tenant/account",fillcolor="#dbeafe"];
+  auth [label="Server RBAC + account ownership verification",fillcolor="#dcfce7"];
+  ledger [label="Idempotent schedule ledger\nOrg + asset version + attempt",fillcolor="#dcfce7"];
+  adapter [label="Tenant-safe Postiz adapter",fillcolor="#dcfce7"];
+  postiz [label="Self-hosted Postiz service",fillcolor="#fef3c7"];
+  social [label="Social platform OAuth + publishing",fillcolor="#fef3c7"];
+  reconcile [label="Remote ID + webhook/poll reconciliation",fillcolor="#dcfce7"];
+  analytics [label="Genuine platform metrics only",fillcolor="#dcfce7"];
+  approved -> auth -> ledger -> adapter -> postiz -> social -> reconcile -> analytics;
+
+}

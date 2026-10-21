@@ -1,0 +1,19 @@
+digraph G {
+  graph [bgcolor="white", rankdir=TB, pad="0.35", nodesep="0.48", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labeljust=l, labelloc=t, fontsize=23, fontcolor="#172554", label="Multi-tenant SaaS · scalable deployment"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=13, fontcolor="#10243b", color="#5b7698", penwidth=1.5, fillcolor="#eef4fb", margin="0.22,0.17"];
+  edge [color="#6b829e", penwidth=1.6, arrowsize=0.8];
+
+  users [label="Customers",fillcolor="#dbeafe"];
+  ingress [label="CDN + TLS + WAF",fillcolor="#dbeafe"];
+  web [label="Stateless Next.js application",fillcolor="#dcfce7"];
+  api [label="API: auth, RBAC, budget, tenants",fillcolor="#dcfce7"];
+  pg [label="PostgreSQL + pgvector / RLS",fillcolor="#e6f0ff"];
+  temporal [label="Temporal durable work queue",fillcolor="#dcfce7"];
+  ingestion [label="Crawl4AI + Docling workers",fillcolor="#dcfce7"];
+  agent [label="Deep Agents + skills workers",fillcolor="#dcfce7"];
+  media [label="GPT Images / Higgsfield / FFmpeg workers",fillcolor="#dcfce7"];
+  postiz [label="Isolated Postiz tenant strategy",fillcolor="#fef3c7"];
+  store [label="Private S3/R2 object storage",fillcolor="#e6f0ff"];
+  users -> ingress -> web -> api; api -> pg; api -> temporal; api -> postiz; temporal -> ingestion; temporal -> agent; temporal -> media; ingestion -> store; agent -> store; media -> store;
+
+}

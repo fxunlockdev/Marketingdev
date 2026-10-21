@@ -1,0 +1,23 @@
+flowchart LR
+  browser[Customer browser] --> edge[Auth + org + brand scope]
+  edge --> quota[Rate and budget reservation]
+  quota --> queue[Temporal per-tenant workload queues]
+  queue --> skill[Isolated skill runtime]
+  queue --> image[OpenAI image adapter]
+  queue --> video[Higgsfield video adapter]
+  queue --> publish[Postiz adapter with proven account mapping]
+  skill --> facts[(Versioned brand context)]
+  image --> ledger[(Usage and cost ledger)]
+  video --> ledger
+  publish --> ledger
+  facts --> db[(Tenant-scoped PostgreSQL RLS)]
+  ledger --> db
+  image --> media[(Private tenant assets)]
+  video --> media
+  publish --> remote[Authorized social accounts]
+  vault[Secrets Manager] -.-> image
+  vault -.-> video
+  vault -.-> publish
+  policy[No cross-tenant context, assets, creds or publishing] -.-> edge
+  classDef warn fill:#fff7e6,stroke:#d97706;
+  class policy warn;

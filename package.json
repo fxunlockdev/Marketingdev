@@ -1,0 +1,9 @@
+{
+  "name": "desvio-m0-contract-audit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "M0 audit probes only; no product implementation",
+  "scripts": {"test:contracts":"node --test tests/contracts/*.test.mjs"},
+  "dependencies": {"openai":"7.39.0", "@higgsfield/client":"0.2.6"}
+}

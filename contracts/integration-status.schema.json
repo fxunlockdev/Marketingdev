@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/integration-status.schema.json",
+  "title": "Marketing OS Integration Evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "generated_by", "environment", "code_commit", "checked_at", "integrations", "security", "overall_release_state"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "generated_by": {"type": "string", "minLength": 1},
+    "environment": {"enum": ["offline_dev", "staging", "production"]},
+    "code_commit": {"type": "string", "minLength": 7},
+    "checked_at": {"type": "string", "format": "date-time"},
+    "integrations": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/integration"}
+    },
+    "security": {
+      "type": "object",
+      "required": ["tenant_isolation_passed", "secret_scan_passed"],
+      "properties": {
+        "tenant_isolation_passed": {"type": "boolean"},
+        "secret_scan_passed": {"type": "boolean"}
+      }
+    },
+    "overall_release_state": {"enum": ["BLOCKED", "STAGING_ONLY", "LAUNCH_READY"]}
+  },
+  "$defs": {
+    "integration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "live_test", "evidence", "blocked_reason"],
+      "properties": {
+        "state": {"enum": ["NOT_IMPLEMENTED", "MOCKED", "ADAPTER_READY", "LIVE_VERIFIED", "LAUNCH_READY"]},
+        "live_test": {"type": "boolean"},
+        "evidence": {"type": "array", "items": {"type": "string"}},
+        "blocked_reason": {"type": ["string", "null"]}
+      }
+    }
+  }
+}

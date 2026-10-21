@@ -1,0 +1,20 @@
+{
+  "scope": "Internal engineering infrastructure, not product live verification",
+  "postiz_runtime_verified": false,
+  "observed_error": "Temporal: cannot have more than 3 search attribute of type Text",
+  "configured_correction": {
+    "TEMPORAL_NAMESPACE": "desvio-postiz",
+    "PORT": "3000",
+    "DISABLE_REGISTRATION": "true"
+  },
+  "temporal_correction": {
+    "DEFAULT_NAMESPACE": "desvio-postiz",
+    "SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES": "true"
+  },
+  "redeploy_result": "Deploys have been paused temporarily",
+  "ssh_probe_result": "Host key verification failed; host checking was not disabled",
+  "source_image_equivalence_verified": false,
+  "social_accounts_connected": 0,
+  "live_provider_tests_run": false,
+  "temporary_ssh_key_cleanup": "Task public-key registration removed after unsuccessful host-verification probe"
+}

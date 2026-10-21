@@ -1,0 +1,10 @@
+flowchart LR
+  m0[M0 Prove OSS and SDK contracts] --> infra[M1 Tenant-safe skeleton + live Postiz service]
+  infra --> onboard[M2 Real crawling + upload + review]
+  onboard --> slice[M3 Real skill and GPT Image + approval + Postiz]
+  slice --> video[M4 Higgsfield + video render + analytics]
+  video --> learn[M5 Learning + billing + load hardening]
+  learn --> paid[M6 Optional paid ads API]
+  blocked[No UI-only completion. Live integrations must pass gates.] -.-> slice
+  classDef gate fill:#fff1f2,stroke:#be123c,color:#9f1239;
+  class blocked gate;

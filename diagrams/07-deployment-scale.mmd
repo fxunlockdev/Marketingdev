@@ -1,0 +1,23 @@
+flowchart TB
+  customer[Web and mobile users] --> cdn[CDN / WAF / TLS]
+  cdn --> web[Stateless Next.js replicas]
+  web --> api[Stateless API replicas]
+  api --> pg[(Managed PostgreSQL + pgvector / RLS)]
+  api --> redis[(Redis Cache / Rate Controls)]
+  api --> obj[(S3 / R2 Private Buckets)]
+  api --> tq[Temporal cluster + namespaces]
+  tq --> w1[Ingestion workers: Crawl4AI + Docling]
+  tq --> w2[Intelligence workers: Deep Agents]
+  tq --> w3[Media workers: FFmpeg]
+  w2 --> oai[OpenAI APIs]
+  w2 --> hf[Higgsfield API]
+  w3 --> obj
+  api --> postiz[Postiz Adapter / Tenant Isolation Boundary]
+  postiz --> pz[Self-hosted Postiz deployment(s)]
+  pz --> social[Social networks]
+  api --> trace[OpenTelemetry + Langfuse]
+  w1 --> trace
+  w2 --> trace
+  w3 --> trace
+  policy[Autoscale by workload; enforce per-tenant limits; prove scale by realistic load tests]
+  api -.-> policy

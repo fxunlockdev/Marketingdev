@@ -1,0 +1,15 @@
+digraph G {
+  graph [bgcolor="white", rankdir=TB, pad="0.35", nodesep="0.48", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labeljust=l, labelloc=t, fontsize=23, fontcolor="#172554", label="Skill Harness · controlled execution"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=13, fontcolor="#10243b", color="#5b7698", penwidth=1.5, fillcolor="#eef4fb", margin="0.22,0.17"];
+  edge [color="#6b829e", penwidth=1.6, arrowsize=0.8];
+
+  owner [label="User brief + brand selection", fillcolor="#dbeafe"];
+  orchestrator [label="Deep Agents runtime\nTask routing + workflow state", fillcolor="#dcfce7"];
+  registry [label="52 imported SKILL.md files\nContent hash + allowlist + policy",fillcolor="#dcfce7"];
+  brain [label="Verified Brand Brain\nTenant-specific approved facts",fillcolor="#dcfce7"];
+  tools [label="Typed tool capabilities\nOpenAI text / GPT image / Higgsfield",fillcolor="#fef3c7"];
+  qa [label="Output schema + Brand QA\nUsage + trace + audit",fillcolor="#dcfce7"];
+  approval [label="Persist draft → Customer editing + approval",fillcolor="#dbeafe"];
+  owner -> orchestrator; orchestrator -> registry; orchestrator -> brain; registry -> tools; brain -> tools; tools -> qa; qa -> approval;
+
+}

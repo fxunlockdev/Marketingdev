@@ -1,0 +1,29 @@
+flowchart TB
+  user[Customer / Brand Marketer] --> ui[YOUR Marketing OS Web App]
+  ui --> api[Marketing OS API / BFF]
+  api --> auth[Auth, Org, RBAC, Billing]
+  api --> brand[Verified Brand Brain]
+  api --> agent[Deep Agents + 52 Marketing Skills]
+  api --> job[Temporal Durable Workflows]
+  agent --> job
+  job --> img[OpenAI GPT Image Adapter]
+  job --> vid[Higgsfield Video Adapter]
+  job --> render[Fabric.js Project + FFmpeg Renderer]
+  api --> pub[Internal Postiz Adapter]
+  pub --> postiz[Self-hosted Postiz Service]
+  postiz --> social[Authorized Social Accounts]
+  img --> store[(Private Object Storage)]
+  vid --> store
+  render --> store
+  api --> data[(PostgreSQL + pgvector)]
+  brand <--> data
+  api --> learn[Performance Learning Service]
+  learn --> data
+  postiz --> learn
+  agent --> eval[Langfuse: traces and evaluations]
+  classDef customer fill:#e7f2fe,stroke:#2563eb,color:#172554;
+  classDef owned fill:#eaf7ee,stroke:#15803d,color:#14532d;
+  classDef external fill:#fff7e6,stroke:#d97706,color:#78350f;
+  class ui customer;
+  class api,auth,brand,agent,job,render,pub,learn,data,store owned;
+  class img,vid,postiz,social,eval external;

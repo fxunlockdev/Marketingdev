@@ -1,0 +1,14 @@
+flowchart TB
+  cr[Generated creative + DNA + versioned skills] --> pub[Approved publication / campaign]
+  pub --> m[Source-specific metrics + timestamps]
+  m --> n[Normalize objective, placement, audience, exposure]
+  n --> ex[Compare under evidence thresholds]
+  ex --> insight[Evidence-linked hypothesis + uncertainty]
+  insight --> human[Human reviews experiment]
+  human -->|Approved| brief[Structured variant / experiment brief]
+  brief --> generate[Skill Harness creates controlled variants]
+  generate --> cr
+  approved[(Approved Brand Facts)] --> generate
+  insight -.->|May suggest, never overwrite| approved
+  classDef fact fill:#eaf7ee,stroke:#15803d;
+  class approved fact;

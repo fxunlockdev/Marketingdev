@@ -1,0 +1,15 @@
+digraph G {
+  graph [bgcolor="white", rankdir=TB, pad="0.35", nodesep="0.48", ranksep="0.70", splines=ortho, fontname="DejaVu Sans", labeljust=l, labelloc=t, fontsize=23, fontcolor="#172554", label="Marketing performance · evidence first"];
+  node [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=13, fontcolor="#10243b", color="#5b7698", penwidth=1.5, fillcolor="#eef4fb", margin="0.22,0.17"];
+  edge [color="#6b829e", penwidth=1.6, arrowsize=0.8];
+
+  creative [label="Creative version + skill/model digest",fillcolor="#dbeafe"];
+  publish [label="Postiz published post / ad campaign",fillcolor="#dcfce7"];
+  metrics [label="Real metrics + timestamps + provenance",fillcolor="#dcfce7"];
+  normal [label="Normalize campaign, reach, attribution and cohort",fillcolor="#dcfce7"];
+  insight [label="Evidence-linked, uncertainty-aware insight",fillcolor="#dcfce7"];
+  experiment [label="Owner-approved next experiment",fillcolor="#dbeafe"];
+  brand [label="Authoritative brand facts\nNever silently rewritten by learning",fillcolor="#fef3c7"];
+  creative -> publish -> metrics -> normal -> insight -> experiment; brand -> creative [style=dashed]; insight -> brand [style=dashed, arrowhead=none, color="#dc7a47"];
+
+}
