@@ -1,17 +1,27 @@
 {
   "suite": "contracts",
   "scope": "Pinned OpenAI/Higgsfield SDKs with MOCK transports",
-  "checked_at": "2026-10-21T12:38:10.863539+00:00",
-  "source_sha256": "a6e53dc3e1c4795b435d020dd9b79bb2e03ae2173ce0846fdcd4d88c9c1860bc",
+  "checked_at": "2026-10-21T14:56:14.646387+00:00",
+  "source_sha256": "ac88fe39a4e1a606898b5a07498c6ef429a49ace4144366f0b0addee4509f0cb",
   "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
     {
       "command": [
         "node",
         "--test",
-        "tests/contracts/sdk.test.mjs"
+        "tests/contracts/sdk.test.mjs",
+        "tests/contracts/intake.test.mjs"
       ],
       "exit_code": 0,
-      "output": "\u2714 OpenAI generate: exact route, request serialization, base64 response (3.570791ms)\n\u2714 OpenAI edit uses multipart image and prompt (1.291791ms)\n\u2714 OpenAI 401 surfaces error without paid-call retry (0.529834ms)\n\u2714 OpenAI 403 surfaces error without paid-call retry (0.2765ms)\n\u2714 OpenAI 429 surfaces error without paid-call retry (0.315333ms)\n\u2714 OpenAI 500 surfaces error without paid-call retry (0.246625ms)\n\u2714 OpenAI ambiguous network failure is not automatically resubmitted (0.307667ms)\n\u2714 Higgsfield V2 submit exposes remote ID without automatic polling (14.702125ms)\n\u2139 tests 8\n\u2139 suites 0\n\u2139 pass 8\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 176.851375\n"
+      "output": "\u2714 vision uses verified pixels, bounded full-page/detail views and exact visual citations (MOCK provider) (51.544375ms)\n\u2714 crawler blocks nonpublic IPv4/IPv6 and unsafe URL representations (4.032333ms)\n\u2714 mixed public/private DNS answers fail before opening a socket (0.195875ms)\n\u2714 robots denial and cross-site redirect stop before target fetch (MOCK transport) (1002.50275ms)\n\u2714 structured OpenAI extraction sends actual SDK contract, no tools/storage/retries (MOCK provider) (4.581041ms)\n\u2714 AI output cannot forge citations, duplicate fields or replace reviewed facts (0.693667ms)\n\u2714 missing key, refusal, incomplete and malformed AI response produce no fabricated findings (6.844333ms)\n\u2714 OpenAI generate: exact route, request serialization, base64 response (3.725292ms)\n\u2714 OpenAI edit uses multipart image and prompt (1.299667ms)\n\u2714 OpenAI 401 surfaces error without paid-call retry (0.522209ms)\n\u2714 OpenAI 403 surfaces error without paid-call retry (0.275334ms)\n\u2714 OpenAI 429 surfaces error without paid-call retry (0.303042ms)\n\u2714 OpenAI 500 surfaces error without paid-call retry (0.256375ms)\n\u2714 OpenAI ambiguous network failure is not automatically resubmitted (0.271292ms)\n\u2714 Higgsfield V2 submit exposes remote ID without automatic polling (14.303625ms)\n\u2139 tests 15\n\u2139 suites 0\n\u2139 pass 15\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 1351.910459\n"
     }
   ],
   "passed": true,

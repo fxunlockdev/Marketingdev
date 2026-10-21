@@ -1,0 +1,45 @@
+{
+  "at": "2026-10-21T14:58:45.610Z",
+  "parserImage": "sha256:8b6e7d51e44f2c9b5d0e1b60199fde81602a890edebcb7e8e1da5fdbfa025426",
+  "scope": "Real public HTTPS, robots, DNS-pinned resource broker and network-disabled Chromium. Blaze.ai homepage only; no authenticated product/model/live-gate claim.",
+  "generated_by": "bounded public render smoke; derived without model calls",
+  "pages": [
+    {
+      "url": "https://www.blaze.ai/",
+      "version": "crawl4ai-0.9.5/chromium-1248/desvio-visual-v2",
+      "requests": 107,
+      "snapshots": [
+        {
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "height": 9961,
+          "sha256": "f2bfb8b4955e4fb42e55620c876dd1cd066eefbf2acc0e982b7048111eb005c6",
+          "truncated": false,
+          "title": "Blaze | Marketing Done For You",
+          "fontStatus": "loaded",
+          "images": 57
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "height": 12976,
+          "sha256": "4cdf587e459631c404223b3554737ef899d474c07d6b03989db940029ca9d894",
+          "truncated": false,
+          "title": "Blaze | Marketing Done For You",
+          "fontStatus": "loaded",
+          "images": 57
+        }
+      ],
+      "resource_outcomes": {
+        "unsupported_request": 25,
+        "resource_unavailable": 4
+      }
+    }
+  ],
+  "live_model_calls": false,
+  "product_live_verified": false
+}
