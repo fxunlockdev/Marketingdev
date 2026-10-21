@@ -703,7 +703,7 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   await expect(alice.getByLabel("Posts per week")).toHaveValue("4");
   await alice.getByText("Why these suggestions?", { exact: true }).click();
   await expect(
-    alice.getByText("Appointment software for dental practices", {
+    alice.getByText("offering: Appointment software for dental practices", {
       exact: true,
     }),
   ).toBeVisible();
