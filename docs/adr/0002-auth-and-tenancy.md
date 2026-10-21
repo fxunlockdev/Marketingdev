@@ -1,6 +1,6 @@
 # ADR 0002 — authenticated client workspaces and brand persistence
 
-Status: adopted for initial M1 implementation, not accepted as the complete M1 release gate.
+Status: adopted for initial M1 implementation, not accepted as the complete M1 release gate. ADR 0003 extends this foundation with verified email/recovery and team access; it supersedes the initial account limitations below.
 
 ## Reuse and verified contracts
 
@@ -37,7 +37,7 @@ Outbox rows are durable pending events only. No dispatcher or Temporal workflow 
 
 | Route | Actual behavior |
 |---|---|
-| /api/auth/sign-up/email, sign-in/email, sign-out | Better Auth cookie/session flow; development/test only |
+| /api/auth/sign-up/email, sign-in/email, sign-out | Better Auth verified cookie/session flow; tested locally, see ADR 0003 |
 | GET /health | API database query; explicitly not provider or complete product readiness |
 | GET/POST /api/v1/workspaces | List own memberships / create client workspace and owner membership |
 | GET/POST /api/v1/workspaces/:org/brands | List/create tenant brands; creation requires idempotency key |
@@ -49,4 +49,4 @@ Exact same-origin checks apply to all mutations including auth; no wildcard orig
 
 The Docker suite uses a pinned PostgreSQL 17.11 image on loopback and genuine HTTP sessions. It tests two independent clients, multiple brands, direct SQL without tenant predicates, cross-client attacks, restricted-role writes, revocation, idempotency races, transaction rollback, API/database restart, schema compatibility, request bounds, credentials and auth throttling. Fixture credentials/users are generated solely for the disposable test; no provider calls or customer accounts are involved. Successful tests prove only those covered local paths.
 
-External auth startup is deliberately blocked until email verification/recovery and sender configuration exist. Also outstanding: invitation/team management, MFA/admin policies, client API rate limits, durable jobs and dispatch authorization, private object storage, secrets rotation, billing/credits, operational telemetry, deployment, UI, full security scans/load tests and actual provider journeys. Membership changes are currently test-fixture administration only, not a shipped team-management capability. Local API restart and database restart evidence is not disaster-recovery/backup evidence. No capability is LIVE_VERIFIED or LAUNCH_READY.
+ADR 0003 adds verified email, recovery and client team-management backend routes. Production startup remains blocked by the full release gate. Still outstanding: external email delivery verification, account/team UI, MFA/admin policies, client API rate limits, durable generation jobs and dispatch authorization, private object storage, secrets rotation, billing/credits, operational telemetry, deployment, full security scans/load tests and actual provider journeys. Local API restart and database restart evidence is not disaster-recovery/backup evidence. No capability is LIVE_VERIFIED or LAUNCH_READY.

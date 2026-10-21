@@ -1,0 +1,94 @@
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import type { PoolClient } from 'pg';
+import { TenantDatabase } from './database.js';
+import { MailQueue, mailbox } from './mail.js';
+import { object,uuid } from './workspaces.js';
+
+const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
+function invitationRole(value:unknown): string {
+  if(typeof value!=='string' || !['admin','editor','viewer'].includes(value)) throw new BadRequestException('Choose admin, editor or viewer');
+  return value;
+}
+function key(value:unknown):string {
+  if(typeof value!=='string' || !/^[A-Za-z0-9_.:-]{8,128}$/.test(value)) throw new BadRequestException('An Idempotency-Key is required');
+  return value;
+}
+function teamError(error:unknown):never {
+  const code=(error as {code?:string})?.code;
+  if(code==='42501') throw new ForbiddenException('You do not have permission to make this team change');
+  if(code==='P0002') throw new NotFoundException('Invitation unavailable or expired');
+  if(code==='23514') throw new ConflictException('Keep at least one active workspace owner');
+  if(code==='23505') throw new ConflictException('Already a member; an owner can change the role');
+  throw error;
+}
+export class Team {
+  constructor(readonly database:TenantDatabase,readonly mail:MailQueue,readonly origin:string) {}
+  private async admin(db:PoolClient,user:string,org:string) {
+    const {rows:[member]}=await db.query('SELECT role FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[org,user]);
+    if(!member || !['owner','admin'].includes(member.role)) throw new ForbiddenException('Only workspace owners and admins can manage invitations');
+    return member.role as string;
+  }
+  list(user:string,organizationId:string) {
+    return this.database.transaction(user,uuid(organizationId),false,async db=>({members:(await db.query('SELECT * FROM app.team_members()')).rows})).catch(teamError);
+  }
+  invitations(user:string,organizationId:string) {
+    const org=uuid(organizationId);
+    return this.database.transaction(user,org,false,async db=>{
+      await this.admin(db,user,org);
+      const {rows}=await db.query(`SELECT i.id,i.email,i.role,CASE WHEN i.status='pending' AND i.expires_at<=now() THEN 'expired' ELSE i.status END AS status,
+        i.expires_at,m.status AS email_status,m.error_code FROM app.invitations i JOIN delivery.outbox m ON m.id=i.mail_id
+        WHERE i.organization_id=$1 ORDER BY i.created_at DESC LIMIT 100`,[org]);
+      return{invitations:rows};
+    });
+  }
+  invite(user:string,organizationId:string,input:unknown,idempotency:unknown) {
+    const org=uuid(organizationId),value=object(input,['email','role']),role=invitationRole(value.role),requestKey=key(idempotency);
+    let email:string;try{email=mailbox(value.email);}catch{throw new BadRequestException('Enter a valid email address');}
+    const requestHash=digest(JSON.stringify({email,role}));
+    return this.database.transaction(user,org,true,async db=>{
+      // Same lock as role changes and acceptance: permissions cannot change mid-invitation.
+      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`members:${org}`]);
+      const actorRole=await this.admin(db,user,org);
+      if(actorRole==='admin' && role==='admin') throw new ForbiddenException('Only an owner can invite another admin');
+      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`invite:${org}:${requestKey}`]);
+      const {rows:[prior]}=await db.query(`SELECT request_hash,response FROM app.idempotency WHERE organization_id=$1 AND operation='invitation.create' AND key=$2`,[org,requestKey]);
+      if(prior) {if(prior.request_hash!==requestHash) throw new ConflictException('This request key was used for different content');return prior.response;}
+      const {rows:[count]}=await db.query(`SELECT count(*)::int AS count FROM app.invitations WHERE organization_id=$1 AND created_at>now()-interval '1 day'`,[org]);
+      if(count.count>=100) throw new ConflictException('This client has reached its daily invitation limit');
+      // A replacement is authoritative: an older link must not retain a different grant.
+      const previous=await db.query(`SELECT id FROM app.invitations WHERE organization_id=$1 AND email=$2 AND status='pending' AND expires_at>now()`,[org,email]);
+      for(const pending of previous.rows) await db.query('SELECT app.revoke_invitation($1)',[pending.id]);
+      const {rows:[workspace]}=await db.query('SELECT name FROM app.organizations WHERE id=$1',[org]);
+      const token=randomBytes(32).toString('base64url'),id=randomUUID(),expires=new Date(Date.now()+7*24*60*60*1000);
+      const link=new URL('/accept-invitation',this.origin);link.hash=new URLSearchParams({token}).toString();
+      const mailId=await this.mail.enqueue(db,'invite',{to:email,url:link.toString(),workspace:workspace.name},expires,org,user);
+      await db.query(`INSERT INTO app.invitations(id,organization_id,email,role,invited_by,token_hash,expires_at,mail_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,[id,org,email,role,user,digest(token),expires,mailId]);
+      await db.query(`INSERT INTO app.audit_events(organization_id,actor_id,action,resource_id) VALUES($1,$2,'invitation.created',$3)`,[org,user,id]);
+      const result={id,email,role,status:'pending',email_status:'pending',expires_at:expires.toISOString()};
+      await db.query(`INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response) VALUES($1,'invitation.create',$2,$3,$4::jsonb)`,[org,requestKey,requestHash,JSON.stringify(result)]);
+      return result;
+    }).catch(teamError);
+  }
+  accept(user:string,input:unknown) {
+    const {token}=object(input,['token']);
+    if(typeof token!=='string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new NotFoundException('Invitation unavailable or expired');
+    return this.database.transaction(user,undefined,true,async db=>{
+      const {rows:[result]}=await db.query('SELECT * FROM app.accept_invitation($1)',[digest(token)]);
+      if(!result) throw new NotFoundException('Invitation unavailable or expired');
+      return result;
+    }).catch(teamError);
+  }
+  revoke(user:string,organizationId:string,id:string) {
+    return this.database.transaction(user,uuid(organizationId),true,async db=>{
+      await db.query('SELECT app.revoke_invitation($1)',[uuid(id)]);return{status:'revoked'};
+    }).catch(teamError);
+  }
+  change(user:string,organizationId:string,target:string,input:unknown) {
+    const value=object(input,['role','active']);
+    if(typeof value.role!=='string' || !['owner','admin','editor','viewer'].includes(value.role) || typeof value.active!=='boolean') throw new BadRequestException('A valid role and active status are required');
+    return this.database.transaction(user,uuid(organizationId),true,async db=>{
+      await db.query('SELECT app.change_member($1,$2,$3)',[uuid(target),value.role,value.active]);return{user_id:target,role:value.role,active:value.active};
+    }).catch(teamError);
+  }
+}

@@ -15,6 +15,9 @@
 | Redis | Railway template | Deployed; exact image/digest/security audit pending |
 | NestJS core/common/platform-express | 12.2.0 | MIT; real local HTTP API exercised |
 | Better Auth | 1.7.12 | MIT; actual schema generation, sessions, revocation, hash and throttle tests |
+| Kysely | 0.29.7 | MIT; explicit Better Auth transactions and rollback tests |
+| Nodemailer | 10.1.7 | MIT-0; SMTP tested against local protocol fixture only |
+| smtp-server / mailparser | 3.20.2 / 3.10.0 | Dev-only; MIT-0 / MIT; loopback fixture and parsed messages |
 | node-postgres | 8.23.1 | MIT; real role/RLS and restart tests |
 | Express | 5.3.0 | MIT; bounded JSON parser including auth, exact origin policy |
 | PostgreSQL test image | postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73 | Runtime reports 17.11; local disposable database only, PostgreSQL license |
