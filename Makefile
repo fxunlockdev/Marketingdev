@@ -24,5 +24,5 @@ release-gate:
 	$(PYTHON) -m scripts.release_gate
 
 dev verify-load:
-	@echo 'NOT_IMPLEMENTED at M0: application runtime/load harness is the next milestone.'
+	@echo 'NOT_IMPLEMENTED: full-stack dev/load harness requires storage and durable workers. Local API foundation tests: npm run test:foundation.'
 	@exit 2

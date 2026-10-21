@@ -1,9 +1,18 @@
 {
   "suite": "offline",
-  "scope": "M0 audit probes only; no product E2E or authenticated tenant proof",
-  "checked_at": "2026-10-21T02:29:14.112448+00:00",
-  "source_sha256": "a8087b4d23cd878a1fe759eb67ffe3052e3e629e096619870525ec96770be2c1",
+  "scope": "TypeScript build and M0 skill archive/middleware probes",
+  "checked_at": "2026-10-21T02:50:31.364910+00:00",
+  "source_sha256": "f44af514614dfee16717562336dfda5984a64a51061603e62372d8a11815ee3c",
   "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
     {
       "command": [
         "/Users/viloljoshi/Documents/Codex/2026-10-21/i-want-you-to-design-blaze-2/work/Marketingdev/.venv/bin/python3",
@@ -15,7 +24,7 @@
         "-v"
       ],
       "exit_code": 0,
-      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\n\n----------------------------------------------------------------------\nRan 3 tests in 1.229s\n\nOK\n"
+      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\n\n----------------------------------------------------------------------\nRan 3 tests in 1.248s\n\nOK\n"
     }
   ],
   "passed": true,
