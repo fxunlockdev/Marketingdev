@@ -25,7 +25,7 @@ def gate_errors(status):
         if report.get("passed") is not True or report.get("source_sha256") != source_hash():
             errors.append(f"Failed or stale {name} evidence")
     # No manual LAUNCH_READY flags can bypass this missing live execution proof.
-    errors.append("Product E2E, private storage/worker tenant isolation and trusted live evidence runner are NOT_IMPLEMENTED; local auth/RLS tests are not launch proof")
+    errors.append("Product E2E, deployed provider-worker tenant isolation and trusted live evidence runner are NOT_IMPLEMENTED; local auth/storage/validation-worker tests are not launch proof")
     if status["overall_release_state"] != "LAUNCH_READY":
         errors.append("Overall release state is BLOCKED")
     return errors
