@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-10-22T09:40:04.844Z",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "requested_environment": "dev",
+  "scope": "Authorized dev creation still rejected by Railway upstream pause; no application deployment claimed.",
+  "read": {
+    "content": [
+      {
+        "type": "text",
+        "text": "tool call error: tool call failed for `railway/environment_status`\n\nCaused by:\n    Mcp error: -32602: Failed to resolve environment: Environment \"dev\" not found.\n    Run `railway environment` to connect to an environment.. Available environments:\n    - production (id: 0ca68498-6559-4b95-9788-34a5ff703dc0)"
+      }
+    ],
+    "isError": true
+  },
+  "create": {
+    "content": [
+      {
+        "type": "text",
+        "text": "tool call error: tool call failed for `railway/create_environment`\n\nCaused by:\n    Mcp error: -32603: Failed to create environment: Deploys have been paused due to an upstream issue"
+      }
+    ],
+    "isError": true
+  }
+}
