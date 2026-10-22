@@ -1,4 +1,4 @@
-.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load verify-social verify-connections verify-publishing verify-publishing-ui
+.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load verify-social verify-connections verify-publishing verify-publishing-ui verify-deployment bootstrap-database
 PYTHON ?= uv run --frozen python
 
 bootstrap:
@@ -41,3 +41,9 @@ verify-publishing:
 
 verify-publishing-ui:
 	$(PYTHON) -m scripts.verify publishing-ui
+
+verify-deployment:
+	$(PYTHON) -m scripts.verify deployment
+
+bootstrap-database:
+	node scripts/bootstrap-database.mjs

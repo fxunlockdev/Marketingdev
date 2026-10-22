@@ -11,6 +11,7 @@ from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
+    "deployment": [["npm", "run", "build"], ["node", "scripts/deployment-test.mjs"], ["node", "scripts/foundation-test.mjs", "--accounts"]],
     "publishing-ui": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--publishing-web"]],
     "publishing": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--publishing"]],
     "connections": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--social-web"]],
@@ -28,11 +29,11 @@ def now():
 
 def source_hash():
     files = {}
-    for directory in ["scripts", "tests", "contracts", "apps", "database"]:
+    for directory in ["scripts", "tests", "contracts", "apps", "database", "infra"]:
         for path in sorted((ROOT / directory).rglob("*")):
             if path.is_file() and not set(path.parts).intersection({"__pycache__", ".next", "node_modules", ".venv"}) and not path.name.endswith(".tsbuildinfo"):
                 files[str(path.relative_to(ROOT))] = hashlib.sha256(path.read_bytes()).hexdigest()
-    for name in ["package.json", "package-lock.json", "pyproject.toml", "uv.lock", "Makefile", "tsconfig.json"]:
+    for name in ["package.json", "package-lock.json", "pyproject.toml", "uv.lock", "Makefile", "tsconfig.json", ".dockerignore"]:
         files[name] = hashlib.sha256((ROOT / name).read_bytes()).hexdigest()
     return hashlib.sha256(json.dumps(files, sort_keys=True).encode()).hexdigest()
 
@@ -125,6 +126,12 @@ def write_status():
         integrations[capability] = {"state": "ADAPTER_READY" if publishing_ui_ready else "NOT_IMPLEMENTED", "live_test": False,
             "evidence": ["docs/evidence/social.json", "docs/evidence/publishing.json", "docs/evidence/publishing-ui.json"],
             "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."}
+    deployment_path = EVIDENCE / "deployment.json"
+    deployment = json.loads(deployment_path.read_text()) if deployment_path.exists() else {}
+    deployment_ready = deployment.get("passed") is True and deployment.get("source_sha256") == source_hash()
+    integrations["deployment_bootstrap"] = {"state": "ADAPTER_READY" if deployment_ready else "NOT_IMPLEMENTED", "live_test": False,
+        "evidence": ["docs/evidence/deployment.json"],
+        "blocked_reason": "Actual disposable PostgreSQL role/migration bootstrap, rollback/replay/credential-drift rejection, cloud-address API startup and real generated standalone Next/browser/proxy/shutdown smoke tested on the host. Pinned Node registry manifests and Dockerfiles are prepared, not container-build/deployed proof. Railway dev creation, Linux image acceptance, private sandbox workers, operator setup, cloud security and live providers remain incomplete."}
     update_matrix(ROOT, foundation_passed and browser_passed, creative_ready)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
@@ -152,6 +159,7 @@ def run_suite(name):
     scopes["connections"] = "Actual Next/Nest/Better Auth/PostgreSQL/Temporal/private provisioning worker browser journey; explicitly MOCK Postiz HTTP and LinkedIn consent; no external OAuth, paid models, deployment or publishing. Focused suite does not replace full browser/security gates."
     scopes["publishing"] = "Actual local auth, forced PostgreSQL RLS, approved creative fixtures, network-disabled canonical Fabric rendering/private S3, dispatcher and Temporal; explicitly MOCK Postiz upload/schedule/status HTTP. No actual OAuth/social publication or deployed/live acceptance; focused backend suite does not replace full security/browser gates."
     scopes["publishing-ui"] = "Actual Next/Nest/Better Auth/PostgreSQL RLS/private S3/canonical Fabric renderer/Temporal browser journeys; exact approved fixture image and destination/time consent, published/uncertain/missing observations, history, cancellation and lost-client-response recovery, stale approval/preview integrity, readonly/foreign/business switching, genuine overview counts and desktop/mobile accessibility. Explicitly MOCK Postiz HTTP; no real social post or live/deployed evidence. Focused suite does not replace full security/browser gates."
+    scopes["deployment"] = "Actual disposable PostgreSQL bootstrap and six distinct service logins; unrelated database/role refusal, transaction rollback, checksum/privilege/password drift, concurrent replay, API dual-stack startup and shutdown; generated standalone Next package serving real API proxy and browser sign-in; configuration mismatch rejection. Existing real account/tenant/email integration regression also runs through the refactored migration wrapper. Host-built artifact only: no Linux container build, Railway deployment, external SMTP, paid providers or social publication."
     finished_hash = source_hash()
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,

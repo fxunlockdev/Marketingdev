@@ -8,6 +8,7 @@ if (
 )
   throw new Error("API_ORIGIN must be a plain server origin");
 export default {
+  output: process.env.DESVIO_STANDALONE === "true" ? "standalone" : undefined,
   poweredByHeader: false,
   devIndicators: false,
   outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
