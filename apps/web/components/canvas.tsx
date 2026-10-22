@@ -171,10 +171,11 @@ export function CanvasScreen({ business }: { business: Business }) {
       clearTimeout(timer);
     };
   }, [root, threadId, revision]);
+  const [planningDirty,setPlanningDirty]=useState(false);
   function choose(id: string) {
     if (id === threadId && id) return;
     if (
-      (dirty || prompt) &&
+      (dirty || prompt || planningDirty) &&
       !confirm("Leave your unsaved edits and draft message?")
     )
       return;
@@ -335,7 +336,7 @@ export function CanvasScreen({ business }: { business: Business }) {
             </div>
           )}
           {!!conversation?.planning_runs.length&&<section aria-label="Conversation plans">{conversation.planning_runs.map(r=><p key={r.id}>{r.output_plan_id?<a href={`/b/${business.id}/content-plan?start=${r.starts_on}`}>Open calendar · {r.starts_on}</a>:r.cancel_requested?'Planning canceled':r.status==='queued'&&Date.parse(r.scheduled_at)>Date.now()?`Planning scheduled for ${r.starts_on}`:r.status==='unknown'?'Planning needs reconciliation before another request.':`Planning ${r.status}`}</p>)}</section>}
-          <CanvasPlanner key={business.id+threadId} business={business} threadId={threadId} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>
+          <CanvasPlanner key={business.id+threadId} business={business} threadId={threadId} onDirty={setPlanningDirty} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>
           <form className="studio-composer" onSubmit={send}>
             <fieldset
               disabled={!write || busy || held || !business.has_approved_brand}

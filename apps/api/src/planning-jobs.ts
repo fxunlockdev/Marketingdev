@@ -6,7 +6,7 @@ import {AssetJobs,type JobScope} from './jobs.js';
 import {SkillRuntime} from './skill-runtime.js';
 import {CreativeProvider} from './creative-provider.js';
 import {CreativeError,type PlannerRequest} from './creative-contracts.js';
-import {validatePlanningResult,type PlanningInput,type PlanningResult} from './planning-contracts.js';
+import {validatePlanningResult,resolvedPlanningInput,type PlanningInput,type PlanningResult} from './planning-contracts.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class PlanningJobs {
@@ -99,6 +99,7 @@ export class PlanningJobs {
     });
    }
    result=validatePlanningResult(result,input);
+   const resolved=resolvedPlanningInput(input,result.plan);
    return await this.jobs.transaction(scope,async(db,j)=>{
     if(terminal.has(j.status))return j.status;
     if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
@@ -108,9 +109,9 @@ export class PlanningJobs {
     if(prior)return this.finish(db,j,'succeeded');
     if((await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0].n>=36)throw new CreativeError('PLAN_LIMIT_REACHED');
     const planId=randomUUID(),reserved=(await db.query('SELECT sum(reserved_micros)::text AS n FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0].n;
-    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,input_sha256:request.input_sha256,helpers_executed:false};
+    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
     await db.query(`INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,origin,created_by,request_key,request_hash,job_id,brain_id,strategy,skill_manifest,duration_days)
-      VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify(result.plan),JSON.stringify(manifest),input.duration_days??30]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify(result.plan),JSON.stringify(manifest),resolved.duration_days??30]);
     for(const [index,s] of result.plan.slots.entries()){
      const sid=randomUUID();
      await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index,video_draft)

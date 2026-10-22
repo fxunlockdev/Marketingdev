@@ -6,17 +6,24 @@ export const PLANNING_SKILLS = {
  'marketing-plan':{skill_sha256:'2b75dfae852bdb61fd96eebe3d2b373f99f67c86ff830f796310f662ba8906e8',tree_sha256:'d3f0c84f21bf77fb851403e95bd1d0270d81ae664d61a39cd003764fe5571fd6'},
  'product-marketing':CREATIVE_SKILLS['product-marketing'], social:CREATIVE_SKILLS.social,
 };
-export type PlanningInput={task:'content_plan';brand:CreativeInput['brand'];preferences:{starts_on:string;timezone:string;goal:string;cadence:number;channels:('linkedin'|'instagram')[];must_avoid:string;revision:number};brief:string;post_count:number;duration_days?:number;video_count?:number};
-export type GeneratedPlan={title:string;strategy:string;warnings:string[];slots:{channel:'linkedin'|'instagram';planned_at:string;format:'static'|'video';video_draft?:VideoConcept;brief:string;pillar:string;hook:string;cta:string;fact_ids:string[]}[]};
+export type PlanningInput={task:'content_plan';brand:CreativeInput['brand'];preferences:{starts_on:string;timezone:string;goal:string;cadence:number;channels:('linkedin'|'instagram')[];must_avoid:string;revision:number};brief:string;post_count:number;duration_days?:number;video_count?:number;planning_mode?:'natural';reference_plan?:{id:string;sha256:string;title:string;duration_days:number;starts_on:string;timezone:string;slots:unknown[]}};
+export type GeneratedPlan={settings?:{duration_days:number;post_count:number;video_count:number};title:string;strategy:string;warnings:string[];slots:{channel:'linkedin'|'instagram';planned_at:string;format:'static'|'video';video_draft?:VideoConcept;brief:string;pillar:string;hook:string;cta:string;fact_ids:string[]}[]};
 export type PlanningResult=Omit<SkillResult,'brief'> & {plan:GeneratedPlan};
 function fields(value:any,keys:string[]) {return value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===keys.sort().join(',');}
 function plain(v:any,max:number,empty=false) {return typeof v==='string'&&(empty||v.trim().length>0)&&v.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v);}
+export function resolvedPlanningInput(input:PlanningInput,plan:any):PlanningInput {
+ if(input.planning_mode!=='natural')return input;
+ const s=plan?.settings;
+ if(!fields(s,['duration_days','post_count','video_count'])||!Number.isInteger(s.duration_days)||s.duration_days<1||s.duration_days>90||!Number.isInteger(s.post_count)||s.post_count<1||s.post_count>90||!Number.isInteger(s.video_count)||s.video_count<0||s.video_count>Math.min(s.post_count,30))throw new CreativeError('PLAN_OUTPUT_INVALID');
+ return {...input,duration_days:s.duration_days,post_count:s.post_count,video_count:s.video_count};
+}
 export function validateGeneratedPlan(value:any,input:PlanningInput):GeneratedPlan {
  const fail=()=>{throw new CreativeError('PLAN_OUTPUT_INVALID');};
+ const natural=input.planning_mode==='natural';input=resolvedPlanningInput(input,value);
  const days=input.duration_days??30,videos=input.video_count??0;
  if(!Number.isInteger(videos)||videos<0||videos>Math.min(input.post_count,30))fail();
  if(!Number.isInteger(days)||days<1||days>90||!Number.isInteger(input.post_count)||input.post_count<1||input.post_count>90)fail();
- if(!fields(value,['title','strategy','warnings','slots'])||!plain(value.title,140)||!plain(value.strategy,4000)||!Array.isArray(value.warnings)||value.warnings.length>10||value.warnings.some((v:any)=>!plain(v,500))||!Array.isArray(value.slots)||value.slots.length!==input.post_count)fail();
+ if(!fields(value,['title','strategy','warnings','slots',...(natural?['settings']:[])])||!plain(value.title,140)||!plain(value.strategy,4000)||!Array.isArray(value.warnings)||value.warnings.length>10||value.warnings.some((v:any)=>!plain(v,500))||!Array.isArray(value.slots)||value.slots.length!==input.post_count)fail();
  if(Buffer.byteLength(JSON.stringify(value))>100000)fail();
  const seen=new Set(),channels=new Set(),weeks=new Set();
  for(const s of value.slots){

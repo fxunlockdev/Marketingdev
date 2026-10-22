@@ -52,3 +52,11 @@ test('mixed plans require the exact video count and complete bounded concepts wi
  for(const change of [p=>p.slots[0]=null,p=>delete p.slots[0].video_draft,p=>p.slots[0].video_draft.duration_seconds=60,p=>p.slots[0].video_draft.script='',p=>p.slots[0].video_draft.approved=true,p=>p.slots[2].format='video']){const bad=structuredClone(plan);change(bad);assert.throws(()=>validateGeneratedPlan(bad,context));}
  for(const video_count of [-1,7,1.5])assert.throws(()=>validateGeneratedPlan(plan,{...context,video_count}));
 });
+
+
+test('natural planning resolves bounded days and mix while retaining dates, channels and approved-fact validation',()=>{
+ const context={...structuredClone(input),planning_mode:'natural'},settings={duration_days:7,post_count:7,video_count:2};
+ const value={...generatedPlan({...context,...settings}),settings};assert.equal(validateGeneratedPlan(value,context).slots.length,7);
+ for(const change of [p=>delete p.settings,p=>p.settings.duration_days=0,p=>p.settings.duration_days=91,p=>p.settings.post_count=91,p=>p.settings.video_count=8,p=>p.settings.video_count=1.5,p=>p.settings.publish=true,p=>p.settings.starts_on='2027-01-01',p=>p.slots.pop(),p=>p.slots[0].fact_ids=['fabricated']]){const bad=structuredClone(value);change(bad);assert.throws(()=>validateGeneratedPlan(bad,context),/PLAN_OUTPUT_INVALID/);}
+ assert.throws(()=>validateGeneratedPlan(value,input),/PLAN_OUTPUT_INVALID/);
+});

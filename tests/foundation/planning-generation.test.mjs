@@ -276,3 +276,22 @@ test('Canvas planning saves the request, genuine result and calendar link in one
  const alien=await canvas.createThread(alice,b.id,{title:'Different conversation'},randomUUID());
  await assert.rejects(jobs.transaction(scope(b,j),db=>db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'assistant','forged')",[randomUUID(),org.id,b.id,alien.id,j.id])),e=>e.code==='42501');
 });
+
+
+test('natural follow-up planning snapshots current edited context and saves resolved counts without overwriting the source',async()=>{
+ const b=await fresh();await grant(b);const original=await planning.submit(alice,b.id,{starts_on:'2090-03-01',duration_days:6,post_count:6,video_count:2,canvas_thread_id:null},randomUUID());assert.equal(await handler.run(scope(b,original)),'succeeded');
+ const source=(await planning.jobs(alice,b.id)).jobs[0].output_plan_id;
+ const slot=(await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 AND video_draft IS NOT NULL ORDER BY planned_at LIMIT 1',[source])).rows[0];
+ await plans.edit(alice,b.id,slot.id,{revision:slot.revision,video_draft:{...slot.video_draft,script:'Owner revised script about the approved offering'}});
+ const before=(await admin.query('SELECT revision,video_draft FROM app.content_slots WHERE id=$1',[slot.id])).rows[0];
+ const body={starts_on:'2090-04-01',brief:'Make this a weekly plan with two videos, retaining my revised script direction',planning_mode:'natural',reference_plan_id:source,canvas_thread_id:original.thread_id};
+ assert.throws(()=>planning.submit(alice,b.id,{...body,repeat_cycles:2,confirm_recurring_spend:true,loop_budget_micros:1000000},randomUUID()),/fixed/);
+ const other=await fresh();await assert.rejects(planning.submit(alice,other.id,body,randomUUID()),/Reference plan not found/);
+ const j=await planning.submit(alice,b.id,body,randomUUID());
+ transport=async(url,init)=>{calls++;const wire=JSON.parse(init.body),context=inputFrom(wire);assert.equal(context.planning_mode,'natural');assert.equal(context.reference_plan.id,source);assert.ok(context.reference_plan.slots.some(s=>s.video_draft?.script===before.video_draft.script));assert.ok(wire.input.some(m=>m.role==='system'&&m.content.includes('settings object')));const settings={duration_days:7,post_count:7,video_count:2};return modelResponse({...generatedPlan({...context,...settings}),settings});};
+ try{assert.equal(await handler.run(scope(b,j)),'succeeded');}finally{transport=undefined;}
+ const saved=(await planning.jobs(alice,b.id)).jobs.find(r=>r.id===j.id);assert.equal(saved.duration_days,7);assert.equal(saved.post_count,7);
+ const plan=await planning.detail(alice,b.id,saved.output_plan_id);assert.equal(plan.duration_days,7);assert.equal(plan.skill_manifest.source_plan.id,source);assert.equal(plan.strategy.slots.length,7);assert.equal(plan.strategy.slots.filter(s=>s.format==='video').length,2);
+ assert.deepEqual((await admin.query('SELECT revision,video_draft FROM app.content_slots WHERE id=$1',[slot.id])).rows[0],before);
+ assert.equal(await countPlans(b),2);assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_requests WHERE brand_id=$1',[b.id])).rows[0].n,0);
+});

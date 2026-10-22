@@ -8,7 +8,7 @@ import type {PlanningInput} from './planning-contracts.js';
 export class Planning {
  constructor(readonly plans:ContentPlan){}
  submit(user:string,id:string,body:unknown,key:unknown){
-  const v=object(body,['starts_on','brief','duration_days','post_count','video_count','provider','repeat_cycles','loop_budget_micros','confirm_recurring_spend','canvas_thread_id']),brief=v.brief??'';
+  const v=object(body,['starts_on','brief','duration_days','post_count','video_count','provider','repeat_cycles','loop_budget_micros','confirm_recurring_spend','canvas_thread_id','planning_mode','reference_plan_id']),brief=v.brief??'';
   if(typeof v.starts_on!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v.starts_on)||!Number.isFinite(Date.parse(v.starts_on))||new Date(v.starts_on).toISOString().slice(0,10)!==v.starts_on||v.starts_on<'2000-01-01'||v.starts_on>'2100-12-01')throw new BadRequestException('Choose a valid start date');
   if(typeof brief!=='string'||brief.length>2000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(brief))throw new BadRequestException('Use a planning brief of at most 2000 characters');
   if(typeof key!=='string'||! /^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('An Idempotency-Key is required');
@@ -17,11 +17,15 @@ export class Planning {
   const videos=v.video_count??0;
   if(!Number.isInteger(videos)||Number(videos)<0||Number(videos)>Math.min(Number(count),30))throw new BadRequestException('Choose up to 30 videos within the total post count');
   const provider=v.provider??'openai';if(!['openai','gemini'].includes(String(provider)))throw new BadRequestException('Choose OpenAI or Gemini');
+  if(v.planning_mode!==undefined&&v.planning_mode!=='natural')throw new BadRequestException('Unsupported planning mode');
+  const referenceId=v.reference_plan_id===undefined?undefined:uuid(String(v.reference_plan_id));
+  if(v.planning_mode==='natural'&&!brief.trim())throw new BadRequestException('Describe what you want to plan');
   const threadId=v.canvas_thread_id===undefined?undefined:v.canvas_thread_id===null?null:uuid(String(v.canvas_thread_id));
   const cycles=v.repeat_cycles??1;
   if(!Number.isInteger(cycles)||Number(cycles)<1||Number(cycles)>12||Number(cycles)*Number(days)>366)throw new BadRequestException('Choose up to 12 cycles within one year');
   if(Number(cycles)>1&&(v.confirm_recurring_spend!==true||!Number.isSafeInteger(v.loop_budget_micros)||Number(v.loop_budget_micros)<1||Number(v.loop_budget_micros)>1000000000))throw new BadRequestException('Confirm recurring planning charges and a total budget');
-  const requestHash=hash(canonicalJSON({starts_on:v.starts_on,brief,user,...(threadId!==undefined?{canvas_thread_id:threadId}:{}),...(Number(cycles)>1?{repeat_cycles:cycles,loop_budget_micros:v.loop_budget_micros}:{}),...(v.duration_days!==undefined||v.post_count!==undefined?{duration_days:days,post_count:count}:{}),...(v.video_count!==undefined?{video_count:videos}:{}),...(v.provider!==undefined?{provider}:{})}));
+  if(v.planning_mode==='natural'&&Number(cycles)>1)throw new BadRequestException('Choose fixed days and post counts before authorizing a recurring loop');
+  const requestHash=hash(canonicalJSON({starts_on:v.starts_on,brief,user,...(v.planning_mode?{planning_mode:v.planning_mode}:{}),...(referenceId?{reference_plan_id:referenceId}:{}),...(threadId!==undefined?{canvas_thread_id:threadId}:{}),...(Number(cycles)>1?{repeat_cycles:cycles,loop_budget_micros:v.loop_budget_micros}:{}),...(v.duration_days!==undefined||v.post_count!==undefined?{duration_days:days,post_count:count}:{}),...(v.video_count!==undefined?{video_count:videos}:{}),...(v.provider!==undefined?{provider}:{})}));
   return this.plans.scope(user,id,true,async(db,b)=>{
    const prior=(await db.query('SELECT r.request_hash,j.id,j.status,r.output_plan_id,r.thread_id,r.loop_id FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,key])).rows[0];
    if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another planning request');return {id:prior.id,status:prior.status,output_plan_id:prior.output_plan_id,thread_id:prior.thread_id,loop_id:prior.loop_id};}
@@ -34,6 +38,14 @@ export class Planning {
    const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
    if(!prefs||prefs.step!==3||!prefs.channels.length)throw new ConflictException('Finish your brand goals and choose content channels before planning');
    const input:PlanningInput={task:'content_plan',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(v.video_count!==undefined?{video_count:Number(videos)}:{})};
+   if(v.planning_mode==='natural')input.planning_mode='natural';
+   if(referenceId){
+    const plan=(await db.query('SELECT id,title,duration_days,starts_on::text,timezone FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,referenceId])).rows[0];
+    if(!plan)throw new NotFoundException('Reference plan not found');
+    const slots=(await db.query('SELECT id,revision,channel,planned_at::text,format,brief,pillar,hook,cta,video_draft FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND plan_id=$3 ORDER BY planned_at,id LIMIT 121',[b.organization_id,id,referenceId])).rows;
+    const snapshot={...plan,slots};if(slots.length>120||Buffer.byteLength(JSON.stringify(snapshot))>120000)throw new ConflictException('This reference plan exceeds the planning context limit');
+    input.reference_plan={...snapshot,sha256:hash(canonicalJSON(snapshot))};
+   }
    if(Buffer.byteLength(JSON.stringify(input))>390000)throw new ConflictException('The approved brand profile exceeds the planning context limit');
    const grant=(await db.query('SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[b.organization_id,id,provider])).rows[0];
    if(Number(cycles)>1&&(await db.query("SELECT l.id FROM app.planning_loops l WHERE l.organization_id=$1 AND l.brand_id=$2 AND l.stopped_at IS NULL AND EXISTS(SELECT 1 FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.loop_id=l.id AND j.status IN ('queued','running','retrying','unknown'))",[b.organization_id,id])).rowCount)throw new ConflictException('Stop the active planning loop before starting another');
@@ -56,7 +68,7 @@ export class Planning {
    await db.query('INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,loop_id,scheduled_at,thread_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[job,b.organization_id,id,brain.id,JSON.stringify(cycleInput),hash(canonicalJSON(cycleInput)),cycle===0?key:`loop:${loop}:${cycle}`,requestHash,provider,grant?.model??null,loop,due,conversation??null]);
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',$4)",[job,b.organization_id,id,due]);
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
-   if(conversation&&cycle===0)await db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",[randomUUID(),b.organization_id,id,conversation,job,`${brief.trim()||'Plan content for this business.'}\n${count} posts over ${days} days, starting ${v.starts_on}; ${videos} videos. ${cycles} planning cycle(s).`]);
+   if(conversation&&cycle===0)await db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",[randomUUID(),b.organization_id,id,conversation,job,`${brief.trim()||'Plan content for this business.'}\n${v.planning_mode==='natural'?`AI chooses the plan length and mix from this request, starting ${v.starts_on}.`:`${count} posts over ${days} days, starting ${v.starts_on}; ${videos} videos. ${cycles} planning cycle(s).`}${input.reference_plan?`\nContext: ${input.reference_plan.title}. Create a new draft plan.`:''}`]);
    }
    return {id:first,status:'queued',output_plan_id:null,loop_id:loop,thread_id:conversation??null};
   });
@@ -68,7 +80,7 @@ export class Planning {
   await db.query("UPDATE app.jobs SET cancel_requested=true WHERE id IN (SELECT job_id FROM app.planning_requests WHERE loop_id=$1) AND status IN ('queued','running','retrying')",[loopId]);
   return r.rows[0];
  });}
- jobs(user:string,id:string){return this.plans.scope(user,id,false,async(db,b)=>({jobs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.output_plan_id,r.input->'preferences' AS preferences,r.input->'duration_days' AS duration_days,r.input->'post_count' AS post_count,r.provider,r.selected_model,r.loop_id,r.scheduled_at,r.thread_id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id])).rows}));}
+ jobs(user:string,id:string){return this.plans.scope(user,id,false,async(db,b)=>({jobs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.output_plan_id,r.input->'preferences' AS preferences,COALESCE(r.output->'plan'->'settings'->'duration_days',r.input->'duration_days') AS duration_days,COALESCE(r.output->'plan'->'settings'->'post_count',r.input->'post_count') AS post_count,r.provider,r.selected_model,r.loop_id,r.scheduled_at,r.thread_id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id])).rows}));}
  cancel(user:string,id:string,jobId:string){jobId=uuid(jobId);return this.plans.scope(user,id,true,async(db,b)=>{
   const j=(await db.query("SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND kind='plan.generate'",[b.organization_id,id,jobId])).rows[0];
   if(!j)throw new NotFoundException('Planning request not found');

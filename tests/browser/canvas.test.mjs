@@ -257,7 +257,8 @@ before(async () => {
   );
   const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
    assert.equal(new URL(url).pathname,'/v1beta/models/gemini-fixture:generateContent');const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
-   return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(generatedPlan(input))}]},finishReason:'STOP'}]});
+   const settings=input.planning_mode==='natural'?{duration_days:7,post_count:7,video_count:2}:null;
+   return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input))}]},finishReason:'STOP'}]});
   }}}));
   const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider,gemini);
   const exporter=new ExportJobs(jobs,new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE));
@@ -761,6 +762,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByText('Plan content in Canvas',{exact:true}).click();
  await page.getByLabel('Planning model',{exact:true}).selectOption('gemini');
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
+ await page.getByLabel('Set days and post counts myself',{exact:true}).check();
  await page.getByLabel('Planning days',{exact:true}).fill('4');
  await page.getByLabel('Videos in this plan',{exact:true}).fill('2');
  await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2026-12-01');
@@ -769,9 +771,9 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByLabel('Allow recurring AI planning charges', {exact:false}).check();
  await page.getByRole('button',{name:'Plan my content',exact:true}).click();
  const preview=page.getByRole('region',{name:'Planned posts',exact:true});
- await expect(preview.getByRole('listitem')).toHaveCount(4,{timeout:60000});
+ await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4,{timeout:60000});
  const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'gemini');
- await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('listitem')).toHaveCount(4);
+ await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4);
  await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('TEST four-day launch sequence');
  await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Prepared 4 draft posts');
  await expect(page.getByRole('region',{name:'Conversation plans'}).getByRole('link',{name:'Open calendar · 2026-12-01'})).toBeVisible();
@@ -788,4 +790,25 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByRole('button',{name:'Save post changes',exact:true}).click();
  await page.reload();await expect(page.getByLabel('Planned video prompt',{exact:true})).toHaveValue('TEST edited calendar video prompt');
  await page.screenshot({path:'work/browser/canvas-custom-plan.png',fullPage:true});assert.deepEqual(errors,[]);
+});
+
+
+test('Canvas natural follow-up uses the edited selected plan and opens a new weekly calendar',async()=>{
+ const original=(await admin.query("SELECT id FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];
+ const before=(await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at,id',[original.id])).rows;
+ await page.goto(`${base}/b/${brand}/canvas`);await page.getByText('Plan content in Canvas',{exact:true}).click();
+ await expect(page.getByLabel('Use selected saved plan as context',{exact:true})).toBeChecked();
+ await expect(page.getByLabel('Set days and post counts myself',{exact:true})).not.toBeChecked();
+ await expect(page.getByLabel('Planning days',{exact:true})).toHaveCount(0);
+ await page.getByLabel('Planning model',{exact:true}).selectOption('gemini');
+ await page.getByLabel('What should we plan?',{exact:true}).fill('TEST: Make this a weekly plan with two videos and keep my edited script direction');
+ await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2027-01-01');
+ await page.getByRole('button',{name:'Plan my content',exact:true}).click();
+ const preview=page.getByRole('region',{name:'Planned posts',exact:true});await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(7,{timeout:60000});await expect(preview).toContainText('7 days · 7 posts · 2 videos');
+ const request=(await admin.query("SELECT input,output_plan_id FROM app.planning_requests WHERE brand_id=$1 AND input->>'planning_mode'='natural'",[brand])).rows[0];
+ assert.equal(request.input.reference_plan.id,original.id);assert.ok(request.input.reference_plan.slots.some(s=>s.video_draft?.prompt==='TEST edited calendar video prompt'));assert.ok(request.output_plan_id);
+ assert.deepEqual((await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at,id',[original.id])).rows,before);
+ await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(7);
+ await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Make this a weekly plan');
+ await page.screenshot({path:'work/browser/canvas-natural-followup.png',fullPage:true});assert.deepEqual(errors,[]);
 });
