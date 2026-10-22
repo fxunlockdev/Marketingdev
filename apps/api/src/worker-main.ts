@@ -35,7 +35,7 @@ const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new Cre
 const social=new SocialJobs(jobs,config.social);
 const socialOAuth=new SocialOAuthJobs(jobs,config.social,config.oauthEncryptionKey);
 const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
-const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue);
+const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue,config.provisionTaskQueue);
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),
   maxConcurrentActivityTaskExecutions:2,activities:{
     authorizeSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await socialOAuth.run(scope);}catch(e){throw ApplicationFailure.create({message:'Authorization processing unavailable',type:'SocialAuthorizationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},

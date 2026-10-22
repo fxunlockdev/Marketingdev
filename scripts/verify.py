@@ -11,10 +11,10 @@ from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
-    "social": [["npm", "run", "build"], ["node", "--test", "tests/contracts/postiz.test.mjs"], ["node", "scripts/foundation-test.mjs", "--social"]],
+    "social": [["npm", "run", "build"], ["node", "--test", "tests/contracts/postiz.test.mjs", "tests/contracts/provisioning.test.mjs"], ["node", "scripts/foundation-test.mjs", "--social"]],
     "offline": [["npm", "run", "build"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/offline", "-v"]],
     "browser": [["npm", "run", "build"], ["npm", "run", "test:browser"]],
-    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs", "tests/contracts/creative.test.mjs", "tests/contracts/planning.test.mjs", "tests/contracts/local-calendar.test.mjs", "tests/contracts/postiz.test.mjs"]],
+    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs", "tests/contracts/creative.test.mjs", "tests/contracts/planning.test.mjs", "tests/contracts/local-calendar.test.mjs", "tests/contracts/postiz.test.mjs", "tests/contracts/provisioning.test.mjs"]],
     "security": [["npm", "run", "build"], ["npm", "audit", "--prefix", "apps/media", "--omit=dev", "--audit-level=moderate", "--json"], ["npm", "run", "test:foundation"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/security", "-v"]],
 }
 
@@ -100,6 +100,9 @@ def write_status():
     integrations["social_oauth_workflow"] = {"state": "ADAPTER_READY" if social_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/social.json"],
         "blocked_reason": "Actual local auth sessions, forced PostgreSQL RLS and Temporal prove LinkedIn start/callback with 256-bit state, encrypted code, expiry, single-session ownership, one-time exchange, revoked access and uncertain-outcome recovery. Upstream HTTP is explicitly MOCK. No provider login/consent or deployed callback UI has been tested. Provisioning, customer UI, account selection/reconnect/revoke and live acceptance remain incomplete."}
+    integrations["social_account_provisioning"] = {"state": "ADAPTER_READY" if social_ready else "NOT_IMPLEMENTED", "live_test": False,
+        "evidence": ["docs/evidence/social.json"],
+        "blocked_reason": "Actual local auth/RLS/Temporal and separate provisioning role prove idempotent setup enqueue, encrypted candidate capture, remote identity/name verification, retryable read-only confirmation, binding recovery and cross-business denial. Enterprise Postiz HTTP is MOCK. No real provisioning/deployment proof. Operator resolution of unknown/lost responses, customer UI, credential lifecycle and live acceptance remain incomplete."}
     update_matrix(ROOT, foundation_passed and browser_passed, creative_ready)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
