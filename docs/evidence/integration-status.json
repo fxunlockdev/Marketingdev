@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "24c51a6cc6cadeb802af23cd217997813c25db0c",
-  "checked_at": "2026-10-22T07:21:59.798531+00:00",
+  "code_commit": "20b2a0db35f63b90e4ec53a327698531bb896084",
+  "checked_at": "2026-10-22T07:45:27.621206+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/video-provider.json",
         "docs/evidence/deployment.json",
         "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
@@ -57,7 +58,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Transport and untrusted download are separately tested; durable tenant-scoped generation/edit workflow, funded grants/ledger, original video skill, isolated FFmpeg validation/composition, private versions/approval, customer UI and cost-capped live acceptance remain incomplete. No video customer route is enabled."
+      "blocked_reason": "Transport, untrusted download and durable provider substage have separate local test scope. Full skill-driven tenant generation/edit workflow, approved reference leases, isolated FFmpeg validation/composition, private versions/approval, customer UI and cost-capped live acceptance remain incomplete. No video customer route is enabled."
     },
     "creative_editor": {
       "state": "NOT_IMPLEMENTED",
@@ -82,6 +83,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/video-provider.json",
         "docs/evidence/deployment.json",
         "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
@@ -98,6 +100,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/video-provider.json",
         "docs/evidence/deployment.json",
         "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
@@ -202,7 +205,16 @@
       "evidence": [
         "docs/evidence/contracts.json"
       ],
-      "blocked_reason": "Pinned SDK and documented image-to-video/edit bodies, fixed-origin HTTP submission/status/cancel, persisted-intent fingerprint boundary, duplicate key semantics and bounded credentials-free output download tested against MOCK transports. Downloaded bytes remain untrusted. No durable video product workflow, tenant/budget integration, media decoder/private canonical output, Canvas video controls, account model eligibility, actual provider output or paid/live verification."
+      "blocked_reason": "Pinned SDK and documented image-to-video/edit bodies, fixed-origin HTTP submission/status/cancel, persisted-intent fingerprint boundary, duplicate key semantics and bounded credentials-free output download tested against MOCK transports. Downloaded bytes remain untrusted. The durable provider substage has separate evidence; complete approved-reference/skill-driven video workflow, media decoder/private canonical output, Canvas video controls, account model eligibility, actual provider output and paid/live verification remain incomplete."
+    },
+    "video_provider_stage": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/video-provider.json",
+        "docs/evidence/contracts.json"
+      ],
+      "blocked_reason": "Real disposable PostgreSQL forced RLS, encrypted immutable intents, per-business funded-grant fixtures/reservations, MOCK Higgsfield submit/status/cancel, unknown-write holds and durable Temporal timer/worker replacement. This is an internal pipeline stage without a customer route or ordinary worker registration. Original video skill, approved reference leases/lineage, media validation/private versions, Canvas controls, deployed runtime and paid/live acceptance remain incomplete. Provider completion does not mark a Desvio job succeeded."
     },
     "canvas_runtime": {
       "state": "NOT_IMPLEMENTED",
@@ -314,7 +326,7 @@
       "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
     },
     "deployment_bootstrap": {
-      "state": "NOT_IMPLEMENTED",
+      "state": "ADAPTER_READY",
       "live_test": false,
       "evidence": [
         "docs/evidence/deployment.json"
