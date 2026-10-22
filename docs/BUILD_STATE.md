@@ -2,6 +2,14 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas and calendar/channel-review workflows are implemented locally. Prior checkpoint: 124 checks passed at 35b86cc. Current Postiz-boundary checkpoint passes source-bound offline, contracts and focused social verification; full security/browser evidence is stale or failed for this source. No live generation, social publication or dev app deployment is claimed.
 
+## Current session — session-bound social authorization backend
+
+- Previous turn published verified progress in draft PR #13; full end-to-end goal remains active. Branch `codex/pr-13-social-oauth`, stacked on PR #13. Existing architecture retained; no unrelated local apps stopped and Docker expansion consent remains pending.
+- Migration 016, `oauth-secrets.ts`, `social-oauth.ts`, `social-oauth-jobs.ts`, API/session/config and Temporal routing implement admin-only LinkedIn authorization start, authenticated same-session callback, 256-bit state bridge, encrypted one-time codes, ten-minute expiry, attempt limits and exact-business account confirmation. API cannot read state/code ciphertext; worker can only query a job-scoped session-liveness boolean. No customer callback UI or real consent claim yet.
+- Persisted mutation markers prevent duplicate code exchanges on activity retry or lost responses. Confirmed exchange identities survive retryable read-only checks and local channel-promotion failures. Unknown mutation outcomes stay unresolved; no automatic resubmission. Permission/session/cancel/revision checks protect preparation and promotion. No posting authority is inferred.
+- Initial eight new authorization tests passed; combined run found a duplicate test remote-organization ID shared with the earlier suite. Namespaced the OAuth fixtures; second combined run passed 16 tests, zero skips. Added Retry-After and start-response-loss coverage; final frozen-source verification pending. Six security guard tests passed separately, not full security clearance.
+- ADR 0014 records audited state translation, session/credential boundaries, exact APIs, failure semantics and remaining cleanup/UI/live limits. Next: operator provisioning and customer OAuth/callback UI, then approved-image publishing/reconciliation. Railway deployment, live provider acceptance, Higgsfield/analytics and remaining V5 modules stay open.
+
 ## Current session — business-scoped Postiz boundary and account refresh
 
 - Previous checkpoint made verified progress in PR #12; the full end-to-end goal remains active. Local Docker expansion/restart still awaits owner consent because unrelated apps run in that engine. No restart, unrelated cleanup, paid provider call or social publish performed.

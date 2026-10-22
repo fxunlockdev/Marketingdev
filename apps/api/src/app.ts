@@ -1,3 +1,4 @@
+import {SocialOAuth} from './social-oauth.js';
 import {SocialConnections} from './social-connections.js';
 import {CreativeExports} from './creative-exports.js';
 import {SlotCreatives} from './slot-creatives.js';
@@ -25,7 +26,7 @@ import {BrandBrain} from './brand-brain.js';
 import {Assets} from './assets.js';
 import {ObjectStore} from './object-store.js';
 
-type AuthRequest = Request & { actorId: string; traceId: string };
+type AuthRequest = Request & { actorId: string; sessionId: string; traceId: string };
 const AUTH = Symbol('auth');
 
 @Injectable()
@@ -36,6 +37,7 @@ class SessionGuard implements CanActivate {
     const session = await this.auth.api.getSession({ headers: fromNodeHeaders(request.headers), query: { disableCookieCache: true } });
     if (!session || !session.user.emailVerified) throw new UnauthorizedException('Sign in with a verified email to continue');
     request.actorId = session.user.id;
+    request.sessionId = session.session.id;
     return true;
   }
 }
@@ -53,7 +55,10 @@ class SafeErrors implements ExceptionFilter {
 @Controller('api/v1/businesses/:id/connections')
 @UseGuards(SessionGuard)
 class SocialController {
- constructor(@Inject(SocialConnections) private readonly service:SocialConnections){}
+ constructor(@Inject(SocialConnections) private readonly service:SocialConnections,@Inject(SocialOAuth) private readonly oauth:SocialOAuth){}
+ @Post('oauth/linkedin') start(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.oauth.start(req.actorId,req.sessionId,id,key);}
+ @Get('oauth/:attempt') authorization(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.read(req.actorId,req.sessionId,id,attempt);}
+ @Post('oauth/:attempt/callback') callback(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.callback(req.actorId,req.sessionId,id,attempt,body);}
  @Get() read(@Req() req:AuthRequest,@Param('id') id:string){return this.service.read(req.actorId,id);}
  @Post('refresh') refresh(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.service.refresh(req.actorId,id,key);}
  @Post('jobs/:job/cancel') cancel(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(req.actorId,id,job);}
@@ -233,7 +238,7 @@ export async function createApplication(config: Config) {
       catch {return unavailable();}
     }));
     @Module({ controllers: [SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
-      {provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true)},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces)),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces)))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces))},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
+      {provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.oauthEncryptionKey)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true)},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces)),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces)))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces))},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());

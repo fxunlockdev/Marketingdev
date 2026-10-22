@@ -14,6 +14,7 @@ export type Config = {
   storage: StorageConfig;
   renderImage?:string;
   socialEnabled?:boolean;
+  oauthEncryptionKey?:string;
 };
 
 export function configFromEnv(env = process.env): Config {
@@ -42,7 +43,8 @@ export function configFromEnv(env = process.env): Config {
   const storage=storageFromEnv(env);
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
   if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
-  return {renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
+  return {oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }
@@ -68,5 +70,7 @@ export function workerConfigFromEnv(env=process.env){
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
   if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
   const social:SocialWorkerConfig|undefined=env.POSTIZ_ENABLED==='true'?{client:{baseURL:required('POSTIZ_BASE_URL'),mediaOrigins:required('POSTIZ_MEDIA_ORIGINS').split(','),callbackOrigin:required('POSTIZ_CALLBACK_ORIGIN'),mode:mode as 'test'|'development'|'staging'},encryptionKey:required('POSTIZ_ENCRYPTION_KEY')}:undefined;
-  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social};
+  const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
+  if(oauthEncryptionKey&&oauthEncryptionKey===social?.encryptionKey)throw new Error('OAuth and Postiz credentials require separate keys');
+  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey};
 }
