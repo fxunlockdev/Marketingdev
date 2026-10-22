@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "1fc289846f6940856d76499e6e036b6b9dc31b79",
-  "checked_at": "2026-10-22T14:35:03.903217+00:00",
+  "code_commit": "efc361bd939c59c466de79c15a1cc2ffda39b774",
+  "checked_at": "2026-10-22T14:47:53.710098+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -16,7 +16,7 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "docling": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -126,7 +126,7 @@
       "blocked_reason": "Auth/workspace/brand/team APIs and RLS are implemented locally; deployed private storage, generation-worker authorization and deployed tenant journey remain incomplete."
     },
     "workspace_auth": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -134,7 +134,7 @@
       "blocked_reason": "Local HTTP/PostgreSQL/SMTP foundation tests only. External deployment, actual sender/delivery validation, invitation UX and broader tenant runtime remain incomplete."
     },
     "account_email": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -142,7 +142,7 @@
       "blocked_reason": "Encrypted queue, verification/reset/invitations and SMTP error paths tested against a local server only. Real sender credentials, deliverability, UI and operator retry/monitoring remain unverified/incomplete."
     },
     "private_assets": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -150,7 +150,7 @@
       "blocked_reason": "Actual local Garage/ClamAV/Temporal tests only. Production IAM/CORS/TLS, retention, cleanup, UI, intake sandbox and deployed/provider workflows remain incomplete."
     },
     "durable_asset_jobs": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -167,7 +167,7 @@
       "blocked_reason": "Real local browser account/client/brand/team/upload flows only. Deployed ingress/CORS, email delivery, generation, editor and publishing UI remain incomplete."
     },
     "brand_evidence": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -175,7 +175,7 @@
       "blocked_reason": "Real local Docling/native rendering/English textless-page OCR, private page storage, Temporal/RLS, approved document visual provenance and account quota tests. The model sees actual page pixels through the official adapter with explicitly MOCK responses. Mixed-content OCR, broader document fidelity, full business roles, deployed sandbox and live model quality/provider journeys remain incomplete."
     },
     "business_accounts": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -220,7 +220,7 @@
       "blocked_reason": "Pinned SDK and documented image-to-video/edit bodies, fixed-origin HTTP submission/status/cancel, persisted-intent fingerprint boundary, duplicate key semantics and bounded credentials-free output download tested against MOCK transports. Downloaded bytes remain untrusted. The durable provider substage has separate evidence; complete approved-reference/skill-driven video workflow, media decoder/private canonical output, Canvas video controls, account model eligibility, actual provider output and paid/live verification remain incomplete."
     },
     "canvas_video_workflow": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/video-canvas.json"
@@ -274,7 +274,7 @@
       "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "content_slot_reviews": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -282,7 +282,7 @@
       "blocked_reason": "Manual/AI plan persistence and channel-specific exact-version review tested locally. Slot generation attaches safely, preserves newer edits and recovers cached output; worker cannot approve. Calendar/channel inbox use real local APIs and MOCK models. OAuth/publishing and deployed/live evidence remain missing."
     },
     "ai_content_planning": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
