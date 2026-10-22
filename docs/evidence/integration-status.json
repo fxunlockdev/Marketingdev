@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "edec068a7be8ed2adb52f096420bd6e3efc624c3",
-  "checked_at": "2026-10-22T03:41:48.334358+00:00",
+  "code_commit": "35b86ccf07d00d38731a1d8315db037413c469a4",
+  "checked_at": "2026-10-22T04:07:16.988666+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "ADAPTER_READY",
@@ -209,7 +209,7 @@
       "evidence": [
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Backend-only manual plan persistence and channel-specific exact-version review tested with real HTTP sessions/PostgreSQL RLS and explicit creative fixtures. No AI 30-day strategy generation, customer calendar/inbox UI, OAuth/publishing or deployed/live evidence."
+      "blocked_reason": "Manual/AI plan persistence and channel-specific exact-version review tested locally. Slot generation attaches safely, preserves newer edits and recovers cached output; worker cannot approve. Calendar/channel inbox use real local APIs and MOCK models. OAuth/publishing and deployed/live evidence remain missing."
     },
     "ai_content_planning": {
       "state": "ADAPTER_READY",
@@ -218,7 +218,17 @@
         "docs/evidence/security.json",
         "docs/evidence/contracts.json"
       ],
-      "blocked_reason": "Actual isolated original marketing-plan/social/product-marketing skills, Temporal, immutable approved context, MOCK OpenAI Responses, bounded 30-slot generation, PostgreSQL persistence/RLS, budget holds and failure recovery tested. Customer calendar/inbox and Canvas slot-generation linkage, deployed/runtime proof and paid quality verification remain incomplete."
+      "blocked_reason": "Actual isolated original marketing-plan/social/product-marketing skills, Temporal, immutable approved context, MOCK OpenAI Responses, bounded 30-slot generation, PostgreSQL persistence/RLS, budget holds and failure recovery tested. Deployed runtime, paid strategy/creative quality, semantic claim validation, broader channels and full product acceptance remain incomplete."
+    },
+    "planning_review_ui": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/browser.json"
+      ],
+      "blocked_reason": "Real local browser calendar/channel filtering, 30-day skill-driven plan, slot creative creation/revision, private preview, saved feedback, local-time rescheduling and confirmed bulk approval. MOCK OpenAI only. Full V5 formats, connected identities, exports/bulk submission, deployed runtime and live quality remain incomplete."
     }
   },
   "security": {
