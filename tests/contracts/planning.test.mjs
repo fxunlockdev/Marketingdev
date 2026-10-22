@@ -1,0 +1,37 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import OpenAI from 'openai';
+import {CreativeProvider} from '../../dist/creative-provider.js';
+import {validateGeneratedPlan,validatePlanningResult,PLANNING_SKILLS} from '../../dist/planning-contracts.js';
+import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
+const input={task:'content_plan',brand:{id:'brain',sha256:'0'.repeat(64),facts:[{id:'offering',field:'offering',value:'Scheduling tools'}]},preferences:{starts_on:'2026-11-01',timezone:'UTC',goal:'awareness',cadence:3,channels:['linkedin','instagram'],must_avoid:'Unsupported claims',revision:1},brief:'Brand-specific plan',post_count:30};
+const message={type:'model',step:1,messages:[{role:'user',content:'UNTRUSTED TEST FIXTURE'}],tools:[]};
+test('planning uses the official Responses SDK with bounded 16000-token output, no storage and no implicit retry',async()=>{
+ let calls=0;
+ const provider=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
+  calls++;assert.equal(new URL(url).pathname,'/v1/responses');const body=JSON.parse(init.body);assert.equal(body.max_output_tokens,16000);assert.equal(body.store,false);assert.equal(body.parallel_tool_calls,false);return modelResponse(generatedPlan(input));
+ }}));
+ const wire=provider.plannerRequest(message,'MOCK-plan',16000);assert.equal(wire.maxOutputTokens,16000);assert.ok(wire.maxInputTokens>=Buffer.byteLength(JSON.stringify(wire.body)));
+ const result=await provider.plan(message,'MOCK-plan',16000);assert.equal(validateGeneratedPlan(JSON.parse(result.content),input).slots.length,30);assert.equal(calls,1);
+ assert.equal(provider.plannerRequest(message,'MOCK-creative').maxOutputTokens,4000);
+});
+test('plan contract rejects fabricated facts, copied variants, missing channels, invalid periods and malformed shapes',()=>{
+ for(const change of [p=>p.slots.pop(),p=>p.slots[0].fact_ids=['invented'],p=>{p.slots[1].brief=p.slots[0].brief;p.slots[1].hook=p.slots[0].hook;},p=>p.slots.forEach(s=>s.channel='linkedin'),p=>p.slots[0].planned_at='2026-12-01T08:00:00Z',p=>p.slots[0].format='video',p=>p.slots.forEach(s=>s.planned_at='2026-11-01T08:00:00Z'),p=>p.slots[0].approved=true,p=>p.title='',p=>p.slots[0].fact_ids.push(p.slots[0].fact_ids[0])]){
+  const value=generatedPlan(input);change(value);assert.throws(()=>validateGeneratedPlan(value,input),/PLAN_OUTPUT_INVALID/);
+ }
+});
+test('planning skill result requires exact owner skill digests, actual reads and no helper execution',()=>{
+ const value={type:'result',version:'deepagents-0.7.29/desvio-plan-v1',plan:generatedPlan(input),skills:Object.entries(PLANNING_SKILLS).map(([name,pin])=>({name,...pin})),reads:Object.keys(PLANNING_SKILLS).map(s=>`/skills/${s}/SKILL.md`),model_calls:1,helpers_executed:false};
+ assert.equal(validatePlanningResult(value,input).plan.slots.length,30);
+ for(const change of [v=>v.skills[0].tree_sha256='wrong',v=>v.reads.pop(),v=>v.reads.push('/etc/passwd'),v=>v.reads.push('/skills/image/SKILL.md'),v=>v.helpers_executed=true,v=>v.model_calls=4]){
+  const bad=structuredClone(value);change(bad);assert.throws(()=>validatePlanningResult(bad,input),/SKILL_/);
+ }
+});
+
+test('thirty-day planning crosses month/year boundaries and leap days without being tied to one month',()=>{
+ for(const starts_on of ['2028-02-15','2026-12-20','2026-04-25']){
+  const context=structuredClone(input);context.preferences.starts_on=starts_on;
+  const plan=generatedPlan(context);assert.equal(validateGeneratedPlan(plan,context).slots.length,30);
+  assert.notEqual(plan.slots[0].planned_at.slice(0,7),plan.slots[29].planned_at.slice(0,7));
+ }
+});
