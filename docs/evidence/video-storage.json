@@ -1,0 +1,30 @@
+{
+  "suite": "video-storage",
+  "scope": "Actual local private S3-compatible storage with synthetic byte fixtures through 64 MiB; concurrency, replay/new-client recovery, lost acknowledgement after real write, injected 404/412 race with real saved bytes, corruption/size denial and unchanged 20 MiB upload boundary. Existing real authenticated API/forced PostgreSQL RLS/ClamAV/private storage/Temporal worker-process death and cancellation tests also run. Not actual provider media, decoded video, database video versions, parent generation workflow, deployed storage or live acceptance.",
+  "checked_at": "2026-10-22T08:36:12.508772+00:00",
+  "source_sha256": "60440d47921b08372a836bb16291200fa07641241bc854363209485974f4e46c",
+  "source_sha256_start": "60440d47921b08372a836bb16291200fa07641241bc854363209485974f4e46c",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--video-storage"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\nActual local Garage 2.4.1, ClamAV 1.5.4 and Temporal CLI 1.9.1 services ready; no paid providers\nTemporal CLI 1.9.1 (Server 1.32.0, UI 2.54.1)\n\nTemporal Server:      localhost:54506\nTemporal Persistence: /Users/viloljoshi/Documents/Codex/2026-10-21/i-want-you-to-design-blaze-2/work/Marketingdev/work/asset-services-RXDEyt/temporal.db\nTemporal Metrics:     http://localhost:54515/metrics\n\u2714 authenticated reservation is private, idempotent, format bounded and tenant scoped (2239.809333ms)\n\u2714 real scanner, checksum and image decoding reject unsafe uploads (1051.738291ms)\n\u2714 worker and dispatcher database roles deny cross-job reads and identity mutations (345.419625ms)\n\u2714 cancellation and removed requester prevent queued asset promotion (2679.179042ms)\n\u2714 actual worker process death resumes the durable activity and dispatch replay keeps one workflow (6502.55075ms)\n\u2714 upload limits serialize concurrent reservations and abandoning frees a slot (198.710667ms)\n\u2714 temporary scanner connection failure preserves work and retries safely (1601.477125ms)\n\u2714 canonical video larger than upload limit persists once and verifies replay through actual private storage (290.670792ms)\n\u2714 concurrent video persistence and new worker instances recover the same content without replacing it (299.436209ms)\n\u2714 a lost acknowledgement after actual object persistence is safely recovered by hash-checked replay (162.533125ms)\n\u2714 video conflicts and oversize existing objects fail closed without overwriting the object (339.429291ms)\n\u2714 larger canonical-video allowance cannot enlarge image/document writes or accept empty/unbounded reads (78.791709ms)\n\u2714 canonical size checks retain content-addressed key and exact byte integrity requirements (25.842ms)\n\u2714 the exact 64 MiB canonical video boundary round-trips and replays through real storage (692.531541ms)\n\u2714 conditional-write conflict recovery re-reads large saved videos with the correct bound (181.172583ms)\n\u2139 tests 15\n\u2139 suites 0\n\u2139 pass 15\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 17584.953292\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}
