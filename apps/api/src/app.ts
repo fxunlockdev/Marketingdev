@@ -131,6 +131,8 @@ class ExportController {
 @UseGuards(SessionGuard)
 class ContentPlanController {
  constructor(@Inject(ContentPlan) private readonly service:ContentPlan,@Inject(Planning) private readonly planning:Planning,@Inject(SlotCreatives) private readonly creatives:SlotCreatives){}
+ @Get('content-plan/loops') loops(@Req() r:AuthRequest,@Param('id') id:string){return this.planning.loops(r.actorId,id);}
+ @Post('content-plan/loops/:loopId/stop') stopLoop(@Req() r:AuthRequest,@Param('id') id:string,@Param('loopId') loop:string){return this.planning.stopLoop(r.actorId,id,loop);}
  @Post('content-plan/generate') generate(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.planning.submit(r.actorId,id,body,key);}
  @Get('content-plan/jobs') jobs(@Req() r:AuthRequest,@Param('id') id:string){return this.planning.jobs(r.actorId,id);}
  @Get('content-plans') catalog(@Req() r:AuthRequest,@Param('id') id:string){return this.service.catalog(r.actorId,id);}

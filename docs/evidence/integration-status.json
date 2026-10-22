@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "1bb1caed66f0de1fde91754f861f3cb8b6096f7b",
-  "checked_at": "2026-10-22T16:14:01.120814+00:00",
+  "code_commit": "f48f8bfcc08d55f164ecb222bb67382e9d93ec3f",
+  "checked_at": "2026-10-22T16:33:41.880816+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -225,7 +225,7 @@
       "evidence": [
         "docs/evidence/video-canvas.json"
       ],
-      "blocked_reason": "Local authenticated video script/prompt edit and explicit pre-generation approval, actual original skills/Temporal/rendering/private storage, final review and retained regeneration versions with MOCK paid providers. Deployment, live generation/quality, Gemini, calendar video attachment/publishing and recurring planning remain incomplete. This is not full Canvas or product completion."
+      "blocked_reason": "Local authenticated video script/prompt edit and explicit pre-generation approval, actual original skills/Temporal/rendering/private storage, final review and retained regeneration versions with MOCK paid providers. Deployment, live generation/quality, direct Gemini creative planning and video publishing remain incomplete. This is not full Canvas or product completion."
     },
     "video_provider_stage": {
       "state": "NOT_IMPLEMENTED",
@@ -299,6 +299,15 @@
         "docs/evidence/video-canvas.json"
       ],
       "blocked_reason": "Pinned official Google Gen AI SDK, signed read_file context through actual original skills, immutable OpenAI/Gemini choice, separate provider funding, unknown-outcome holds and Canvas model-selection browser flow use MOCK Gemini responses. Gemini for direct creative/video-script requests, authorized live quality/cost proof and deployed worker acceptance remain open."
+    },
+    "recurring_content_planning": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json",
+        "docs/evidence/video-canvas.json"
+      ],
+      "blocked_reason": "Bounded 2\u201312-cycle planning, explicit total spending consent, persisted future dispatch, refreshed approved context, immutable execution snapshots, aggregate reservations, uncertain-call holds and Canvas stop controls are tested locally with MOCK models. No image/video generation or publication is authorized by a loop. Deployed scheduling, live calls and long-running acceptance remain unverified."
     },
     "planning_review_ui": {
       "state": "NOT_IMPLEMENTED",

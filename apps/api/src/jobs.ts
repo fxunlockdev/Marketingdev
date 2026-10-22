@@ -78,7 +78,7 @@ export class JobDispatcher {
   async runOnce(){
     const lease=randomUUID();
     const {rows:[row]}=await this.pool.query(`UPDATE app.job_dispatch SET lease_id=$1,leased_until=now()+interval '30 seconds',attempts=attempts+1
-      WHERE job_id=(SELECT job_id FROM app.job_dispatch WHERE dispatched_at IS NULL AND (leased_until IS NULL OR leased_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
+      WHERE job_id=(SELECT job_id FROM app.job_dispatch WHERE dispatched_at IS NULL AND available_at<=now() AND (leased_until IS NULL OR leased_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
       RETURNING job_id,organization_id,brand_id,kind`,[lease]);
     if(!row)return false;
     try{

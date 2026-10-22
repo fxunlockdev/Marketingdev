@@ -208,3 +208,57 @@ test('Gemini uncertain outcomes remain held and unavailable provider funding nev
  await admin.query("UPDATE app.planning_grants SET budget_micros=10000000 WHERE brand_id=$1 AND provider='gemini'",[b.id]);j=await planning.submit(alice,b.id,body,randomUUID());assert.equal(await mixed.run(scope(b,j)),'unknown');assert.equal(sent,1);assert.equal(calls,before);
  await assert.rejects(planning.submit(alice,b.id,body,randomUUID()),/uncertain/);assert.equal(await mixed.run(scope(b,j)),'finished');assert.equal(sent,1);
 });
+
+
+const loopBody={starts_on:'2090-01-01',duration_days:7,post_count:4,video_count:2,repeat_cycles:3,loop_budget_micros:1000000,confirm_recurring_spend:true};
+test('recurring planning persists bounded idempotent cycles, defers future work and refreshes approved context once per cycle',async()=>{
+ const b=await fresh();await grant(b);const key=randomUUID(),j=await planning.submit(alice,b.id,loopBody,key),before=calls;
+ assert.equal((await planning.submit(alice,b.id,loopBody,key)).id,j.id);
+ const all=(await admin.query('SELECT job_id AS id,scheduled_at,input FROM app.planning_requests WHERE loop_id=$1 ORDER BY scheduled_at',[j.loop_id])).rows;
+ assert.equal(all.length,3);assert.deepEqual(all.map(r=>r.input.preferences.starts_on),['2090-01-01','2090-01-08','2090-01-15']);
+ assert.equal(await handler.run(scope(b,all[1])),'finished');assert.equal(calls,before);assert.equal((await row(all[1])).status,'queued');
+ const future=(await admin.query('SELECT available_at FROM app.job_dispatch WHERE job_id=$1',[all[1].id])).rows[0];assert.equal(new Date(future.available_at).toISOString(),'2090-01-08T00:00:00.000Z');
+ assert.equal(await handler.run(scope(b,j)),'succeeded');
+ let state=await brain.read(alice,org.id,b.id);await brain.manual(alice,org.id,b.id,{field:'offering',value:'Updated approved clinic scheduling offering'},randomUUID());
+ state=await brain.read(alice,org.id,b.id);for(const f of state.findings)await brain.review(alice,org.id,b.id,f.id,{decision:f.field==='offering'&&f.value==='Scheduling tools for clinics'?'wrong':'correct',revision:f.revision});
+ state=await brain.read(alice,org.id,b.id);await brain.approve(alice,org.id,b.id,{revision:state.revision});
+ await admin.query("UPDATE app.planning_requests SET scheduled_at=now()-interval '1 second' WHERE job_id=$1",[all[1].id]);
+ assert.equal(await handler.run(scope(b,all[1])),'succeeded');assert.ok(inputs.at(-1).brand.facts.some(f=>f.value==='Updated approved clinic scheduling offering'));
+ const snapshot=(await admin.query('SELECT execution_input,execution_brain_id,brain_id FROM app.planning_requests WHERE job_id=$1',[all[1].id])).rows[0];assert.notEqual(snapshot.execution_brain_id,snapshot.brain_id);
+ await assert.rejects(jobs.transaction(scope(b,all[1]),db=>db.query("UPDATE app.planning_requests SET execution_input='{}' WHERE job_id=$1",[all[1].id])),/immutable/);
+ assert.equal((await planning.loops(alice,b.id)).loops[0].completed,2);
+ await planning.stopLoop(alice,b.id,j.loop_id);assert.equal(await handler.run(scope(b,all[2])),'finished');assert.equal((await row(all[2])).status,'canceled');assert.equal(calls,before+2);
+ await assert.rejects(planning.stopLoop(bob,b.id,j.loop_id));await assert.rejects(planning.stopLoop(viewer,b.id,j.loop_id));
+});
+
+test('recurring planning requires spending consent and enforces its own aggregate ceiling before model calls',async()=>{
+ const b=await fresh();await grant(b);const before=calls;
+ assert.throws(()=>planning.submit(alice,b.id,{...loopBody,confirm_recurring_spend:false},randomUUID()),/Confirm/);
+ assert.throws(()=>planning.submit(alice,b.id,{...loopBody,repeat_cycles:13},randomUUID()));
+ const j=await planning.submit(alice,b.id,{...loopBody,loop_budget_micros:1},randomUUID());assert.equal(await handler.run(scope(b,j)),'rejected');assert.equal((await row(j)).error_code,'PLAN_LOOP_BUDGET_EXHAUSTED');assert.equal(calls,before);
+ await planning.stopLoop(alice,b.id,j.loop_id);
+ const next=await planning.submit(alice,b.id,loopBody,randomUUID());assert.equal(await handler.run(scope(b,next)),'succeeded');
+ const reserved=Number((await admin.query('SELECT sum(reserved_micros)::text AS n FROM app.planning_calls WHERE loop_id=$1',[next.loop_id])).rows[0].n);
+ await admin.query('UPDATE app.planning_loops SET budget_micros=$2 WHERE id=$1',[next.loop_id,reserved]);
+ const second=(await admin.query("UPDATE app.planning_requests SET scheduled_at=now()-interval '1 second' WHERE loop_id=$1 AND job_id<>$2 RETURNING job_id AS id",[next.loop_id,next.id])).rows[0];
+ assert.equal(await handler.run(scope(b,second)),'rejected');assert.equal((await row(second)).error_code,'PLAN_LOOP_BUDGET_EXHAUSTED');assert.equal(calls,before+1);
+});
+
+test('an ambiguous earlier loop call blocks all later paid occurrences',async()=>{
+ const b=await fresh();await grant(b);const j=await planning.submit(alice,b.id,loopBody,randomUUID()),before=calls;
+ transport=async()=>{calls++;throw new TypeError('MOCK lost response');};try{assert.equal(await handler.run(scope(b,j)),'unknown');}finally{transport=undefined;}
+ const second=(await admin.query("UPDATE app.planning_requests SET scheduled_at=now()-interval '1 second' WHERE loop_id=$1 AND job_id<>$2 RETURNING job_id AS id",[j.loop_id,j.id])).rows[0];
+ assert.equal(await handler.run(scope(b,second)),'rejected');assert.equal((await row(second)).error_code,'PLAN_LOOP_NEEDS_ATTENTION');assert.equal(calls,before+1);
+});
+
+test('dispatcher waits for the persisted loop due time and submits the occurrence only once',async()=>{
+ const {JobDispatcher}=await import('../../dist/jobs.js');const b=await fresh();await grant(b);const j=await planning.submit(alice,b.id,loopBody,randomUUID());
+ const later=(await admin.query('SELECT job_id FROM app.planning_requests WHERE loop_id=$1 AND job_id<>$2 ORDER BY scheduled_at LIMIT 1',[j.loop_id,j.id])).rows[0].job_id;
+ await admin.query('UPDATE app.job_dispatch SET dispatched_at=now()');await admin.query('UPDATE app.job_dispatch SET dispatched_at=NULL WHERE job_id=$1',[later]);
+ const dispatchPool=new Pool({connectionString:config.jobs.dispatcherDatabaseUrl});let sent=0;
+ try{const dispatcher=new JobDispatcher(dispatchPool,{workflow:{start:async(name,args)=>{sent++;assert.equal(name,'generatePlanWorkflow');assert.equal(args.args[0].jobId,later);}}},'local-loop-fixture');
+  assert.equal(await dispatcher.runOnce(),false);assert.equal(sent,0);
+  await admin.query("UPDATE app.job_dispatch SET available_at=now()-interval '1 second' WHERE job_id=$1",[later]);
+  assert.equal(await dispatcher.runOnce(),true);assert.equal(sent,1);assert.equal(await dispatcher.runOnce(),false);assert.equal(sent,1);
+ }finally{await dispatchPool.end();}
+});

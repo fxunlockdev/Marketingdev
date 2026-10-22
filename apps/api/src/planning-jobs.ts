@@ -18,8 +18,11 @@ export class PlanningJobs {
   const prepared=await this.jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='plan.generate')throw new Error('JOB_KIND_DENIED');
    if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
-   const bound=(await db.query('SELECT provider,selected_model FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];
+   const bound=(await db.query('SELECT provider,selected_model,loop_id,scheduled_at FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];
    if(!bound||bound.provider!==providerName||bound.selected_model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
+   if(new Date(bound.scheduled_at).getTime()>Date.now())throw new CreativeError('PLAN_NOT_DUE');
+   const loop=bound.loop_id?(await db.query('SELECT * FROM app.planning_loops WHERE id=$1',[bound.loop_id])).rows[0]:null;
+   if(bound.loop_id&&(!loop||loop.stopped_at))throw new CreativeError('PLAN_ACCESS_REVOKED');
    const prior=(await db.query('SELECT * FROM app.planning_calls WHERE job_id=$1 AND step=$2',[j.id,message.step])).rows[0];
    if(prior){
     if(prior.provider!==providerName||prior.model!==model||prior.input_sha256!==wire.sha256)return {blocked:'PLAN_REPLAY_MISMATCH'};
@@ -27,13 +30,15 @@ export class PlanningJobs {
     if(prior.status==='submitted')await db.query("UPDATE app.planning_calls SET status='unknown' WHERE job_id=$1 AND step=$2",[j.id,message.step]);
     return {blocked:prior.status==='rejected'?'PLAN_PROVIDER_REJECTED':'PLAN_SUBMISSION_UNKNOWN'};
    }
+   if(loop&&(await db.query("SELECT job_id FROM app.planning_calls WHERE loop_id=$1 AND job_id<>$2 AND status IN ('submitted','unknown') LIMIT 1",[loop.id,j.id])).rowCount)throw new CreativeError('PLAN_LOOP_NEEDS_ATTENTION');
    const grant=(await db.query('SELECT * FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,providerName])).rows[0];
    if(!grant)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
    if(grant.model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
    const cost=Math.ceil(wire.maxInputTokens*Number(grant.input_micros_per_token)+wire.maxOutputTokens*Number(grant.output_micros_per_token));
    const used=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3',[j.organization_id,j.brand_id,providerName])).rows[0].n);
    if(!Number.isSafeInteger(cost)||cost<=0||cost+used>Number(grant.budget_micros))throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
-   await db.query("INSERT INTO app.planning_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8)",[j.id,message.step,j.organization_id,j.brand_id,model,wire.sha256,cost,providerName]);
+   if(loop){const loopUsed=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.planning_calls WHERE loop_id=$1',[loop.id])).rows[0].n);if(cost+loopUsed>Number(loop.budget_micros))throw new CreativeError('PLAN_LOOP_BUDGET_EXHAUSTED');}
+   await db.query("INSERT INTO app.planning_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider,loop_id) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8,$9)",[j.id,message.step,j.organization_id,j.brand_id,model,wire.sha256,cost,providerName,bound.loop_id]);
    return {submit:true};
   });
   if('cached' in prepared)return prepared.cached;
@@ -56,6 +61,22 @@ export class PlanningJobs {
     if(!await this.jobs.permitted(db,j)){await this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');return null;}
     if(!this.runtime.configured)throw new CreativeError('SKILL_RUNTIME_NOT_CONFIGURED');
     const request=(await db.query('SELECT * FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];
+    if(new Date(request.scheduled_at).getTime()>Date.now())return null;
+    if(request.loop_id){
+     const loop=(await db.query('SELECT stopped_at FROM app.planning_loops WHERE id=$1',[request.loop_id])).rows[0];
+     if(!loop||loop.stopped_at){await this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');return null;}
+     if(!request.execution_input){
+      if(hash(canonicalJSON(request.input))!==request.input_sha256)throw new CreativeError('PLAN_BRAND_INTEGRITY_FAILED');
+      const latest=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[j.organization_id,j.brand_id])).rows[0];
+      const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0];
+      if(!latest||hash(canonicalJSON(latest.snapshot))!==latest.sha256||!prefs||prefs.step!==3||!prefs.channels.length)throw new CreativeError('PLAN_BRAND_INTEGRITY_FAILED');
+      const input={...request.input,brand:{id:latest.id,sha256:latest.sha256,facts:latest.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{...request.input.preferences,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,revision:prefs.revision}};
+      if(Buffer.byteLength(JSON.stringify(input))>390000)throw new CreativeError('SKILL_INPUT_LIMIT');
+      request.execution_input=input;request.execution_sha256=hash(canonicalJSON(input));request.execution_brain_id=latest.id;
+      await db.query('UPDATE app.planning_requests SET execution_input=$2,execution_sha256=$3,execution_brain_id=$4 WHERE job_id=$1',[j.id,JSON.stringify(input),request.execution_sha256,latest.id]);
+     }
+     request.input=request.execution_input;request.input_sha256=request.execution_sha256;request.brain_id=request.execution_brain_id;
+    }
     const client=request.provider==='gemini'?this.gemini:this.provider;
     if(!client.configured)throw new CreativeError('PLAN_PROVIDER_NOT_CONFIGURED');
     const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE id=$1',[request.brain_id])).rows[0];
