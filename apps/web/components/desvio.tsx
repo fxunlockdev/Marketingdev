@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api, type Workspace } from "./api";
 import { Wordmark, Loading, Notice, Field } from "./primitives";
+import {SocialCallbackResult} from "./connections";
 import { BusinessApp } from "./businesses";
 import { AuthScreen } from "./auth";
 import { WorkspaceHome, BrandHome } from "./workspaces";
@@ -10,6 +11,7 @@ import { TeamScreen } from "./team";
 export function Desvio() {
   const pathname = usePathname();
   const mode = pathname.split("/")[1];
+  if(pathname==="/integrations/social/result")return <SocialCallbackResult/>;
   if (
     [
       "sign-in",

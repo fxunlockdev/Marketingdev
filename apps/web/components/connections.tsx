@@ -1,0 +1,74 @@
+"use client";
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {api,ApiError} from './api';
+import {Loading,Notice,Wordmark} from './primitives';
+type Business={id:string;name:string};
+type Job={id:string;status:string;error_code:string|null;cancel_requested?:boolean;phase?:string};
+type Attempt={id:string;phase:string;authorization_url:string|null;expires_at:string;job?:Job};
+type ConnectionData={can_manage:boolean;configured:boolean;setup_available:boolean;authorization_available:boolean;setup_status:string;provisioning:Job|null;authorization:{id:string;phase:string;expires_at:string}|null;channels:Array<{id:string;name:string;provider:string;observed_state:string;token_health:string;last_checked_at:string;last_seen_at:string}>;jobs:Job[]};
+const active=(j?:Job|null)=>!!j&&['queued','running','retrying'].includes(j.status);
+const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const date=(value:string)=>new Intl.DateTimeFormat(undefined,{dateStyle:'medium',timeStyle:'short'}).format(new Date(value));
+function safeAuthorization(value:string|null,business:string,attempt:string){if(!value)return null;try{const u=new URL(value),state=u.searchParams.get('state')??'';return u.origin==='https://www.linkedin.com'&&u.pathname==='/oauth/v2/authorization'&&!u.username&&!u.password&&!u.hash&&state.startsWith(`${business}.${attempt}.`)&&u.searchParams.get('redirect_uri')===location.origin+'/integrations/social/linkedin'?u.href:null;}catch{return null;}}
+function attemptMessage(a:Attempt){
+ if(a.phase==='succeeded')return 'Your LinkedIn account was found and saved for this business.';
+ if(a.phase==='unknown')return 'We couldn’t confirm the connection outcome. Check your accounts below before starting again. No post has been sent.';
+ if(a.phase==='canceled')return 'The connection was canceled or your access changed. No post has been sent.';
+ if(a.phase==='expired')return 'This connection link expired. Start a new connection when you’re ready.';
+ if(a.phase==='settings_changed')return 'Connection settings changed. Start a new connection when you’re ready.';
+ if(a.phase==='rejected')return 'We couldn’t complete this connection. Check your access and try a new connection.';
+ if(a.phase==='verifying'||a.phase==='exchanging')return 'Checking your authorized account…';
+ if(a.phase==='awaiting_consent')return 'Your secure connection link is ready.';
+ return 'Preparing your secure connection link…';
+}
+export function ConnectionsScreen({business}:{business:Business}){
+ const path=`/api/v1/businesses/${business.id}/connections`,[data,setData]=useState<ConnectionData>(),[attempt,setAttempt]=useState<Attempt>(),[error,setError]=useState<unknown>(),[loadError,setLoadError]=useState<unknown>(),[busy,setBusy]=useState(false),[continueAfterSetup,setContinueAfterSetup]=useState(false),[notice,setNotice]=useState('');
+ const mounted=useRef(true),action=useRef(false),startKey=useRef(''),setupKey=useRef(''),refreshKey=useRef(''),attemptId=useRef(''),initial=useRef(true);
+ const load=useCallback(async()=>{
+  const value=await api<ConnectionData>(path);if(!mounted.current)return;setData(value);
+  if(initial.current){initial.current=false;const q=new URLSearchParams(location.search).get('attempt');attemptId.current=q&&uuid.test(q)?q:value.authorization?.id??'';}
+  if(attemptId.current&&value.can_manage&&value.authorization_available){try{const a=await api<Attempt>(path+'/oauth/'+attemptId.current);if(mounted.current)setAttempt(a);}catch(e){if(e instanceof ApiError&&[403,404].includes(e.status)){attemptId.current='';if(mounted.current){setAttempt(undefined);setNotice('That connection attempt is no longer available in this login. Start again from this business.');}}else throw e;}}else if(mounted.current)setAttempt(undefined);
+ },[path]);
+ useEffect(()=>{mounted.current=true;let stopped=false,timer:ReturnType<typeof setTimeout>;const poll=async()=>{try{await load();if(mounted.current)setLoadError(undefined);}catch(e){if(mounted.current)setLoadError(e);}finally{if(!stopped)timer=setTimeout(poll,4000);}};void poll();return()=>{mounted.current=false;stopped=true;clearTimeout(timer);};},[load]);
+ const start=useCallback(async()=>{
+  if(action.current)return;action.current=true;setBusy(true);setError(undefined);setNotice('');
+  try{startKey.current||=crypto.randomUUID();const a=await api<{id:string}>(path+'/oauth/linkedin',{},'POST',startKey.current);if(!mounted.current)return;startKey.current='';attemptId.current=a.id;history.replaceState(history.state,'',location.pathname+'?attempt='+a.id);setAttempt({id:a.id,phase:'queued',authorization_url:null,expires_at:new Date(Date.now()+600000).toISOString()});await load();}
+  catch(e){if(mounted.current)setError(e);}finally{action.current=false;if(mounted.current)setBusy(false);}
+ },[path,load]);
+ useEffect(()=>{if(continueAfterSetup&&data?.configured&&data.authorization_available&&!action.current){setContinueAfterSetup(false);void start();}else if(continueAfterSetup&&data?.provisioning&&!active(data.provisioning))setContinueAfterSetup(false);},[continueAfterSetup,data,start,busy]);
+ async function connect(){if(!data||action.current)return;if(data.configured){await start();return;}action.current=true;setBusy(true);setError(undefined);setNotice('');try{setupKey.current||=crypto.randomUUID();await api(path+'/prepare',{},'POST',setupKey.current);if(!mounted.current)return;setupKey.current='';setContinueAfterSetup(true);await load();}catch(e){if(mounted.current)setError(e);}finally{action.current=false;if(mounted.current)setBusy(false);}}
+ async function cancelAuthorization(){if(action.current||!attempt||!authURL)return;action.current=true;setBusy(true);setError(undefined);try{await api(path+'/oauth/'+attempt.id+'/callback',{state:new URL(authURL).searchParams.get('state'),denied:true});await load();}catch(e){if(mounted.current)setError(e);}finally{action.current=false;if(mounted.current)setBusy(false);}}
+ async function refresh(){if(action.current)return;action.current=true;setBusy(true);setError(undefined);try{refreshKey.current||=crypto.randomUUID();await api(path+'/refresh',{},'POST',refreshKey.current);refreshKey.current='';if(mounted.current)setNotice('An account check has been queued. Your saved accounts will update when it finishes.');await load();}catch(e){if(mounted.current)setError(e);}finally{action.current=false;if(mounted.current)setBusy(false);}}
+ async function cancel(job:Job,setup:boolean){if(action.current)return;action.current=true;setBusy(true);try{await api(path+(setup?'/provisioning/':'/jobs/')+job.id+'/cancel',{});if(mounted.current){setContinueAfterSetup(false);setNotice('Cancellation requested. A connection already authorized outside Desvio may still need to be checked.');}await load();}catch(e){if(mounted.current)setError(e);}finally{action.current=false;if(mounted.current)setBusy(false);}}
+ const authURL=attempt?safeAuthorization(attempt.authorization_url,business.id,attempt.id):null,setup=data?.provisioning,setupHeld=setup?.phase==='unknown',pendingSetup=active(setup),pendingAuthorization=data?.authorization_available&&attempt&&['queued','starting','exchanging','verifying'].includes(attempt.phase),authReady=data?.authorization_available&&attempt?.phase==='awaiting_consent'&&!!authURL;
+ return <>
+  <div className="heading-row"><div className="v5-page-title"><p className="eyebrow">{business.name}</p><h1>Connections</h1><p>Bring your social accounts into your business workspace.</p></div><button onClick={()=>void load().then(()=>{setError(undefined);setLoadError(undefined);}).catch(setLoadError)} disabled={busy}>Check status</button></div>
+  <Notice error={loadError}/><Notice error={error}/>{notice&&<p role="status" className="notice">{notice}</p>}
+  {!data?<Loading/>:<>
+   {!data.can_manage&&<p className="notice">You can view these accounts. A business owner or administrator can manage connections.</p>}
+   <section className="connection-feature v5-panel" aria-labelledby="linkedin-title">
+    <div className="connection-provider"><span className="connection-logo" aria-hidden="true">in</span><div><p className="eyebrow">Social account</p><h2 id="linkedin-title">LinkedIn</h2><p>Connect your personal LinkedIn profile to {business.name}.</p></div></div>
+    <p>Choose your account on LinkedIn and review its permission request. Connecting won’t publish a post.</p>
+    {data.can_manage&&<div className="connection-action">
+     {setupHeld?<div role="status"><strong>Account setup needs a check.</strong><p>We couldn’t confirm the outcome. Another setup attempt is paused until an operator resolves it.</p></div>
+      :pendingSetup?<div role="status"><strong>Preparing this business…</strong><p>This work is saved. You can return here to check its progress.</p><button disabled={busy||setup?.cancel_requested} onClick={()=>void cancel(setup!,true)}>{setup?.cancel_requested?'Cancellation requested':'Cancel setup'}</button></div>
+      :pendingAuthorization?<p role="status">{attemptMessage(attempt!)}</p>
+      :authReady?<><p role="status">{attemptMessage(attempt!)}</p><a className="button primary" href={authURL!} rel="noreferrer">Continue to LinkedIn <span aria-hidden="true">↗</span></a> <button disabled={busy} onClick={()=>void cancelAuthorization()}>Cancel connection</button><p className="hint">This link expires at {date(attempt!.expires_at)}. Continue in this browser to keep your connection secure.</p></>
+      :data.authorization_available||data.setup_available?<><button className="primary" disabled={busy} onClick={()=>void connect()}>{busy?'Preparing…':data.channels.some(c=>c.provider==='linkedin'&&c.observed_state==='available')?'Connect another LinkedIn profile':'Connect LinkedIn'}</button>{attempt&&<p role="status">{attemptMessage(attempt)}</p>}</>
+      :<p className="notice">{data.setup_status==='disabled'?'Connections for this business need an operator check.':'Social connections aren’t available in this environment yet.'}</p>}
+    </div>}
+   </section>
+   <section className="v5-panel connection-accounts" aria-labelledby="accounts-title">
+    <div className="connection-section-heading"><div><h2 id="accounts-title">Your accounts</h2><p>Only accounts observed for this business appear here.</p></div>{data.can_manage&&data.configured&&<button disabled={busy||data.jobs.some(active)} onClick={()=>void refresh()}>{data.jobs.some(active)?'Checking accounts…':'Refresh accounts'}</button>}</div>
+    {data.channels.length?<ul className="connection-list">{data.channels.map(c=><li key={c.id}><span className="connection-avatar" aria-hidden="true">{c.name.slice(0,1).toUpperCase()}</span><div><h3>{c.name}</h3><p>{c.provider==='linkedin'?'LinkedIn':c.provider} · Last checked {date(c.last_checked_at)}</p><p className="hint">Publishing permissions have not been verified.</p></div><span className={'connection-state '+(c.observed_state==='available'?'observed':'')}>{c.observed_state==='available'?'Account found':c.observed_state==='disabled'?'Unavailable':'Not found on last check'}</span></li>)}</ul>:<div className="connection-empty"><h3>No social accounts yet</h3><p>Connect an account above. Your other businesses keep their own connections.</p></div>}
+    {data.jobs[0]&&<div className="connection-check" role="status"><p>{active(data.jobs[0])?'An account check is in progress.':data.jobs[0].status==='succeeded'?'The latest account check finished.':data.jobs[0].status==='canceled'?'The account check was canceled.':'The latest account check could not finish. Previously saved accounts are still shown.'}</p>{active(data.jobs[0])&&data.can_manage&&<button disabled={busy||data.jobs[0].cancel_requested} onClick={()=>void cancel(data.jobs[0],false)}>{data.jobs[0].cancel_requested?'Cancellation requested':'Cancel check'}</button>}</div>}
+   </section>
+   <div className="connection-note"><h2>Keep creating while publishing is prepared</h2><p>Publishing isn’t available in this build yet. Your drafts and reviews stay saved.</p><a href={`/b/${business.id}/review`}>Open review inbox →</a><p className="hint">Instagram, Facebook, LinkedIn Pages and other channel workflows are still being implemented.</p></div>
+  </>}
+ </>;
+}
+export function SocialCallbackResult(){
+ const [result,setResult]=useState<{reason:string;business:string;attempt:string}>();useEffect(()=>{const q=new URLSearchParams(location.search);setResult({reason:q.get('reason')??'invalid',business:q.get('business')??'',attempt:q.get('attempt')??''});},[]);
+ const messages:Record<string,string>={session:'Your Desvio session ended. Sign in and start a new connection from your business.',access:'This connection does not belong to this login, or your access changed. Return to your business and start again.',expired:'This connection link expired or its settings changed. Return to your business and start again.',invalid:'We couldn’t recognize this connection return. Start a new connection from Desvio.',unconfirmed:'We couldn’t confirm that your connection return was saved. Check the business’s connection status before starting again.'};
+ return <main id="main" className="standalone"><Wordmark/><p className="eyebrow">Social connection</p><h1>Let’s check your connection.</h1><p role="status">{result?messages[result.reason]??messages.invalid:'Checking the connection return…'}</p><div className="connection-result-actions">{result?.reason==='session'&&<a className="button primary" href="/sign-in">Sign in</a>}{result&&uuid.test(result.business)&&<a className="button" href={`/b/${result.business}/connections${uuid.test(result.attempt)?'?attempt='+result.attempt:''}`}>Back to connections</a>}<a href="/brands">Your businesses</a></div></main>;
+}
