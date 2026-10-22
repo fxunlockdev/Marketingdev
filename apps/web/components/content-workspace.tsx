@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor } from "./creative-editor";
+import {CreativeExportPanel} from './creative-export';
 import { useUnsavedChanges } from "./unsaved";
 import {
   addDays,
@@ -1218,6 +1219,7 @@ function SlotPanel({
               </ul>
             </div>
           )}
+          {s.creative_version_id&&<CreativeExportPanel key={business.id+s.id+s.creative_version_id} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
           <details className="slot-activity">
             <summary>Version & decision history ({data.events.length})</summary>
             <ol>

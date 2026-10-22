@@ -1,6 +1,15 @@
 # Desvio build state
 
-Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas and calendar/channel-review workflows are implemented locally; all 124 final checks pass against unchanged source at implementation commit 35b86cc. No live generation, social publication or dev app deployment is claimed.
+Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas and calendar/channel-review workflows are implemented locally. Prior checkpoint: 124 checks passed at 35b86cc. Current canonical-export changes are under verification; prior evidence does not certify the changed source. No live generation, social publication or dev app deployment is claimed.
+
+## Current session — canonical saved images and final approval
+
+- Branch `codex/pr-11-canonical-exports`, stacked on PR #11. Migration 014, `creative-exports.ts`, `export-jobs.ts`, `static-renderer.ts`, isolated `apps/media` runtime and Temporal dispatch implement private deterministic PNG export of an immutable creative version. API and worker bind the exact renderer image. Font substitutions are disclosed; saved pixels require explicit approval.
+- Seven initial real local export tests passed: tenant/idempotency boundaries, actual deterministic rendering, hostile inputs/overflow, exact image/context approval, atomic review rollback/replay, cancellation/access loss/newer version protection, storage-to-database recovery and media integrity. A further concurrency/quota test and final source-bound suite are pending. No live provider claims.
+- `CreativeExportPanel` adds saved-image integrity-checked preview/download and explicit final approval to Canvas and planned-post review. Browser test proved export/download fingerprint and approval; the first run found a missing existing confirmation notice, now corrected. Full browser rerun is pending. Web production build passed.
+- Local Docker VM disk exhaustion prevented disposable PostgreSQL startup. Removed only confirmed unused Desvio build images; no unrelated resources touched. Test database now uses a disposable host-backed directory so restart/recovery remains real and cleanup does not leave anonymous Docker volumes.
+- Owner's “railway done” confirmed the Railway MCP connection now works. Fresh read shows the four existing infrastructure deployments as SUCCESS; this is not application/runtime acceptance. Creating `dev` still returns “Deploys have been paused temporarily”; read-back lists only `production`. No dev app/domain has been created. Continue local implementation while this external restriction remains.
+- Next: finish current regression/evidence and reviewable PR, then tenant-safe social OAuth/publishing/reconciliation and deployable runtime; all other V5 modules remain in the end-to-end scope. API keys, funded caps and explicit live account consent remain required only for guarded live acceptance.
 
 ## Current session — calendar, channel inbox and safe Canvas linkage
 

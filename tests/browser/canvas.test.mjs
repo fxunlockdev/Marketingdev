@@ -1,4 +1,6 @@
 import {PlanningJobs} from '../../dist/planning-jobs.js';
+import {ExportJobs} from '../../dist/export-jobs.js';
+import {StaticRenderer} from '../../dist/static-renderer.js';
 import {Businesses} from '../../dist/businesses.js';
 import {Workspaces} from '../../dist/workspaces.js';
 import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
@@ -238,6 +240,7 @@ before(async () => {
     provider,
   );
   const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider);
+  const exporter=new ExportJobs(jobs,new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE));
   native = await NativeConnection.connect({ address: config.jobs.address });
   connection = await Connection.connect({ address: config.jobs.address });
   temporal = await Worker.create({
@@ -248,6 +251,8 @@ before(async () => {
       new URL("../../dist/asset-workflow.js", import.meta.url),
     ),
     activities: {
+      exportCreative:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await exporter.run(scope);}finally{clearInterval(timer);}},
+      failExport:scope=>exporter.fail(scope),
       generatePlan:scope=>planner.run(scope),
       failPlan:scope=>planner.fail(scope),
       generateCreative: async (scope) => {
@@ -479,7 +484,20 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   await expect(
     page.getByRole("button", { name: "Approve version" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Approve version" }).click();
+  await page.getByRole('button',{name:'Prepare final image',exact:true}).click();
+  await expect(page.getByRole('img',{name:'Saved final image for approval'})).toBeVisible({timeout:30000});
+  const confirm=page.getByLabel('I reviewed this saved image and its text.');
+  await expect(confirm).toBeEnabled();
+  await expect(page.getByRole('button',{name:'Approve final image',exact:true})).toBeDisabled();
+  await confirm.check();
+  await page.getByRole('button',{name:'Approve final image',exact:true}).click();
+  await expect(page.getByText('Final image approved for this creative version.',{exact:true})).toBeVisible();
+  const exportApproval=(await admin.query("SELECT a.*,e.sha256 FROM app.creative_export_approvals a JOIN app.creative_exports e ON e.id=a.export_id WHERE a.brand_id=$1",[brand])).rows;
+  assert.equal(exportApproval.length,1);assert.equal(exportApproval[0].context_type,'canvas');
+  const finalDownload=page.waitForEvent('download');await page.getByRole('link',{name:'Download final image',exact:true}).click();
+  const finalBytes=await readFile(await(await finalDownload).path());
+  assert.equal((await import('node:crypto')).createHash('sha256').update(finalBytes).digest('hex'),exportApproval[0].sha256);
+  await page.screenshot({path:'work/browser/canvas-final-image.png',fullPage:true});
   await expect(
     page.getByText(
       "This saved version is approved. It has not been published.",
@@ -635,6 +653,11 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByRole('button',{name:'Confirm bulk approval',exact:true}).click();await expect(page.getByText('1 post approved. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
  assert.equal((await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[postSlot.id])).rows[0].state,'approved');
  await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Prepare final image',exact:true}).click();
+ await expect(page.getByRole('img',{name:'Saved final image for approval'})).toBeVisible({timeout:30000});
+ await expect(page.getByLabel('I reviewed this saved image and its text.')).toBeEnabled();await page.getByLabel('I reviewed this saved image and its text.').check();
+ await page.getByRole('button',{name:'Approve final image',exact:true}).click();await expect(page.getByText('Final image approved for this post.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.creative_export_approvals WHERE context_type='slot' AND context_id=$1",[postSlot.id])).rows[0].n,1);
  await page.screenshot({path:'work/browser/review-inbox-desktop.png',fullPage:true});
  assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'work/browser/review-inbox-mobile.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));

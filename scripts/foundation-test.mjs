@@ -1,8 +1,10 @@
+import {prepareRenderImage} from './render-test-image.mjs';
 import {prepareSkillImage} from "./skill-test-image.mjs";
 // Disposable local PostgreSQL only. Never accepts an external database URL.
 import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { writeFile } from 'node:fs/promises';
+import { writeFile, mkdtemp, rm } from 'node:fs/promises';
+import {resolve} from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { createServer } from 'node:net';
 import { Pool } from 'pg';
@@ -18,6 +20,9 @@ const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8', std
 const password = randomBytes(32).toString('hex');
 let pool, authMigrationPool,services;
 let started = false;
+// Host-backed disposable data avoids exhausting Docker's shared VM disk and
+// survives the deliberate database restart in the recovery tests.
+const databaseDir=await mkdtemp(resolve('work/foundation-data-'));
 try {
   // Docker can reassign an automatically published port on restart. Reserve an explicit
   // loopback port so recovery tests exercise the database, not a changed endpoint.
@@ -26,6 +31,7 @@ try {
   const reservedPort=reservation.address().port;
   await new Promise(resolve=>reservation.close(resolve));
   docker('run','--rm','-d','--name',container,'--label','desvio.purpose=isolated-test',
+    '-v',`${databaseDir}:/var/lib/postgresql/data`,
     '-p',`127.0.0.1:${reservedPort}:5432`,'-e',`POSTGRES_PASSWORD=${password}`,IMAGE);
   started = true;
   const port = docker('port',container,'5432/tcp').split(':').at(-1);
@@ -66,11 +72,13 @@ try {
     await migrate(pool); // Reapply must be a verified no-op.
     const version = (await pool.query('SHOW server_version')).rows[0].server_version;
     console.log(`Disposable PostgreSQL ${version}; image ${IMAGE}; migration replay passed`);
+    const exportOnly=process.argv.includes('--exports');
     const planningOnly=process.argv.includes('--planning'),aiPlanningOnly=process.argv.includes('--ai-planning');
     const canvasWeb=process.argv.includes('--canvas-web'),browserSuite=process.argv.includes('--web')||canvasWeb,intakeOnly=process.argv.includes('--intake'),canvasOnly=process.argv.includes('--canvas');
-    if(!intakeOnly&&!planningOnly)process.env.SKILL_RUNTIME_IMAGE=prepareSkillImage();
-    if(!browserSuite&&!canvasOnly&&!planningOnly&&!aiPlanningOnly)process.env.DOCUMENT_PARSER_IMAGE=prepareDocumentImage();
-    const code = browserSuite||intakeOnly||canvasOnly||planningOnly||aiPlanningOnly?0:await new Promise((resolve,reject) => {
+    if(!intakeOnly&&!planningOnly&&!exportOnly)process.env.SKILL_RUNTIME_IMAGE=prepareSkillImage();
+    if(!intakeOnly&&!planningOnly&&!aiPlanningOnly){process.env.RENDER_RUNTIME_IMAGE=prepareRenderImage();config.renderImage=process.env.RENDER_RUNTIME_IMAGE;}
+    if(!exportOnly&&!browserSuite&&!canvasOnly&&!planningOnly&&!aiPlanningOnly)process.env.DOCUMENT_PARSER_IMAGE=prepareDocumentImage();
+    const code = exportOnly||browserSuite||intakeOnly||canvasOnly||planningOnly||aiPlanningOnly?0:await new Promise((resolve,reject) => {
       const child = spawn(process.execPath,['--test','--test-concurrency=1','tests/foundation/tenancy.test.mjs'], {
         stdio:'inherit', env:{...process.env, DESVIO_TEST_CONFIG:JSON.stringify(config), DESVIO_TEST_ADMIN_URL:url('postgres',password), DESVIO_TEST_CONTAINER:container} });
       child.on('error',reject); child.on('exit', code=>resolve(code ?? 1));
@@ -78,11 +86,12 @@ try {
     process.exitCode=code;
     if(code===0){
       if(!intakeOnly&&!planningOnly){services=await startAssetServices();Object.assign(config,{storage:services.storage,scanner:services.scanner});config.jobs.address=services.address;}
-      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',...(aiPlanningOnly?['tests/foundation/planning-generation.test.mjs']:planningOnly?['tests/foundation/content-plan.test.mjs']:browserSuite?(canvasWeb?['tests/browser/canvas.test.mjs']:['tests/browser/customer.test.mjs','tests/browser/canvas.test.mjs']):intakeOnly?['tests/foundation/intake.test.mjs']:canvasOnly?['tests/foundation/creative.test.mjs']:['tests/foundation/assets.test.mjs','tests/foundation/brand-brain.test.mjs','tests/foundation/intake.test.mjs','tests/foundation/creative.test.mjs','tests/foundation/content-plan.test.mjs','tests/foundation/planning-generation.test.mjs'])],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
+      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',...(exportOnly?['tests/foundation/exports.test.mjs']:aiPlanningOnly?['tests/foundation/planning-generation.test.mjs']:planningOnly?['tests/foundation/content-plan.test.mjs']:browserSuite?(canvasWeb?['tests/browser/canvas.test.mjs']:['tests/browser/customer.test.mjs','tests/browser/canvas.test.mjs']):intakeOnly?['tests/foundation/intake.test.mjs']:canvasOnly?['tests/foundation/creative.test.mjs']:['tests/foundation/assets.test.mjs','tests/foundation/brand-brain.test.mjs','tests/foundation/intake.test.mjs','tests/foundation/creative.test.mjs','tests/foundation/content-plan.test.mjs','tests/foundation/planning-generation.test.mjs','tests/foundation/exports.test.mjs'])],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
     }
   }
 } finally {
   await services?.close();
   await authMigrationPool?.end(); await pool?.end();
-  if (started) docker('rm','-f',container);
+  if (started) {try{docker('rm','-f',container);}catch{/* --rm may already have removed a failed database. */}}
+  await rm(databaseDir,{recursive:true,force:true});
 }

@@ -1,0 +1,146 @@
+import {test,before,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+import {mkdir,writeFile} from 'node:fs/promises';
+import {Pool} from 'pg';
+import sharp from 'sharp';
+import {Worker,NativeConnection} from '@temporalio/worker';
+import {Client,Connection} from '@temporalio/client';
+import {Context} from '@temporalio/activity';
+import {createApplication} from '../../dist/app.js';
+import {Workspaces} from '../../dist/workspaces.js';
+import {Businesses} from '../../dist/businesses.js';
+import {BrandBrain,canonicalJSON,hash} from '../../dist/brand-brain.js';
+import {Canvas} from '../../dist/canvas.js';
+import {ContentPlan} from '../../dist/content-plan.js';
+import {CreativeExports} from '../../dist/creative-exports.js';
+import {StaticRenderer} from '../../dist/static-renderer.js';
+import {ExportJobs} from '../../dist/export-jobs.js';
+import {ObjectStore,digest} from '../../dist/object-store.js';
+import {AssetJobs} from '../../dist/jobs.js';
+const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),workerPool=new Pool({connectionString:config.jobs.workerDatabaseUrl});
+const store=new ObjectStore(config.storage),renderer=new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE),jobs=new AssetJobs(workerPool,store,null),handler=new ExportJobs(jobs,renderer);
+let app,base,ws,businesses,brain,canvas,plans,exports,alice,bob,editor,viewer,org,brand,sibling,brainId,current,project,canonical;
+const png=await sharp({create:{width:1024,height:1024,channels:3,background:'#eee7db'}}).png().toBuffer();
+const scope=j=>({organizationId:org.id,brandId:brand.id,jobId:j.id});
+async function api(path,{user=alice,body,method='GET',key}={}){const r=await fetch(base+path,{method,headers:{...(user?{cookie:user.cookie}:{}),origin:config.origin,'content-type':'application/json',...(key?{'idempotency-key':key}:{})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json(),cookie:r.headers.getSetCookie().map(s=>s.split(';')[0]).join('; ')};}
+const path=(suffix,b=brand)=>`/api/v1/businesses/${b.id}/${suffix}`;
+async function signup(){await admin.query('DELETE FROM auth."rateLimit"');const email=randomUUID()+'@example.test',password='long-fixture-password-2026';const r=await api('/api/auth/sign-up/email',{user:null,body:{name:'Export fixture',email,password},method:'POST'});assert.equal(r.status,200);await admin.query('UPDATE auth."user" SET "emailVerified"=true WHERE id=$1',[r.body.user.id]);const login=await api('/api/auth/sign-in/email',{user:null,body:{email,password},method:'POST'});assert.equal(login.status,200);return {id:r.body.user.id,cookie:login.cookie};}
+async function fixture(overrides={}){
+ const thread=await canvas.createThread(alice.id,brand.id,{title:'TEST FIXTURE render'},randomUUID()),p=randomUUID(),job=randomUUID(),media=randomUUID(),id=randomUUID();
+ const key=`creative/${org.id}/${brand.id}/${job}/${digest(png)}`;await store.persist(key,png,'image/png',digest(png));
+ const design={schema_version:1,width:1024,height:1024,background_media_id:media,layers:[{id:'headline',type:'text',text:'TEST FIXTURE: A calmer day',x:80,y:80,width:850,fontSize:56,fontFamily:'Arial',fill:'#112233',align:'left'},{id:'body',type:'text',text:'Owner-editable creative',x:80,y:700,width:850,fontSize:32,fontFamily:'Georgia',fill:'#112233',align:'left'}],...overrides};
+ const caption='TEST FIXTURE: renderer input, not AI generation',sha=hash(canonicalJSON({design,caption,brain_id:brainId}));
+ await admin.query('INSERT INTO app.creative_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[p,org.id,brand.id,thread.id,'TEST FIXTURE',alice.id]);
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.generate','succeeded')",[job,org.id,brand.id,alice.id]);
+ await admin.query('INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,1024,1024)',[media,org.id,brand.id,job,key,digest(png),png.length]);
+ await admin.query('INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,brain_id,job_id,media_id,design,caption,skill_manifest,sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,org.id,brand.id,p,brainId,job,media,JSON.stringify(design),caption,'{}',sha,alice.id]);await admin.query('UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1',[p,id]);
+ return {id,sha256:sha,design,caption,project_id:p,media_id:media};
+}
+async function queue(v=current){return exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},randomUUID());}
+async function render(v){const j=await queue(v);assert.equal(await handler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
+before(async()=>{
+ app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses);exports=new CreativeExports(canvas,renderer.image);
+ alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Render fixtures'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
+ for(const [u,role] of [[editor,'editor'],[viewer,'viewer']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',[org.id,u.id,role]);
+ for(const [field,value] of [['brand_name','Render fixtures'],['offering','Creative workflow tools'],['audience','Business owners']])await brain.manual(alice.id,org.id,brand.id,{field,value},randomUUID());
+ let state=await brain.read(alice.id,org.id,brand.id);for(const f of state.findings)await brain.review(alice.id,org.id,brand.id,f.id,{decision:'correct',revision:f.revision});state=await brain.read(alice.id,org.id,brand.id);await brain.approve(alice.id,org.id,brand.id,{revision:state.revision});brainId=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1',[brand.id])).rows[0].id;current=await fixture();project=current.project_id;
+});
+after(async()=>{store.close();await app?.close();await Promise.all([admin.end(),workerPool.end()]);});
+
+test('real authenticated export requests are scoped, idempotent, and create one durable job',async()=>{
+ const endpoint=path(`creative-versions/${current.id}/exports`),body={source_sha256:current.sha256},key=randomUUID();
+ assert.equal((await api(endpoint,{user:null})).status,401);assert.equal((await api(endpoint,{user:bob})).status,404);assert.equal((await api(path(`creative-versions/${current.id}/exports`,sibling))).status,404);
+ assert.equal((await api(endpoint,{user:viewer,method:'POST',body,key})).status,403);
+ const results=await Promise.all([api(endpoint,{method:'POST',body,key}),api(endpoint,{method:'POST',body,key})]);results.forEach(r=>assert.equal(r.status,201,JSON.stringify(r.body)));assert.equal(results[0].body.id,results[1].body.id);
+ assert.equal((await api(endpoint,{method:'POST',body:{source_sha256:'a'.repeat(64)},key})).status,409);
+ const list=await api(endpoint);assert.equal(list.body.jobs.length,1);assert.equal(list.body.exports.length,0);assert.equal(list.body.configured,true);
+ const j=results[0].body,native=await NativeConnection.connect({address:config.jobs.address}),connection=await Connection.connect({address:config.jobs.address}),taskQueue='export-'+randomUUID();
+ const temporal=await Worker.create({connection:native,namespace:config.jobs.namespace,taskQueue,workflowsPath:fileURLToPath(new URL('../../dist/asset-workflow.js',import.meta.url)),activities:{exportCreative:async s=>{const ctx=Context.current(),timer=setInterval(()=>ctx.heartbeat(),1000);try{return await handler.run(s);}finally{clearInterval(timer);}},failExport:s=>handler.fail(s)}});
+ try{const client=new Client({connection,namespace:config.jobs.namespace});assert.equal(await temporal.runUntil(()=>client.workflow.execute('exportCreativeWorkflow',{workflowId:'export-'+j.id,taskQueue,args:[scope(j)]})),'succeeded');}finally{await native.close();await connection.close();}
+ canonical=(await exports.list(alice.id,brand.id,current.id)).exports[0];assert.equal(canonical.source_sha256,current.sha256);assert.equal(canonical.renderer_image,renderer.image);assert.equal(canonical.manifest.fabric,'7.4.0');assert.ok(canonical.manifest.warnings.some(s=>s.includes('Liberation Sans')));
+ const grant=await exports.download(alice.id,brand.id,canonical.id),pixels=Buffer.from(await (await fetch(grant.url)).arrayBuffer());assert.equal(digest(pixels),canonical.sha256);assert.notEqual(digest(pixels),digest(png));assert.equal((await sharp(pixels).metadata()).width,1024);
+ const raw=await sharp(pixels).removeAlpha().raw().toBuffer();assert.deepEqual([...raw.subarray(0,3)],[238,231,219]);assert.ok(raw.some((v,i)=>v!==[238,231,219][i%3]));
+ await mkdir('work/render',{recursive:true});await writeFile('work/render/canonical-fixture.png',pixels);
+ assert.equal((await exports.list(alice.id,brand.id,current.id)).approvals.length,0);assert.equal(await handler.run(scope(j)),'finished');assert.equal((await queue()).export_id,canonical.id);
+ assert.equal((await api(path(`creative-exports/${canonical.id}/download`),{user:bob})).status,404);assert.equal((await api(path(`creative-exports/${canonical.id}/download`,sibling))).status,404);
+ await jobs.transaction(scope(j),async db=>{assert.deepEqual((await db.query('SELECT id FROM app.creative_versions')).rows.map(v=>v.id),[current.id]);assert.equal((await db.query('SELECT * FROM app.creative_calls')).rowCount,0);});
+ await assert.rejects(workerPool.query("UPDATE app.creative_exports SET sha256='bad'"),e=>e.code==='42501');await assert.rejects(workerPool.query('INSERT INTO app.creative_export_approvals DEFAULT VALUES'),e=>e.code==='42501');
+});
+
+test('fixed renderer produces identical saved pixels; untrusted text stays text and remote URLs/overflow are rejected',async()=>{
+ const one=await renderer.render(current.design,png),two=await renderer.render(current.design,png);assert.equal(one.sha256,two.sha256);assert.equal(one.sha256,canonical.sha256);
+ const d=structuredClone(current.design);d.layers[0].text='<script>fetch("https://attacker.invalid")</script>';const safe=await renderer.render(d,png);assert.ok(safe.bytes.length>png.length);assert.notEqual(safe.sha256,canonical.sha256);
+ await assert.rejects(renderer.render({...d,layers:[{...d.layers[0],fontFamily:'https://attacker.invalid/font.ttf'}]},png),/DESIGN_INVALID/);
+ await assert.rejects(renderer.render({...d,layers:[{...d.layers[0],y:1000,text:'Text outside the image'}]},png),/EXPORT_TEXT_OVERFLOW/);
+ await assert.rejects(renderer.render(d,Buffer.from('<svg/>')));
+ await assert.rejects(new StaticRenderer().render(d,png),/NOT_CONFIGURED/);
+});
+
+test('final pixel approval is explicit, current-version/owner bound and separate from prior creative approval',async()=>{
+ const body={sha256:canonical.sha256,source_sha256:current.sha256,context_type:'canvas',context_id:current.id,context_revision:1,confirmed:true};
+ await assert.rejects(exports.approve(alice.id,brand.id,canonical.id,body),/Send the current/);
+ await canvas.review(editor.id,brand.id,current.id,{decision:'in_review',feedback:'Ready',revision:1});await canvas.review(alice.id,brand.id,current.id,{decision:'approved',feedback:'Concept approved',revision:2});body.context_revision=3;
+ assert.equal((await exports.list(alice.id,brand.id,current.id)).approvals.length,0);
+ assert.equal((await api(path(`creative-exports/${canonical.id}/approve`),{method:'POST',user:editor,body})).status,403);
+ assert.equal((await api(path(`creative-exports/${canonical.id}/approve`),{method:'POST',body:{...body,confirmed:false}})).status,400);
+ assert.equal((await api(path(`creative-exports/${canonical.id}/approve`),{method:'POST',body:{...body,sha256:'b'.repeat(64)}})).status,409);
+ const a=await api(path(`creative-exports/${canonical.id}/approve`),{method:'POST',body});assert.equal(a.status,201,JSON.stringify(a.body));assert.equal((await exports.approve(alice.id,brand.id,canonical.id,body)).id,a.body.id);
+ const p=await plans.create(alice.id,brand.id,{title:'TEST FIXTURE publication plan',objective:'Awareness',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:'2026-11-01T10:00:00Z',brief:'TEST FIXTURE',creative_version_id:current.id}]},randomUUID());
+ let s=(await plans.list(alice.id,brand.id,{start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:p.id})).slots[0];const review=d=>({revision:s.revision,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,decision:d});s=await plans.review(alice.id,brand.id,s.id,review('pending_review'));s=await plans.review(alice.id,brand.id,s.id,review('approved'));
+ await assert.rejects(plans.scope(alice.id,brand.id,false,db=>exports.publicationProof(db,s.id)),/final saved image/);
+ const slotApproval={...body,context_type:'slot',context_id:s.id,context_revision:s.revision};await exports.approve(alice.id,brand.id,canonical.id,slotApproval);
+ assert.equal((await plans.scope(alice.id,brand.id,false,db=>exports.publicationProof(db,s.id))).sha256,canonical.sha256);
+ await plans.edit(alice.id,brand.id,s.id,{revision:s.revision,brief:'Changed after approval',reset_approval:true});await assert.rejects(plans.scope(alice.id,brand.id,false,db=>exports.publicationProof(db,s.id)),/final saved image/);
+ const saved=await canvas.save(alice.id,brand.id,project,{parent_id:current.id,design:current.design,caption:'New version'});await assert.rejects(exports.approve(alice.id,brand.id,canonical.id,body),/current saved export/);assert.equal((await exports.list(alice.id,brand.id,saved.id)).exports.length,0);assert.equal((await exports.list(alice.id,brand.id,current.id)).approvals.length,2);
+});
+
+test('one final-image approval atomically approves a pending review; failure rolls back both records and replay is stable',async()=>{
+ const v=await fixture(),e=await render(v);
+ await canvas.review(editor.id,brand.id,v.id,{decision:'in_review',feedback:'Ready',revision:1});
+ const body={sha256:e.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:2,confirmed:true};
+ await admin.query("CREATE FUNCTION app.test_approval_failure() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'TEST approval commit failure'; END$$");
+ await admin.query('CREATE TRIGGER test_approval_failure BEFORE INSERT ON app.creative_export_approvals FOR EACH ROW EXECUTE FUNCTION app.test_approval_failure()');
+ try{await assert.rejects(exports.approve(alice.id,brand.id,e.id,body),/TEST approval commit failure/);}finally{await admin.query('DROP TRIGGER test_approval_failure ON app.creative_export_approvals');await admin.query('DROP FUNCTION app.test_approval_failure()');}
+ assert.deepEqual((await admin.query('SELECT status,review_revision FROM app.creative_versions WHERE id=$1',[v.id])).rows[0],{status:'in_review',review_revision:2});
+ assert.equal((await exports.list(alice.id,brand.id,v.id)).approvals.length,0);
+ const approved=await exports.approve(alice.id,brand.id,e.id,body);assert.equal((await exports.approve(alice.id,brand.id,e.id,body)).id,approved.id);
+ assert.deepEqual((await admin.query('SELECT status,review_revision FROM app.creative_versions WHERE id=$1',[v.id])).rows[0],{status:'approved',review_revision:3});
+ const p=await plans.create(alice.id,brand.id,{title:'TEST FIXTURE atomic review',objective:'Awareness',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:'2026-11-01T10:00:00Z',brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
+ let s=(await plans.list(alice.id,brand.id,{start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:p.id})).slots[0];
+ s=await plans.review(alice.id,brand.id,s.id,{revision:s.revision,creative_version_id:v.id,creative_sha256:v.sha256,decision:'pending_review'});
+ const sb={...body,context_type:'slot',context_id:s.id,context_revision:s.revision};
+ const sa=await exports.approve(alice.id,brand.id,e.id,sb);assert.equal((await exports.approve(alice.id,brand.id,e.id,sb)).id,sa.id);
+ assert.equal((await plans.scope(alice.id,brand.id,false,db=>exports.publicationProof(db,s.id))).sha256,e.sha256);
+ assert.equal((await admin.query('SELECT revision FROM app.content_slots WHERE id=$1',[s.id])).rows[0].revision,s.revision+1);
+});
+
+test('cancel/access loss and renderer mismatch prevent export promotion; historical export never overwrites a newer version',async()=>{
+ let v=await fixture(),j=await queue(v);await exports.cancel(alice.id,brand.id,j.id);assert.equal(await handler.run(scope(j)),'finished');assert.equal((await exports.list(alice.id,brand.id,v.id)).exports.length,0);
+ j=await queue(v);await admin.query('UPDATE app.memberships SET active=false WHERE organization_id=$1 AND user_id=$2',[org.id,alice.id]);try{assert.equal(await handler.run(scope(j)),'finished');}finally{await admin.query('UPDATE app.memberships SET active=true WHERE organization_id=$1 AND user_id=$2',[org.id,alice.id]);}
+ j=await queue(v);assert.equal(await new ExportJobs(jobs,new StaticRenderer('sha256:'+'a'.repeat(64))).run(scope(j)),'rejected');assert.equal((await exports.list(alice.id,brand.id,v.id)).exports.length,0);
+ j=await queue(v);let saved;const racing=new ExportJobs(jobs,{image:renderer.image,configured:true,render:async(d,b)=>{const output=await renderer.render(d,b);saved=await canvas.save(alice.id,brand.id,v.project_id,{parent_id:v.id,design:v.design,caption:'Owner changed while rendering'});return output;}});
+ assert.equal(await racing.run(scope(j)),'succeeded');const e=(await exports.list(alice.id,brand.id,v.id)).exports[0];assert.ok(e);assert.equal((await canvas.project(alice.id,brand.id,v.project_id)).project.latest_version_id,saved.id);assert.equal((await exports.list(alice.id,brand.id,saved.id)).exports.length,0);
+});
+
+test('lost export database promotion can recover from deterministic private bytes without duplicate records',async()=>{
+ const v=await fixture(),j=await queue(v);
+ await admin.query("CREATE FUNCTION app.test_export_failure() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'TEST export commit failure'; END$$");await admin.query('CREATE TRIGGER test_export_failure BEFORE INSERT ON app.creative_exports FOR EACH ROW EXECUTE FUNCTION app.test_export_failure()');
+ try{await assert.rejects(handler.run(scope(j)),/TEST export commit failure/);}finally{await admin.query('DROP TRIGGER test_export_failure ON app.creative_exports');await admin.query('DROP FUNCTION app.test_export_failure()');}
+ assert.equal((await exports.list(alice.id,brand.id,v.id)).exports.length,0);assert.equal(await handler.run(scope(j)),'succeeded');assert.equal((await exports.list(alice.id,brand.id,v.id)).exports.length,1);assert.equal(await handler.run(scope(j)),'finished');
+});
+
+test('rendered media integrity and actual text overflow fail closed with persisted error status',async()=>{
+ const v=await fixture(),j=await queue(v);await admin.query("UPDATE app.creative_media SET sha256=$2 WHERE id=$1",[v.media_id,'c'.repeat(64)]);assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await exports.list(alice.id,brand.id,v.id)).jobs[0].error_code,'EXPORT_MEDIA_INTEGRITY_FAILED');
+ const clipped=await fixture({layers:[{id:'headline',type:'text',text:'This cannot fit',x:0,y:1000,width:900,fontSize:56,fontFamily:'Arial',fill:'#112233',align:'left'}]});const queued=await queue(clipped);assert.equal(await handler.run(scope(queued)),'rejected');const state=await exports.list(alice.id,brand.id,clipped.id);assert.equal(state.jobs[0].error_code,'EXPORT_TEXT_OVERFLOW');assert.equal(state.exports.length,0);
+});
+
+test('concurrent exports reserve bounded private storage before accepting work',async()=>{
+ const versions=[];for(let i=0;i<26;i++)versions.push(await fixture());
+ const results=await Promise.allSettled(versions.map(v=>queue(v))),accepted=results.filter(r=>r.status==='fulfilled'),denied=results.filter(r=>r.status==='rejected');
+ assert.equal(accepted.length,25);assert.equal(denied.length,1);assert.match(denied[0].reason.message,/storage limit/);
+ const reserved=(await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='creative.export' AND status IN ('queued','running','retrying')",[brand.id])).rows[0].n;
+ assert.equal(reserved,25);
+ for(const r of accepted){await exports.cancel(alice.id,brand.id,r.value.id);assert.equal(await handler.run(scope(r.value)),'finished');}
+});
