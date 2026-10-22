@@ -1,3 +1,4 @@
+import {SocialConnections} from './social-connections.js';
 import {CreativeExports} from './creative-exports.js';
 import {SlotCreatives} from './slot-creatives.js';
 import {Planning} from "./planning.js";
@@ -47,6 +48,15 @@ class SafeErrors implements ExceptionFilter {
     const status = error instanceof HttpException ? error.getStatus() : parserType === 'entity.too.large' ? 413 : parserType === 'entity.parse.failed' ? 400 : 503;
     response.status(status).json({ error: error instanceof HttpException ? error.message : status === 413 ? 'This request is too large' : status === 400 ? 'Invalid request body' : 'Unable to save or load your work. Please try again.', traceId: request.traceId });
   }
+}
+
+@Controller('api/v1/businesses/:id/connections')
+@UseGuards(SessionGuard)
+class SocialController {
+ constructor(@Inject(SocialConnections) private readonly service:SocialConnections){}
+ @Get() read(@Req() req:AuthRequest,@Param('id') id:string){return this.service.read(req.actorId,id);}
+ @Post('refresh') refresh(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.service.refresh(req.actorId,id,key);}
+ @Post('jobs/:job/cancel') cancel(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(req.actorId,id,job);}
 }
 
 @Controller('api/v1')
@@ -222,8 +232,8 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
-      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces)),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces)))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces))},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
+    @Module({ controllers: [SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+      {provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true)},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces)),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces)))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces))},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());

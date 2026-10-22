@@ -29,3 +29,6 @@ release-gate:
 dev verify-load:
 	@echo 'NOT_IMPLEMENTED: full-stack dev/load harness and production provisioning remain pending. Local API foundation tests: npm run test:foundation.'
 	@exit 2
+
+verify-social:
+	$(PYTHON) -m scripts.verify social

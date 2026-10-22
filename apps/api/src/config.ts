@@ -1,3 +1,4 @@
+import type {SocialWorkerConfig} from './social-jobs.js';
 export type StorageConfig={endpoint:string;region:string;bucket:string;accessKeyId:string;secretAccessKey:string};
 export type ScannerConfig={host:string;port:number};
 export type JobsConfig={workerDatabaseUrl:string;dispatcherDatabaseUrl:string;address:string;namespace:string;taskQueue:string};
@@ -12,6 +13,7 @@ export type Config = {
   smtp: {host:string;port:number;secure:boolean;user?:string;password?:string;from:string};
   storage: StorageConfig;
   renderImage?:string;
+  socialEnabled?:boolean;
 };
 
 export function configFromEnv(env = process.env): Config {
@@ -39,7 +41,8 @@ export function configFromEnv(env = process.env): Config {
   if(mode==='staging' && (!smtp.user || !smtp.password)) throw new Error('Authenticated SMTP required for staging');
   const storage=storageFromEnv(env);
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
-  return {renderImage, mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
+  return {renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }
@@ -63,5 +66,7 @@ export function workerConfigFromEnv(env=process.env){
   const documentImage=env.DOCUMENT_PARSER_IMAGE;if(documentImage&&!/^sha256:[a-f0-9]{64}$/.test(documentImage))throw new Error('DOCUMENT_PARSER_IMAGE must be an exact local image digest');
   const skillImage=env.SKILL_RUNTIME_IMAGE;if(skillImage&&!/^sha256:[a-f0-9]{64}$/.test(skillImage))throw new Error('SKILL_RUNTIME_IMAGE must be an exact local image digest');
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
-  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage};
+  if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
+  const social:SocialWorkerConfig|undefined=env.POSTIZ_ENABLED==='true'?{client:{baseURL:required('POSTIZ_BASE_URL'),mediaOrigins:required('POSTIZ_MEDIA_ORIGINS').split(','),callbackOrigin:required('POSTIZ_CALLBACK_ORIGIN'),mode:mode as 'test'|'development'|'staging'},encryptionKey:required('POSTIZ_ENCRYPTION_KEY')}:undefined;
+  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social};
 }

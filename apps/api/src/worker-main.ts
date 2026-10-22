@@ -1,3 +1,4 @@
+import {SocialJobs,SocialReadRetry} from './social-jobs.js';
 import {ExportJobs} from './export-jobs.js';
 import {StaticRenderer} from './static-renderer.js';
 import {PlanningJobs} from "./planning-jobs.js";
@@ -30,10 +31,13 @@ const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new WebsiteParser(config.documentImage),new BrandAnalyzer(process.env.OPENAI_API_KEY),undefined,new VisualCrawler(config.documentImage));
 const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
+const social=new SocialJobs(jobs,config.social);
 const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
 const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue);
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),
   maxConcurrentActivityTaskExecutions:2,activities:{
+    syncSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await social.run(scope);}catch(e){throw ApplicationFailure.create({message:'Connection check temporarily unavailable',type:'SocialUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
+    failSocial:async(scope:JobScope)=>social.fail(scope),
     exportCreative:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await exporter.run(scope);}catch{throw ApplicationFailure.retryable('Export temporarily unavailable','ExportUnavailable');}finally{clearInterval(heartbeat);}},
     failExport:async(scope:JobScope)=>exporter.fail(scope),
     generatePlan:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await planning.run(scope);}catch{throw ApplicationFailure.retryable("Planning temporarily unavailable","PlanningUnavailable");}finally{clearInterval(heartbeat);}},

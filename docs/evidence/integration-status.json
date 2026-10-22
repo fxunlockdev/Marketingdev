@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "ebae869d73cf6d5ae3b6c6fbf83496f6861e3bc9",
-  "checked_at": "2026-10-22T04:34:15.419076+00:00",
+  "code_commit": "ab1be017bb7444b0dffc69a8a79ce78ed45d1a9c",
+  "checked_at": "2026-10-22T04:53:13.145332+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/social.json",
         "docs/evidence/offline.json",
         "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
@@ -68,6 +69,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/social.json",
         "docs/evidence/offline.json",
         "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
@@ -79,6 +81,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/social.json",
         "docs/evidence/offline.json",
         "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
@@ -90,6 +93,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/social.json",
         "docs/evidence/offline.json",
         "docs/evidence/browser.json",
         "docs/evidence/contracts.json",
@@ -238,6 +242,14 @@
         "docs/evidence/browser.json"
       ],
       "blocked_reason": "Actual isolated Fabric/node renderer, pinned fonts, private immutable PNG, Temporal recovery, tenant isolation and explicit exact-pixel approvals tested locally. Font substitutions are disclosed and saved pixels are authoritative. No deployed renderer, publishing proof or video/carousel exports."
+    },
+    "postiz_connection_boundary": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/social.json"
+      ],
+      "blocked_reason": "Pinned-source transport contracts use a MOCK Postiz HTTP server. Actual local auth/PostgreSQL RLS/Temporal prove encrypted per-business binding, queued account refresh, permission/rotation/cancel boundaries and snapshot recovery. No real Postiz organization/OAuth/token health or publishing acceptance. Provisioning, session-bound callback workflow, customer UI and authorized live tests remain incomplete."
     }
   },
   "security": {
