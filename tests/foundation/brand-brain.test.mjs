@@ -6,6 +6,10 @@ import { once } from "node:events";
 import { setTimeout } from "node:timers/promises";
 import { readFile } from "node:fs/promises";
 import { Pool } from "pg";
+import OpenAI from "openai";
+import { BrandAnalyzer } from "../../dist/brand-analysis.js";
+import { IntakeJobs } from "../../dist/intake-jobs.js";
+import { WebsiteParser } from "../../dist/website-parser.js";
 import { createApplication } from "../../dist/app.js";
 import { ObjectStore, digest } from "../../dist/object-store.js";
 import { AssetJobs } from "../../dist/jobs.js";
@@ -519,18 +523,63 @@ test("scanned guidelines persist real OCR provenance through owner correction an
     assert.ok(evidence.body.chunks.some(c => c.bbox.method === "ocr_eng" && Number.isFinite(c.bbox.confidence)));
     const outsider = await signup("scan-outsider");
     assert.equal((await request(`${path()}/brain`, { cookie: outsider.cookie })).status, 404);
+    const intakePath = `/api/v1/businesses/${brand.id}/intake`;
+    const capture = (await request(intakePath)).body.visuals[0];
+    assert.equal(capture.document_page, 1);
+    assert.equal(capture.object_key, undefined);
+    const previewPath = `/api/v1/businesses/${brand.id}/visuals/${capture.id}`;
+    assert.equal((await request(previewPath, {cookie:outsider.cookie})).status, 404);
+    const preview = await request(previewPath);
+    const downloaded = await fetch(preview.body.url);
+    assert.equal(downloaded.status, 200);
+    assert.equal(downloaded.headers.get("content-type"), "image/jpeg");
+    const stored = (await admin.query("SELECT * FROM app.document_visuals WHERE id=$1", [capture.id])).rows[0];
+    assert.equal(digest(Buffer.from(await downloaded.arrayBuffer())), stored.sha256);
+    await stopWorker();
+    await admin.query("INSERT INTO app.analysis_grants(organization_id,brand_id,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_tokens_per_image,approved_by,enabled) VALUES($1,$2,'MOCK-document-vision',now()+interval '1 hour',10000000,1,1,10000,'LOCAL TEST ONLY',true)", [org.id,brand.id]);
+    let modelCalls = 0;
+    const analyzer = new BrandAnalyzer(undefined, new OpenAI({apiKey:"fixture-only",maxRetries:0,fetch:async (_url,init)=>{
+      modelCalls++;
+      const content = JSON.parse(init.body).input[0].content;
+      const input = JSON.parse(content[0].text);
+      const reference = input.visual_manifest[0];
+      assert.equal(reference.document_page, 1);
+      assert.equal(reference.document_sha256, state.sources[0].sha256);
+      assert.equal(reference.source_sha256, stored.sha256);
+      assert.ok(content.some(c=>c.type==="input_image" && c.image_url.startsWith("data:image/jpeg;base64,")));
+      assert.ok(!JSON.stringify(input).includes(stored.object_key));
+      const chunk = input.chunks.find(c=>c.text.includes("Botanical soap"));
+      return Response.json({object:"response",id:"resp_mock_document",status:"completed",output:[{type:"message",content:[{type:"output_text",annotations:[],text:JSON.stringify({
+        findings:[{field:"positioning",value:"Botanical soap",quote:"Botanical soap",chunk_id:chunk.id}],
+        recommendation:{goal:"leads",audience:"Homeware shops",channels:["linkedin"],cadence:3,reason:"TEST recommendation grounded in the uploaded guideline",chunk_ids:[chunk.id]},missing:[],
+        visual_guidance:[{category:"composition",observation:"TEST interpretation of the actual stored page",creative_direction:"TEST proposed spacious composition",image_ids:[reference.id]}]
+      })}]}],usage:{input_tokens:100,output_tokens:100,total_tokens:200}});
+    }}));
+    const analysis = await request(intakePath,{method:"POST",key:randomUUID(),body:{kind:"brand.analyze"}});
+    assert.equal(analysis.status,201,JSON.stringify(analysis.body));
+    const handler = new IntakeJobs(new AssetJobs(workerPool,store,null),new WebsiteParser(process.env.DOCUMENT_PARSER_IMAGE),analyzer);
+    const scope={organizationId:org.id,brandId:brand.id,jobId:analysis.body.id};
+    assert.equal(await handler.run(scope),"succeeded");
+    assert.equal(await handler.run(scope),"finished");
+    assert.equal(modelCalls,1);
+    state = await brain();
+    assert.equal(state.visuals.directions.length,1);
+    assert.ok(state.findings.some(f=>f.field==="positioning"));
     assert.equal((await approve(state.revision)).status, 409);
     for (const finding of state.findings) {
       const result = await review(finding, finding.field === "voice" ? "edited" : "correct", finding.field === "voice" ? "Warm and concise" : undefined);
       assert.equal(result.status, 200);
     }
+    const direction=(await brain()).visuals.directions[0];
+    assert.equal((await request(path()+"/brain/visuals",{method:"PATCH",body:{analysis_job_id:direction.analysis_job_id,index:direction.index,evidence_sha256:direction.evidence_sha256,revision:0,decision:"correct"}})).status,200);
     const approved = await approve((await brain()).revision);
     assert.equal(approved.status, 201, JSON.stringify(approved.body));
     assert.ok(approved.body.snapshot.facts.some(f => f.field === "voice" && f.value === "Warm and concise"));
-    assert.ok(approved.body.snapshot.facts.every(f => f.page === 1 && f.source_sha256));
+    assert.ok(approved.body.snapshot.facts.filter(f=>!f.evidence_type).every(f => f.page === 1 && f.source_sha256));
+    assert.equal(approved.body.snapshot.facts.find(f=>f.evidence_type==="approved_visual_direction").references[0].document_page,1);
     state = await brain();
     assert.equal(state.active.sha256, approved.body.sha256);
-  } finally { brand = previousBrand; }
+  } finally { brand = previousBrand; if(worker.exitCode!==null||worker.signalCode!==null)startWorker(); }
 });
 
 test("canceled and revoked extraction jobs leave the saved file and prior approved brain intact", async () => {
@@ -597,6 +646,11 @@ test("parser rejects malformed, oversized and unconfigured inputs and forged par
   );
   const bytes = await readFile("work/document-fixtures/guidelines.pdf"),
     valid = await parser.parse(bytes, "pdf");
+  assert.equal(valid.visuals.length, 2);
+  const notJpeg = Buffer.from("not a JPEG even with a matching hash");
+  for (const visual of [{...valid.visuals[0],sha256:"0".repeat(64)}, {...valid.visuals[0],page:2}, {...valid.visuals[0],width:2001}, {...valid.visuals[0],image:notJpeg.toString('base64'),sha256:digest(notJpeg)}]) {
+    assert.throws(()=>parseDocumentOutput(JSON.stringify({...valid,visuals:[visual,valid.visuals[1]]}),bytes,"pdf"),/INVALID_DOCUMENT_OUTPUT/);
+  }
   assert.throws(
     () =>
       parseDocumentOutput(

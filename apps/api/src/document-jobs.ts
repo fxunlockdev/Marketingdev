@@ -58,6 +58,10 @@ export class DocumentJobs {
         await this.finish(db, job, "canceled", "ACCESS_REVOKED_OR_CANCELED");
         return null;
       }
+      if ((await db.query("SELECT id FROM app.brand_sources WHERE asset_id=$1 AND parser_version=$2", [job.asset_id, PARSER_VERSION])).rowCount) {
+        await this.finish(db, job, "succeeded");
+        return null;
+      }
       const asset = (
         await db.query("SELECT * FROM app.assets WHERE id=$1", [job.asset_id])
       ).rows[0];
@@ -91,6 +95,17 @@ export class DocumentJobs {
           asset.content_type === "application/pdf" ? "pdf" : "pptx",
         ),
         findings = literalFindings(document);
+      const visuals = document.visuals.map(page => ({ ...page, bytes: Buffer.from(page.image, "base64"),
+        key: `evidence/${scope.organizationId}/${scope.brandId}/documents/${asset.id}/${PARSER_VERSION.replaceAll("/", "-")}/${page.page}/${page.sha256}` }));
+      const checkVisualQuota = async (db: any) => {
+        const used = Number((await db.query("SELECT COALESCE(sum(bytes),0) AS n FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2", [scope.organizationId, scope.brandId])).rows[0].n);
+        if (used + visuals.reduce((n, page) => n + page.bytes.length, 0) > 256 * 1024 * 1024) throw new DocumentError("DOCUMENT_VISUAL_STORAGE_LIMIT");
+      };
+      await this.jobs.transaction(scope, async (db, job) => {
+        if (!(await this.jobs.permitted(db, job))) throw new DocumentError("ACCESS_REVOKED_OR_CANCELED");
+        await checkVisualQuota(db);
+      });
+      for (const page of visuals) await this.jobs.store.persist(page.key, page.bytes, "image/jpeg", page.sha256);
       return await this.jobs.transaction(scope, async (db, job) => {
         if (terminal.has(job.status)) return job.status;
         if (!(await this.jobs.permitted(db, job)))
@@ -105,6 +120,7 @@ export class DocumentJobs {
           ).rowCount
         )
           return this.finish(db, job, "succeeded");
+        await checkVisualQuota(db);
         const state = (
           await db.query(
             "SELECT source_count,finding_count FROM app.brand_review_state WHERE organization_id=$1 AND brand_id=$2",
@@ -132,11 +148,15 @@ export class DocumentJobs {
               pages: document.pages,
               text_pages: document.textPages,
               ocr_pages: document.ocrPages,
+              visual_pages: document.visuals.map(p => p.page),
               warning:
                 "English OCR is used on pages without embedded text and may contain errors. Image-only regions on other pages, tables and visual design require additional review.",
             }),
           ],
         );
+        for (const page of visuals) await db.query(
+          "INSERT INTO app.document_visuals(id,organization_id,brand_id,source_id,job_id,page,parser_version,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+          [randomUUID(),job.organization_id,job.brand_id,source,job.id,page.page,PARSER_VERSION,page.key,page.sha256,page.bytes.length,page.width,page.height]);
         // Batches remain inside the same transaction: no partial evidence after interruption.
         for (let start = 0; start < document.chunks.length; start += 100) {
           const batch = document.chunks

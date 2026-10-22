@@ -71,11 +71,11 @@ test('changed analysis or website capture invalidates prior decisions and approv
  await assert.rejects(brain.reviewVisual(owner,org.id,brand.id,{...body(fresh),evidence_sha256:'0'.repeat(64)}),/evidence changed/);
  await assert.rejects(approve(),/Review every visual/);
  await brain.reviewVisual(owner,org.id,brand.id,body(fresh));
- await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status,created_at) VALUES($1,$2,$3,$4,'website.extract','succeeded',now()+interval '1 second')",[randomUUID(),org.id,brand.id,owner]);
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status,created_at,updated_at) VALUES($1,$2,$3,$4,'website.extract','succeeded',now()+interval '1 second',now()+interval '1 second')",[randomUUID(),org.id,brand.id,owner]);
  await assert.rejects(brain.reviewVisual(owner,org.id,brand.id,body(fresh)),/evidence changed/);
  await assert.rejects(approve(),/Website evidence changed/);
  // Keep following fixtures chronological without a wall-clock sleep.
- await admin.query("UPDATE app.jobs SET created_at=now()-interval '1 minute' WHERE brand_id=$1 AND kind='website.extract'",[brand.id]);
+ await admin.query("UPDATE app.jobs SET created_at=now()-interval '1 minute',updated_at=now()-interval '1 minute' WHERE brand_id=$1 AND kind='website.extract'",[brand.id]);
 });
 test('runtime roles cannot forge provenance, mutate evidence or write approvals from a worker',async()=>{
  const d=(await analysis()).directions[0];const saved=await brain.reviewVisual(owner,org.id,brand.id,body(d));

@@ -1,15 +1,16 @@
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { once } from "node:events";
 import { setTimeout } from "node:timers/promises";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { chromium, expect } from "@playwright/test";
 import AxeBuilder from "@axe-core/playwright";
 import { Pool } from "pg";
 import { randomUUID } from "node:crypto";
 import { S3Client, PutBucketCorsCommand } from "@aws-sdk/client-s3";
 import sharp from "sharp";
+import { ObjectStore, digest } from "../../dist/object-store.js";
 import { createApplication } from "../../dist/app.js";
 import { startMailbox, messageLink } from "../foundation/smtp.mjs";
 import { port } from "../../scripts/storage-test-services.mjs";
@@ -619,6 +620,21 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
     ])
   ).rows[0];
   const job = randomUUID();
+  // Explicit browser fixture: actual PDF/page pixels in private storage. The
+  // complete scanner/extraction/analysis path is covered by foundation tests.
+  execFileSync('uv',['run','--project','apps/ingestion','--frozen','--group','test','python','scripts/make_document_fixtures.py'],{stdio:'pipe'});
+  execFileSync('uv',['run','--project','apps/ingestion','--frozen','python','-c',"import sys; from pathlib import Path; sys.path.insert(0,'apps/ingestion'); from document_visuals import render_pdf; Path('work/document-fixtures/browser-page.jpg').write_bytes(next(render_pdf(Path('work/document-fixtures/guidelines.pdf').read_bytes()))['bytes'])"],{stdio:'pipe'});
+  const documentBytes=await readFile('work/document-fixtures/guidelines.pdf'),pageBytes=await readFile('work/document-fixtures/browser-page.jpg');
+  const documentId=randomUUID(),sourceId=randomUUID(),documentJob=randomUUID(),visualId=randomUUID();
+  const documentKey=`evidence/${target.organization_id}/${target.id}/documents/${documentId}/original`;
+  const pageKey=`evidence/${target.organization_id}/${target.id}/documents/${documentId}/page-1`;
+  const objectStore=new ObjectStore(config.storage);
+  try {await objectStore.persist(documentKey,documentBytes,'application/pdf',digest(documentBytes));await objectStore.persist(pageKey,pageBytes,'image/jpeg',digest(pageBytes));}finally{objectStore.close();}
+  const dimensions=await sharp(pageBytes).metadata();
+  await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'BROWSER-FIXTURE.pdf','application/pdf',$5,$6,$7,$8,'ready')",[documentId,target.organization_id,target.id,user.id,documentBytes.length,digest(documentBytes),documentKey+'-quarantine',documentKey]);
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind,status) VALUES($1,$2,$3,$4,$5,'document.extract','succeeded')",[documentJob,target.organization_id,target.id,documentId,user.id]);
+  await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,asset_id,kind,sha256,parser_version,coverage) VALUES($1,$2,$3,$4,'document',$5,'BROWSER-FIXTURE',$6)",[sourceId,target.organization_id,target.id,documentId,digest(documentBytes),JSON.stringify({type:'BROWSER FIXTURE',pages:2,visual_pages:[1]})]);
+  await admin.query("INSERT INTO app.document_visuals(id,organization_id,brand_id,source_id,job_id,page,parser_version,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,1,'BROWSER-FIXTURE',$6,$7,$8,$9,$10)",[visualId,target.organization_id,target.id,sourceId,documentJob,pageKey,digest(pageBytes),pageBytes.length,dimensions.width,dimensions.height]);
   await admin.query(
     "INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'brand.analyze','succeeded')",
     [job, target.organization_id, target.id, user.id],
@@ -656,10 +672,11 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
               "BROWSER FIXTURE: generous spacing around the headline.",
             creative_direction:
               "BROWSER FIXTURE: consider a spacious campaign layout.",
-            image_ids: ["fixture:overview"],
+            image_ids: ["fixture:overview",visualId+":overview"],
           },
         ],
         visual_manifest: [
+          {id:visualId+":overview",visual_id:visualId,source_id:sourceId,document_page:1,document_sha256:digest(documentBytes),source_sha256:digest(pageBytes),viewport:'document',view:'overview'},
           {
             id: "fixture:overview",
             visual_id: "fixture",
@@ -672,6 +689,12 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
     ],
   );
   await alice.goto(`${base}/b/${target.id}/onboarding`);
+  await alice.getByText(/Explore your brand’s visual sources/).click();
+  await alice.getByRole('button',{name:'View document page 1',exact:true}).click();
+  await expect(alice.getByAltText('Uploaded guideline page 1')).toBeVisible();
+  await expect.poll(()=>alice.getByAltText('Uploaded guideline page 1').evaluate(image=>image.naturalWidth)).toBeGreaterThan(0);
+  const privatePreview=`${base}/api/v1/businesses/${target.id}/visuals/${visualId}`;
+  assert.equal((await bob.request.get(privatePreview)).status(),404);
   await alice
     .getByText("Visual style & creative inspiration", { exact: true })
     .click();
@@ -722,6 +745,10 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   );
   await alice.getByRole("button",{name:"Back to brand review",exact:true}).click();
   const visual=alice.getByRole('article',{name:'Visual direction: composition'});
+  await visual.getByText('Supporting visual evidence',{exact:true}).click();
+  await visual.getByRole('button',{name:'View document page 1',exact:true}).click();
+  await expect(visual.getByAltText('Source guideline page 1')).toBeVisible();
+  await expect.poll(()=>visual.getByAltText('Source guideline page 1').evaluate(image=>image.naturalWidth)).toBeGreaterThan(0);
   await expect(visual.getByText('Needs review',{exact:true})).toBeVisible();
   await visual.getByRole('button',{name:'Edit',exact:true}).click();
   await visual.getByLabel('Edit visual composition').fill('Use spacious layouts with calm typography.');

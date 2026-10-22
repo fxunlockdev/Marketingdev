@@ -6,11 +6,11 @@ import {canonicalJSON,hash,lockReview,bumpReview} from './brand-brain.js';
 
 // Evidence stays immutable; only the human's direction/decision can change.
 export async function visualDirections(db:PoolClient,org:string,brand:string){
- const analysis=(await db.query(`SELECT j.id,j.created_at,r.result FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id
+ const analysis=(await db.query(`SELECT j.id,j.created_at,j.updated_at,r.result FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id
  WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='brand.analyze' AND j.status='succeeded'
  ORDER BY j.created_at DESC,j.id DESC LIMIT 1`,[org,brand])).rows[0];
  if(!analysis)return {analysis_job_id:null,stale:false,directions:[],retained:[],retained_directions:[]};
- const newer=(await db.query(`SELECT 1 FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='website.extract' AND status='succeeded' AND created_at>$3 LIMIT 1`,[org,brand,analysis.created_at])).rowCount;
+ const newer=(await db.query(`SELECT 1 FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('website.extract','document.extract') AND status='succeeded' AND updated_at>$3 LIMIT 1`,[org,brand,analysis.updated_at])).rowCount;
  const reviews=(await db.query('SELECT * FROM app.brand_visual_reviews WHERE organization_id=$1 AND brand_id=$2 AND analysis_job_id=$3',[org,brand,analysis.id])).rows;
  const manifest=analysis.result?.visual_manifest??[];
  const directions=(analysis.result?.visual_guidance??[]).map((suggestion:any,index:number)=>{

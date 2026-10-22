@@ -23,13 +23,17 @@ export class Intake {
       async (db) => ({
         visuals: (
           await db.query(
-            "SELECT v.id,v.source_id,v.viewport,v.width,v.height,v.observations,v.coverage,s.website_url FROM app.website_visuals v JOIN app.brand_sources s ON s.id=v.source_id WHERE v.organization_id=$1 AND v.brand_id=$2 ORDER BY v.captured_at DESC LIMIT 20",
+            `SELECT * FROM (
+              SELECT v.id,v.source_id,v.viewport,v.width,v.height,v.observations,v.coverage,s.website_url,NULL::integer AS document_page,v.captured_at FROM app.website_visuals v JOIN app.brand_sources s ON s.id=v.source_id WHERE v.organization_id=$1 AND v.brand_id=$2
+              UNION ALL
+              SELECT v.id,v.source_id,'document',v.width,v.height,'{}'::jsonb,'{}'::jsonb,NULL::text,v.page,v.captured_at FROM app.document_visuals v WHERE v.organization_id=$1 AND v.brand_id=$2
+            ) evidence ORDER BY captured_at DESC,source_id,document_page LIMIT 70`,
             [b.organization_id, id],
           )
         ).rows,
         jobs: (
           await db.query(
-            `SELECT j.id,j.kind,j.status,j.error_code,j.created_at,r.website_url,r.result FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 ORDER BY j.created_at DESC LIMIT 20`,
+            `SELECT j.id,j.kind,j.status,j.error_code,j.created_at,j.updated_at,r.website_url,r.result FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 ORDER BY j.created_at DESC LIMIT 20`,
             [b.organization_id, id],
           )
         ).rows,
@@ -54,7 +58,7 @@ export class Intake {
       async (db) => {
         const v = (
           await db.query(
-            "SELECT object_key,viewport FROM app.website_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+            "SELECT object_key,viewport FROM app.website_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3 UNION ALL SELECT object_key,'document-page-'||page FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
             [b.organization_id, id, visualId],
           )
         ).rows[0];

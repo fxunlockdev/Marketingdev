@@ -143,12 +143,12 @@ export function BrandIntake({
     ),
     visualAnalysisStale =
       visualAnalysis &&
-      state.jobs.some(
+      (state.visuals.some((v:any)=>v.captured_at > visualAnalysis.updated_at) || state.jobs.some(
         (j: any) =>
           j.kind === "website.extract" &&
           j.status === "succeeded" &&
-          j.created_at > visualAnalysis.created_at,
-      );
+          j.updated_at > visualAnalysis.updated_at,
+      ));
   return (
     <section className="v5-panel" aria-busy={busy || !!pending}>
       <h2>Let Desvio get to know your business.</h2>
@@ -200,7 +200,7 @@ export function BrandIntake({
       {state?.visuals?.length > 0 && (
         <details>
           <summary>
-            Explore your website’s visual identity · {state.visuals.length}{" "}
+            Explore your brand’s visual sources · {state.visuals.length}{" "}
             captures
           </summary>
           <p>
@@ -211,19 +211,18 @@ export function BrandIntake({
           {state.visuals.map((v: any) => (
             <article key={v.id} id={"visual-" + v.id} className="v5-panel">
               <h3>
-                {v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
-                {v.observations.title || "Website reference"}
+                {v.document_page ? `Document page ${v.document_page}` : v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
+                {v.document_page ? "Uploaded guideline" : v.observations.title || "Website reference"}
               </h3>
-              <a href={v.website_url} target="_blank" rel="noopener noreferrer">
+              {!v.document_page && <a href={v.website_url} target="_blank" rel="noopener noreferrer">
                 Open source page
-              </a>
+              </a>}
               <p>
                 {v.width} × {v.height} pixels
                 {v.coverage.truncated ? " · height capped" : ""}.{" "}
-                {v.coverage.resourceFailures.length} resources could not be
-                captured.
+                {!v.document_page && <>{v.coverage.resourceFailures.length} resources could not be captured.</>}
               </p>
-              <p>
+              {!v.document_page && <><p>
                 Observed fonts:{" "}
                 {[
                   ...new Set(
@@ -243,7 +242,7 @@ export function BrandIntake({
                   ).length
                 }{" "}
                 logo candidates.
-              </p>
+              </p></>}
               <button
                 onClick={async () => {
                   try {
@@ -256,7 +255,7 @@ export function BrandIntake({
                   }
                 }}
               >
-                View {v.viewport} capture
+                View {v.document_page ? `document page ${v.document_page}` : `${v.viewport} capture`}
               </button>
               {previews[v.id] && (
                 <div
@@ -264,7 +263,7 @@ export function BrandIntake({
                 >
                   <img
                     src={previews[v.id]}
-                    alt={`${v.viewport} capture of ${v.website_url}`}
+                    alt={v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}
                     style={{ width: "100%", height: "auto" }}
                   />
                 </div>
@@ -283,10 +282,11 @@ export function BrandIntake({
           </p>
           {visualAnalysisStale && (
             <p role="status">
-              Your website evidence has changed since these suggestions. Run
+              Your source evidence has changed since these suggestions. Run
               analysis again to update them.
             </p>
           )}
+          {visualAnalysis.result.visual_coverage?.limited && <p role="status">Visual analysis covered {visualAnalysis.result.visual_coverage.document_pages_analyzed.length} of {visualAnalysis.result.visual_coverage.document_pages_available} saved document pages. The remaining page visuals have not been analyzed.</p>}
           {visualAnalysis.result.visual_guidance.map(
             (g: any, index: number) => (
               <article key={index} className="v5-panel">
@@ -331,19 +331,19 @@ export function BrandIntake({
                                 ?.setAttribute("open", "");
                             }}
                           >
-                            {reference.viewport} {reference.view}
+                            {reference.document_page ? `Document page ${reference.document_page}` : `${reference.viewport} ${reference.view}`}
                           </a>
                         ) : (
                           reference.viewport + " " + reference.view
                         )}{" "}
                         ·{" "}
-                        <a
+                        {!reference.document_page && <a
                           href={reference.website_url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
                           Source page
-                        </a>
+                        </a>}
                       </li>
                     );
                   })}
