@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "3271363112da541c511db7b088e6a0eb4ef34b24",
-  "checked_at": "2026-10-22T13:37:34.342135+00:00",
+  "code_commit": "03487155f724a725b33f3817389c44e415f9b9ac",
+  "checked_at": "2026-10-22T14:28:28.520993+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -48,6 +48,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/document-visuals.json",
+        "docs/evidence/video-canvas.json",
         "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
@@ -87,6 +88,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/document-visuals.json",
+        "docs/evidence/video-canvas.json",
         "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
@@ -107,6 +109,7 @@
       "live_test": false,
       "evidence": [
         "docs/evidence/document-visuals.json",
+        "docs/evidence/video-canvas.json",
         "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
@@ -216,6 +219,14 @@
       ],
       "blocked_reason": "Pinned SDK and documented image-to-video/edit bodies, fixed-origin HTTP submission/status/cancel, persisted-intent fingerprint boundary, duplicate key semantics and bounded credentials-free output download tested against MOCK transports. Downloaded bytes remain untrusted. The durable provider substage has separate evidence; complete approved-reference/skill-driven video workflow, media decoder/private canonical output, Canvas video controls, account model eligibility, actual provider output and paid/live verification remain incomplete."
     },
+    "canvas_video_workflow": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/video-canvas.json"
+      ],
+      "blocked_reason": "Local authenticated video script/prompt edit and explicit pre-generation approval, actual original skills/Temporal/rendering/private storage, final review and retained regeneration versions with MOCK paid providers. Deployment, live generation/quality, Gemini, calendar video attachment/publishing and recurring planning remain incomplete. This is not full Canvas or product completion."
+    },
     "video_provider_stage": {
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
@@ -234,7 +245,7 @@
       "blocked_reason": "Real local private S3-compatible storage verifies bounded 64 MiB canonical MP4 byte persistence, replay/concurrency/lost acknowledgements and a fault-injected conditional-write race; existing authenticated upload/scanner/tenant/Temporal worker-recovery regression is included. Synthetic byte fixtures are not decoded videos or provider output. Customer uploads retain 20 MiB limits. Video database/version persistence, approved-reference leases, parent jobs, deployed storage and live generation remain incomplete."
     },
     "video_planning_media_stage": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/video-runtime.json",
