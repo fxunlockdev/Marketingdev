@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "ab1be017bb7444b0dffc69a8a79ce78ed45d1a9c",
-  "checked_at": "2026-10-22T04:53:13.145332+00:00",
+  "code_commit": "f02741e22bb6e02854d1d00df776ec723cd9ebe0",
+  "checked_at": "2026-10-22T05:07:46.974416+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -249,7 +249,15 @@
       "evidence": [
         "docs/evidence/social.json"
       ],
-      "blocked_reason": "Pinned-source transport contracts use a MOCK Postiz HTTP server. Actual local auth/PostgreSQL RLS/Temporal prove encrypted per-business binding, queued account refresh, permission/rotation/cancel boundaries and snapshot recovery. No real Postiz organization/OAuth/token health or publishing acceptance. Provisioning, session-bound callback workflow, customer UI and authorized live tests remain incomplete."
+      "blocked_reason": "Pinned-source transport contracts use a MOCK Postiz HTTP server. Actual local auth/PostgreSQL RLS/Temporal prove encrypted per-business binding, queued account refresh, permission/rotation/cancel boundaries and snapshot recovery. No real Postiz organization/OAuth/token health or publishing acceptance. Session-bound callback workflows are also tested locally. Provisioning, customer UI and authorized live tests remain incomplete."
+    },
+    "social_oauth_workflow": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/social.json"
+      ],
+      "blocked_reason": "Actual local auth sessions, forced PostgreSQL RLS and Temporal prove LinkedIn start/callback with 256-bit state, encrypted code, expiry, single-session ownership, one-time exchange, revoked access and uncertain-outcome recovery. Upstream HTTP is explicitly MOCK. No provider login/consent or deployed callback UI has been tested. Provisioning, customer UI, account selection/reconnect/revoke and live acceptance remain incomplete."
     }
   },
   "security": {
