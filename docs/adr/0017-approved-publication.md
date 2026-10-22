@@ -1,6 +1,6 @@
 # 0017 — Durable publication of an exact approved image
 
-Status: implementation and local verification in progress. Personal LinkedIn is the first publisher; other V5 formats/channels and analytics remain in scope.
+Status: implemented and locally verified at 6d0e66a. Personal LinkedIn is the first publisher; other V5 formats/channels and analytics remain in scope.
 
 ## Source and request contract
 
@@ -29,3 +29,5 @@ The Temporal publication workflow performs an immediate read, sleeps durably unt
 The focused suite uses actual local sessions, forced PostgreSQL RLS, approved Brand Brain/creative fixtures, network-disabled Fabric rendering, immutable private S3 bytes and Temporal. The Postiz server is explicitly MOCK HTTP; no external provider or paid model is called. It exercises confirmation/grant/idempotency, exact uploaded pixels, accepted versus published, read failures/missing/changed results, lost mutation responses, stale approval, revoked access, disabled account, local acceptance commit loss, immutable snapshots/history and tenant/job denial.
 
 This backend precedes customer publishing UI. Production release, deployed ingress/runtime, actual Postiz source equivalence/license review, authorized test-social publication, model quality, video/analytics and remaining modules are still required.
+
+Final frozen-source proof: offline/contracts/social/publishing/Connections reports all pass at dfd78d29f1172f8ac17a23a96361a54fb9d098219d2fe8c1d655b0c293d66ec6 (82 distinct tests, zero skips; social repeats 15 contracts). Six security guards pass separately. Full security/browser reports remain failed or stale and release remains BLOCKED.

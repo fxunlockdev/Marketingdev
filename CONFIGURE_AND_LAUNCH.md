@@ -45,3 +45,7 @@ The desired end state is **no more feature programming after configuration**. Al
 ## Implemented Connections return configuration (development checkpoint)
 
 The web service now requires `APP_ORIGIN` (exact public HTTPS origin) and `API_ORIGIN` (private API origin) for `/integrations/social/linkedin`. Preserve the public Host at ingress; redirect destinations come only from configured APP_ORIGIN. Redact OAuth callback query strings in access logs/traces before deployed acceptance. Do not configure model, Postiz enterprise signing or social-provider secrets on the web service. See [ADR 0016](docs/adr/0016-customer-connections.md) for the implemented scope, existing private worker configuration and focused verification. This is not evidence that Railway ingress or real consent has passed.
+
+## Implemented publication backend (development checkpoint)
+
+Publication defaults off. Both API and worker require `POSTIZ_PUBLISHING_ENABLED=true`; a separate expiring `publication_grants` row must authorize the exact business/channel and daily limit before any submission. The customer must explicitly confirm a current approved slot and final image. No real staging grant or social publish was provisioned by development tests. The final operator setup interface is still incomplete; this manual development safeguard is not a finished handoff. See [ADR 0017](docs/adr/0017-approved-publication.md) for exact routes, durable unknown-outcome behavior, reconciliation and remaining live/deployment requirements.
