@@ -1,15 +1,18 @@
 import { spawn, execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
+import sharp from "sharp";
 import { digest, MAX_UPLOAD_BYTES } from "./object-store.js";
-export const PARSER_VERSION = "docling-native-2.141.0/desvio-v1";
+export const PARSER_VERSION = "docling-native-2.141.0/tesseract-5.5.0/desvio-v3";
 export type ParsedDocument = {
   parserVersion: string;
   sha256: string;
   pages: number;
   textPages: number[];
   kind: "pdf" | "pptx";
-  coverage: "embedded_text_only";
+  coverage: "embedded_text_only" | "embedded_text_with_ocr";
+  ocrPages: number[];
+  visuals: { page: number; width: number; height: number; sha256: string; image: string }[];
   chunks: {
     text: string;
     page: number;
@@ -43,6 +46,13 @@ export function parseDocumentOutput(
       "DOCUMENT_PARSE_FAILED",
       "INVALID_DOCUMENT_PROVENANCE",
       "DOCUMENT_NEEDS_OCR_OR_MANUAL_REVIEW",
+      "DOCUMENT_NATIVE_FAILED",
+      "DOCUMENT_CONVERSION_FAILED",
+      "DOCUMENT_OCR_OUTPUT_INVALID",
+      "DOCUMENT_RENDER_FAILED",
+      "DOCUMENT_PAGE_DIMENSIONS_INVALID",
+      "PRESENTATION_EXTERNAL_RESOURCE_UNSUPPORTED",
+      "PRESENTATION_EMBEDDED_OBJECT_UNSUPPORTED",
     ];
     throw new DocumentError(
       codes.includes(v.error) ? v.error : "DOCUMENT_PARSE_FAILED",
@@ -53,7 +63,7 @@ export function parseDocumentOutput(
     v.parserVersion !== PARSER_VERSION ||
     v.sha256 !== digest(bytes) ||
     v.kind !== kind ||
-    v.coverage !== "embedded_text_only" ||
+    !["embedded_text_only", "embedded_text_with_ocr"].includes(v.coverage) ||
     !Number.isInteger(v.pages) ||
     v.pages < 1 ||
     v.pages > 50 ||
@@ -63,7 +73,17 @@ export function parseDocumentOutput(
   )
     throw invalid();
   let size = 0;
+  if (!Array.isArray(v.visuals) || v.visuals.length !== v.pages) throw invalid();
+  let visualBytes = 0;
+  for (const [index, visual] of v.visuals.entries()) {
+    if (visual?.page !== index + 1 || ![visual.width, visual.height].every(n => Number.isSafeInteger(n) && n > 0 && n <= 2000) || typeof visual.image !== "string" || visual.image.length > 2800000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(visual.image)) throw invalid();
+    const image = Buffer.from(visual.image, "base64");
+    if (image.length < 4 || image[0] !== 0xff || image[1] !== 0xd8 || image[2] !== 0xff || image.toString("base64") !== visual.image || image.length > 2 * 1024 * 1024 || digest(image) !== visual.sha256) throw invalid();
+    visualBytes += image.length;
+  }
+  if (visualBytes > 24 * 1024 * 1024) throw invalid();
   const pages = new Set<number>();
+  const ocrPages = new Set<number>();
   for (const c of v.chunks) {
     if (
       !c ||
@@ -84,9 +104,15 @@ export function parseDocumentOutput(
       throw invalid();
     size += c.text.length;
     pages.add(c.page);
+    if (c.bbox.method !== undefined) {
+      if (c.bbox.method !== "ocr_eng" || !Number.isFinite(c.bbox.confidence) || c.bbox.confidence < 0 || c.bbox.confidence > 100 || c.bbox.coord_origin !== "TOPLEFT" || !c.anchor.startsWith(`#/ocr/${c.page}/`)) throw invalid();
+      ocrPages.add(c.page);
+    } else if (c.anchor.startsWith("#/ocr/")) throw invalid();
   }
   if (
     size > 250000 ||
+    JSON.stringify(v.ocrPages) !== JSON.stringify([...ocrPages].sort((a, b) => a - b)) ||
+    v.coverage !== (ocrPages.size ? "embedded_text_with_ocr" : "embedded_text_only") ||
     !Array.isArray(v.textPages) ||
     JSON.stringify(v.textPages) !==
       JSON.stringify([...pages].sort((a, b) => a - b))
@@ -99,6 +125,8 @@ export function parseDocumentOutput(
     textPages: v.textPages,
     kind,
     coverage: v.coverage,
+    ocrPages: v.ocrPages,
+    visuals: v.visuals.map((p: any) => ({page:p.page,width:p.width,height:p.height,sha256:p.sha256,image:p.image})),
     chunks: v.chunks.map((c: any) => ({
       text: c.text,
       page: c.page,
@@ -109,6 +137,7 @@ export function parseDocumentOutput(
         r: c.bbox.r,
         b: c.bbox.b,
         coord_origin: c.bbox.coord_origin,
+        ...(c.bbox.method ? { method: c.bbox.method, confidence: c.bbox.confidence } : {}),
       },
     })),
   };
@@ -128,11 +157,18 @@ export class DocumentParser {
       throw new DocumentError("DOCUMENT_LIMIT_EXCEEDED");
     if (!["pdf", "pptx"].includes(kind))
       throw new DocumentError("UNSUPPORTED_DOCUMENT");
-    return parseDocumentOutput(
+    const parsed = parseDocumentOutput(
       await runIntakeSandbox(this.image, bytes, kind),
       bytes,
       kind,
     );
+    for (const visual of parsed.visuals) {
+      try {
+        const decoded = await sharp(Buffer.from(visual.image, "base64"), { limitInputPixels: 4000000, failOn: "warning" }).raw().toBuffer({ resolveWithObject: true });
+        if (decoded.info.width !== visual.width || decoded.info.height !== visual.height) throw invalid();
+      } catch { throw invalid(); }
+    }
+    return parsed;
   }
 }
 export async function runIntakeSandbox(
@@ -201,7 +237,7 @@ export async function runIntakeSandbox(
       );
       child.stdout.on("data", (chunk: Buffer) => {
         length += chunk.length;
-        if (length > 2 * 1024 * 1024) finish(invalid());
+        if (length > (kind === "website" ? 2 : 36) * 1024 * 1024) finish(invalid());
         else output += chunk.toString("utf8");
       });
       child.stdin.on("error", () => {});

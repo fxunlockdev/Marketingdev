@@ -345,7 +345,15 @@ export class IntakeJobs {
           [j.organization_id, j.brand_id],
         )
       ).rows;
-      if (!rows.length) return null;
+      const documentRows = (await db.query(`SELECT v.*,v.page AS document_page,s.sha256 AS document_sha256,'document' AS viewport,'{}'::jsonb AS observations
+        FROM app.document_visuals v JOIN app.brand_sources s ON s.id=v.source_id
+        WHERE v.organization_id=$1 AND v.brand_id=$2
+        ORDER BY v.captured_at DESC,v.source_id,v.page LIMIT 10`, [j.organization_id,j.brand_id])).rows;
+      const documentPageCount = Number((await db.query("SELECT count(*) AS n FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2", [j.organization_id,j.brand_id])).rows[0].n);
+      // Share the existing ten-source budget. Keep website evidence alongside
+      // documents, and record exactly which pages reached the model manifest.
+      const selectedRows = documentRows.length ? [...rows.slice(0, Math.min(rows.length, 4)), ...documentRows.slice(0, 10-Math.min(rows.length, 4))] : rows;
+      if (!selectedRows.length) return null;
       const grant = (
         await db.query(
           "SELECT max_tokens_per_image FROM app.analysis_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()",
@@ -355,7 +363,8 @@ export class IntakeJobs {
       if (!grant?.max_tokens_per_image)
         throw new IntakeError("AI_VISION_APPROVAL_REQUIRED");
       return {
-        rows,
+        rows: selectedRows,
+        documentPageCount,
         revision: await lockReview(db, j.organization_id, j.brand_id),
       };
     });
@@ -498,6 +507,11 @@ export class IntakeJobs {
             JSON.stringify({
               ...response.result,
               visual_manifest: visualManifest(prepared.input.visuals ?? []),
+              visual_coverage: {
+                document_pages_available: visualEvidence?.documentPageCount ?? 0,
+                document_pages_analyzed: (prepared.input.visuals ?? []).filter(v => v.document_page).map(v => ({source_id:v.source_id,page:v.document_page})),
+                limited: (visualEvidence?.documentPageCount ?? 0) > (prepared.input.visuals ?? []).filter(v => v.document_page).length,
+              },
             }),
             JSON.stringify(response.usage),
           ],

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "11e5c7cbd57b62ccf9addb8ef5b5f06112edc317",
-  "checked_at": "2026-10-22T10:05:03.883207+00:00",
+  "code_commit": "30f62c6805a598d47455e73e6578521b29377e7a",
+  "checked_at": "2026-10-22T12:54:06.577192+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "ADAPTER_READY",
@@ -21,7 +21,7 @@
       "evidence": [
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Full business roles, deployed sandbox, document vision and live provider journey remain incomplete."
+      "blocked_reason": "Real local Docling/native rendering/English textless-page OCR, private page storage, Temporal/RLS, approved document visual provenance and account quota tests. The model sees actual page pixels through the official adapter with explicitly MOCK responses. Mixed-content OCR, broader document fidelity, full business roles, deployed sandbox and live model quality/provider journeys remain incomplete."
     },
     "deepagents": {
       "state": "ADAPTER_READY",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/document-visuals.json",
         "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
@@ -85,6 +86,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/document-visuals.json",
         "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
@@ -104,6 +106,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/document-visuals.json",
         "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
@@ -166,7 +169,7 @@
       "evidence": [
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Full business roles, deployed sandbox, document vision and live provider journey remain incomplete."
+      "blocked_reason": "Real local Docling/native rendering/English textless-page OCR, private page storage, Temporal/RLS, approved document visual provenance and account quota tests. The model sees actual page pixels through the official adapter with explicitly MOCK responses. Mixed-content OCR, broader document fidelity, full business roles, deployed sandbox and live model quality/provider journeys remain incomplete."
     },
     "business_accounts": {
       "state": "ADAPTER_READY",
@@ -174,7 +177,7 @@
       "evidence": [
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Full business roles, deployed sandbox, document vision and live provider journey remain incomplete."
+      "blocked_reason": "Real local Docling/native rendering/English textless-page OCR, private page storage, Temporal/RLS, approved document visual provenance and account quota tests. The model sees actual page pixels through the official adapter with explicitly MOCK responses. Mixed-content OCR, broader document fidelity, full business roles, deployed sandbox and live model quality/provider journeys remain incomplete."
     },
     "v5_business_ui": {
       "state": "ADAPTER_READY",
@@ -349,7 +352,7 @@
       "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
     },
     "deployment_bootstrap": {
-      "state": "NOT_IMPLEMENTED",
+      "state": "ADAPTER_READY",
       "live_test": false,
       "evidence": [
         "docs/evidence/deployment.json"

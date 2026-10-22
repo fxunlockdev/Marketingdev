@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from 'react';
 import {api} from './api';
+import {PrivateVisual} from './private-visual';
 import {Field,Notice} from './primitives';
 import {useUnsavedChanges} from './unsaved';
 const identity=(d:any)=>`${d.analysis_job_id}:${d.index}`;
@@ -15,8 +16,8 @@ export function VisualReview({state,path,writable,onSaved,onEditingChange}:{stat
  if(!live.length&&!orphaned.length)return null;
  return <section className="v5-panel" aria-label="Review visual identity">
   <h2>Make the visual direction yours.</h2>
-  <p>Review these suggestions from your website. Accepted directions become design preferences in your approved brand profile. This does not approve source images for reuse.</p>
-  {state?.stale&&<p role="status">Your website evidence changed. Run analysis again before reviewing new suggestions. You can still edit your previously approved preferences.</p>}
+  <p>Review these suggestions from your website and uploaded guidelines. Accepted directions become design preferences in your approved brand profile. This does not approve source images for reuse.</p>
+  {state?.stale&&<p role="status">Your source evidence changed. Run analysis again before reviewing new suggestions. You can still edit your previously approved preferences.</p>}
   <div className="finding-grid">{[...live,...orphaned].map(d=><Direction key={identity(d)} direction={d} obsolete={!current.has(identity(d))} stale={!!state?.stale&&!d.retained} path={path} writable={writable} onSaved={onSaved} onEditing={editing}/>)}</div>
  </section>;
 }
@@ -42,7 +43,7 @@ function Direction({direction,obsolete,stale,path,writable,onSaved,onEditing}:{d
   <p className="status neutral">{direction.review?.status==='wrong'&&direction.retained?'Marked for removal':direction.review?.status??'Needs review'}</p>
   <p><strong>Observed:</strong> {direction.suggestion.observation}</p>
   {editing?<Field label={`Edit visual ${category}`} hint="Describe the style you want Desvio to follow.">{(id,hint)=><textarea id={id} aria-describedby={hint} readOnly={busy} required maxLength={1500} value={value} onChange={e=>setValue(e.target.value)}/>}</Field>:<p>{direction.review?.value??direction.suggestion.creative_direction}</p>}
-  <details><summary>Supporting visual evidence</summary><ul>{direction.manifest.filter((r:any)=>direction.suggestion.image_ids.includes(r.id)).map((r:any)=><li key={r.id}><a href={r.website_url} target="_blank" rel="noopener noreferrer">{r.viewport} · {r.view} · source page</a></li>)}</ul></details>
+  <details><summary>Supporting visual evidence</summary><ul>{direction.manifest.filter((r:any)=>direction.suggestion.image_ids.includes(r.id)).map((r:any)=><li key={r.id}>{r.document_page ? <PrivateVisual businessId={path.split('/').at(-1)!} visualId={r.visual_id} label={`View document page ${r.document_page}`} alt={`Source guideline page ${r.document_page}`}/> : <a href={r.website_url} target="_blank" rel="noopener noreferrer">{r.viewport} · {r.view} · source page</a>}</li>)}</ul></details>
   <Notice error={error}/>{saved&&<p role="status">{saved}</p>}
   {changed&&<p role="status">This suggestion changed while you were editing. Your text is retained so you can copy it. Discard this edit before reviewing the latest suggestion.</p>}
   {writable&&<div className="actions">{editing?<>

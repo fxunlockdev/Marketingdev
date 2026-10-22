@@ -4,6 +4,7 @@ Run in a network-disabled, read-only, non-root, resource-limited container.
 No application/database/provider credentials enter this process.
 """
 import hashlib
+import base64
 import io
 import json
 import logging
@@ -18,7 +19,7 @@ from importlib.metadata import version
 MAX_BYTES = 20 * 1024 * 1024
 MAX_PAGES = 50
 MAX_TEXT = 250_000
-PARSER_VERSION = "docling-native-2.141.0/desvio-v1"
+PARSER_VERSION = "docling-native-2.141.0/tesseract-5.5.0/desvio-v3"
 
 
 def fail(code):
@@ -91,12 +92,41 @@ def main():
                 fail("DOCUMENT_LIMIT_EXCEEDED")
             chunks.append({"text": text, "page": prov.page_no, "anchor": item.self_ref,
                            "bbox": prov.bbox.model_dump(mode="json")})
+    native_pages = {c["page"] for c in chunks}
+    ocr_pages = []
+    visuals = []
+    from document_native import presentation_pdf, ocr_page
+    from document_visuals import render_pdf
+    rendered = data if kind == "pdf" else presentation_pdf(data)
+    for visual in render_pdf(rendered):
+        visuals.append({"page": visual["page"], "width": visual["width"], "height": visual["height"],
+            "sha256": visual["sha256"], "image": base64.b64encode(visual["bytes"]).decode()})
+        if visual["pages"] != pages:
+            fail("INVALID_DOCUMENT_PROVENANCE")
+        if visual["page"] in native_pages:
+            continue
+        lines = ocr_page(visual["bytes"], visual["width"], visual["height"])
+        if lines:
+            ocr_pages.append(visual["page"])
+        for index, line in enumerate(lines):
+            size += len(line["text"])
+            if size > MAX_TEXT or len(chunks) >= 2000 or len(line["text"]) > 12000:
+                fail("DOCUMENT_LIMIT_EXCEEDED")
+            bbox = line["bbox"]
+            chunks.append({"text": line["text"], "page": visual["page"],
+                "anchor": f"#/ocr/{visual['page']}/{index}",
+                "bbox": {"l": bbox["l"] * visual["pageWidth"] / visual["width"],
+                    "r": bbox["r"] * visual["pageWidth"] / visual["width"],
+                    "t": bbox["t"] * visual["pageHeight"] / visual["height"],
+                    "b": bbox["b"] * visual["pageHeight"] / visual["height"],
+                    "coord_origin": "TOPLEFT", "method": "ocr_eng", "confidence": line["confidence"]}})
     if not chunks:
         fail("DOCUMENT_NEEDS_OCR_OR_MANUAL_REVIEW")
     covered = sorted({c["page"] for c in chunks})
     print(json.dumps({"parserVersion": PARSER_VERSION, "packages": {"docling-slim": version("docling-slim"), "docling-core": version("docling-core")},
                       "sha256": hashlib.sha256(data).hexdigest(), "pages": pages, "textPages": covered, "kind": kind,
-                      "coverage": "embedded_text_only", "chunks": chunks}, ensure_ascii=True), flush=True)
+                      "coverage": "embedded_text_with_ocr" if ocr_pages else "embedded_text_only", "ocrPages": ocr_pages,
+                      "visuals": visuals, "chunks": chunks}, ensure_ascii=True), flush=True)
 
 
 if __name__ == "__main__":
@@ -104,5 +134,6 @@ if __name__ == "__main__":
         main()
     except SystemExit:
         raise
-    except Exception:
-        fail("DOCUMENT_PARSE_FAILED")
+    except Exception as error:
+        from document_visuals import DocumentVisualError
+        fail(str(error) if isinstance(error, DocumentVisualError) else "DOCUMENT_PARSE_FAILED")

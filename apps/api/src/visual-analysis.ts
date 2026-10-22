@@ -6,7 +6,9 @@ export type VisualInput = {
   id: string;
   visual_id: string;
   source_id: string;
-  website_url: string;
+  website_url?: string;
+  document_page?: number;
+  document_sha256?: string;
   viewport: string;
   view: "overview" | "hero" | "detail";
   source_sha256: string;
@@ -44,7 +46,7 @@ export async function prepareVisuals(
     const height = Math.min(row.height, 1200);
     const regions: { view: VisualInput["view"]; y: number; height: number }[] =
       [{ view: "overview", y: 0, height: row.height }];
-    if (row.height > 1600) {
+    if (!row.document_page && row.height > 1600) {
       regions.push({ view: "hero", y: 0, height });
       const candidate = (row.observations.images ?? [])
         .filter(
@@ -95,7 +97,7 @@ export async function prepareVisuals(
         id: `${row.id}:${region.view}`,
         visual_id: row.id,
         source_id: row.source_id,
-        website_url: row.website_url,
+        ...(row.document_page ? {document_page:row.document_page,document_sha256:row.document_sha256} : {website_url:row.website_url}),
         viewport: row.viewport,
         view: region.view,
         source_sha256: row.sha256,
