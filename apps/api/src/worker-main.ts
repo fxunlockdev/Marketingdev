@@ -1,3 +1,9 @@
+import {VideoJobs} from './video-jobs.js';
+import {VideoReferences} from './video-references.js';
+import {VideoProviderJobs} from './video-provider-jobs.js';
+import {VideoRenderer} from './video-renderer.js';
+import {VideoDownload} from './video-download.js';
+import {HiggsfieldClient,HIGGSFIELD_MODELS} from './higgsfield-client.js';
 import {PublicationJobs} from './publication-jobs.js';
 import {SocialOAuthJobs} from './social-oauth-jobs.js';
 import {SocialJobs,SocialReadRetry} from './social-jobs.js';
@@ -37,9 +43,14 @@ const publication=new PublicationJobs(jobs,config.social,config.renderImage,conf
 const social=new SocialJobs(jobs,config.social);
 const socialOAuth=new SocialOAuthJobs(jobs,config.social,config.oauthEncryptionKey);
 const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
+const video=config.video?new VideoJobs(jobs,new VideoReferences(undefined,jobs,config.video.encryptionKey,config.renderImage!,config.video.mode),creative,
+ new VideoProviderJobs(jobs,new HiggsfieldClient({mode:config.video.mode,credentials:config.video.credentials,models:[HIGGSFIELD_MODELS.image],referenceOrigins:[new URL(config.storage.endpoint).origin]}),config.video.encryptionKey),
+ new VideoDownload(config.video.outputOrigins),new VideoRenderer(config.video.image)):undefined;
 const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue,config.provisionTaskQueue);
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),
   maxConcurrentActivityTaskExecutions:2,activities:{
+    stepVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.nonRetryable('Video generation is not configured','VideoUnavailable');const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await video.step(scope);}catch{throw ApplicationFailure.retryable('Video processing temporarily unavailable','VideoUnavailable');}finally{clearInterval(heartbeat);}},
+    failVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.retryable('Video recovery awaits configured worker','VideoUnavailable');return video.exhausted(scope);},
     publishSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.run(scope);}catch(e){throw ApplicationFailure.create({message:'Publication processing unavailable',type:'PublicationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     reconcileSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.reconcile(scope);}catch(e){throw ApplicationFailure.create({message:'Publication check unavailable',type:'PublicationCheckUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     failPublication:async(scope:JobScope)=>publication.fail(scope),

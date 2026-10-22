@@ -1,3 +1,4 @@
+export {generateVideoWorkflow} from './video-workflow.js';
 import {proxyActivities,sleep} from '@temporalio/workflow';
 import type {JobScope} from './jobs.js';
 type Activities={validate(scope:JobScope):Promise<string>;fail(scope:JobScope):Promise<string>};

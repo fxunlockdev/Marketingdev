@@ -23,12 +23,13 @@ export class VideoProviderJobs {
   if(release)await db.query("UPDATE app.video_reservations SET state='released' WHERE job_id=$1",[j.id]);
   await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,phase==='canceled'?'canceled':phase==='unknown'?'unknown':phase==='failed'?'failed':'rejected',code]);return phase;
  }
- async prepare(scope:JobScope,intent:VideoIntent){
+ async prepare(scope:JobScope,intent:VideoIntent,beforePrepare?:(db:any,j:any)=>Promise<void>){
   const prepared=this.#provider.prepare(intent);
   return this.transaction(scope,async(db,j)=>{
    const prior=(await db.query('SELECT * FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
    if(prior){if(prior.intent_sha256!==prepared.sha256||prior.provider_key!==prepared.idempotencyKey)throw new VideoStateError('VIDEO_REPLAY_MISMATCH');return {phase:prior.phase};}
    if(!['queued','running','retrying'].includes(j.status)||!await this.#jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
+   if(beforePrepare)await beforePrepare(db,j);
    const g=await this.grant(db,j,prepared.model),reserve=Number(intent.kind==='image'?g.max_create_micros:g.max_edit_micros);
    const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.video_reservations WHERE organization_id=$1 AND brand_id=$2 AND state='held'",[j.organization_id,j.brand_id])).rows[0].n);
    if(!Number.isSafeInteger(reserve)||reserve<=0||used+reserve>Number(g.budget_micros))throw new VideoStateError('VIDEO_BUDGET_EXHAUSTED');
@@ -37,7 +38,7 @@ export class VideoProviderJobs {
    return {phase:'prepared'};
   });
  }
- async step(scope:JobScope):Promise<string>{
+ async step(scope:JobScope,beforeSubmit?:(db:any,j:any)=>Promise<void>):Promise<string>{
   const state=await this.transaction(scope,async(db,j)=>{
    const r=(await db.query('SELECT * FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
    if(!r)throw new VideoStateError('VIDEO_INTENT_MISSING');
@@ -56,6 +57,7 @@ export class VideoProviderJobs {
     const currentCap=Number(intent.kind==='image'?g.max_create_micros:g.max_edit_micros);
     const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.video_reservations WHERE state='held'",[])).rows[0].n);
     if(Number(held.reserved_micros)!==currentCap||used>Number(g.budget_micros))return {done:await this.stop(db,j,'rejected','VIDEO_BUDGET_CHANGED',true)};
+    if(beforeSubmit)await beforeSubmit(db,j);
     await db.query("UPDATE app.video_operations SET phase='submitting' WHERE job_id=$1",[j.id]);
     await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);
     return {submit:intent,sha:r.intent_sha256};

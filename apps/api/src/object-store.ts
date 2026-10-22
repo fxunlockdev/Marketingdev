@@ -23,6 +23,12 @@ export class ObjectStore {
     return getSignedUrl(this.client,new GetObjectCommand({Bucket:this.config.bucket,Key:key,
       ResponseContentDisposition:`attachment; filename="${filename}"`,ResponseContentType:type}),{expiresIn:60});
   }
+  async referenceURL(key:string,expiresAt:Date) {
+    const uuid='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}';
+    const signingDate=new Date(Math.floor(Date.now()/1000)*1000),expiresIn=Math.floor((expiresAt.getTime()-signingDate.getTime())/1000);
+    if(!new RegExp(`^video-reference/${uuid}/${uuid}/${uuid}/[a-f0-9]{64}$`).test(key)||!Number.isInteger(expiresIn)||expiresIn<60||expiresIn>8*3600)throw new InvalidAsset('REFERENCE_LEASE_INVALID');
+    return getSignedUrl(this.client,new GetObjectCommand({Bucket:this.config.bucket,Key:key,ResponseContentType:'image/png',ResponseContentDisposition:'attachment; filename="desvio-reference.png"'}),{expiresIn,signingDate});
+  }
   async read(key:string,limit=MAX_UPLOAD_BYTES):Promise<Buffer> {
     if(!Number.isSafeInteger(limit)||limit<1||limit>MAX_CANONICAL_VIDEO_BYTES)throw new InvalidAsset('OBJECT_READ_LIMIT_INVALID');
     const result=await this.client.send(new GetObjectCommand({Bucket:this.config.bucket,Key:key}),{abortSignal:AbortSignal.timeout(15000)});

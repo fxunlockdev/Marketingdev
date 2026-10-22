@@ -13,6 +13,7 @@ export type Config = {
   smtp: {host:string;port:number;secure:boolean;user?:string;password?:string;from:string};
   storage: StorageConfig;
   renderImage?:string;
+  videoEnabled?:boolean;
   socialEnabled?:boolean;
   publishingEnabled?:boolean;
   oauthEncryptionKey?:string;
@@ -21,6 +22,7 @@ export type Config = {
 
 export function configFromEnv(env = process.env): Config {
   const mode = env.APP_MODE;
+  if(env.VIDEO_ENABLED!==undefined&&!['true','false'].includes(env.VIDEO_ENABLED))throw new Error('VIDEO_ENABLED must be true or false');
   if (!['development', 'test', 'staging', 'production'].includes(mode ?? '')) throw new Error('APP_MODE is required');
   const required = (key: string) => {
     if (!env[key]) throw new Error(`${key} is required`);
@@ -47,7 +49,7 @@ export function configFromEnv(env = process.env): Config {
   if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(env.POSTIZ_PROVISIONING_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_PROVISIONING_ENABLED))throw new Error('POSTIZ_PROVISIONING_ENABLED must be true or false');
-  return {publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  return {videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }
@@ -76,7 +78,11 @@ export function workerConfigFromEnv(env=process.env){
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(oauthEncryptionKey&&oauthEncryptionKey===social?.encryptionKey)throw new Error('OAuth and Postiz credentials require separate keys');
   const provisionTaskQueue=env.POSTIZ_PROVISION_TASK_QUEUE;if(provisionTaskQueue&&(!/^[A-Za-z0-9_.:-]{1,100}$/.test(provisionTaskQueue)||provisionTaskQueue===jobs.taskQueue))throw new Error('Provisioning requires a separate task queue');
-  return {publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey,provisionTaskQueue};
+  if(env.VIDEO_ENABLED!==undefined&&!['true','false'].includes(env.VIDEO_ENABLED))throw new Error('VIDEO_ENABLED must be true or false');
+  const video=env.VIDEO_ENABLED==='true'?{mode:mode as 'test'|'development'|'staging',image:required('VIDEO_RUNTIME_IMAGE'),encryptionKey:required('VIDEO_ENCRYPTION_KEY'),credentials:required('HIGGSFIELD_CREDENTIALS'),outputOrigins:required('HIGGSFIELD_OUTPUT_ORIGINS').split(',')}:undefined;
+  if(video&&(!/^sha256:[a-f0-9]{64}$/.test(video.image)||!/^sha256:[a-f0-9]{64}$/.test(renderImage??'')||!skillImage||!env.OPENAI_API_KEY||!/^[a-f0-9]{64}$/i.test(video.encryptionKey)))throw new Error('Video requires pinned renderers, skills, model credentials and a 32-byte encryption key');
+  if(video&&[oauthEncryptionKey,social?.encryptionKey].includes(video.encryptionKey))throw new Error('Video requires a separate encryption key');
+  return {video,publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey,provisionTaskQueue};
 }
 
 // Deliberately independent of storage, authentication, SMTP and model settings.

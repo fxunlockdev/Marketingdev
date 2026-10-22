@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import {CanvasVideos} from './video-canvas';
 import {BrandReferences} from "./brand-references";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
@@ -439,11 +440,12 @@ export function CanvasScreen({ business }: { business: Business }) {
             )}
             <p className="hint">
               Generation uses your configured allowance. Approval and publishing
-              are separate. Video creation is not available yet.
+              are separate. To make a video, start from an approved final image below.
             </p>
           </form>
         </section>
       </div>
+      {threadId&&<CanvasVideos key={business.id+threadId} business={business} threadId={threadId}/>}
       {conversation?.projects.some((p) => p.latest_version_id) && (
         <section className="studio-projects">
           <div className="section-heading">
@@ -807,7 +809,7 @@ export function CreativeProject({
             </div>
           ))}
       </section>
-      <CreativeExportPanel key={business.id+version.id} business={business} versionId={version.id} sourceSHA={version.sha256} context={{type:'canvas',id:version.id,revision:version.review_revision,state:version.status}} disabled={dirty||busy||!latest} onApproved={async()=>{await load(selected);setFeedback('');setNotice('This saved version is approved. It has not been published.');}}/>
+      <CreativeExportPanel threadId={data.project.thread_id} key={business.id+version.id} business={business} versionId={version.id} sourceSHA={version.sha256} context={{type:'canvas',id:version.id,revision:version.review_revision,state:version.status}} disabled={dirty||busy||!latest} onApproved={async()=>{await load(selected);setFeedback('');setNotice('This saved version is approved. It has not been published.');}}/>
     </article>
   );
 }

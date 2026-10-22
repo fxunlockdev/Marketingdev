@@ -1,12 +1,13 @@
 "use client";
 import {useCallback,useEffect,useId,useRef,useState} from 'react';
+import {VideoRequest} from './video-canvas';
 import {api} from './api';
 import {Notice} from './primitives';
 type SavedImage={id:string;sha256:string;source_sha256:string;renderer_image:string;manifest:{warnings?:string[]}};
-type ExportState={configured:boolean;renderer_image:string|null;exports:SavedImage[];jobs:{id:string;status:string;cancel_requested:boolean;error_code:string|null}[];approvals:{export_id:string;context_type:string;context_id:string;context_revision:number}[]};
-type Props={business:{id:string;role:string};versionId:string;sourceSHA:string;context:{type:'canvas'|'slot';id:string;revision:number;state:string};disabled:boolean;onApproved:()=>Promise<void>};
+type ExportState={configured:boolean;renderer_image:string|null;exports:SavedImage[];jobs:{id:string;status:string;cancel_requested:boolean;error_code:string|null}[];approvals:{id:string;export_id:string;context_type:string;context_id:string;context_revision:number}[]};
+type Props={threadId?:string;business:{id:string;role:string};versionId:string;sourceSHA:string;context:{type:'canvas'|'slot';id:string;revision:number;state:string};disabled:boolean;onApproved:()=>Promise<void>};
 const active=(s:string)=>['queued','running','retrying'].includes(s);
-export function CreativeExportPanel({business,versionId,sourceSHA,context,disabled,onApproved}:Props){
+export function CreativeExportPanel({threadId,business,versionId,sourceSHA,context,disabled,onApproved}:Props){
  const root=`/api/v1/businesses/${business.id}`,labelId=useId();
  const [state,setState]=useState<ExportState>(),[error,setError]=useState<unknown>(),[busy,setBusy]=useState(false),[confirmed,setConfirmed]=useState(false),[preview,setPreview]=useState(''),[loaded,setLoaded]=useState(false);
  const requestKey=useRef<string|null>(null),[previewRetry,setPreviewRetry]=useState(0);
@@ -49,6 +50,7 @@ export function CreativeExportPanel({business,versionId,sourceSHA,context,disabl
     {reviewer&&reviewable&&<><label className="check-row"><input type="checkbox" checked={confirmed} disabled={busy||disabled||!loaded} onChange={e=>setConfirmed(e.target.checked)}/>I reviewed this saved image and its text.</label><button className="primary" disabled={busy||disabled||!loaded||!confirmed} onClick={()=>void act(async()=>{await api(`${root}/creative-exports/${saved.id}/approve`,{sha256:saved.sha256,source_sha256:sourceSHA,context_type:context.type,context_id:context.id,context_revision:context.revision,confirmed:true});setConfirmed(false);await onApproved();})}>Approve final image</button></>}
    </>}
   </>}
+  {approved&&!disabled&&saved&&threadId&&context.type==='canvas'&&<VideoRequest business={business} threadId={threadId} reference={{export_id:saved.id,approval_id:state!.approvals.find(a=>a.export_id===saved.id&&a.context_type==='canvas'&&a.context_id===context.id&&a.context_revision===context.revision)!.id,source_sha256:sourceSHA,export_sha256:saved.sha256}}/>}
   {job&&<div role="status"><p>{job.cancel_requested?'Canceling export…':job.status==='queued'?'Final image queued…':'Preparing final image…'}</p>{writer&&<button disabled={busy||job.cancel_requested} onClick={()=>void act(()=>api(`${root}/export-jobs/${job.id}/cancel`,{}))}>Cancel export</button>}</div>}
   {!saved&&!job&&state?.configured&&writer&&<>
    {latestJob&&['failed','rejected'].includes(latestJob.status)&&<p role="alert">{latestJob.error_code==='EXPORT_TEXT_OVERFLOW'?'Some text extends beyond the image. Move or resize it, save, and try again.':'The export could not finish. Your creative is still saved. You can try again.'}</p>}

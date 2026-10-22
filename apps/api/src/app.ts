@@ -1,3 +1,5 @@
+import {VideoCanvas} from './video-canvas.js';
+import {VideoReferenceBindings} from './video-references.js';
 import {BusinessOverview} from './business-overview.js';
 import {Publication} from './publication.js';
 import {SocialProvisioning} from './social-provisioning.js';
@@ -96,6 +98,22 @@ class BusinessController {
  @Get('businesses/:id/onboarding') onboarding(@Req() r:AuthRequest,@Param('id') id:string){return this.service.onboarding(r.actorId,id);}
  @Patch('businesses/:id/onboarding') saveOnboarding(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.onboarding(r.actorId,id,body);}
  @Get('businesses/:id') resolve(@Req() r:AuthRequest,@Param('id') id:string){return this.service.resolve(r.actorId,id);}
+}
+
+@Controller('api/v1/businesses/:id')
+@UseGuards(SessionGuard)
+class VideoController {
+ constructor(@Inject(VideoCanvas) private readonly service:VideoCanvas){}
+ @Get('video-jobs/:jobId/draft') draft(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.draft(r.actorId,id,j);}
+ @Post('video-jobs/:jobId/draft') saveDraft(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string,@Body() body:unknown){return this.service.saveDraft(r.actorId,id,j,body);}
+ @Post('video-versions/:versionId/regenerate') regenerate(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.regenerate(r.actorId,id,v,body,key);}
+ @Post('video-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
+ @Get('videos') list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Post('canvas/threads/:threadId/videos') submit(@Req() r:AuthRequest,@Param('id') id:string,@Param('threadId') t:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.submit(r.actorId,id,t,body,key);}
+ @Get('video-versions/:versionId') version(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.version(r.actorId,id,v);}
+ @Get('video-versions/:versionId/download') download(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.download(r.actorId,id,v);}
+ @Get('video-versions/:versionId/poster') poster(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.download(r.actorId,id,v,true);}
+ @Post('video-versions/:versionId/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown){return this.service.review(r.actorId,id,v,body);}
 }
 
 @Controller('api/v1/businesses/:id')
@@ -259,7 +277,8 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+ {provide:VideoCanvas,useFactory:()=>{const canvas=new Canvas(new Businesses(database,workspaces),store);return new VideoCanvas(canvas,new VideoReferenceBindings(canvas,config.renderImage),config.videoEnabled===true);}},
       {provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Publication,useValue:new Publication(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),config.publishingEnabled===true)},{provide:SocialProvisioning,useValue:new SocialProvisioning(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialProvisioningEnabled===true)},{provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.oauthEncryptionKey)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true,{provisioning:config.socialProvisioningEnabled===true,authorization:!!config.oauthEncryptionKey})},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces)),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces)))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces))},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });

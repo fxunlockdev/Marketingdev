@@ -40,6 +40,7 @@ export function validateVideoBrief(value:any,input:VideoPlanningInput):VideoBrie
  for(let i=0;i<value.overlays.length;i++)for(let j=i+1;j<value.overlays.length;j++){
   const a=value.overlays[i],b=value.overlays[j];if(a.position===b.position&&a.start_ms<b.end_ms&&b.start_ms<a.end_ms)fail();
  }
+ if((value.video_prompt+'\nScript:\n'+value.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n')).length>10000)fail();
  return value;
 }
 export function validateVideoPlanningResult(value:any,input:VideoPlanningInput):VideoPlanningResult {

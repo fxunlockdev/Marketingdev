@@ -60,3 +60,7 @@ verify-video-runtime:
 
 verify-video-storage:
 	$(PYTHON) -m scripts.verify video-storage
+
+.PHONY: verify-video-canvas
+verify-video-canvas:
+	$(PYTHON) -m scripts.verify video-canvas

@@ -1,3 +1,12 @@
+import {VideoJobs} from '../../dist/video-jobs.js';
+import {VideoReferences} from '../../dist/video-references.js';
+import {VideoProviderJobs} from '../../dist/video-provider-jobs.js';
+import {VideoRenderer} from '../../dist/video-renderer.js';
+import {VideoDownload} from '../../dist/video-download.js';
+import {canonicalJSON,hash} from '../../dist/brand-brain.js';
+import {prepareVideoImage} from '../../scripts/video-runtime-image.mjs';
+import {execFileSync} from 'node:child_process';
+let videoSubmits=0;
 import {PlanningJobs} from '../../dist/planning-jobs.js';
 import {ExportJobs} from '../../dist/export-jobs.js';
 import {StaticRenderer} from '../../dist/static-renderer.js';
@@ -100,7 +109,7 @@ async function post(path, body, key) {
 before(async () => {
   await mkdir("work/browser", { recursive: true });
   smtp = await startMailbox();
-  config.smtp.port = smtp.port;
+  config.smtp.port = smtp.port;config.videoEnabled=true;
   base = `http://127.0.0.1:${await port()}`;
   config.origin = base;
   config.jobs.taskQueue = "canvas-browser-" + randomUUID();
@@ -185,6 +194,7 @@ before(async () => {
           assert.ok(
             input.brand.facts.every((f) => !f.value.includes("OTHER BUSINESS")),
           );
+          if(input.task==='video')return modelResponse({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]});
           if(input.task==='content_plan')return modelResponse(generatedPlan(input));
           planned++;
           const brief = {
@@ -244,6 +254,10 @@ before(async () => {
   );
   const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider);
   const exporter=new ExportJobs(jobs,new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE));
+  const videoImage=prepareVideoImage(),videoKey='ab'.repeat(32);
+  const clip=Buffer.from(execFileSync('docker',['run','--rm','--network','none','--read-only','--cap-drop=ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--entrypoint','python',videoImage,'-c',"import sys,base64; sys.path.insert(0,'/runtime'); import runtime as r; r.command('ffmpeg',['-v','error','-f','lavfi','-i','color=blue:size=320x180:duration=3:rate=24','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','/tmp/test.mp4']); print(base64.b64encode(open('/tmp/test.mp4','rb').read()).decode())"],{encoding:'utf8',timeout:30000}).trim(),'base64');
+  const videoProvider={prepare:intent=>({model:intent.model,idempotencyKey:intent.idempotencyKey,sha256:hash(canonicalJSON(intent))}),submit:async intent=>{videoSubmits++;assert.ok(intent.prompt.startsWith('TEST user edited video prompt'));assert.ok(intent.prompt.includes('TEST revised storyline'));assert.equal((await fetch(intent.referenceURL)).status,200);return {requestId:randomUUID()};},status:async()=>({state:'completed',videoURL:'https://video.example.org/fixture.mp4',errorCode:null}),cancel:async()=>{}};
+  const video=new VideoJobs(jobs,new VideoReferences(undefined,jobs,videoKey,process.env.RENDER_RUNTIME_IMAGE,'test'),handler,new VideoProviderJobs(jobs,videoProvider,videoKey),new VideoDownload(['https://video.example.org'],{fetch:async()=>({status:200,headers:{'content-type':'video/mp4'},bytes:clip})}),new VideoRenderer(videoImage));
   native = await NativeConnection.connect({ address: config.jobs.address });
   connection = await Connection.connect({ address: config.jobs.address });
   temporal = await Worker.create({
@@ -254,6 +268,8 @@ before(async () => {
       new URL("../../dist/asset-workflow.js", import.meta.url),
     ),
     activities: {
+      stepVideo:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await video.step(scope);}finally{clearInterval(timer);}},
+      failVideo:scope=>video.exhausted(scope),
       exportCreative:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await exporter.run(scope);}finally{clearInterval(timer);}},
       failExport:scope=>exporter.fail(scope),
       generatePlan:scope=>planner.run(scope),
@@ -512,11 +528,28 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   const finalBytes=await readFile(await(await finalDownload).path());
   assert.equal((await import('node:crypto')).createHash('sha256').update(finalBytes).digest('hex'),exportApproval[0].sha256);
   await page.screenshot({path:'work/browser/canvas-final-image.png',fullPage:true});
-  await expect(
-    page.getByText(
-      "This saved version is approved. It has not been published.",
-    ),
-  ).toBeVisible();
+  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true)",[org,brand]);
+  await page.getByText('Make a video from this approved image',{exact:true}).click();
+  await page.getByLabel('Video idea',{exact:true}).fill('TEST animate this brand image');
+  await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
+  await page.getByRole('button',{name:'Draft video script',exact:true}).click();
+  await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,0);
+  await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt');
+  await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline');
+  await page.getByRole('button',{name:'Save video draft',exact:true}).click();
+  await page.reload();await expect(page.getByLabel('Video prompt',{exact:true})).toHaveValue('TEST user edited video prompt');assert.equal(videoSubmits,0);
+  await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
+  await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+  await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});assert.equal(videoSubmits,1);
+  const player=page.getByLabel('Saved video preview',{exact:true});await player.evaluate(el=>el.play());await expect.poll(()=>player.evaluate(el=>el.currentTime)).toBeGreaterThan(0.25);await player.evaluate(el=>el.pause());
+  await page.getByRole('button',{name:'Send video for review',exact:true}).click();
+  await page.getByLabel('I reviewed this saved video and caption.').check();
+  await page.getByRole('button',{name:'Approve final video',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Video review'}).getByRole('status')).toHaveText('approved');
+  const savedVideo=(await admin.query('SELECT status,manifest FROM app.video_versions WHERE brand_id=$1',[brand])).rows[0];assert.equal(savedVideo.status,'approved');assert.equal(savedVideo.manifest.plan.brief.video_prompt,'TEST user edited video prompt');
+  await page.screenshot({path:'work/browser/canvas-video-approved.png',fullPage:true});
+
+
   await page.getByRole("button", { name: "Revise image with AI" }).click();
   await page
     .getByLabel("Describe your changes")
