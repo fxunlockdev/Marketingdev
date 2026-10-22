@@ -66,18 +66,19 @@ try {
     await migrate(pool); // Reapply must be a verified no-op.
     const version = (await pool.query('SHOW server_version')).rows[0].server_version;
     console.log(`Disposable PostgreSQL ${version}; image ${IMAGE}; migration replay passed`);
+    const planningOnly=process.argv.includes('--planning');
     const canvasWeb=process.argv.includes('--canvas-web'),browserSuite=process.argv.includes('--web')||canvasWeb,intakeOnly=process.argv.includes('--intake'),canvasOnly=process.argv.includes('--canvas');
-    if(!intakeOnly)process.env.SKILL_RUNTIME_IMAGE=prepareSkillImage();
-    if(!browserSuite&&!canvasOnly)process.env.DOCUMENT_PARSER_IMAGE=prepareDocumentImage();
-    const code = browserSuite||intakeOnly||canvasOnly?0:await new Promise((resolve,reject) => {
+    if(!intakeOnly&&!planningOnly)process.env.SKILL_RUNTIME_IMAGE=prepareSkillImage();
+    if(!browserSuite&&!canvasOnly&&!planningOnly)process.env.DOCUMENT_PARSER_IMAGE=prepareDocumentImage();
+    const code = browserSuite||intakeOnly||canvasOnly||planningOnly?0:await new Promise((resolve,reject) => {
       const child = spawn(process.execPath,['--test','--test-concurrency=1','tests/foundation/tenancy.test.mjs'], {
         stdio:'inherit', env:{...process.env, DESVIO_TEST_CONFIG:JSON.stringify(config), DESVIO_TEST_ADMIN_URL:url('postgres',password), DESVIO_TEST_CONTAINER:container} });
       child.on('error',reject); child.on('exit', code=>resolve(code ?? 1));
     });
     process.exitCode=code;
     if(code===0){
-      if(!intakeOnly){services=await startAssetServices();Object.assign(config,{storage:services.storage,scanner:services.scanner});config.jobs.address=services.address;}
-      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',...(browserSuite?(canvasWeb?['tests/browser/canvas.test.mjs']:['tests/browser/customer.test.mjs','tests/browser/canvas.test.mjs']):intakeOnly?['tests/foundation/intake.test.mjs']:canvasOnly?['tests/foundation/creative.test.mjs']:['tests/foundation/assets.test.mjs','tests/foundation/brand-brain.test.mjs','tests/foundation/intake.test.mjs','tests/foundation/creative.test.mjs'])],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
+      if(!intakeOnly&&!planningOnly){services=await startAssetServices();Object.assign(config,{storage:services.storage,scanner:services.scanner});config.jobs.address=services.address;}
+      process.exitCode=await new Promise((resolve,reject)=>{const child=spawn(process.execPath,['--test','--test-concurrency=1',...(planningOnly?['tests/foundation/content-plan.test.mjs']:browserSuite?(canvasWeb?['tests/browser/canvas.test.mjs']:['tests/browser/customer.test.mjs','tests/browser/canvas.test.mjs']):intakeOnly?['tests/foundation/intake.test.mjs']:canvasOnly?['tests/foundation/creative.test.mjs']:['tests/foundation/assets.test.mjs','tests/foundation/brand-brain.test.mjs','tests/foundation/intake.test.mjs','tests/foundation/creative.test.mjs','tests/foundation/content-plan.test.mjs'])],{stdio:'inherit',env:{...process.env,DESVIO_TEST_CONFIG:JSON.stringify(config),DESVIO_TEST_ADMIN_URL:url('postgres',password)}});child.on('error',reject);child.on('exit',code=>resolve(code??1));});
     }
   }
 } finally {

@@ -2,6 +2,14 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas is now implemented locally through exact-version review; all 92 final local checks passed against unchanged source at implementation commit da76771. No live generation, social publication or dev app deployment is claimed.
 
+## Current session — Content Plan and per-channel review backend
+
+- Previous goal turn made verified progress: Canvas checkpoint and 92 source-bound checks, PR #8; the goal remains end-to-end and active.
+- Branch `codex/pr-08-content-plan-reviews`, stacked on PR #8. Migration 011 and `apps/api/src/content-plan.ts` add persisted manual 30-day plan/slots, UTC/IANA dates, stable calendar queries, independent channel reviews, immutable feedback/history and explicitly confirmed atomic bulk approvals. Routes use genuine sessions and existing business scoping; no new architecture or provider.
+- Nine targeted tests pass through actual Nest/Better Auth/PostgreSQL, including 30 slots/two channels, concurrent create replay, business/viewer/worker denial, channel independence, stale approval and explicit reset, bulk rollback, competing decisions, feedback/cancellation, DST boundaries, newer-creative protection and history-failure rollback. Fixture creatives and identity verification are labeled fixtures; no AI plan generation, UI completion or publishing claimed.
+- Full source-bound regression verification is being refreshed. ADR 0009 documents exact routes, approval semantics and limits. Existing Canvas approvals never imply permission for every channel. A planned date never implies a remote schedule.
+- Next: implement actual original-skill 30-day AI planning through durable jobs and conservative cost reservations, then calendar/Review Inbox UI and Canvas slot/feedback linking; continue canonical exports, OAuth/publishing, Higgsfield, analytics/learning and remaining account modules. Railway outage remains an independent deployment blocker; no keys or live tests requested/run in this session.
+
 ## Current session — Canvas and deployment readiness
 
 - Branch `codex/pr-07-canvas-runtime`, stacked on PR #7. Migration 010 adds scoped conversations, projects, requests, private generated media, immutable editable versions, review history, operator grants and per-call reservations. `canvas.ts` exposes authenticated business APIs; `creative-jobs.ts` runs actual Temporal generation/edit workflows. Prior approved snapshots remain authoritative.
