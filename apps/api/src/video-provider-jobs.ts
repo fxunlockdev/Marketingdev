@@ -43,6 +43,8 @@ export class VideoProviderJobs {
    if(!r)throw new VideoStateError('VIDEO_INTENT_MISSING');
    if(terminal.has(r.phase))return {done:r.phase};
    if(r.phase==='submitting')return {done:await this.stop(db,j,'unknown','VIDEO_SUBMISSION_UNKNOWN')};
+   if(r.phase==='prepared'&&(!['queued','running','retrying'].includes(j.status)||new Date(r.deadline_at).getTime()<=Date.now()))
+    return {done:await this.stop(db,j,'rejected','VIDEO_UNUSED_INTENT_EXPIRED_OR_STOPPED',true)};
    if(new Date(r.deadline_at).getTime()<=Date.now())return {done:await this.stop(db,j,'unknown','VIDEO_PROVIDER_DEADLINE')};
    const permitted=await this.#jobs.permitted(db,j);
    if(r.phase==='prepared'){

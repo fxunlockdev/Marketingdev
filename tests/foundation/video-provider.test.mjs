@@ -201,6 +201,15 @@ test('request-key collision rolls back the new reservation and job cannot rewrit
  assert.equal((await row(a.s)).phase,'prepared');
 });
 
+test('a stopped parent job or expired unused intent cannot submit paid work and releases its unused reservation',async()=>{
+ const f=await fixture();for(const reason of ['stopped','expired']){
+  const {s}=await prepare(f),before=submits;
+  if(reason==='stopped')await admin.query("UPDATE app.jobs SET status='failed' WHERE id=$1",[s.jobId]);
+  else await admin.query("UPDATE app.video_operations SET deadline_at=now()-interval '1 second' WHERE job_id=$1",[s.jobId]);
+  assert.equal(await handler.step(s),'rejected');assert.equal((await row(s)).reservation_state,'released');assert.equal(submits,before);
+ }
+});
+
 test('membership loss after acceptance permits cleanup/status only and cannot expose a completed output',async()=>{
  const f=await fixture();await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'editor')",[f.org,f.brand,selected]);
  const s=await newJob(f,selected);await handler.prepare(s,intent());await handler.step(s);const before=submits;
