@@ -13,7 +13,8 @@
     "build:web": "next build apps/web --webpack",
     "dev:web": "next dev apps/web --webpack -H 127.0.0.1 -p 3000",
     "start:web": "next start apps/web -H 127.0.0.1 -p 3000",
-    "test:browser": "node scripts/foundation-test.mjs --web"
+    "test:browser": "node scripts/foundation-test.mjs --web",
+    "start:provisioner": "node dist/provisioner-main.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1154.0",
@@ -29,6 +30,7 @@
     "better-auth": "1.7.12",
     "express": "5.3.0",
     "fabric": "7.4.0",
+    "jose": "6.2.13",
     "kysely": "0.29.7",
     "next": "16.4.2",
     "nodemailer": "10.1.7",

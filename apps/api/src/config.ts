@@ -15,6 +15,7 @@ export type Config = {
   renderImage?:string;
   socialEnabled?:boolean;
   oauthEncryptionKey?:string;
+  socialProvisioningEnabled?:boolean;
 };
 
 export function configFromEnv(env = process.env): Config {
@@ -44,7 +45,8 @@ export function configFromEnv(env = process.env): Config {
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
   if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
-  return {oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  if(env.POSTIZ_PROVISIONING_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_PROVISIONING_ENABLED))throw new Error('POSTIZ_PROVISIONING_ENABLED must be true or false');
+  return {socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }
@@ -72,5 +74,14 @@ export function workerConfigFromEnv(env=process.env){
   const social:SocialWorkerConfig|undefined=env.POSTIZ_ENABLED==='true'?{client:{baseURL:required('POSTIZ_BASE_URL'),mediaOrigins:required('POSTIZ_MEDIA_ORIGINS').split(','),callbackOrigin:required('POSTIZ_CALLBACK_ORIGIN'),mode:mode as 'test'|'development'|'staging'},encryptionKey:required('POSTIZ_ENCRYPTION_KEY')}:undefined;
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(oauthEncryptionKey&&oauthEncryptionKey===social?.encryptionKey)throw new Error('OAuth and Postiz credentials require separate keys');
-  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey};
+  const provisionTaskQueue=env.POSTIZ_PROVISION_TASK_QUEUE;if(provisionTaskQueue&&(!/^[A-Za-z0-9_.:-]{1,100}$/.test(provisionTaskQueue)||provisionTaskQueue===jobs.taskQueue))throw new Error('Provisioning requires a separate task queue');
+  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey,provisionTaskQueue};
+}
+
+// Deliberately independent of storage, authentication, SMTP and model settings.
+export function provisionerConfigFromEnv(env=process.env){
+ const required=envReader(env),mode=required('APP_MODE');if(!['development','test','staging'].includes(mode))throw new Error('Provisioner production launch blocked pending release gate');
+ const taskQueue=required('POSTIZ_PROVISION_TASK_QUEUE');if(!/^[A-Za-z0-9_.:-]{1,100}$/.test(taskQueue)||taskQueue===env.TEMPORAL_TASK_QUEUE)throw new Error('Provisioning requires a separate task queue');
+ const encryptionKey=required('POSTIZ_ENCRYPTION_KEY'),signingSecret=required('POSTIZ_ENTERPRISE_SIGNING_SECRET');if(!/^[a-f0-9]{64}$/i.test(encryptionKey)||signingSecret.length<32||encryptionKey===signingSecret||encryptionKey===env.OAUTH_ENCRYPTION_KEY)throw new Error('Provisioning requires distinct valid encryption and signing secrets');
+ return {databaseUrl:required('POSTIZ_PROVISIONER_DATABASE_URL'),address:required('TEMPORAL_ADDRESS'),namespace:required('TEMPORAL_NAMESPACE'),taskQueue,provider:{client:{baseURL:required('POSTIZ_BASE_URL'),mediaOrigins:required('POSTIZ_MEDIA_ORIGINS').split(','),callbackOrigin:required('POSTIZ_CALLBACK_ORIGIN'),mode:mode as 'test'|'development'|'staging'},encryptionKey,signingSecret}};
 }

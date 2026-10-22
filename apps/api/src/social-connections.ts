@@ -10,7 +10,8 @@ export class SocialConnections {
   const account=(await db.query('SELECT revision,enabled,identity_verified_at FROM app.postiz_accounts WHERE brand_id=$1',[id])).rows[0];
   const channels=(await db.query('SELECT id,provider,name,profile,observed_state,token_health,last_seen_at,last_checked_at FROM app.social_channels ORDER BY provider,name,id')).rows;
   const jobs=(await db.query("SELECT id,status,error_code,cancel_requested,created_at,updated_at FROM app.jobs WHERE kind='social.sync' ORDER BY created_at DESC LIMIT 20")).rows;
-  return {configured:this.enabled&&!!account?.enabled&&!!account?.identity_verified_at,channels,jobs};
+  const provisioning=(await db.query('SELECT p.job_id AS id,p.phase,j.status,j.error_code FROM app.social_provisioning p JOIN app.jobs j ON j.id=p.job_id ORDER BY p.created_at DESC LIMIT 1')).rows[0]??null;
+  return {provisioning,configured:this.enabled&&!!account?.enabled&&!!account?.identity_verified_at,channels,jobs};
  });}
  refresh(user:string,id:string,key:unknown){if(typeof key!=='string'||! /^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('Include a valid request key');return this.scope(user,id,true,async(db,b)=>{
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`social:${id.toLowerCase()}`]);
