@@ -5,6 +5,7 @@ import { api } from "./api";
 import { Wordmark, Loading, Notice, Field } from "./primitives";
 import { BrandFiles } from "./uploads";
 import { BrandIntake } from "./intake";
+import {CanvasScreen} from "./canvas";
 import { useUnsavedChanges } from "./unsaved";
 type Business = {
   id: string;
@@ -268,6 +269,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             />
           ) : section === "onboarding" ? (
             <BrandOnboarding business={business} />
+          ) : section === "canvas" ? (
+            <CanvasScreen business={business}/>
           ) : section === "memory" ? (
             <Memory business={business} />
           ) : (

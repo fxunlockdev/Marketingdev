@@ -1,0 +1,514 @@
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
+import { randomUUID } from "node:crypto";
+import { Businesses } from "./businesses.js";
+import { ObjectStore } from "./object-store.js";
+import { object, uuid } from "./workspaces.js";
+import { canonicalJSON, hash } from "./brand-brain.js";
+import { validateDesign } from "./creative-design.js";
+const key = (v: unknown) => {
+  if (typeof v !== "string" || !/^[A-Za-z0-9_.:-]{8,128}$/.test(v))
+    throw new BadRequestException("An Idempotency-Key is required");
+  return v;
+};
+const plain = (v: unknown, max: number) => {
+  if (
+    typeof v !== "string" ||
+    !v.trim() ||
+    v.length > max ||
+    /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(v)
+  )
+    throw new BadRequestException(`Use 1–${max} characters of plain text`);
+  return v.trim();
+};
+export class Canvas {
+  constructor(
+    readonly businesses: Businesses,
+    readonly store: ObjectStore,
+  ) {}
+  async scope<T>(
+    user: string,
+    id: string,
+    write: boolean,
+    action: (db: any, b: any) => Promise<T>,
+  ) {
+    const b = await this.businesses.resolve(user, id);
+    return this.businesses.database.transaction(
+      user,
+      b.organization_id,
+      write,
+      (db) => action(db, b),
+      id,
+    );
+  }
+  list(user: string, id: string) {
+    return this.scope(user, id, false, async (db, b) => ({
+      threads: (
+        await db.query(
+          "SELECT id,title,created_at FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 ORDER BY created_at DESC LIMIT 100",
+          [b.organization_id, id],
+        )
+      ).rows,
+    }));
+  }
+  createThread(user: string, id: string, body: unknown, requestKey: unknown) {
+    const v = object(body, ["title"]),
+      title = plain(v.title, 140),
+      k = key(requestKey),
+      sha = hash(canonicalJSON({ title }));
+    return this.scope(user, id, true, async (db, b) => {
+      await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+        `canvas:${id}`,
+      ]);
+      const prior = (
+        await db.query(
+          "SELECT id,request_hash FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND created_by=$3 AND request_key=$4",
+          [b.organization_id, id, user, k],
+        )
+      ).rows[0];
+      if (prior) {
+        if (prior.request_hash !== sha)
+          throw new ConflictException(
+            "That request key belongs to a different conversation",
+          );
+        return { id: prior.id };
+      }
+      if (
+        (
+          await db.query(
+            "SELECT count(*)::int AS n FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2",
+            [b.organization_id, id],
+          )
+        ).rows[0].n >= 100
+      )
+        throw new ConflictException(
+          "This business has reached its conversation limit",
+        );
+      const thread = randomUUID();
+      await db.query(
+        "INSERT INTO app.canvas_threads(id,organization_id,brand_id,title,created_by,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [thread, b.organization_id, id, title, user, k, sha],
+      );
+      return { id: thread };
+    });
+  }
+  thread(user: string, id: string, threadId: string) {
+    threadId = uuid(threadId);
+    return this.scope(user, id, false, async (db, b) => {
+      const thread = (
+        await db.query(
+          "SELECT id,title,created_at FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+          [b.organization_id, id, threadId],
+        )
+      ).rows[0];
+      if (!thread) throw new NotFoundException("Conversation not found");
+      return {
+        thread,
+        messages: (
+          await db.query(
+            "SELECT id,job_id,role,content,created_at FROM app.canvas_messages WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 ORDER BY created_at,id LIMIT 200",
+            [b.organization_id, id, threadId],
+          )
+        ).rows,
+        runs: (
+          await db.query(
+            "SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.project_id,r.parent_version_id,r.output_version_id,r.channel,r.size,r.format FROM app.jobs j JOIN app.creative_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC LIMIT 100",
+            [b.organization_id, id, threadId],
+          )
+        ).rows,
+        projects: (
+          await db.query(
+            "SELECT id,title,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 ORDER BY created_at DESC LIMIT 100",
+            [b.organization_id, id, threadId],
+          )
+        ).rows,
+      };
+    });
+  }
+  submit(
+    user: string,
+    id: string,
+    threadId: string,
+    body: unknown,
+    requestKey: unknown,
+  ) {
+    threadId = uuid(threadId);
+    const v = object(body, [
+        "prompt",
+        "format",
+        "channel",
+        "size",
+        "parent_version_id",
+      ]),
+      prompt = plain(v.prompt, 4000),
+      k = key(requestKey);
+    if (
+      !["static", "ad"].includes(String(v.format)) ||
+      !["linkedin", "instagram"].includes(String(v.channel)) ||
+      !["1024x1024", "1536x1024", "1024x1536"].includes(String(v.size))
+    )
+      throw new BadRequestException(
+        "Choose a supported static image format, channel and size",
+      );
+    const parent =
+        v.parent_version_id === null || v.parent_version_id === undefined
+          ? null
+          : uuid(String(v.parent_version_id)),
+      sha = hash(
+        canonicalJSON({
+          threadId,
+          prompt,
+          format: v.format,
+          channel: v.channel,
+          size: v.size,
+          parent,
+        }),
+      );
+    return this.scope(user, id, true, async (db, b) => {
+      await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+        `canvas:${id}`,
+      ]);
+      if (
+        !(
+          await db.query(
+            "SELECT id FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+            [b.organization_id, id, threadId],
+          )
+        ).rowCount
+      )
+        throw new NotFoundException("Conversation not found");
+      const prior = (
+        await db.query(
+          "SELECT r.request_hash,j.id,j.status FROM app.creative_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3",
+          [b.organization_id, id, k],
+        )
+      ).rows[0];
+      if (prior) {
+        if (prior.request_hash !== sha)
+          throw new ConflictException(
+            "That request key belongs to another creative request",
+          );
+        return { id: prior.id, status: prior.status };
+      }
+      if (
+        (
+          await db.query(
+            "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND status IN ('queued','running','retrying','unknown') LIMIT 1",
+            [b.organization_id, id],
+          )
+        ).rowCount
+      )
+        throw new ConflictException(
+          "A creative request is running or needs its uncertain provider outcome reconciled",
+        );
+      if (
+        (
+          await db.query(
+            "SELECT count(*)::int AS n FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND created_at>now()-interval '1 day'",
+            [b.organization_id, id],
+          )
+        ).rows[0].n >= 30
+      )
+        throw new ConflictException("Daily creative request limit reached");
+      const brain = (
+        await db.query(
+          "SELECT id FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1",
+          [b.organization_id, id],
+        )
+      ).rows[0];
+      if (!brain)
+        throw new ConflictException(
+          "Confirm your brand profile before creating",
+        );
+      let project: string;
+      if (parent) {
+        const version = (
+          await db.query(
+            "SELECT v.project_id,p.latest_version_id,p.thread_id,m.width,m.height FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_media m ON m.id=v.media_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.id=$3",
+            [b.organization_id, id, parent],
+          )
+        ).rows[0];
+        if (!version || version.thread_id !== threadId)
+          throw new NotFoundException("Creative version not found");
+        if (version.latest_version_id !== parent)
+          throw new ConflictException(
+            "Open the latest version before requesting an image edit",
+          );
+        if (`${version.width}x${version.height}` !== v.size)
+          throw new BadRequestException(
+            "Keep the current dimensions when editing this image",
+          );
+        project = version.project_id;
+      } else {
+        project = randomUUID();
+        await db.query(
+          "INSERT INTO app.creative_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)",
+          [
+            project,
+            b.organization_id,
+            id,
+            threadId,
+            prompt.slice(0, 140),
+            user,
+          ],
+        );
+      }
+      const job = randomUUID();
+      await db.query(
+        "INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",
+        [job, b.organization_id, id, user],
+      );
+      await db.query(
+        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+        [
+          job,
+          b.organization_id,
+          id,
+          threadId,
+          project,
+          brain.id,
+          parent,
+          prompt,
+          v.format,
+          v.channel,
+          v.size,
+          k,
+          sha,
+        ],
+      );
+      await db.query(
+        "INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",
+        [randomUUID(), b.organization_id, id, threadId, job, prompt],
+      );
+      await db.query(
+        "INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.generate')",
+        [job, b.organization_id, id],
+      );
+      await db.query(
+        "INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'creative.requested',$4)",
+        [b.organization_id, id, user, job],
+      );
+      return { id: job, status: "queued" };
+    });
+  }
+  project(user: string, id: string, projectId: string) {
+    projectId = uuid(projectId);
+    return this.scope(user, id, false, async (db, b) => {
+      const p = (
+        await db.query(
+          "SELECT id,title,thread_id,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+          [b.organization_id, id, projectId],
+        )
+      ).rows[0];
+      if (!p) throw new NotFoundException("Creative not found");
+      return {
+        project: p,
+        versions: (
+          await db.query(
+            "SELECT id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,status,review_revision,reviewed_at,created_at FROM app.creative_versions WHERE organization_id=$1 AND brand_id=$2 AND project_id=$3 ORDER BY created_at DESC,id",
+            [b.organization_id, id, projectId],
+          )
+        ).rows,
+        reviews: (
+          await db.query(
+            "SELECT r.version_id,r.decision,r.feedback,r.created_at FROM app.creative_reviews r JOIN app.creative_versions v ON v.id=r.version_id WHERE v.project_id=$1 ORDER BY r.created_at",
+            [projectId],
+          )
+        ).rows,
+      };
+    });
+  }
+  save(user: string, id: string, projectId: string, body: unknown) {
+    projectId = uuid(projectId);
+    const v = object(body, ["parent_id", "design", "caption"]),
+      parent = uuid(String(v.parent_id));
+    if (typeof v.caption !== "string" || v.caption.length > 3000)
+      throw new BadRequestException("Use a caption of at most 3000 characters");
+    return this.scope(user, id, true, async (db, b) => {
+      await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+        `canvas:${id}`,
+      ]);
+      const p = (
+        await db.query(
+          "SELECT v.*,p.latest_version_id,m.width,m.height FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_media m ON m.id=v.media_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.project_id=$3 AND v.id=$4",
+          [b.organization_id, id, projectId, parent],
+        )
+      ).rows[0];
+      if (!p) throw new NotFoundException("Creative not found");
+      let design;
+      try {
+        design = validateDesign(v.design, p.media_id, p.width, p.height);
+      } catch {
+        throw new BadRequestException("Check the editable design fields");
+      }
+      const sha = hash(
+        canonicalJSON({ design, caption: v.caption, brain_id: p.brain_id }),
+      );
+      const replay = (
+        await db.query(
+          "SELECT id FROM app.creative_versions WHERE project_id=$1 AND parent_id=$2 AND sha256=$3 AND created_by=$4",
+          [projectId, parent, sha, user],
+        )
+      ).rows[0];
+      if (replay) return replay;
+      if (p.latest_version_id !== parent)
+        throw new ConflictException(
+          "Your creative changed. Open the latest saved version before saving",
+        );
+      if (
+        (
+          await db.query(
+            "SELECT count(*)::int AS n FROM app.creative_versions WHERE project_id=$1",
+            [projectId],
+          )
+        ).rows[0].n >= 100
+      )
+        throw new ConflictException("Creative version limit reached");
+      const version = randomUUID();
+      await db.query(
+        "INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)",
+        [
+          version,
+          b.organization_id,
+          id,
+          projectId,
+          parent,
+          p.brain_id,
+          p.media_id,
+          JSON.stringify(design),
+          v.caption,
+          JSON.stringify(p.skill_manifest),
+          sha,
+          user,
+        ],
+      );
+      await db.query(
+        "UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1",
+        [projectId, version],
+      );
+      return { id: version };
+    });
+  }
+  review(user: string, id: string, versionId: string, body: unknown) {
+    versionId = uuid(versionId);
+    const v = object(body, ["decision", "feedback", "revision"]);
+    if (
+      !["in_review", "approved", "rejected", "changes_requested"].includes(
+        String(v.decision),
+      ) ||
+      typeof v.feedback !== "string" ||
+      v.feedback.length > 2000 ||
+      !Number.isInteger(v.revision)
+    )
+      throw new BadRequestException(
+        "Check the review decision and saved revision",
+      );
+    return this.scope(user, id, true, async (db, b) => {
+      await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
+        `canvas:${id}`,
+      ]);
+      const version = (
+        await db.query(
+          "SELECT v.*,p.latest_version_id FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.id=$3",
+          [b.organization_id, id, versionId],
+        )
+      ).rows[0];
+      if (!version) throw new NotFoundException("Creative not found");
+      if (
+        v.decision !== "in_review" &&
+        !(
+          await db.query("SELECT app.creative_reviewer($1,$2) AS allowed", [
+            b.organization_id,
+            id,
+          ])
+        ).rows[0].allowed
+      )
+        throw new ForbiddenException(
+          "Only a business owner or admin can approve or reject creative versions",
+        );
+      if (
+        version.review_revision !== v.revision ||
+        version.latest_version_id !== versionId
+      )
+        throw new ConflictException("Review the latest saved version");
+      if (
+        v.decision === "in_review"
+          ? !["draft", "changes_requested"].includes(version.status)
+          : version.status !== "in_review"
+      )
+        throw new ConflictException(
+          "This version is not eligible for that review action",
+        );
+      await db.query(
+        "UPDATE app.creative_versions SET status=$2,review_revision=review_revision+1,reviewed_by=$3,reviewed_at=$4 WHERE id=$1",
+        [
+          versionId,
+          v.decision,
+          v.decision === "in_review" ? null : user,
+          v.decision === "in_review" ? null : new Date(),
+        ],
+      );
+      await db.query(
+        "INSERT INTO app.creative_reviews(id,organization_id,brand_id,version_id,actor_id,decision,feedback) VALUES($1,$2,$3,$4,$5,$6,$7)",
+        [
+          randomUUID(),
+          b.organization_id,
+          id,
+          versionId,
+          user,
+          v.decision,
+          v.feedback,
+        ],
+      );
+      return {
+        id: versionId,
+        status: v.decision,
+        revision: Number(v.revision) + 1,
+      };
+    });
+  }
+  media(user: string, id: string, mediaId: string) {
+    mediaId = uuid(mediaId);
+    return this.scope(user, id, false, async (db, b) => {
+      const m = (
+        await db.query(
+          "SELECT object_key FROM app.creative_media WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+          [b.organization_id, id, mediaId],
+        )
+      ).rows[0];
+      if (!m) throw new NotFoundException("Creative image not found");
+      return {
+        url: await this.store.downloadURL(
+          m.object_key,
+          "creative-background.png",
+          "image/png",
+        ),
+        expiresIn: 60,
+      };
+    });
+  }
+  cancel(user: string, id: string, jobId: string) {
+    jobId = uuid(jobId);
+    return this.scope(user, id, true, async (db, b) => {
+      const j = (
+        await db.query(
+          "SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND kind='creative.generate'",
+          [b.organization_id, id, jobId],
+        )
+      ).rows[0];
+      if (!j) throw new NotFoundException("Creative request not found");
+      if (!["queued", "running", "retrying"].includes(j.status))
+        throw new ConflictException(
+          "This request has already finished or needs reconciliation",
+        );
+      await db.query("UPDATE app.jobs SET cancel_requested=true WHERE id=$1", [
+        jobId,
+      ]);
+      return { id: jobId, cancel_requested: true };
+    });
+  }
+}

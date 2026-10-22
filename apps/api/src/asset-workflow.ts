@@ -16,3 +16,9 @@ type IntakeActivities={processIntake(scope:JobScope):Promise<string>;failIntake(
 const intake=proxyActivities<IntakeActivities>({startToCloseTimeout:"15 minutes",heartbeatTimeout:"5 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"10 seconds",maximumAttempts:3}});
 const intakeFinalization=proxyActivities<IntakeActivities>({startToCloseTimeout:"20 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"1 minute"}});
 export async function processIntakeWorkflow(scope:JobScope){try{return await intake.processIntake(scope);}catch{return await intakeFinalization.failIntake(scope);}}
+
+
+type CreativeActivities={generateCreative(scope:JobScope):Promise<string>;failCreative(scope:JobScope):Promise<string>};
+const creative=proxyActivities<CreativeActivities>({startToCloseTimeout:'10 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
+const creativeFinalization=proxyActivities<CreativeActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function generateCreativeWorkflow(scope:JobScope){try{return await creative.generateCreative(scope);}catch{return await creativeFinalization.failCreative(scope);}}

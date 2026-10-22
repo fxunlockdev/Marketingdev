@@ -1,3 +1,4 @@
+import {Canvas} from "./canvas.js";
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
@@ -58,6 +59,21 @@ class BusinessController {
  @Get('businesses/:id/onboarding') onboarding(@Req() r:AuthRequest,@Param('id') id:string){return this.service.onboarding(r.actorId,id);}
  @Patch('businesses/:id/onboarding') saveOnboarding(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.onboarding(r.actorId,id,body);}
  @Get('businesses/:id') resolve(@Req() r:AuthRequest,@Param('id') id:string){return this.service.resolve(r.actorId,id);}
+}
+
+@Controller('api/v1/businesses/:id')
+@UseGuards(SessionGuard)
+class CanvasController {
+ constructor(@Inject(Canvas) private readonly service:Canvas){}
+ @Get('canvas/threads') list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Post('canvas/threads') create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.createThread(r.actorId,id,body,key);}
+ @Get('canvas/threads/:threadId') thread(@Req() r:AuthRequest,@Param('id') id:string,@Param('threadId') t:string){return this.service.thread(r.actorId,id,t);}
+ @Post('canvas/threads/:threadId/messages') message(@Req() r:AuthRequest,@Param('id') id:string,@Param('threadId') t:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.submit(r.actorId,id,t,body,key);}
+ @Get('creative-projects/:projectId') project(@Req() r:AuthRequest,@Param('id') id:string,@Param('projectId') p:string){return this.service.project(r.actorId,id,p);}
+ @Post('creative-projects/:projectId/versions') save(@Req() r:AuthRequest,@Param('id') id:string,@Param('projectId') p:string,@Body() body:unknown){return this.service.save(r.actorId,id,p,body);}
+ @Post('creative-versions/:versionId/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown){return this.service.review(r.actorId,id,v,body);}
+ @Get('creative-media/:mediaId') media(@Req() r:AuthRequest,@Param('id') id:string,@Param('mediaId') m:string){return this.service.media(r.actorId,id,m);}
+ @Post('creative-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
 }
 
 @Controller('api/v1/workspaces')
@@ -172,8 +188,8 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [WorkspaceController,InvitationController,AssetController,BrainController,BusinessController], providers: [SessionGuard,
-      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
+    @Module({ controllers: [WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController], providers: [SessionGuard,
+      { provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());

@@ -914,3 +914,294 @@ summary:focus-visible {
     display: block;
   }
 }
+/* Canvas: the existing Desvio palette, with real saved conversations and versions. */
+.studio-layout {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--white);
+  overflow: hidden;
+}
+.studio-conversations {
+  padding: 20px;
+  background: #f0e4d3;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+.studio-conversations ul {
+  padding: 0;
+  list-style: none;
+  max-height: 550px;
+  overflow: auto;
+}
+.studio-conversations li {
+  margin: 8px 0;
+}
+.studio-conversations button {
+  width: 100%;
+  text-align: left;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.studio-conversations button[aria-current] {
+  background: var(--ink);
+  color: white;
+  border-color: var(--ink);
+}
+.studio-chat {
+  padding: 28px;
+  min-width: 0;
+}
+.studio-chat h2 {
+  font-size: 26px;
+  overflow-wrap: anywhere;
+}
+.studio-intro {
+  color: var(--muted);
+  max-width: 520px;
+  font-size: 14px;
+}
+.studio-messages {
+  list-style: none;
+  padding: 0;
+  max-height: 400px;
+  overflow: auto;
+}
+.studio-message {
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  margin: 16px 0;
+  max-width: 94%;
+  background: #fffdf9;
+}
+.studio-message.user {
+  margin-left: auto;
+  background: #f0e4d3;
+}
+.studio-message strong {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.studio-message p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  margin: 8px 0 0;
+}
+.studio-composer {
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+  padding-top: 20px;
+}
+.studio-composer fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.studio-composer legend {
+  font-size: 13px;
+  font-weight: bold;
+  margin-bottom: 16px;
+}
+.studio-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.studio-options select {
+  font-size: 13px;
+  padding: 8px;
+}
+.studio-runs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.studio-run {
+  border-left: 3px solid #995126;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+.studio-run p {
+  color: var(--muted);
+  margin: 5px 0;
+}
+.studio-run button {
+  margin-top: 6px;
+  font-size: 12px;
+}
+.studio-projects {
+  margin-top: 32px;
+}
+.studio-projects > .section-heading {
+  flex-wrap: wrap;
+}
+.studio-projects > .section-heading .field {
+  max-width: 400px;
+  min-width: 0;
+}
+.creative-project {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px;
+  min-width: 0;
+}
+.creative-toolbar {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.creative-toolbar .field {
+  margin: 0;
+  flex: 1;
+  min-width: 180px;
+}
+.creative-toolbar select {
+  font-size: 13px;
+}
+.creative-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 24px;
+  margin-bottom: 24px;
+  align-items: start;
+}
+.creative-artboard {
+  min-width: 0;
+}
+.creative-surface {
+  background: #e5d9c8;
+  min-height: 100px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+}
+.creative-surface .canvas-container {
+  margin: auto;
+}
+.creative-layer-controls {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+}
+.creative-layer-controls legend {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 6px;
+}
+.creative-layer-controls button {
+  font-size: 12px;
+  margin-top: 10px;
+}
+.creative-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+.creative-fields input,
+.creative-fields select {
+  font-size: 13px;
+  padding: 8px;
+  min-width: 0;
+}
+.creative-fields input[type="color"] {
+  height: 42px;
+  min-height: 42px;
+  padding: 4px;
+}
+.creative-review {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.creative-review > p {
+  font-size: 13px;
+  color: var(--muted);
+}
+.creative-feedback {
+  padding: 14px 0;
+  font-size: 13px;
+  border-top: 1px solid var(--line);
+  margin-top: 14px;
+}
+.creative-feedback p {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.creative-project .actions {
+  flex-wrap: wrap;
+}
+.studio-layout fieldset:disabled {
+  opacity: 0.75;
+}
+@media (max-width: 1150px) {
+  .studio-layout {
+    grid-template-columns: 170px minmax(0, 1fr);
+  }
+  .studio-conversations {
+    padding: 14px;
+  }
+  .creative-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .creative-layer-controls {
+    max-width: none;
+  }
+  .creative-fields {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .studio-layout {
+    grid-template-columns: 1fr;
+  }
+  .studio-conversations {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .studio-conversations ul {
+    max-height: 150px;
+  }
+  .studio-chat {
+    padding: 20px;
+  }
+  .studio-options {
+    grid-template-columns: 1fr;
+  }
+  .creative-project {
+    padding: 16px;
+  }
+  .creative-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+  .creative-toolbar {
+    gap: 12px;
+  }
+  .studio-message {
+    max-width: 100%;
+  }
+}
+.creative-provenance {
+  margin-top: 24px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.creative-provenance summary {
+  cursor: pointer;
+  color: var(--ink);
+  padding: 8px 0;
+}
+.creative-provenance li {
+  margin-top: 8px;
+}
+.studio-messages:focus-visible {
+  outline: 3px solid #995126;
+  outline-offset: 4px;
+}

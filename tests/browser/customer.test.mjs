@@ -435,14 +435,12 @@ test("three saved businesses, server fourth rejection, selector isolation and tr
   );
   await alice.getByRole("link", { name: "Canvas", exact: true }).click();
   await expect(
-    alice.getByText("Canvas is not available in this build.", { exact: true }),
+    alice.getByText("Confirm your brand profile first so each creative starts from approved facts.", { exact: false }),
   ).toBeVisible();
-  assert.equal(
-    await alice.getByRole("button", { name: /Generate|Publish/ }).count(),
-    0,
-  );
+  await expect(alice.getByRole("button", {name:"Generate image",exact:true})).toBeDisabled();
+  assert.equal(await alice.getByRole("button",{name:/Publish/}).count(),0);
   await alice.screenshot({
-    path: "work/browser/v5-canvas-unavailable.png",
+    path: "work/browser/v5-canvas-unapproved.png",
     fullPage: true,
   });
 });

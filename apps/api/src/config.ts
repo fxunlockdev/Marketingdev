@@ -59,5 +59,6 @@ export function workerConfigFromEnv(env=process.env){
   if(!Number.isInteger(scanner.port)||scanner.port<1||scanner.port>65535)throw new Error('Invalid scanner port');
   const jobs={workerDatabaseUrl:required('WORKER_DATABASE_URL'),dispatcherDatabaseUrl:required('DISPATCHER_DATABASE_URL'),address:required('TEMPORAL_ADDRESS'),namespace:required('TEMPORAL_NAMESPACE'),taskQueue:required('TEMPORAL_TASK_QUEUE')};
   const documentImage=env.DOCUMENT_PARSER_IMAGE;if(documentImage&&!/^sha256:[a-f0-9]{64}$/.test(documentImage))throw new Error('DOCUMENT_PARSER_IMAGE must be an exact local image digest');
-  return {storage:storageFromEnv(env),scanner,jobs,documentImage};
+  const skillImage=env.SKILL_RUNTIME_IMAGE;if(skillImage&&!/^sha256:[a-f0-9]{64}$/.test(skillImage))throw new Error('SKILL_RUNTIME_IMAGE must be an exact local image digest');
+  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage};
 }

@@ -13,7 +13,7 @@ EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
     "offline": [["npm", "run", "build"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/offline", "-v"]],
     "browser": [["npm", "run", "build"], ["npm", "run", "test:browser"]],
-    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs"]],
+    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs", "tests/contracts/creative.test.mjs"]],
     "security": [["npm", "run", "build"], ["npm", "run", "test:foundation"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/security", "-v"]],
 }
 
@@ -71,7 +71,14 @@ def write_status():
         integrations[capability] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
             "evidence": ["docs/evidence/security.json", "docs/evidence/contracts.json", "docs/evidence/browser.json"],
             "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."}
-    update_matrix(ROOT, foundation_passed and browser_passed)
+    contracts_path = EVIDENCE / "contracts.json"
+    contracts = json.loads(contracts_path.read_text()) if contracts_path.exists() else {}
+    creative_ready = foundation_passed and browser_passed and contracts.get("passed") is True and contracts.get("source_sha256") == source_hash()
+    for capability in ["deepagents", "openai_images", "creative_editor", "canvas_runtime", "creative_review"]:
+        integrations[capability] = {"state": "ADAPTER_READY" if creative_ready else "NOT_IMPLEMENTED", "live_test": False,
+            "evidence": ["docs/evidence/security.json", "docs/evidence/contracts.json", "docs/evidence/browser.json"],
+            "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, canonical server export/publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."}
+    update_matrix(ROOT, foundation_passed and browser_passed, creative_ready)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
               "checked_at": now(), "integrations": integrations,
@@ -84,15 +91,18 @@ def run_suite(name):
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     if name == "offline":
         audit_skills()
+    started_hash = source_hash()
     results = []
     for command in SUITES[name]:
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=600)
         log = result.stdout + result.stderr
         print(log, end="")
         results.append({"command": command, "exit_code": result.returncode, "output": log})
-    scopes = {"browser": "Actual Chromium through V5 business UI to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; manual onboarding/approved memory, scope, quota, recovery, accessibility and persisted AI-prefill/visual-guidance fixtures; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; plus Crawl4AI/Chromium screenshots, private visual storage, SSRF controls and AI reservation/recovery and multimodal image provenance/budget guards with MOCK model/resource transports; no external model provider or deployed generation-worker proof"}
+    scopes = {"browser": "Actual Chromium through V5 business UI and Canvas to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; actual isolated owner skills, MOCK OpenAI generation/edit, Fabric edits/export, version approval and uncertain-outcome holds; manual onboarding/approved memory, scope, quota, recovery, accessibility and persisted AI-prefill/visual-guidance fixtures; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; plus Crawl4AI/Chromium screenshots, private visual storage, SSRF controls and AI reservation/recovery and multimodal image provenance/budget guards with MOCK model/resource transports; plus actual isolated owner-skill planning, MOCK OpenAI create/edit, creative media/version approval, cost holds, cancellation, stale edits and replay isolation; no external model provider or deployed generation-worker proof"}
+    finished_hash = source_hash()
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
-              "source_sha256": source_hash(), "results": results, "passed": all(x["exit_code"] == 0 for x in results), "live_calls": False}
+              "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,
+              "results": results, "passed": started_hash == finished_hash and all(x["exit_code"] == 0 for x in results), "live_calls": False}
     (EVIDENCE / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")
     write_status()
     return 0 if report["passed"] else 1

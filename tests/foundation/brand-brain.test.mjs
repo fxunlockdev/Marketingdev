@@ -437,10 +437,9 @@ test("review roles, manual idempotency and immutable original evidence enforce c
     workerPool.query("UPDATE app.brand_findings SET status=$1", ["correct"]),
     /permission denied/,
   );
-  await assert.rejects(
-    workerPool.query("SELECT * FROM app.brand_brain_versions"),
-    /permission denied/,
-  );
+  // Canvas grants SELECT for the bound creative job only; unscoped workers
+  // must still see none of the approved snapshots that exist above.
+  assert.equal((await workerPool.query("SELECT * FROM app.brand_brain_versions")).rowCount, 0);
   const scoped = new AssetJobs(
     workerPool,
     store,

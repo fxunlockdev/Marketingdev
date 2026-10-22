@@ -1,3 +1,6 @@
+import {CreativeJobs} from './creative-jobs.js';
+import {CreativeProvider} from './creative-provider.js';
+import {SkillRuntime} from './skill-runtime.js';
 import {Worker,NativeConnection} from '@temporalio/worker';
 import {Connection,Client} from '@temporalio/client';
 import {Context,ApplicationFailure} from '@temporalio/activity';
@@ -22,9 +25,12 @@ const connection=await NativeConnection.connect({address:config.jobs.address}),c
 const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new WebsiteParser(config.documentImage),new BrandAnalyzer(process.env.OPENAI_API_KEY),undefined,new VisualCrawler(config.documentImage));
+const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
 const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue);
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),
   maxConcurrentActivityTaskExecutions:2,activities:{
+    generateCreative:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await creative.run(scope);}catch{throw ApplicationFailure.retryable("Creative processing temporarily unavailable","CreativeUnavailable");}finally{clearInterval(heartbeat);}},
+    failCreative:async(scope:JobScope)=>creative.fail(scope),
     processIntake:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await intake.run(scope);}catch{throw ApplicationFailure.retryable("Intake temporarily unavailable","IntakeUnavailable");}finally{clearInterval(heartbeat);}},
     failIntake:async(scope:JobScope)=>intake.fail(scope),
     extract:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await documents.extract(scope);}catch{throw ApplicationFailure.retryable('Document processing is temporarily unavailable','DocumentProcessingUnavailable');}finally{clearInterval(heartbeat);}},
