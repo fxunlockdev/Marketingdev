@@ -14,6 +14,7 @@ export type Config = {
   storage: StorageConfig;
   renderImage?:string;
   socialEnabled?:boolean;
+  publishingEnabled?:boolean;
   oauthEncryptionKey?:string;
   socialProvisioningEnabled?:boolean;
 };
@@ -46,7 +47,7 @@ export function configFromEnv(env = process.env): Config {
   if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(env.POSTIZ_PROVISIONING_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_PROVISIONING_ENABLED))throw new Error('POSTIZ_PROVISIONING_ENABLED must be true or false');
-  return {socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  return {publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }
@@ -75,7 +76,7 @@ export function workerConfigFromEnv(env=process.env){
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(oauthEncryptionKey&&oauthEncryptionKey===social?.encryptionKey)throw new Error('OAuth and Postiz credentials require separate keys');
   const provisionTaskQueue=env.POSTIZ_PROVISION_TASK_QUEUE;if(provisionTaskQueue&&(!/^[A-Za-z0-9_.:-]{1,100}$/.test(provisionTaskQueue)||provisionTaskQueue===jobs.taskQueue))throw new Error('Provisioning requires a separate task queue');
-  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey,provisionTaskQueue};
+  return {publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey,provisionTaskQueue};
 }
 
 // Deliberately independent of storage, authentication, SMTP and model settings.
