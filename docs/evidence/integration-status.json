@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "f4f3b9e5934ad8ff537416b1c8ac684668e03eda",
-  "checked_at": "2026-10-22T07:03:51.008563+00:00",
+  "code_commit": "24c51a6cc6cadeb802af23cd217997813c25db0c",
+  "checked_at": "2026-10-22T07:21:59.798531+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -57,7 +57,7 @@
         "docs/evidence/contracts.json",
         "docs/evidence/security.json"
       ],
-      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
+      "blocked_reason": "Transport and untrusted download are separately tested; durable tenant-scoped generation/edit workflow, funded grants/ledger, original video skill, isolated FFmpeg validation/composition, private versions/approval, customer UI and cost-capped live acceptance remain incomplete. No video customer route is enabled."
     },
     "creative_editor": {
       "state": "NOT_IMPLEMENTED",
@@ -70,7 +70,7 @@
       "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "postiz_publish": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/social.json",
@@ -196,6 +196,14 @@
       ],
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
+    "higgsfield_transport": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/contracts.json"
+      ],
+      "blocked_reason": "Pinned SDK and documented image-to-video/edit bodies, fixed-origin HTTP submission/status/cancel, persisted-intent fingerprint boundary, duplicate key semantics and bounded credentials-free output download tested against MOCK transports. Downloaded bytes remain untrusted. No durable video product workflow, tenant/budget integration, media decoder/private canonical output, Canvas video controls, account model eligibility, actual provider output or paid/live verification."
+    },
     "canvas_runtime": {
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
@@ -253,7 +261,7 @@
       "blocked_reason": "Actual isolated Fabric/node renderer, pinned fonts, private immutable PNG, Temporal recovery, tenant isolation and explicit exact-pixel approvals tested locally. Font substitutions are disclosed and saved pixels are authoritative. No deployed renderer, publishing proof or video/carousel exports."
     },
     "postiz_connection_boundary": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/social.json"
@@ -261,7 +269,7 @@
       "blocked_reason": "Pinned-source transport contracts use a MOCK Postiz HTTP server. Actual local auth/PostgreSQL RLS/Temporal prove encrypted per-business binding, queued account refresh, permission/rotation/cancel boundaries and snapshot recovery. No real Postiz organization/OAuth/token health or publishing acceptance. Session-bound callback workflows are also tested locally. Provisioning and customer UI have separate focused local evidence; authorized live tests remain incomplete."
     },
     "social_oauth_workflow": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/social.json"
@@ -269,7 +277,7 @@
       "blocked_reason": "Actual local auth sessions, forced PostgreSQL RLS and Temporal prove LinkedIn start/callback with 256-bit state, encrypted code, expiry, single-session ownership, one-time exchange, revoked access and uncertain-outcome recovery. Upstream HTTP is explicitly MOCK. No real provider login/consent or deployed callback UI has been tested. Customer UI has separate focused evidence; account selection/reconnect/revoke and live acceptance remain incomplete."
     },
     "social_account_provisioning": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/social.json"
@@ -277,7 +285,7 @@
       "blocked_reason": "Actual local auth/RLS/Temporal and separate provisioning role prove idempotent setup enqueue, encrypted candidate capture, remote identity/name verification, retryable read-only confirmation, binding recovery and cross-business denial. Enterprise Postiz HTTP is MOCK. No real provisioning/deployment proof. Customer UI has separate focused evidence. Operator resolution of unknown/lost responses, credential lifecycle and live acceptance remain incomplete."
     },
     "customer_connections_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/social.json",
@@ -286,7 +294,7 @@
       "blocked_reason": "Actual local browser/session/business setup, server callback, private provisioning worker, PostgreSQL RLS and Temporal tested with explicitly MOCK Postiz HTTP and LinkedIn consent. Desktop/mobile accessibility, canceled/expired/wrong-login returns, saved account refresh and business isolation are covered. No real provider consent, deployed ingress, token health, publication or full lifecycle acceptance. Operator recovery, reconnect/revoke and other channels remain incomplete."
     },
     "customer_publishing_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/social.json",
@@ -296,7 +304,7 @@
       "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
     },
     "business_overview": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/social.json",
@@ -306,7 +314,7 @@
       "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
     },
     "deployment_bootstrap": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/deployment.json"
