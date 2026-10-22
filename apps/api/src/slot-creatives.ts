@@ -207,7 +207,8 @@ export class SlotCreatives {
           [slotId],
         )
       ).rows;
-      return { slot, events, generations };
+      const videos=(await db.query('SELECT r.job_id,r.slot_revision,r.project_id,r.output_version_id,p.thread_id,j.status,j.error_code,j.cancel_requested FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id JOIN app.jobs j ON j.id=r.job_id WHERE r.slot_id=$1 ORDER BY j.created_at DESC',[slotId])).rows;
+      return { slot, events, generations, videos };
     });
   }
 }

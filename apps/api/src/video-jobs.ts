@@ -16,7 +16,14 @@ export class VideoJobs {
  constructor(readonly jobs:AssetJobs,readonly references:VideoReferences,readonly creative:CreativeJobs,readonly provider:VideoProviderJobs,readonly download:VideoDownload,readonly renderer:VideoRenderer){}
  private transaction<T>(scope:JobScope,action:(db:any,j:any)=>Promise<T>){return this.jobs.transaction(scope,async(db,j)=>{if(j.kind!=='creative.video')throw new VideoStateError('VIDEO_JOB_KIND_DENIED');return action(db,j);});}
  private async finish(scope:JobScope,status:string,code:string|null){await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]);});await this.references.revoke(scope);return status;}
- private async providerStep(scope:JobScope){const phase=await this.provider.step(scope,(db,j)=>this.references.verifySubmission(db,j));if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
+ private async providerStep(scope:JobScope){const phase=await this.provider.step(scope,async(db,j)=>{await this.references.verifySubmission(db,j);await this.checkSlot(db,j);});if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
+ private async checkSlot(db:any,j:any){
+  const r=(await db.query('SELECT slot_id,slot_revision FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
+  if(!r?.slot_id)return;
+  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${j.brand_id}`]);
+  const s=(await db.query('SELECT revision,state FROM app.content_slots WHERE id=$1',[r.slot_id])).rows[0];
+  if(!s||s.revision!==r.slot_revision||['approved','cancelled'].includes(s.state))throw new VideoStateError('VIDEO_CALENDAR_CHANGED');
+ }
  async exhausted(scope:JobScope){
   const state=await this.transaction(scope,async(db,j)=>({status:j.status,phase:(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0]?.phase}));
   if(terminal.has(state.status)){await this.references.revoke(scope);return state.status;}
@@ -45,6 +52,7 @@ export class VideoJobs {
    if(!this.renderer.configured||!this.creative.runtime.configured||!this.creative.provider.configured)throw new VideoStateError('VIDEO_RUNTIME_NOT_CONFIGURED');
    const request=state.request;
    if(!state.phase){
+    await this.transaction(scope,(db,j)=>this.checkSlot(db,j));
     const context=await this.transaction(scope,async(db,j)=>{
      const brain=(await db.query('SELECT * FROM app.brand_brain_versions WHERE id=$1',[request.brain_id])).rows[0];
      if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new VideoStateError('VIDEO_BRAND_INTEGRITY_FAILED');
@@ -68,6 +76,7 @@ export class VideoJobs {
     const lease=await this.references.prepare(scope);
     await this.references.verify(scope);
     await this.provider.prepare(scope,{kind:'image',model:HIGGSFIELD_MODELS.image,idempotencyKey:scope.jobId,referenceURL:lease.url,prompt:plan.brief.video_prompt+'\nScript:\n'+plan.brief.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n'),durationSeconds:request.duration_seconds,sound:'off'},async(db,j)=>{
+     await this.checkSlot(db,j);
      const latest=(await db.query('SELECT approved_brief,approved_revision,draft_revision FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
      if(!latest?.approved_brief||latest.approved_revision!==request.approved_revision||latest.draft_revision!==request.draft_revision||canonicalJSON(latest.approved_brief)!==canonicalJSON(request.approved_brief))throw new Error('VIDEO_PROMPT_APPROVAL_CHANGED');
     });
@@ -102,10 +111,16 @@ export class VideoJobs {
     await db.query('INSERT INTO app.video_versions(id,organization_id,brand_id,project_id,job_id,object_key,sha256,bytes,poster_key,poster_sha256,poster_bytes,caption,overlays,manifest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',[id,j.organization_id,j.brand_id,request.project_id,j.id,key,output.manifest.video_sha256,output.video.length,posterKey,output.manifest.poster_sha256,output.poster.length,request.approved_brief.caption,JSON.stringify(request.approved_brief.overlays),JSON.stringify(manifest)]);
     await db.query('UPDATE app.video_projects SET latest_version_id=$2 WHERE id=$1',[request.project_id,id]);
     await db.query('UPDATE app.video_requests SET output_version_id=$2 WHERE job_id=$1',[j.id,id]);
+    if(request.slot_id){
+     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${j.brand_id}`]);
+     const attached=(await db.query("UPDATE app.content_slots SET video_version_id=$2,video_sha256=$3,revision=revision+1,state='draft_ready',updated_at=now() WHERE id=$1 AND revision=$4 AND approved_by IS NULL AND state NOT IN ('approved','cancelled') RETURNING *",[request.slot_id,id,output.manifest.video_sha256,request.slot_revision])).rows[0];
+     if(attached)await db.query("INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,video_version_id,video_sha256,feedback,snapshot) VALUES($1,$2,$3,$4,$5,'creative_attached',$6,$7,$8,'',$9)",[randomUUID(),j.organization_id,j.brand_id,attached.id,attached.revision,j.requested_by,id,output.manifest.video_sha256,JSON.stringify({state:attached.state,video_version_id:id,video_sha256:output.manifest.video_sha256,job_id:j.id})]);
+    }
     await db.query("UPDATE app.jobs SET status='succeeded',error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);return 'succeeded';
    });
    await this.references.revoke(scope);return outcome;
   }catch(error){
+   if(error instanceof VideoStateError&&error.code==='VIDEO_CALENDAR_CHANGED'){await this.provider.cancelPrepared(scope,error.code);return this.finish(scope,'canceled',error.code);}
    if(error instanceof CreativeError||error instanceof VideoStateError){const code=error.code;return this.finish(scope,/UNKNOWN|REPLAY/.test(code)?'unknown':'rejected',code);}
    if(error instanceof VideoDownloadError&&error.code!=='VIDEO_DOWNLOAD_FAILED')return this.finish(scope,'rejected',error.code);
    throw error;

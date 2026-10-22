@@ -154,7 +154,9 @@ test('approved export to original video skills, durable provider stage, actual m
  const approval=await exports.approve(alice.id,brand.id,e.id,{sha256:e.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:2,confirmed:true});
  const refs=new VideoReferences(canvas,jobs,encryptionKey,renderer.image,'test'),service=new VideoCanvas(canvas,refs,true);
  const thread=(await admin.query('SELECT thread_id FROM app.creative_projects WHERE id=$1',[v.project_id])).rows[0].thread_id;
- const body={prompt:'Animate our approved creative',channel:'instagram',duration_seconds:3,reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
+ const linkedPlan=await plans.create(alice.id,brand.id,{title:'Linked video plan',objective:'Generate into this plan',starts_on:'2027-01-01',timezone:'UTC',slots:[{channel:'instagram',format:'video',brief:'TEST planned video',planned_at:'2027-01-06T08:00:00Z'}]},randomUUID());
+ const linkedRange={start:'2027-01-01T00:00:00Z',end:'2027-02-01T00:00:00Z',plan_id:linkedPlan.id},linkedSlot=(await plans.list(alice.id,brand.id,linkedRange)).slots[0];
+ const body={prompt:'Animate our approved creative',slot_id:linkedSlot.id,slot_revision:linkedSlot.revision,channel:'instagram',duration_seconds:3,reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
  await assert.rejects(service.submit(viewer.id,brand.id,thread,body,randomUUID()));await assert.rejects(service.submit(bob.id,brand.id,thread,body,randomUUID()));
  const requestKey=randomUUID(),j=await service.submit(alice.id,brand.id,thread,body,requestKey);
  assert.equal((await service.submit(alice.id,brand.id,thread,body,requestKey)).id,j.id);
@@ -190,6 +192,7 @@ test('approved export to original video skills, durable provider stage, actual m
  assert.equal(await pipeline.step(scope(j)),'completed');assert.equal(await pipeline.step(scope(j)),'succeeded');
  assert.equal(plansCalled,1);assert.equal(submits,1);assert.equal(statuses,1);assert.equal(downloads,1);
  const saved=(await service.list(alice.id,brand.id)).projects[0],version=await service.version(alice.id,brand.id,saved.latest_version_id);
+ const attached=(await plans.list(alice.id,brand.id,linkedRange)).slots[0];assert.equal(attached.video_version_id,version.id);assert.equal(attached.state,'draft_ready');assert.equal(attached.revision,linkedSlot.revision+1);
  assert.equal(version.status,'draft');assert.equal(version.caption,'TEST FIXTURE video caption');assert.equal(version.duration_ms,3000);assert.equal(version.manifest.reference.sha256,e.sha256);assert.equal(version.manifest.plan.skills.length,4);
  const row=(await admin.query('SELECT * FROM app.video_versions WHERE id=$1',[version.id])).rows[0];assert.equal(digest(await store.read(row.object_key,64*1024*1024)),row.sha256);assert.equal(digest(await store.read(row.poster_key)),row.poster_sha256);
  assert.equal((await fetch(leasedURL)).status,404);assert.equal(await pipeline.step(scope(j)),'succeeded');assert.equal(submits,1);assert.equal(downloads,1);
@@ -208,6 +211,12 @@ test('approved export to original video skills, durable provider stage, actual m
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_reviews WHERE version_id=$1',[version.id])).rows[0].n,2);
  await assert.rejects(service.version(bob.id,brand.id,version.id));assert.equal((await service.list(alice.id,sibling.id)).projects.length,0);
  const calendarBody={title:'Video calendar test',objective:'Review saved video',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:body.channel,format:'video',planned_at:'2026-11-05T08:00:00Z',brief:'TEST saved video',video_version_id:version.id}]};
+ const appendBody={video_version_id:version.id,channel:'instagram',planned_at:'2027-01-07T08:00:00Z',brief:'Reuse saved video'},appendKey=randomUUID();
+ const added=await plans.addVideo(alice.id,brand.id,linkedPlan.id,appendBody,appendKey);assert.equal((await plans.addVideo(alice.id,brand.id,linkedPlan.id,appendBody,appendKey)).id,added.id);
+ await assert.rejects(plans.addVideo(alice.id,brand.id,linkedPlan.id,{...appendBody,planned_at:'2027-02-02T08:00:00Z'},randomUUID()),/local calendar days/);
+ await assert.rejects(plans.addVideo(alice.id,sibling.id,linkedPlan.id,appendBody,randomUUID()),/Content plan not found/);
+ await assert.rejects(plans.addVideo(viewer.id,brand.id,linkedPlan.id,appendBody,randomUUID()));
+ assert.ok((await plans.catalog(alice.id,brand.id)).plans.some(p=>p.id===linkedPlan.id));
  const calendarKey=randomUUID(),calendar=await plans.create(alice.id,brand.id,calendarBody,calendarKey);
  assert.equal((await plans.create(alice.id,brand.id,calendarBody,calendarKey)).id,calendar.id);
  await assert.rejects(plans.create(alice.id,sibling.id,calendarBody,randomUUID()),/Video version not found/);
@@ -239,5 +248,22 @@ test('approved export to original video skills, durable provider stage, actual m
  assert.equal(videoSlot.state,'draft_ready');assert.equal(videoSlot.approved_by,null);assert.equal(videoSlot.video_version_id,history[1].id);
  const events=(await plans.history(alice.id,brand.id,videoSlot.id)).events;assert.equal(events.at(-1).video_version_id,history[1].id);assert.equal(events[0].video_version_id,version.id);
  const canceled=await service.regenerate(alice.id,brand.id,history[1].id,{feedback:'Cancel this draft before any charge'},randomUUID());await service.cancel(alice.id,brand.id,canceled.id);assert.equal(await pipeline.step(scope(canceled)),'canceled');assert.equal(submits,2);
+ const currentSlot=(await plans.list(alice.id,brand.id,linkedRange)).slots.find(s=>s.id===linkedSlot.id);
+ const changedJob=await service.submit(alice.id,brand.id,thread,{...body,slot_revision:currentSlot.revision,parent_version_id:history[1].id},randomUUID());
+ await plans.edit(alice.id,brand.id,currentSlot.id,{revision:currentSlot.revision,brief:'TEST calendar direction changed',video_version_id:history[1].id});
+ assert.equal(await pipeline.step(scope(changedJob)),'canceled');assert.equal(submits,2);
+ assert.equal((await admin.query('SELECT error_code FROM app.jobs WHERE id=$1',[changedJob.id])).rows[0].error_code,'VIDEO_CALENDAR_CHANGED');
+ const beforePaid=(await plans.list(alice.id,brand.id,linkedRange)).slots.find(s=>s.id===linkedSlot.id);
+ const paidJob=await service.submit(alice.id,brand.id,thread,{...body,slot_revision:beforePaid.revision,parent_version_id:history[1].id},randomUUID());
+ assert.equal(await pipeline.step(scope(paidJob)),'awaiting_approval');const paidDraft=await service.draft(alice.id,brand.id,paidJob.id);
+ await service.saveDraft(alice.id,brand.id,paidJob.id,{brief:{...paidDraft.brief,video_prompt:'TEST FIXTURE user edited motion'},revision:1,approve:true});
+ assert.equal(await pipeline.step(scope(paidJob)),'accepted');
+ await plans.edit(alice.id,brand.id,beforePaid.id,{revision:beforePaid.revision,brief:'Keep the owner edit made after submission'});
+ assert.equal(await pipeline.step(scope(paidJob)),'completed');assert.equal(await pipeline.step(scope(paidJob)),'succeeded');
+ const preserved=(await plans.list(alice.id,brand.id,linkedRange)).slots.find(s=>s.id===linkedSlot.id);
+ assert.equal(preserved.brief,'Keep the owner edit made after submission');assert.equal(preserved.video_version_id,beforePaid.video_version_id);assert.equal(preserved.revision,beforePaid.revision+1);
+ assert.ok((await admin.query('SELECT output_version_id FROM app.video_requests WHERE job_id=$1',[paidJob.id])).rows[0].output_version_id);assert.equal(submits,3);
+
+
 
 });

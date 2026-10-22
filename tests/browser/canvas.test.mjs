@@ -1,3 +1,4 @@
+import {ContentPlan} from '../../dist/content-plan.js';
 import {VideoJobs} from '../../dist/video-jobs.js';
 import {VideoReferences} from '../../dist/video-references.js';
 import {VideoProviderJobs} from '../../dist/video-provider-jobs.js';
@@ -529,7 +530,14 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   assert.equal((await import('node:crypto')).createHash('sha256').update(finalBytes).digest('hex'),exportApproval[0].sha256);
   await page.screenshot({path:'work/browser/canvas-final-image.png',fullPage:true});
   await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true)",[org,brand]);
+  const videoPlans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
+  const linkedPlan=await videoPlans.create(actor,brand,{title:'Browser video plan',objective:'Create a planned video',starts_on:'2027-01-01',timezone:'Asia/Kuala_Lumpur',slots:[{channel:'instagram',format:'video',brief:'TEST planned browser video',planned_at:'2027-01-06T04:00:00Z'}]},randomUUID());
+  let videoSlot=(await videoPlans.list(actor,brand,{start:'2027-01-01T00:00:00Z',end:'2027-02-01T00:00:00Z',plan_id:linkedPlan.id})).slots[0];
+  videoSlot=await videoPlans.edit(actor,brand,videoSlot.id,{revision:videoSlot.revision,video_draft:{storyline:'TEST planned storyline',script:'TEST planned script',prompt:'TEST planned prompt',duration_seconds:3}});
+  await page.goto(`${base}/b/${brand}/canvas?slot=${videoSlot.id}`);
+  await expect(page.getByRole('region',{name:'Video calendar context'})).toBeVisible();
   await page.getByText('Make a video from this approved image',{exact:true}).click();
+  await expect(page.getByLabel('Video idea',{exact:true})).toHaveValue(/TEST planned script/);
   await page.getByLabel('Video idea',{exact:true}).fill('TEST animate this brand image');
   await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
   await page.getByRole('button',{name:'Draft video script',exact:true}).click();
@@ -549,17 +557,14 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   const savedVideo=(await admin.query('SELECT status,manifest FROM app.video_versions WHERE brand_id=$1',[brand])).rows[0];assert.equal(savedVideo.status,'approved');assert.equal(savedVideo.manifest.plan.brief.video_prompt,'TEST user edited video prompt');
   await page.screenshot({path:'work/browser/canvas-video-approved.png',fullPage:true});
   const canvasURL=page.url();
-  await page.getByText('Add video to calendar',{exact:true}).click();
-  await page.getByLabel(/Video calendar time/).fill('2027-01-06T12:00');
-  await page.getByRole('button',{name:'Add saved video to calendar',exact:true}).click();
-  await page.getByRole('link',{name:'Open video in calendar',exact:true}).click();
+  await page.getByRole('link',{name:'Open linked video post in calendar',exact:true}).click();
   await expect(page.getByLabel('Saved video preview',{exact:true})).toBeVisible();
   await page.getByRole('button',{name:'Send for review',exact:true}).click();
   await page.getByRole('button',{name:'Approve post',exact:true}).click();
   await expect(page.getByText('Approved this saved version. It has not been published.',{exact:true})).toBeVisible();
   const calendarVideo=(await admin.query("SELECT state,video_version_id,creative_version_id FROM app.content_slots WHERE brand_id=$1 AND format='video'",[brand])).rows[0];assert.equal(calendarVideo.state,'approved');assert.ok(calendarVideo.video_version_id);assert.equal(calendarVideo.creative_version_id,null);
   await page.screenshot({path:'work/browser/calendar-video-approved.png',fullPage:true});
-  await page.goto(canvasURL);
+  await page.goto(canvasURL.split('?')[0]);
 
 
 
@@ -748,6 +753,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByText('Plan content in Canvas',{exact:true}).click();
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
  await page.getByLabel('Planning days',{exact:true}).fill('4');
+ await page.getByLabel('Videos in this plan',{exact:true}).fill('2');
  await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2026-12-01');
  await page.getByRole('button',{name:'Plan my content',exact:true}).click();
  const preview=page.getByRole('region',{name:'Planned posts',exact:true});
@@ -757,5 +763,9 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await preview.getByRole('link',{name:'Edit or review this post',exact:true}).first().click();
  await expect(page.getByLabel('Calendar date',{exact:true})).toHaveValue('2026-12-01');
  await expect(page.getByRole('region',{name:'Post details',exact:true})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Planned video script',exact:true})).toHaveValue('TEST script 1');
+ await page.getByLabel('Planned video prompt',{exact:true}).fill('TEST edited calendar video prompt');
+ await page.getByRole('button',{name:'Save post changes',exact:true}).click();
+ await page.reload();await expect(page.getByLabel('Planned video prompt',{exact:true})).toHaveValue('TEST edited calendar video prompt');
  await page.screenshot({path:'work/browser/canvas-custom-plan.png',fullPage:true});assert.deepEqual(errors,[]);
 });

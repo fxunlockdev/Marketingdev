@@ -9,8 +9,10 @@ export class VideoCanvas {
  constructor(readonly canvas:Canvas,readonly references:VideoReferenceBindings,readonly enabled=false){}
  submit(user:string,brand:string,threadId:string,body:unknown,requestKey:unknown){
   if(!this.enabled||!this.references.image)throw new ConflictException('Video generation is not configured');
-  threadId=uuid(threadId);const v=object(body,['prompt','channel','duration_seconds','reference','parent_version_id']);
+  threadId=uuid(threadId);const v=object(body,['prompt','channel','duration_seconds','reference','parent_version_id','slot_id','slot_revision']);
   if(typeof requestKey!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(requestKey)||typeof v.prompt!=='string'||!v.prompt.trim()||v.prompt.length>4000||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(v.prompt)||!['instagram','linkedin'].includes(String(v.channel))||!Number.isInteger(v.duration_seconds)||Number(v.duration_seconds)<3||Number(v.duration_seconds)>15)throw new BadRequestException('Choose a video brief, channel and duration from 3 to 15 seconds');
+  if((v.slot_id===undefined)!==(v.slot_revision===undefined)||v.slot_id!==undefined&&(!Number.isSafeInteger(v.slot_revision)||Number(v.slot_revision)<1))throw new BadRequestException('Include the saved calendar post revision');
+  const slotId=v.slot_id===undefined?null:uuid(String(v.slot_id));
   const prompt=v.prompt.trim();
   const fingerprint=hash(canonicalJSON({threadId,...v}));
   return this.canvas.scope(user,brand,true,async(db,b)=>{
@@ -18,6 +20,12 @@ export class VideoCanvas {
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${brand.toLowerCase()}`]);
    const prior=(await db.query('SELECT r.request_hash,j.id,j.status FROM app.video_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,brand,requestKey])).rows[0];
    if(prior){if(prior.request_hash!==fingerprint)throw new ConflictException('That request key belongs to a different video');return {id:prior.id,status:prior.status};}
+   if(slotId){
+    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${brand.toLowerCase()}`]);
+    const slot=(await db.query('SELECT * FROM app.content_slots WHERE id=$1',[slotId])).rows[0];
+    if(!slot)throw new NotFoundException('Calendar post not found');
+    if(slot.format!=='video'||slot.channel!==v.channel||slot.revision!==v.slot_revision||['approved','cancelled'].includes(slot.state))throw new ConflictException('Save the current video post as a draft before creating it');
+   }
    if(!(await db.query('SELECT id FROM app.canvas_threads WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[threadId,b.organization_id,brand])).rowCount)throw new NotFoundException('Conversation not found');
    if((await db.query("SELECT id FROM app.jobs WHERE brand_id=$1 AND kind='creative.video' AND status IN ('queued','running','retrying','unknown')",[brand])).rowCount)throw new ConflictException('A video request is running or needs reconciliation');
    if((await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='creative.video' AND created_at>now()-interval '1 day'",[brand])).rows[0].n>=10)throw new ConflictException('Daily video limit reached');
@@ -31,14 +39,14 @@ export class VideoCanvas {
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.video')",[job,b.organization_id,brand,user]);
    await this.references.bind(user,brand,job,v.reference,{db,b});
    if(!v.parent_version_id)await db.query('INSERT INTO app.video_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[project,b.organization_id,brand,threadId,prompt.slice(0,140),user]);
-   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint]);
+   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint,slotId,v.slot_revision??null]);
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.video')",[job,b.organization_id,brand]);
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'video.requested',$4)",[b.organization_id,brand,user,job]);
    return {id:job,status:'queued'};
   });
  }
- list(user:string,brand:string){return this.canvas.scope(user,brand,false,async(db)=>({configured:this.enabled,versions:(await db.query('SELECT id,project_id,status,created_at FROM app.video_versions ORDER BY created_at DESC LIMIT 300')).rows,projects:(await db.query('SELECT id,title,thread_id,latest_version_id,created_at FROM app.video_projects ORDER BY created_at DESC LIMIT 100')).rows,runs:(await db.query('SELECT j.id,j.status,j.error_code,r.project_id,r.output_version_id,r.duration_seconds,j.cancel_requested,r.draft_revision,r.approved_revision,(r.plan IS NOT NULL AND r.approved_brief IS NULL) AS awaiting_approval FROM app.jobs j JOIN app.video_requests r ON r.job_id=j.id ORDER BY j.created_at DESC LIMIT 100')).rows}));}
- version(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async(db)=>{const r=(await db.query('SELECT v.id,v.project_id,v.caption,v.overlays,v.manifest,v.status,v.review_revision,v.sha256,r.channel,b.width,b.height,b.duration_ms FROM app.video_versions v JOIN app.video_bases b ON b.job_id=v.job_id JOIN app.video_requests r ON r.job_id=v.job_id WHERE v.id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Video not found');return {...r,reviews:(await db.query('SELECT decision,feedback,revision,created_at FROM app.video_reviews WHERE version_id=$1 ORDER BY revision',[id])).rows};});}
+ list(user:string,brand:string){return this.canvas.scope(user,brand,false,async(db)=>({configured:this.enabled,versions:(await db.query('SELECT id,project_id,status,created_at FROM app.video_versions ORDER BY created_at DESC LIMIT 300')).rows,projects:(await db.query('SELECT id,title,thread_id,latest_version_id,created_at FROM app.video_projects ORDER BY created_at DESC LIMIT 100')).rows,runs:(await db.query('SELECT j.id,j.status,j.error_code,r.project_id,r.output_version_id,r.slot_id,r.slot_revision,r.duration_seconds,j.cancel_requested,r.draft_revision,r.approved_revision,(r.plan IS NOT NULL AND r.approved_brief IS NULL) AS awaiting_approval FROM app.jobs j JOIN app.video_requests r ON r.job_id=j.id ORDER BY j.created_at DESC LIMIT 100')).rows}));}
+ version(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async(db)=>{const r=(await db.query('SELECT v.id,v.project_id,v.caption,v.overlays,v.manifest,v.status,v.review_revision,v.sha256,r.channel,r.slot_id,b.width,b.height,b.duration_ms FROM app.video_versions v JOIN app.video_bases b ON b.job_id=v.job_id JOIN app.video_requests r ON r.job_id=v.job_id WHERE v.id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Video not found');return {...r,reviews:(await db.query('SELECT decision,feedback,revision,created_at FROM app.video_reviews WHERE version_id=$1 ORDER BY revision',[id])).rows};});}
  cancel(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,true,async db=>{
   const row=(await db.query("SELECT id,status FROM app.jobs WHERE id=$1 AND kind='creative.video' FOR UPDATE",[id])).rows[0];if(!row)throw new NotFoundException('Video request not found');if(!['queued','running','retrying'].includes(row.status))throw new ConflictException('This video request has finished');await db.query('UPDATE app.jobs SET cancel_requested=true WHERE id=$1',[id]);return {id,cancel_requested:true};
  });}

@@ -7,7 +7,7 @@ import {
   type FormEvent,
 } from "react";
 import {CanvasPlanner} from './canvas-planner';
-import {CanvasVideos} from './video-canvas';
+import {CanvasVideos,CanvasVideoContext} from './video-canvas';
 import {BrandReferences} from "./brand-references";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
@@ -253,6 +253,7 @@ export function CanvasScreen({ business }: { business: Business }) {
         </div>
       )}
       <Notice error={error} />
+      <CanvasVideoContext businessId={business.id}/>
       <CanvasPlanner key={business.id} business={business}/>
       <div className="studio-layout">
         <aside className="studio-conversations" aria-label="Conversations">

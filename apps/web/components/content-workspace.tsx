@@ -107,7 +107,7 @@ export function ContentWorkspace({
   const [generate, setGenerate] = useState(false),
     [start, setStart] = useState(""),
     [planDays,setPlanDays]=useState(30),
-    [postCount,setPostCount]=useState(30),
+    [postCount,setPostCount]=useState(30),[videoCount,setVideoCount]=useState(0),
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
   useEffect(()=>{const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
@@ -209,7 +209,7 @@ export function ContentWorkspace({
     setBusy(true);
     setError(undefined);
     try {
-      const body = { starts_on: start, brief, duration_days:planDays,post_count:postCount };
+      const body = { starts_on: start, brief, duration_days:planDays,post_count:postCount,video_count:videoCount };
       await api(
         `${root}/content-plan/generate`,
         body,
@@ -309,6 +309,7 @@ export function ContentWorkspace({
               }}
             >
               <Field label="Plan duration (days)">{id=><input id={id} type="number" min={1} max={90} required value={planDays} onChange={e=>{setPlanDays(Number(e.target.value));setPostCount(Number(e.target.value));}}/>}</Field>
+              <Field label="Videos in this plan">{id=><input id={id} type="number" min={0} max={Math.min(postCount,30)} required value={videoCount} onChange={e=>setVideoCount(Number(e.target.value))}/>}</Field>
               <Field label="Draft post count">{id=><input id={id} type="number" min={1} max={90} required value={postCount} onChange={e=>setPostCount(Number(e.target.value))}/>}</Field>
               <Field label="Plan starts on">
                 {(id) => (
@@ -724,6 +725,7 @@ function SlotPanel({
             pillar: d.slot.pillar,
             hook: d.slot.hook,
             cta: d.slot.cta,
+            video_draft: d.slot.video_draft,
             local: localMinute(d.slot.planned_at, d.slot.timezone),
           });
           setChosen(d.slot.planned_at);
@@ -743,7 +745,7 @@ function SlotPanel({
     };
   }, [load]);
   const s = data?.slot,
-    active = data?.generations.some(running),
+    active = data?.generations.some(running)||data?.videos?.some(running),
     held = data?.generations.some((j: any) => j.status === "unknown"),
     dirty =
       !!s &&
@@ -752,6 +754,7 @@ function SlotPanel({
         draft.pillar !== s.pillar ||
         draft.hook !== s.hook ||
         draft.cta !== s.cta ||
+        JSON.stringify(draft.video_draft)!==JSON.stringify(s.video_draft) ||
         draft.local !== localMinute(s.planned_at, s.timezone));
   useEffect(()=>setReady(false),[s?.creative_version_id,s?.video_version_id]);
   dirtyRef.current = dirty;
@@ -881,11 +884,13 @@ function SlotPanel({
               ) : (
                 <div className="plan-empty">
                   <h3>This idea needs a creative</h3>
+                  {s.format==='video'&&!dirty&&<a href={`/b/${business.id}/canvas?slot=${s.id}`}>Create this video in Canvas</a>}
                   <p>
-                    Create an image from the saved brief, then review it here.
+                    {s.format==='video'?'Review your script below, then choose an approved reference image in Canvas.':'Create an image from the saved brief, then review it here.'}
                   </p>
                 </div>
               )}
+              {data?.videos?.map((run:any)=><div key={run.job_id}><p role="status">Video: {run.status.replaceAll('_',' ')}</p><a href={`/b/${business.id}/canvas?thread=${run.thread_id}`}>Open video prompt and review</a>{run.output_version_id&&run.output_version_id!==s.video_version_id&&<button disabled={locked||dirty||(s.state==='approved'&&!reset)} onClick={()=>void act(()=>api(`${root}/content-slots/${slotId}`,{revision:s.revision,video_version_id:run.output_version_id,reset_approval:reset},'PATCH'),'Saved video attached as an unapproved draft.')}>Attach this saved video</button>}</div>)}
               {s.has_newer_version && (
                 <div className="notice">
                   <p>
@@ -931,6 +936,7 @@ function SlotPanel({
                           pillar: draft.pillar,
                           hook: draft.hook,
                           cta: draft.cta,
+                          ...(s.format==='video'&&draft.video_draft?{video_draft:draft.video_draft}:{}),
                           planned_at: instant,
                           reset_approval: reset,
                         },
@@ -941,6 +947,7 @@ function SlotPanel({
                 }}
               >
                 <fieldset disabled={locked || s.state === "cancelled"}>
+                  {s.format==='video'&&draft.video_draft&&<section aria-label="Planned video script"><h3>Video concept</h3><p>Saving edits does not authorize paid generation.</p>{(['storyline','script','prompt'] as const).map(field=><Field key={field} label={`Planned video ${field}`}>{id=><textarea id={id} maxLength={field==='storyline'?600:1200} value={draft.video_draft[field]} onChange={e=>setDraft({...draft,video_draft:{...draft.video_draft,[field]:e.target.value}})}/>}</Field>)}<Field label="Planned video duration (seconds)">{id=><input id={id} type="number" min={3} max={15} value={draft.video_draft.duration_seconds} onChange={e=>setDraft({...draft,video_draft:{...draft.video_draft,duration_seconds:Number(e.target.value)}})}/>}</Field></section>}
                   <legend>Post brief & planned date</legend>
                   <Field label="Creative brief">
                     {(id) => (

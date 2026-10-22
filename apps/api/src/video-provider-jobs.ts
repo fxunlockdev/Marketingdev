@@ -115,6 +115,11 @@ export class VideoProviderJobs {
   if(r?.phase!=='completed')throw new VideoStateError('VIDEO_OUTPUT_NOT_READY');
   return this.#vault.open(scope,'output',r.encrypted_output) as {url:string};
  });}
+ async cancelPrepared(scope:JobScope,code:string){return this.transaction(scope,async(db,j)=>{
+  const r=(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
+  if(r?.phase==='prepared')return this.stop(db,j,'canceled',code,true);
+  return r?.phase??null;
+ });}
  async exhausted(scope:JobScope){return this.transaction(scope,async(db,j)=>{
   const r=(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
   if(!r)throw new VideoStateError('VIDEO_INTENT_MISSING');

@@ -1,3 +1,4 @@
+import {validateVideoConcept} from './video-concept.js';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
@@ -73,7 +74,7 @@ export class ContentPlan {
   return v;
  }
  async event(db:PoolClient,user:string,s:any,action:string,feedback='') {
-  const snapshot={plan_id:s.plan_id,channel:s.channel,planned_at:s.planned_at,format:s.format,brief:s.brief,pillar:s.pillar,hook:s.hook,cta:s.cta,state:s.state,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,video_version_id:s.video_version_id,video_sha256:s.video_sha256};
+  const snapshot={plan_id:s.plan_id,channel:s.channel,planned_at:s.planned_at,format:s.format,brief:s.brief,pillar:s.pillar,hook:s.hook,cta:s.cta,state:s.state,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,video_version_id:s.video_version_id,video_sha256:s.video_sha256,video_draft:s.video_draft};
   await db.query(`INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,creative_version_id,creative_sha256,feedback,snapshot,video_version_id,video_sha256)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[randomUUID(),s.organization_id,s.brand_id,s.id,s.revision,action,user,s.creative_version_id,s.creative_sha256,feedback,JSON.stringify(snapshot),s.video_version_id??null,s.video_sha256??null]);
  }
@@ -103,6 +104,26 @@ export class ContentPlan {
     await this.event(db,user,row,'created');
    }
    return {id:pid};
+  });
+ }
+ catalog(user:string,id:string){return this.scope(user,id,false,async(db,b)=>({plans:(await db.query('SELECT id,title,starts_on::text,timezone,duration_days FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2 ORDER BY created_at DESC,id LIMIT 36',[b.organization_id,id])).rows}));}
+ addVideo(user:string,id:string,planId:string,body:unknown,key:unknown){
+  planId=uuid(planId);const v=object(body,['video_version_id','planned_at','channel','brief']);
+  const version=uuid(String(v.video_version_id)),brief=text(v.brief,4000);
+  if(!channels.includes(String(v.channel)))throw new BadRequestException('Choose a supported channel');
+  if(typeof key!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('An Idempotency-Key is required');
+  const sha=hash(canonicalJSON({planId,...v}));
+  return this.scope(user,id,true,async(db,b)=>{
+   const prior=(await db.query('SELECT id,request_hash FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND created_by=$3 AND request_key=$4',[b.organization_id,id,user,key])).rows[0];
+   if(prior){if(prior.request_hash!==sha)throw new ConflictException('That request key belongs to another post');return {id:prior.id};}
+   const plan=(await db.query('SELECT starts_on::text,timezone,duration_days FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,planId])).rows[0];
+   if(!plan)throw new NotFoundException('Content plan not found');
+   const when=planTime(v.planned_at,plan.starts_on,plan.timezone,plan.duration_days);
+   if((await db.query('SELECT count(*)::int AS n FROM app.content_slots WHERE plan_id=$1',[planId])).rows[0].n>=120)throw new ConflictException('This plan has reached its 120-post limit');
+   const video=await this.video(db,b.organization_id,id,version,String(v.channel));
+   const row=(await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,video_version_id,video_sha256,state,created_by,request_key,request_hash)
+    VALUES($1,$2,$3,$4,$5,$6,'video',$7,'','','',$8,$9,'draft_ready',$10,$11,$12) RETURNING *`,[randomUUID(),b.organization_id,id,planId,v.channel,when,brief,video.id,video.sha256,user,key,sha])).rows[0];
+   await this.event(db,user,row,'created');return {id:row.id};
   });
  }
  list(user:string,id:string,query:unknown,inbox=false) {
@@ -139,9 +160,9 @@ export class ContentPlan {
  }
  edit(user:string,id:string,slotId:string,body:unknown) {
   slotId=uuid(slotId);
-  const v=object(body,['revision','planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id','reset_approval']);
+  const v=object(body,['revision','planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id','video_draft','reset_approval']);
   const rev=revision(v.revision);
-  if(!['planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id'].some(k=>k in v))throw new BadRequestException('Include a content change');
+  if(!['planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id','video_draft'].some(k=>k in v))throw new BadRequestException('Include a content change');
   if(v.reset_approval!==undefined&&typeof v.reset_approval!=='boolean')throw new BadRequestException('Invalid approval confirmation');
   return this.scope(user,id,true,async(db,b)=>{
    const s=(await db.query('SELECT s.*,p.starts_on::text,p.timezone,p.duration_days FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.organization_id=$1 AND s.brand_id=$2 AND s.id=$3',[b.organization_id,id,slotId])).rows[0];
@@ -150,11 +171,13 @@ export class ContentPlan {
    if(s.state==='cancelled')throw new ConflictException('This content slot was cancelled');
    if(s.state==='approved'&&v.reset_approval!==true)throw new ConflictException('Confirm that editing this approved post requires a new review');
    if(s.format==='video'?'creative_version_id' in v:'video_version_id' in v)throw new BadRequestException('Match the saved media to the post format');
+   let videoDraft=s.video_draft;
+   if('video_draft' in v){if(s.format!=='video')throw new BadRequestException('Only video posts have scripts');try{videoDraft=validateVideoConcept(v.video_draft);}catch{throw new BadRequestException('Use a storyline, script, prompt and duration from 3 to 15 seconds');}}
    const when='planned_at' in v?planTime(v.planned_at,s.starts_on,s.timezone,s.duration_days):s.planned_at;
    const creative='creative_version_id' in v?(v.creative_version_id===null?null:await this.creative(db,b.organization_id,id,v.creative_version_id,s.format)):s.creative_version_id?await this.creative(db,b.organization_id,id,s.creative_version_id,s.format):null;
    const videoId='video_version_id' in v?v.video_version_id:s.video_version_id;
    const video=videoId?await this.video(db,b.organization_id,id,videoId,s.channel):null;
-   const result=(await db.query(`UPDATE app.content_slots SET planned_at=$2,brief=$3,pillar=$4,hook=$5,cta=$6,creative_version_id=$7,creative_sha256=$8,state=$9,video_version_id=$10,video_sha256=$11,revision=revision+1,approved_by=NULL,approved_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`,[slotId,when,'brief' in v?text(v.brief,4000):s.brief,'pillar' in v?text(v.pillar,140,true):s.pillar,'hook' in v?text(v.hook,500,true):s.hook,'cta' in v?text(v.cta,500,true):s.cta,creative?.id??null,creative?.sha256??null,creative||video?'draft_ready':'content_needed',video?.id??null,video?.sha256??null])).rows[0];
+   const result=(await db.query(`UPDATE app.content_slots SET planned_at=$2,brief=$3,pillar=$4,hook=$5,cta=$6,creative_version_id=$7,creative_sha256=$8,state=$9,video_version_id=$10,video_sha256=$11,video_draft=$12,revision=revision+1,approved_by=NULL,approved_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`,[slotId,when,'brief' in v?text(v.brief,4000):s.brief,'pillar' in v?text(v.pillar,140,true):s.pillar,'hook' in v?text(v.hook,500,true):s.hook,'cta' in v?text(v.cta,500,true):s.cta,creative?.id??null,creative?.sha256??null,creative||video?'draft_ready':'content_needed',video?.id??null,video?.sha256??null,videoDraft?JSON.stringify(videoDraft):null])).rows[0];
    await this.event(db,user,result,'edited');
    return result;
   });

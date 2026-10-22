@@ -161,3 +161,16 @@ test('custom-duration plan persists its horizon, rejects rescheduling outside it
  assert.equal((await planning.detail(alice,b.id,p.id)).duration_days,4);await assert.rejects(planning.detail(bob,b.id,p.id));
  for(const duration_days of [0,91,1.5])assert.throws(()=>planning.submit(alice,b.id,{...body,duration_days},randomUUID()));
 });
+
+test('mixed six-day planning persists editable scripts and no video generation until a separate request',async()=>{
+ const b=await fresh();await grant(b);const body={starts_on:'2026-11-01',brief:'Two videos and four images',duration_days:6,post_count:6,video_count:2};
+ const j=await planning.submit(alice,b.id,body,randomUUID());assert.equal(await handler.run(scope(b,j)),'succeeded');
+ const plan=(await planning.jobs(alice,b.id)).jobs[0].output_plan_id;
+ const saved=(await plans.list(alice,b.id,{...range,plan_id:plan})).slots;assert.equal(saved.length,6);assert.equal(saved.filter(s=>s.format==='video').length,2);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='creative.video'",[b.id])).rows[0].n,0);
+ const slot=saved.find(s=>s.format==='video'),draft={...slot.video_draft,prompt:'TEST edited video direction'};
+ const edited=await plans.edit(alice,b.id,slot.id,{revision:slot.revision,video_draft:draft});assert.equal(edited.video_draft.prompt,draft.prompt);assert.equal(edited.state,'content_needed');
+ await assert.rejects(plans.edit(bob,b.id,slot.id,{revision:edited.revision,video_draft:draft}));
+ await assert.rejects(plans.edit(alice,b.id,slot.id,{revision:edited.revision,video_draft:{...draft,duration_seconds:60}}));
+ assert.equal((await plans.history(alice,b.id,slot.id)).events.at(-1).snapshot.video_draft.prompt,draft.prompt);
+});

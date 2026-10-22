@@ -133,6 +133,8 @@ class ContentPlanController {
  constructor(@Inject(ContentPlan) private readonly service:ContentPlan,@Inject(Planning) private readonly planning:Planning,@Inject(SlotCreatives) private readonly creatives:SlotCreatives){}
  @Post('content-plan/generate') generate(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.planning.submit(r.actorId,id,body,key);}
  @Get('content-plan/jobs') jobs(@Req() r:AuthRequest,@Param('id') id:string){return this.planning.jobs(r.actorId,id);}
+ @Get('content-plans') catalog(@Req() r:AuthRequest,@Param('id') id:string){return this.service.catalog(r.actorId,id);}
+ @Post('content-plans/:planId/videos') addVideo(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addVideo(r.actorId,id,p,body,key);}
  @Get('content-plans/:planId') detail(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string){return this.planning.detail(r.actorId,id,p);}
  @Post('planning-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.planning.cancel(r.actorId,id,j);}
  @Post('content-plans') create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,id,body,key);}

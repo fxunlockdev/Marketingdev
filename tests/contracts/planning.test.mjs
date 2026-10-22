@@ -45,3 +45,10 @@ test('daily, weekly and custom horizons preserve exact counts and reject out-of-
  }
  for(const days of [0,91,1.5,NaN])assert.throws(()=>validateGeneratedPlan(generatedPlan(input),{...input,duration_days:days}),/PLAN_OUTPUT_INVALID/);
 });
+
+test('mixed plans require the exact video count and complete bounded concepts without enabling generation',()=>{
+ const context={...structuredClone(input),duration_days:6,post_count:6,video_count:2};
+ const plan=generatedPlan(context);assert.equal(validateGeneratedPlan(plan,context).slots.filter(s=>s.format==='video').length,2);
+ for(const change of [p=>p.slots[0]=null,p=>delete p.slots[0].video_draft,p=>p.slots[0].video_draft.duration_seconds=60,p=>p.slots[0].video_draft.script='',p=>p.slots[0].video_draft.approved=true,p=>p.slots[2].format='video']){const bad=structuredClone(plan);change(bad);assert.throws(()=>validateGeneratedPlan(bad,context));}
+ for(const video_count of [-1,7,1.5])assert.throws(()=>validateGeneratedPlan(plan,{...context,video_count}));
+});

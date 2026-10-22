@@ -2,22 +2,25 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import {Field,Notice} from './primitives';
-import {localCandidates} from '../../api/src/local-calendar';
+import {localCandidates,localMinute} from '../../api/src/local-calendar';
 import {useUnsavedChanges} from './unsaved';
 type Business={id:string;role:string};
 const active=(status:string)=>['queued','running','retrying'].includes(status);
 export function VideoRequest({business,threadId,reference}:{business:Business;threadId:string;reference:{export_id:string;approval_id:string;source_sha256:string;export_sha256:string}}){
  const [prompt,setPrompt]=useState(''),[duration,setDuration]=useState(5),[channel,setChannel]=useState('instagram'),[enabled,setEnabled]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[notice,setNotice]=useState('');
+ const [slot,setSlot]=useState<any>(),[slotLoading,setSlotLoading]=useState(true);
  const key=useRef(crypto.randomUUID());useUnsavedChanges(!!prompt||busy);
+ useEffect(()=>{let valid=true;const id=new URLSearchParams(location.search).get('slot');if(!id){setSlotLoading(false);return;}void api(`/api/v1/businesses/${business.id}/content-slots/${id}`).then(v=>{if(!valid)return;if(v.slot.format!=='video')throw new Error('Choose a video calendar post.');setSlot(v.slot);setChannel(v.slot.channel);setDuration(v.slot.video_draft?.duration_seconds??5);setPrompt(v.slot.video_draft?`${v.slot.video_draft.storyline}\nScript: ${v.slot.video_draft.script}\nPrompt: ${v.slot.video_draft.prompt}`:v.slot.brief);setSlotLoading(false);}).catch(e=>{if(valid)setError(e);});return()=>{valid=false;};},[business.id]);
  useEffect(()=>{let valid=true;void api(`/api/v1/businesses/${business.id}/videos`).then(v=>{if(valid)setEnabled(v.configured);}).catch(e=>{if(valid)setError(e);});return()=>{valid=false;};},[business.id]);
- async function submit(){setBusy(true);setError(undefined);try{await api(`/api/v1/businesses/${business.id}/canvas/threads/${threadId}/videos`,{prompt,channel,duration_seconds:duration,reference:{...reference,confirmed:true}},'POST',key.current);key.current=crypto.randomUUID();setPrompt('');setNotice('Preparing your video script. Review and approve its prompt in Videos before generation.');window.dispatchEvent(new Event('desvio-video-refresh'));}catch(e){setError(e);}finally{setBusy(false);}}
+ async function submit(){setBusy(true);setError(undefined);try{await api(`/api/v1/businesses/${business.id}/canvas/threads/${threadId}/videos`,{prompt,channel,duration_seconds:duration,...(slot?{slot_id:slot.id,slot_revision:slot.revision}:{}),reference:{...reference,confirmed:true}},'POST',key.current);key.current=crypto.randomUUID();setPrompt('');setNotice('Preparing your video script. Review and approve its prompt in Videos before generation.');window.dispatchEvent(new Event('desvio-video-refresh'));}catch(e){setError(e);}finally{setBusy(false);}}
  return <details><summary>Make a video from this approved image</summary>
+ {slot&&<p>This video is linked to your saved calendar post. The result will attach as a draft if that post has not changed.</p>}
  <p>First draft a script and prompt. Video generation starts only after you approve that draft. Drafting uses your text-model allowance.</p>
  {error!==undefined&&<Notice error={error}/>}<p role="status">{notice}</p>
- {!enabled?<p>Video generation is not configured yet.</p>:<fieldset disabled={busy||business.role==='viewer'}>
+ {!enabled?<p>Video generation is not configured yet.</p>:<fieldset disabled={busy||slotLoading||business.role==='viewer'}>
  <Field label="Video idea">{id=><textarea id={id} value={prompt} maxLength={4000} onChange={e=>{setPrompt(e.target.value);key.current=crypto.randomUUID();}}/>}</Field>
  <Field label="Video length (seconds)">{id=><input id={id} type="number" min={3} max={15} value={duration} onChange={e=>{setDuration(Number(e.target.value));key.current=crypto.randomUUID();}}/>}</Field>
- <Field label="Video channel">{id=><select id={id} value={channel} onChange={e=>{setChannel(e.target.value);key.current=crypto.randomUUID();}}><option value="instagram">Instagram</option><option value="linkedin">LinkedIn</option></select>}</Field>
+ <Field label="Video channel">{id=><select id={id} disabled={!!slot} value={channel} onChange={e=>{setChannel(e.target.value);key.current=crypto.randomUUID();}}><option value="instagram">Instagram</option><option value="linkedin">LinkedIn</option></select>}</Field>
  <button type="button" disabled={!prompt.trim()||duration<3||duration>15} onClick={()=>void submit()}>{busy?'Preparing…':'Draft video script'}</button>
  </fieldset>}</details>;
 }
@@ -70,15 +73,22 @@ export function VideoReview({business,id,historical=false,previewOnly=false,onRe
 }
 
 function VideoCalendar({business,version,id}:{business:Business;version:any;id:string}){
- const [local,setLocal]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[saved,setSaved]=useState('');
- const key=useRef(crypto.randomUUID());const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
-
+ const [local,setLocal]=useState(''),[plans,setPlans]=useState<any[]>([]),[planId,setPlanId]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[saved,setSaved]=useState('');
+ const key=useRef(crypto.randomUUID());const selected=plans.find(p=>p.id===planId),timezone=selected?.timezone??Intl.DateTimeFormat().resolvedOptions().timeZone;
+ useEffect(()=>{let valid=true;void api(`/api/v1/businesses/${business.id}/content-plans`).then(v=>{if(valid)setPlans(v.plans);}).catch(e=>{if(valid)setError(e);});if(version.slot_id)void api(`/api/v1/businesses/${business.id}/content-slots/${version.slot_id}`).then(v=>{if(valid)setSaved(`/b/${business.id}/content-plan?start=${localMinute(v.slot.planned_at,v.slot.timezone).slice(0,10)}&slot=${v.slot.id}`);}).catch(e=>{if(valid)setError(e);});return()=>{valid=false;};},[business.id,version.slot_id]);
  async function save(){setBusy(true);setError(undefined);try{
   const candidates=localCandidates(local,timezone);if(candidates.length!==1)throw new Error('Choose an unambiguous local time outside the daylight-saving change.');
   const root=`/api/v1/businesses/${business.id}`,starts=local.slice(0,10);
-  const plan=await api(root+'/content-plans',{title:'Video content',objective:'Review and prepare this saved video',starts_on:starts,timezone,slots:[{channel:version.channel,planned_at:candidates[0],format:'video',brief:version.caption||'Review this saved video',video_version_id:id}]},'POST',key.current);
+  if(planId){const result=await api(`${root}/content-plans/${planId}/videos`,{channel:version.channel,planned_at:candidates[0],brief:version.caption||'Review this saved video',video_version_id:id},'POST',key.current);setSaved(`/b/${business.id}/content-plan?start=${starts}&slot=${result.id}`);}
+  else {const plan=await api(root+'/content-plans',{title:'Video content',objective:'Review and prepare this saved video',starts_on:starts,timezone,slots:[{channel:version.channel,planned_at:candidates[0],format:'video',brief:version.caption||'Review this saved video',video_version_id:id}]},'POST',key.current);
   const result=await api(root+'/content-plan?'+new URLSearchParams({start:candidates[0],end:new Date(Date.parse(candidates[0])+86400000).toISOString(),plan_id:plan.id}));
-  setSaved(`/b/${business.id}/content-plan?start=${starts}&slot=${result.slots[0].id}`);
+  setSaved(`/b/${business.id}/content-plan?start=${starts}&slot=${result.slots[0].id}`);}
  }catch(e){setError(e);}finally{setBusy(false);}}
- return <details><summary>Add video to calendar</summary><p>This adds a draft for review. It does not schedule or publish it.</p>{error!==undefined&&<Notice error={error}/>}<fieldset disabled={busy||!!saved}><Field label={`Video calendar time (${timezone})`}>{field=><input id={field} type="datetime-local" value={local} onChange={e=>{setLocal(e.target.value);key.current=crypto.randomUUID();}}/>}</Field><button type="button" disabled={!local} onClick={()=>void save()}>Add saved video to calendar</button></fieldset>{saved&&<a href={saved}>Open video in calendar</a>}</details>;
+ if(version.slot_id)return <p>{error!==undefined&&<Notice error={error}/>}<a href={saved||undefined}>Open linked video post in calendar</a></p>;
+ return <details><summary>Add video to calendar</summary><p>This adds a draft for review. It does not schedule or publish it.</p>{error!==undefined&&<Notice error={error}/>}<fieldset disabled={busy||!!saved}><Field label="Video calendar plan">{field=><select id={field} value={planId} onChange={e=>{setPlanId(e.target.value);setLocal('');key.current=crypto.randomUUID();}}><option value="">New plan</option>{plans.map(p=><option key={p.id} value={p.id}>{p.title} · {p.starts_on} · {p.duration_days} days</option>)}</select>}</Field><Field label={`Video calendar time (${timezone})`}>{field=><input id={field} type="datetime-local" value={local} onChange={e=>{setLocal(e.target.value);key.current=crypto.randomUUID();}}/>}</Field><button type="button" disabled={!local} onClick={()=>void save()}>Add saved video to calendar</button></fieldset>{saved&&<a href={saved}>Open video in calendar</a>}</details>;
+}
+export function CanvasVideoContext({businessId}:{businessId:string}){
+ const [slot,setSlot]=useState<any>(),[error,setError]=useState<unknown>();
+ useEffect(()=>{let valid=true;const id=new URLSearchParams(location.search).get('slot');if(id)void api(`/api/v1/businesses/${businessId}/content-slots/${id}`).then(v=>{if(valid)setSlot(v.slot);}).catch(e=>{if(valid)setError(e);});return()=>{valid=false;};},[businessId]);
+ return error!==undefined?<Notice error={error}/>:slot?<section className="v5-panel" aria-label="Video calendar context"><h2>Create your planned video</h2><p>{slot.brief}</p><p>Choose or create an approved reference image below, then select “Make a video from this approved image”. Your saved script and prompt will be prefilled for review.</p></section>:null;
 }

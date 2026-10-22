@@ -85,8 +85,8 @@ export class PlanningJobs {
       VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify(result.plan),JSON.stringify(manifest),input.duration_days??30]);
     for(const [index,s] of result.plan.slots.entries()){
      const sid=randomUUID();
-     await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[sid,j.organization_id,j.brand_id,planId,s.channel,s.planned_at,s.format,s.brief,s.pillar,s.hook,s.cta,j.requested_by,index]);
+     await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index,video_draft)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,[sid,j.organization_id,j.brand_id,planId,s.channel,s.planned_at,s.format,s.brief,s.pillar,s.hook,s.cta,j.requested_by,index,s.video_draft?JSON.stringify(s.video_draft):null]);
      const snapshot={...s,plan_id:planId,origin:'generated',strategy_slot_index:index,state:'content_needed',creative_version_id:null,creative_sha256:null};
      await db.query(`INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,feedback,snapshot)
        VALUES($1,$2,$3,$4,1,'created',$5,'',$6)`,[randomUUID(),j.organization_id,j.brand_id,sid,j.requested_by,JSON.stringify(snapshot)]);
