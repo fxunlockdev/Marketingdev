@@ -760,6 +760,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false),
     [confirmed, setConfirmed] = useState(false),
+    [visualEditing,setVisualEditing] = useState(false),
     [dirty, setDirty] = useState(false);
   const path = scopePath(business);
   useUnsavedChanges(dirty && !busy);
@@ -863,7 +864,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
         </section>
       ) : state.step === 2 ? (
         <>
-          <BrandReview business={business} onChange={setBrain} />
+          <BrandReview business={business} onChange={setBrain} onVisualEditing={setVisualEditing} />
           <BrandFiles
             org={{
               id: business.organization_id,
@@ -872,12 +873,13 @@ export function BrandOnboarding({ business }: { business: Business }) {
             }}
             brandId={business.id}
           />
+          {visualEditing&&<p role="status">Save or discard your visual edit before continuing to goals.</p>}
           <div className="wizard-actions">
             <a href="/brands">Your businesses</a>
             {writable && (
               <button
                 className="primary"
-                disabled={busy}
+                disabled={busy||visualEditing}
                 onClick={() => void save(3)}
               >
                 Save & continue to goals →
@@ -1047,9 +1049,11 @@ export function BrandOnboarding({ business }: { business: Business }) {
 function BrandReview({
   business,
   onChange,
+  onVisualEditing,
 }: {
   business: Business;
   onChange: (brain: any) => void;
+  onVisualEditing: (editing:boolean) => void;
 }) {
   const [brain, setBrain] = useState<any>(),
     [assets, setAssets] = useState<any[]>([]),
@@ -1127,7 +1131,7 @@ function BrandReview({
   return (
     <>
       <BrandIntake business={business} onComplete={() => void load()} />
-      <VisualReview state={brain?.visuals} path={path} writable={writable} onSaved={load} />
+      <VisualReview state={brain?.visuals} path={path} writable={writable} onSaved={load} onEditingChange={onVisualEditing} />
       <section className="v5-panel">
         <div className="section-heading">
           <div>
