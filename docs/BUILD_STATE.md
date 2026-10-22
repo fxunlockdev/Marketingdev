@@ -2,6 +2,13 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Current session — packaged video rendering and timed overlays
+
+- Previous goal turn was verified progress: PR #27 connected approved references to Canvas image creation/editing and passed six local suites. Continuing the complete goal on `codex/pr-28-video-rendering`; the preserved video-reference stash is unchanged.
+- The existing ARM64 FFmpeg stage now builds into a pinned image instead of loading runtime/dependencies from host mounts. Exact archive acquisition uses signed official APT and offline digest verification/build. `apps/api/src/video-renderer.ts` runs it with bounded stdin/stdout and sandbox restrictions, then validates byte hashes, media metadata, poster decode and source/recipe provenance.
+- Timed caption/CTA overlays use fixed fonts, literal text files and validated layout/colors/times. Actual decoded-frame tests verify timing; malformed timelines and filter-like text are covered. Fourteen native tests and two real Node adapter tests passed in development. Final source-bound runtime/offline/contracts verification is next.
+- No customer video control is enabled yet. Remaining connected work: approved image leases → original video skill plan → existing durable Higgsfield stage → safe download/render → immutable private video/poster/version → review/revision UI. Cloud/AMD64 runtime, broad typography/composition and live acceptance remain open. Full eleven-module goal remains active.
+
 ## Current session — approved brand references in Canvas
 
 - Previous goal turn was verified progress: PR #26 passed all six local suites for document onboarding. Continuing on `codex/pr-27-brand-references`, preserving the complete eleven-module goal.

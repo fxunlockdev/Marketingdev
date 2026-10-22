@@ -8,15 +8,19 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import sys
 
 root = Path(__file__).resolve().parent.parent
-pins = json.loads((root / "apps/ingestion/debian-document-arm64-packages.json").read_text())
+kind = sys.argv[1] if len(sys.argv) == 2 else "document"
+if kind not in {"document", "video"}:
+    raise ValueError("Unsupported native archive set")
+pins = json.loads((root / ("apps/video/debian-arm64-packages.json" if kind == "video" else "apps/ingestion/debian-document-arm64-packages.json")).read_text())
 packages = []
 for pin in pins:
     if not re.fullmatch(r"[a-z0-9][a-z0-9+.-]*", pin["Package"]) or not re.fullmatch(r"[a-zA-Z0-9+.:~_-]+", pin["Version"]):
         raise ValueError("Invalid package pin")
     packages.append(pin["Package"] + "=" + pin["Version"])
-bundle = root / "work/document-deps-arm64"
+bundle = root / f"work/{kind}-deps-arm64"
 for name in ["lists", "debs", "log"]:
     (bundle / name).mkdir(parents=True, exist_ok=True)
 (bundle / "apt.conf").write_text('''Dir::State::lists "/bundle/lists";
@@ -39,4 +43,4 @@ subprocess.run(["docker", "run", "--rm", "--read-only", "--cap-drop=ALL", "--sec
 for pin in pins:
     if hashlib.sha256((bundle / "debs" / pin["filename"]).read_bytes()).hexdigest() != pin["sha256"]:
         raise ValueError("Document archive digest mismatch: " + pin["Package"])
-print("Verified", len(pins), "pinned native document archives")
+print("Verified", len(pins), f"pinned native {kind} archives")

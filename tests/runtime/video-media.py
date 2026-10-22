@@ -103,6 +103,36 @@ class MediaTests(unittest.TestCase):
         self.assertIn('--enable-gpl',version)
         self.assertIn('--enable-libx264',version)
 
+    def test_timed_overlay_changes_real_pixels_only_within_its_time_window(self):
+        source = self.root/'black.mp4'
+        media.command('ffmpeg',['-v','error','-f','lavfi','-i','color=black:size=320x180:duration=3:rate=30','-c:v','libx264','-threads','1','-pix_fmt','yuv420p',str(source)])
+        value=self.request(source.read_bytes())
+        value['overlays']=[{'text':"Book now: 50% off",'start_ms':1000,'end_ms':2000,'position':'bottom','foreground':'#ffffff','background':'#ff0000'}]
+        result=media.run(value)
+        self.assertEqual(result['overlays'],value['overlays'])
+        clip=self.root/'overlay.mp4';clip.write_bytes(base64.b64decode(result['video']['base64']))
+        for index,time in enumerate([0.5,1.5,2.5]):
+            raw=self.root/f'pixels-{index}.rgb'
+            media.command('ffmpeg',['-v','error','-ss',str(time),'-i',str(clip),'-frames:v','1','-vf','crop=320:60:0:120','-pix_fmt','rgb24','-f','rawvideo',str(raw)])
+            pixels=raw.read_bytes();red=sum(pixels[i]>120 and pixels[i]>pixels[i+1]*2 and pixels[i]>pixels[i+2]*2 for i in range(0,len(pixels),3))
+            if index==1:self.assertGreater(red,200)
+            else:self.assertEqual(red,0)
+
+    def test_overlay_text_is_literal_and_does_not_enter_filter_expressions(self):
+        value=self.request()
+        value['overlays']=[{'text':"%{metadata:secret}; ' [x] \\ test",'start_ms':0,'end_ms':3000,'position':'top','foreground':'#ffffff','background':'#000000'}]
+        result=media.run(value)
+        self.assertEqual(result['overlays'],value['overlays'])
+        self.assertNotEqual(result['video']['sha256'],media.run(self.request())['video']['sha256'])
+
+    def test_overlay_fields_colors_times_and_collisions_are_bounded(self):
+        good={'text':'Buy now','start_ms':0,'end_ms':2000,'position':'bottom','foreground':'#ffffff','background':'#000000'}
+        for change in [{'text':'x'*91},{'text':'bad\x00text'},{'start_ms':True},{'end_ms':4000},{'start_ms':1500},{'position':'file:///etc/passwd'},{'foreground':'red;movie=/etc/passwd'},{'textfile':'/etc/passwd'}]:
+            with self.subTest(change=change),self.assertRaisesRegex(media.Invalid,'VIDEO_OVERLAY_INVALID'):
+                media.validate_overlays([{**good,**change}],3)
+        with self.assertRaisesRegex(media.Invalid,'VIDEO_OVERLAY_INVALID'):media.validate_overlays([good,good],3)
+        with self.assertRaisesRegex(media.Invalid,'VIDEO_OVERLAY_INVALID'):media.validate_overlays([good]*4,3)
+
     def test_decoder_timeout_fails_closed(self):
         with self.assertRaisesRegex(media.Invalid,'VIDEO_MEDIA_TIMEOUT'):
             media.command('ffmpeg',['-f','lavfi','-i','testsrc2=size=320x180:rate=30:duration=100','-f','null','-'],timeout=0.001)
