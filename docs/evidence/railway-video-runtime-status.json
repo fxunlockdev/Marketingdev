@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-22T08:20:53.468Z",
+  "scope": "Read-only status of existing infrastructure; not an application deployment, source-equivalence check or live provider verification.",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "0ca68498-6559-4b95-9788-34a5ff703dc0",
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "## Environment: production (0ca68498-6559-4b95-9788-34a5ff703dc0)\n\nService | Status | Active Deployments | Latest Deploy\n--------|--------|-------------------|---------------\nPostgres | SUCCESS | 1 | 2026-10-21 02:07:00.431 UTC\ndesvio-postiz | SUCCESS | 1 | 2026-10-21 02:09:35.081 UTC\ndesvio-temporal | SUCCESS | 1 | 2026-10-21 02:17:35.708 UTC\nRedis | SUCCESS | 1 | 2026-10-21 02:07:03.905 UTC\n"
+      }
+    ],
+    "isError": false
+  }
+}
