@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import {BrandReferences} from "./brand-references";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor, type Design } from "./creative-editor";
@@ -89,6 +90,7 @@ function problem(code: string | null) {
     return "The provider outcome is uncertain. Further generation is held until it is reconciled to avoid a duplicate charge.";
   if (/VERSION_CHANGED/.test(code))
     return "The creative changed while this request was running. Your newer edits have been preserved.";
+  if (/REFERENCE_REVOKED/.test(code)) return "An image reference is no longer approved. Remove it from your selection before sending a new request.";
   if (/ACCESS/.test(code))
     return "Access changed before this request could finish.";
   return "This request could not finish. Your saved versions are still available.";
@@ -101,6 +103,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     [projectId, setProjectId] = useState(""),
     [error, setError] = useState<unknown>(),
     [prompt, setPrompt] = useState(""),
+    [referenceIds,setReferenceIds]=useState<string[]>([]),
     [channel, setChannel] = useState("instagram"),
     [format, setFormat] = useState("static"),
     [size, setSize] = useState("1024x1024"),
@@ -111,7 +114,7 @@ export function CanvasScreen({ business }: { business: Business }) {
   const submitKey = useRef(crypto.randomUUID()),
     threadKey = useRef(crypto.randomUUID()),
     write = business.role !== "viewer";
-  useUnsavedChanges(dirty || !!prompt || busy);
+  useUnsavedChanges(dirty || !!prompt || busy || referenceIds.length>0);
   const refreshThreads = useCallback(async () => {
     const list = await api(root + "/canvas/threads");
     setThreads(list.threads);
@@ -176,6 +179,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     setConversation(undefined);
     setProjectId("");
     setEdit(null);
+    setReferenceIds([]);
     setPrompt("");
     setDirty(false);
     setError(undefined);
@@ -213,12 +217,14 @@ export function CanvasScreen({ business }: { business: Business }) {
             ? `${edit.version.design.width}x${edit.version.design.height}`
             : size,
           parent_version_id: edit?.version.id ?? null,
+          ...(referenceIds.length?{reference_ids:referenceIds}:{}),
         },
         "POST",
         submitKey.current,
       );
       submitKey.current = crypto.randomUUID();
       setPrompt("");
+      setReferenceIds([]);
       setEdit(null);
       setRevision((n) => n + 1);
     } catch (e) {
@@ -327,6 +333,7 @@ export function CanvasScreen({ business }: { business: Business }) {
               disabled={!write || busy || held || !business.has_approved_brand}
             >
               <legend>{edit ? "Revise this image" : "Create an image"}</legend>
+              <BrandReferences businessId={business.id} writable={write} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!write||busy||held||!business.has_approved_brand}/>
               {edit && (
                 <p>
                   Editing the selected saved version.{" "}

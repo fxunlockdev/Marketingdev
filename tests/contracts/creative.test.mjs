@@ -148,3 +148,20 @@ test("creative brief citations and editable layers reject forged references and 
       /DESIGN_INVALID/,
     );
 });
+
+test('multiple image references preserve ordered multipart bytes and reject invalid input before submission (MOCK)',async()=>{
+ const png=await sharp({create:{width:1024,height:1024,channels:3,background:'#ff8800'}}).png().toBuffer();
+ let calls=0;
+ const provider=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
+  if(String(url).startsWith('data:'))return fetch(url,init);
+  calls++;assert.equal(new URL(url).pathname,'/v1/images/edits');
+  const files=init.body.getAll('image[]');assert.equal(files.length,4);
+  for(const file of files)assert.deepEqual(Buffer.from(await file.arrayBuffer()),png);
+  return Response.json({created:1,data:[{b64_json:png.toString('base64')}]});
+ }}));
+ await provider.image('gpt-image-fixture','Edit with brand references','1024x1024','low','a'.repeat(64),png,[png,png,png]);
+ assert.equal(calls,1);
+ await assert.rejects(provider.image('gpt-image-fixture','Invalid','1024x1024','low','a'.repeat(64),undefined,[png,png,png,png]),/REFERENCE_INVALID/);
+ await assert.rejects(provider.image('gpt-image-fixture','Invalid','1024x1024','low','a'.repeat(64),undefined,[Buffer.from('invalid')]));
+ assert.equal(calls,1);
+});

@@ -1,3 +1,4 @@
+import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
 import {
   BadRequestException,
   ConflictException,
@@ -44,6 +45,20 @@ export class Canvas {
       (db) => action(db, b),
       id,
     );
+  }
+  references(user:string,id:string){
+    return this.scope(user,id,false,async(db,b)=>({references:(await db.query(`SELECT ${referenceColumns} FROM app.brand_references r ${referenceJoins} WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.revoked_at IS NULL ORDER BY r.approved_at,r.id`,[b.organization_id,id])).rows.map(({object_key,...r}:any)=>r)}));
+  }
+  approveReference(user:string,id:string,body:unknown){return this.scope(user,id,true,(db,b)=>approveReference(db,b.organization_id,id,user,body));}
+  revokeReference(user:string,id:string,referenceId:string){
+    referenceId=uuid(referenceId);
+    return this.scope(user,id,true,async(db,b)=>{
+      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${id.toLowerCase()}`]);
+      if(!(await db.query('SELECT id FROM app.brand_references WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,referenceId])).rowCount)throw new NotFoundException('Reference not found');
+      const changed=await db.query('UPDATE app.brand_references SET revoked_at=now() WHERE id=$1 AND revoked_at IS NULL',[referenceId]);
+      if(changed.rowCount)await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'brand.reference_revoked',$4)",[b.organization_id,id,user,referenceId]);
+      return {revoked:true};
+    });
   }
   list(user: string, id: string) {
     return this.scope(user, id, false, async (db, b) => ({
@@ -153,6 +168,7 @@ export class Canvas {
         "channel",
         "size",
         "parent_version_id",
+        "reference_ids",
       ]),
       prompt = plain(v.prompt, 4000),
       k = key(requestKey);
@@ -164,6 +180,9 @@ export class Canvas {
       throw new BadRequestException(
         "Choose a supported static image format, channel and size",
       );
+    if(v.reference_ids!==undefined&&(!Array.isArray(v.reference_ids)||v.reference_ids.length>3))throw new BadRequestException("Choose up to three approved references");
+    const referenceIds=(v.reference_ids??[]).map((r:unknown)=>uuid(String(r)));
+    if(new Set(referenceIds).size!==referenceIds.length)throw new BadRequestException("Choose each reference once");
     const parent =
         v.parent_version_id === null || v.parent_version_id === undefined
           ? null
@@ -176,6 +195,7 @@ export class Canvas {
           channel: v.channel,
           size: v.size,
           parent,
+          ...(referenceIds.length?{reference_ids:referenceIds}:{}),
         }),
       );
     const action = async (db: any, b: any) => {
@@ -267,6 +287,7 @@ export class Canvas {
           ],
         );
       }
+      if(referenceIds.length&&(await db.query('SELECT id FROM app.brand_references WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[]) AND revoked_at IS NULL',[b.organization_id,id,referenceIds])).rowCount!==referenceIds.length)throw new ConflictException('A reference is unavailable or no longer approved');
       const job = randomUUID();
       await db.query(
         "INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",
@@ -290,6 +311,7 @@ export class Canvas {
           sha,
         ],
       );
+      for(const [position,referenceId] of referenceIds.entries())await db.query('INSERT INTO app.creative_references(organization_id,brand_id,job_id,reference_id,position) VALUES($1,$2,$3,$4,$5)',[b.organization_id,id,job,referenceId,position]);
       await db.query(
         "INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",
         [randomUUID(), b.organization_id, id, threadId, job, prompt],

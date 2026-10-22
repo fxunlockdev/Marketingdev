@@ -1295,3 +1295,8 @@ summary:focus-visible {
  .overview-metric strong { font-size:34px; }
  .publication-consent { font-size:14px; }
 }
+
+.reference-library .reference-list { list-style: none; padding: 0; display: grid; gap: 20px; }
+.reference-library .reference-choice { display: flex; align-items: flex-start; gap: 10px; font-weight: 500; }
+.reference-library .reference-choice input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin: 3px 0 0; padding: 0; }
+.reference-library section { border-top: 1px solid var(--line, #dfcbb7); margin-top: 20px; padding-top: 16px; }

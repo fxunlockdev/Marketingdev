@@ -665,3 +665,57 @@ test('slot promotion failure rolls back version/attachment/event and retries cac
  const calls=planCalls+imageCalls;assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.equal(planCalls+imageCalls,calls);
  const saved=await slotCreatives.detail(alice,brand.id,s.id);assert.equal(saved.generations[0].attachment_status,'attached');assert.equal(saved.events.filter(e=>e.action==='creative_attached').length,1);
 });
+
+test('approved private brand references reach MOCK image edits with immutable provenance, replay and revocation',async()=>{
+ await grant(100000000);
+ const sourceId=randomUUID(),visualId=randomUUID(),captureJob=randomUUID();
+ const jpg=await sharp({create:{width:1440,height:900,channels:3,background:'#2468ac'}}).jpeg().toBuffer();
+ const objectKey=`evidence/${org.id}/${brand.id}/reference-fixture/${digest(jpg)}`;
+ await store.persist(objectKey,jpg,'image/jpeg',digest(jpg));
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'website.extract','succeeded')",[captureJob,org.id,brand.id,alice]);
+ await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,'explicit-test-fixture','{}','https://example.org/')",[sourceId,org.id,brand.id,digest(jpg)]);
+ await admin.query("INSERT INTO app.website_visuals(id,organization_id,brand_id,source_id,job_id,viewport,parser_version,object_key,sha256,bytes,width,height,observations,coverage) VALUES($1,$2,$3,$4,$5,'desktop','explicit-test-fixture',$6,$7,$8,1440,900,'{}','{}')",[visualId,org.id,brand.id,sourceId,captureJob,objectKey,digest(jpg),jpg.length]);
+ const approval={kind:'website',visual_id:visualId,label:'Approved blue palette reference',consent:true};
+ await assert.rejects(canvas.approveReference(viewer,brand.id,approval));
+ await assert.rejects(canvas.approveReference(bob,brand.id,approval));
+ await assert.rejects(canvas.approveReference(alice,brand.id,{...approval,consent:false}));
+ const ref=await canvas.approveReference(alice,brand.id,approval);
+ assert.deepEqual(await canvas.approveReference(alice,brand.id,approval),ref);
+ const listed=(await canvas.references(alice,brand.id)).references;
+ assert.equal(listed.find(r=>r.id===ref.id).sha256,digest(jpg));assert.ok(!JSON.stringify(listed).includes(objectKey));
+ const requestKey=randomUUID(),body={...request('Create using my approved reference'),reference_ids:[ref.id]};
+ const j=await canvas.submit(alice,brand.id,thread.id,body,requestKey);
+ assert.equal((await canvas.submit(alice,brand.id,thread.id,body,requestKey)).id,j.id);
+ await assert.rejects(canvas.submit(alice,brand.id,thread.id,{...body,reference_ids:[]},requestKey),/another creative request/);
+ let uploads=0;
+ transport=async(url,init)=>{
+  if(new URL(url).pathname==='/v1/images/edits'){
+   const files=init.body.getAll('image[]');assert.equal(files.length,1);
+   const bytes=Buffer.from(await files[0].arrayBuffer());assert.equal((await sharp(bytes).metadata()).format,'png');
+   assert.deepEqual(await sharp(bytes).raw().toBuffer(),await sharp(jpg).raw().toBuffer());
+   assert.ok(init.body.get('prompt').includes(approval.label));assert.ok(!init.body.get('prompt').includes(objectKey));uploads++;
+   return Response.json({created:1,data:[{b64_json:png.toString('base64')}]});
+  }
+  return standard(url,init);
+ };
+ try{assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));}finally{transport=undefined;}
+ const v=(await admin.query('SELECT skill_manifest FROM app.creative_versions WHERE job_id=$1',[j.id])).rows[0];
+ assert.equal(Number((await admin.query("SELECT reserved_micros FROM app.creative_calls WHERE job_id=$1 AND step='image'",[j.id])).rows[0].reserved_micros),200000);
+ assert.equal(v.skill_manifest.references[0].source_sha256,digest(jpg));assert.equal(v.skill_manifest.references[0].id,ref.id);assert.equal(uploads,1);
+ assert.equal(await handler.run(scope(j)),'finished');assert.equal(uploads,1);
+ const pending=await canvas.submit(alice,brand.id,thread.id,body,randomUUID()),calls=planCalls+imageCalls;
+ await canvas.revokeReference(alice,brand.id,ref.id);
+ assert.equal(await handler.run(scope(pending)),'rejected');assert.equal((await row(pending)).error_code,'CREATIVE_REFERENCE_REVOKED');assert.equal(planCalls+imageCalls,calls);
+ await assert.rejects(canvas.submit(alice,brand.id,thread.id,body,randomUUID()),/no longer approved/);
+ assert.equal((await canvas.references(alice,brand.id)).references.length,0);
+ const reapproved=await canvas.approveReference(alice,brand.id,approval);
+ assert.notEqual(reapproved.id,ref.id);
+ const damaged=await canvas.submit(alice,brand.id,thread.id,{...body,reference_ids:[reapproved.id]},randomUUID());
+ await admin.query('UPDATE app.website_visuals SET sha256=$2 WHERE id=$1',[visualId,'0'.repeat(64)]);
+ const beforeDamage=planCalls+imageCalls;
+ try{assert.equal(await handler.run(scope(damaged)),'rejected');assert.equal((await row(damaged)).error_code,'CREATIVE_REFERENCE_INVALID');assert.equal(planCalls+imageCalls,beforeDamage);}
+ finally{await admin.query('UPDATE app.website_visuals SET sha256=$2 WHERE id=$1',[visualId,digest(jpg)]);}
+ await database.transaction(alice,org.id,true,async db=>{
+  await assert.rejects(db.query('UPDATE app.brand_references SET label=$2 WHERE id=$1',[reapproved.id,'Tampered']),/permission denied/);
+ },brand.id).catch(e=>{if(!/aborted/.test(e.message))throw e;});
+});
