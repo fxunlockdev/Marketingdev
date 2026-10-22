@@ -70,7 +70,7 @@ const label = (s: string) =>
     succeeded: "Ready to review",
     unknown: "Needs reconciliation",
     failed: "Could not finish",
-    rejected: "Could not start",
+    rejected: "Rejected",
     canceled: "Canceled",
     draft: "Draft",
     in_review: "In review",
@@ -300,7 +300,7 @@ export function CanvasScreen({ business }: { business: Business }) {
                       ? " · cancellation requested"
                       : ""}
                   </span>
-                  {r.error_code && <p>{problem(r.error_code)}</p>}
+                  {r.error_code && r.status !== "canceled" && <p>{problem(r.error_code)}</p>}
                   {running(r) && write && !r.cancel_requested && (
                     <button
                       disabled={busy}
