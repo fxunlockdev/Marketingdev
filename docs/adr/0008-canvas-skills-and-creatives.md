@@ -1,6 +1,6 @@
 # Scoped skill-driven Canvas and immutable creative review
 
-Status: implemented locally, verification in progress. No LIVE_VERIFIED or LAUNCH_READY assertion.
+Status: current local scope implemented and tested (92 passing checks, implementation commit da76771). No LIVE_VERIFIED or LAUNCH_READY assertion.
 
 ## Product behavior
 
