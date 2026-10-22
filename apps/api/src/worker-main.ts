@@ -1,3 +1,4 @@
+import {PublicationJobs} from './publication-jobs.js';
 import {SocialOAuthJobs} from './social-oauth-jobs.js';
 import {SocialJobs,SocialReadRetry} from './social-jobs.js';
 import {ExportJobs} from './export-jobs.js';
@@ -32,12 +33,16 @@ const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new WebsiteParser(config.documentImage),new BrandAnalyzer(process.env.OPENAI_API_KEY),undefined,new VisualCrawler(config.documentImage));
 const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
+const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled);
 const social=new SocialJobs(jobs,config.social);
 const socialOAuth=new SocialOAuthJobs(jobs,config.social,config.oauthEncryptionKey);
 const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
 const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue,config.provisionTaskQueue);
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),
   maxConcurrentActivityTaskExecutions:2,activities:{
+    publishSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.run(scope);}catch(e){throw ApplicationFailure.create({message:'Publication processing unavailable',type:'PublicationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
+    reconcileSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.reconcile(scope);}catch(e){throw ApplicationFailure.create({message:'Publication check unavailable',type:'PublicationCheckUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
+    failPublication:async(scope:JobScope)=>publication.fail(scope),
     authorizeSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await socialOAuth.run(scope);}catch(e){throw ApplicationFailure.create({message:'Authorization processing unavailable',type:'SocialAuthorizationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     failSocialOAuth:async(scope:JobScope)=>socialOAuth.fail(scope),
     syncSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await social.run(scope);}catch(e){throw ApplicationFailure.create({message:'Connection check temporarily unavailable',type:'SocialUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},

@@ -1,4 +1,4 @@
-import {proxyActivities} from '@temporalio/workflow';
+import {proxyActivities,sleep} from '@temporalio/workflow';
 import type {JobScope} from './jobs.js';
 type Activities={validate(scope:JobScope):Promise<string>;fail(scope:JobScope):Promise<string>};
 const validation=proxyActivities<Activities>({startToCloseTimeout:'90 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'1 second',maximumInterval:'5 seconds',maximumAttempts:4}});
@@ -44,3 +44,21 @@ type OAuthActivities={authorizeSocial(scope:JobScope):Promise<string>;failSocial
 const oauth=proxyActivities<OAuthActivities>({startToCloseTimeout:'120 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'30 seconds',maximumInterval:'2 minutes',maximumAttempts:3}});
 const oauthFinalization=proxyActivities<OAuthActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
 export async function authorizeSocialWorkflow(scope:JobScope){try{return await oauth.authorizeSocial(scope);}catch{return await oauthFinalization.failSocialOAuth(scope);}}
+
+
+type PublicationActivities={publishSocial(scope:JobScope):Promise<string>;reconcileSocial(scope:JobScope):Promise<{state:string;scheduledAt?:string}>;failPublication(scope:JobScope):Promise<string>};
+const publication=proxyActivities<PublicationActivities>({startToCloseTimeout:'3 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'30 seconds',maximumInterval:'2 minutes',maximumAttempts:3}});
+const publicationFinalization=proxyActivities<PublicationActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function reconcileSocialWorkflow(scope:JobScope){try{return await publication.reconcileSocial(scope);}catch{return await publicationFinalization.failPublication(scope);}}
+export async function publishSocialWorkflow(scope:JobScope){
+ let outcome:string;try{outcome=await publication.publishSocial(scope);}catch{return await publicationFinalization.failPublication(scope);}
+ if(outcome!=='accepted')return outcome;
+ // Durable bounded observation: no automatic resubmission, even for missing posts.
+ for(let i=0;i<26;i++){
+  let observation;try{observation=await publication.reconcileSocial(scope);}catch{return 'accepted_check_unavailable';}
+  if(['published','failed','check_failed'].includes(observation.state))return observation.state;
+  const until=observation.scheduledAt?Date.parse(observation.scheduledAt)-Date.now():0;
+  await sleep(i===0?Math.max(15000,until+15000):3600000);
+ }
+ return 'accepted_unconfirmed';
+}
