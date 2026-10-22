@@ -2,7 +2,6 @@
   "passed": false,
   "errors": [
     "Failed or stale security evidence",
-    "Failed or stale browser evidence",
     "Product E2E, deployed provider-worker tenant isolation and trusted live evidence runner are NOT_IMPLEMENTED; local auth/storage/validation-worker tests are not launch proof",
     "Overall release state is BLOCKED"
   ]
