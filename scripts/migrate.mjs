@@ -9,6 +9,14 @@ export async function migrate(pool) {
   try {
     await db.query('BEGIN');
     await db.query(`SELECT pg_advisory_xact_lock(724106230)`);
+    await applyMigrations(db);
+    await db.query('COMMIT');
+  } catch (error) { await db.query('ROLLBACK'); throw error; }
+  finally { db.release(); }
+}
+
+// Caller owns the transaction; bootstrap uses this to create roles and schema atomically.
+export async function applyMigrations(db) {
     await db.query(`CREATE SCHEMA IF NOT EXISTS desvio_migrations;
       REVOKE ALL ON SCHEMA desvio_migrations FROM PUBLIC;
       CREATE TABLE IF NOT EXISTS desvio_migrations.applied(name text PRIMARY KEY, sha256 text NOT NULL, applied_at timestamptz NOT NULL DEFAULT now())`);
@@ -24,9 +32,6 @@ export async function migrate(pool) {
       await db.query(sql);
       await db.query('INSERT INTO desvio_migrations.applied(name,sha256) VALUES ($1,$2)', [name,hash]);
     }
-    await db.query('COMMIT');
-  } catch (error) { await db.query('ROLLBACK'); throw error; }
-  finally { db.release(); }
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

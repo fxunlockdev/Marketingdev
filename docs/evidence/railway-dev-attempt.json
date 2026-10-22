@@ -1,0 +1,17 @@
+{
+  "generated_by": "captured Railway MCP create_environment response",
+  "checked_at": "2026-10-22T06:54:06.491Z",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "requested_environment": "dev",
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "tool call error: tool call failed for `railway/create_environment`\n\nCaused by:\n    Mcp error: -32603: Failed to create environment: Deploys have been paused due to an upstream issue"
+      }
+    ],
+    "isError": true
+  },
+  "dev_app_deployed": false,
+  "scope": "Environment creation result only; no service runtime or provider verification"
+}

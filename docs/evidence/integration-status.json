@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "88b1c6ba2f582c710cdabc83a5a3d70be0739bb0",
-  "checked_at": "2026-10-22T06:31:44.446083+00:00",
+  "code_commit": "f4f3b9e5934ad8ff537416b1c8ac684668e03eda",
+  "checked_at": "2026-10-22T07:03:51.008563+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/deployment.json",
         "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
@@ -81,6 +82,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/deployment.json",
         "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
@@ -96,6 +98,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/deployment.json",
         "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
@@ -301,6 +304,14 @@
         "docs/evidence/publishing-ui.json"
       ],
       "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
+    },
+    "deployment_bootstrap": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/deployment.json"
+      ],
+      "blocked_reason": "Actual disposable PostgreSQL role/migration bootstrap, rollback/replay/credential-drift rejection, cloud-address API startup and real generated standalone Next/browser/proxy/shutdown smoke tested on the host. Pinned Node registry manifests and Dockerfiles are prepared, not container-build/deployed proof. Railway dev creation, Linux image acceptance, private sandbox workers, operator setup, cloud security and live providers remain incomplete."
     }
   },
   "security": {

@@ -1,9 +1,11 @@
+import {listenAddress} from './listen.js';
 import { createApplication } from './app.js';
 import { configFromEnv } from './config.js';
 import { setTimeout } from 'node:timers/promises';
 
+const address=listenAddress();
 const runtime = await createApplication(configFromEnv());
-await runtime.app.listen(Number(process.env.PORT ?? 3100), '127.0.0.1');
+try{await runtime.app.listen(address.port,address.host);}catch{await runtime.close();throw new Error('API listener could not start');}
 let stopping=false;
 const mailLoop=(async()=>{
   while(!stopping) {

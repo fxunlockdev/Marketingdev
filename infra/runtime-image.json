@@ -1,0 +1,31 @@
+{
+  "image": "node:26.5.0-bookworm-slim",
+  "digest": "sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb",
+  "registry": "https://registry-1.docker.io/v2/library/node/manifests/26.5.0-bookworm-slim",
+  "checked_at": "2026-10-22T06:46:58.977918+00:00",
+  "platforms": [
+    {
+      "digest": "sha256:607728e8751f69809c871e2cfa65d645f51ffacb5a0e9fc60f4cb7404ee5c16a",
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "digest": "sha256:9e5d714311940c098479ec352029af6df1d9a2dc4269b29373c616f51640dd67",
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux",
+        "variant": "v8"
+      }
+    },
+    {
+      "digest": "sha256:b0b02b4e1477c074c1a098b7966f52a0d719a0ee4c7f2925216c7b23dbe260e5",
+      "platform": {
+        "architecture": "ppc64le",
+        "os": "linux"
+      }
+    }
+  ],
+  "evidence_scope": "Registry manifest only; container build/runtime and vulnerability acceptance remain unverified."
+}
