@@ -11,6 +11,7 @@ from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
+    "publishing-ui": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--publishing-web"]],
     "publishing": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--publishing"]],
     "connections": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--social-web"]],
     "social": [["npm", "run", "build"], ["node", "--test", "tests/contracts/postiz.test.mjs", "tests/contracts/provisioning.test.mjs"], ["node", "scripts/foundation-test.mjs", "--social"]],
@@ -116,7 +117,14 @@ def write_status():
     publishing_ready = social_ready and publishing.get("passed") is True and publishing.get("source_sha256") == source_hash()
     integrations["postiz_publish"] = {"state": "ADAPTER_READY" if publishing_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/social.json", "docs/evidence/publishing.json"],
-        "blocked_reason": "Actual local session/RLS, exact approved Fabric-rendered PNG/private S3, dispatcher and Temporal publication/reconciliation use an explicitly MOCK Postiz HTTP server. Explicit destination consent, expiring staging allowlists, immutable snapshots/history and unknown-write holds tested. No actual social publication, deployed/runtime equivalence or launch proof. Customer publishing UI, remote cancellation/rescheduling, operator recovery, other channels/formats, analytics and live acceptance remain incomplete."}
+        "blocked_reason": "Actual local session/RLS, exact approved Fabric-rendered PNG/private S3, dispatcher and Temporal publication/reconciliation use an explicitly MOCK Postiz HTTP server. Explicit destination consent, expiring staging allowlists, immutable snapshots/history and unknown-write holds tested. No actual social publication, deployed/runtime equivalence or launch proof. Customer publishing UI has separate focused evidence. Remote cancellation/rescheduling, operator recovery, other channels/formats, analytics and live acceptance remain incomplete."}
+    publishing_ui_path = EVIDENCE / "publishing-ui.json"
+    publishing_ui = json.loads(publishing_ui_path.read_text()) if publishing_ui_path.exists() else {}
+    publishing_ui_ready = publishing_ready and publishing_ui.get("passed") is True and publishing_ui.get("source_sha256") == source_hash()
+    for capability in ["customer_publishing_ui", "business_overview"]:
+        integrations[capability] = {"state": "ADAPTER_READY" if publishing_ui_ready else "NOT_IMPLEMENTED", "live_test": False,
+            "evidence": ["docs/evidence/social.json", "docs/evidence/publishing.json", "docs/evidence/publishing-ui.json"],
+            "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."}
     update_matrix(ROOT, foundation_passed and browser_passed, creative_ready)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
@@ -143,6 +151,7 @@ def run_suite(name):
     scopes["social"] = "Real local authentication, PostgreSQL forced RLS, encrypted per-business credentials and Temporal connection-refresh jobs; audited Postiz HTTP contracts against an explicitly MOCK local server; session-bound authorization/callback jobs with MOCK Postiz; no social OAuth or publication to an external provider"
     scopes["connections"] = "Actual Next/Nest/Better Auth/PostgreSQL/Temporal/private provisioning worker browser journey; explicitly MOCK Postiz HTTP and LinkedIn consent; no external OAuth, paid models, deployment or publishing. Focused suite does not replace full browser/security gates."
     scopes["publishing"] = "Actual local auth, forced PostgreSQL RLS, approved creative fixtures, network-disabled canonical Fabric rendering/private S3, dispatcher and Temporal; explicitly MOCK Postiz upload/schedule/status HTTP. No actual OAuth/social publication or deployed/live acceptance; focused backend suite does not replace full security/browser gates."
+    scopes["publishing-ui"] = "Actual Next/Nest/Better Auth/PostgreSQL RLS/private S3/canonical Fabric renderer/Temporal browser journeys; exact approved fixture image and destination/time consent, published/uncertain/missing observations, history, cancellation and lost-client-response recovery, stale approval/preview integrity, readonly/foreign/business switching, genuine overview counts and desktop/mobile accessibility. Explicitly MOCK Postiz HTTP; no real social post or live/deployed evidence. Focused suite does not replace full security/browser gates."
     finished_hash = source_hash()
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,

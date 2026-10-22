@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "6d0e66accf16e18f3cd26c77d372d4c008586c4e",
-  "checked_at": "2026-10-22T06:00:24.019255+00:00",
+  "code_commit": "88b1c6ba2f582c710cdabc83a5a3d70be0739bb0",
+  "checked_at": "2026-10-22T06:31:44.446083+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
         "docs/evidence/social.json",
@@ -74,12 +75,13 @@
         "docs/evidence/social.json",
         "docs/evidence/publishing.json"
       ],
-      "blocked_reason": "Actual local session/RLS, exact approved Fabric-rendered PNG/private S3, dispatcher and Temporal publication/reconciliation use an explicitly MOCK Postiz HTTP server. Explicit destination consent, expiring staging allowlists, immutable snapshots/history and unknown-write holds tested. No actual social publication, deployed/runtime equivalence or launch proof. Customer publishing UI, remote cancellation/rescheduling, operator recovery, other channels/formats, analytics and live acceptance remain incomplete."
+      "blocked_reason": "Actual local session/RLS, exact approved Fabric-rendered PNG/private S3, dispatcher and Temporal publication/reconciliation use an explicitly MOCK Postiz HTTP server. Explicit destination consent, expiring staging allowlists, immutable snapshots/history and unknown-write holds tested. No actual social publication, deployed/runtime equivalence or launch proof. Customer publishing UI has separate focused evidence. Remote cancellation/rescheduling, operator recovery, other channels/formats, analytics and live acceptance remain incomplete."
     },
     "performance_learning": {
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
         "docs/evidence/social.json",
@@ -94,6 +96,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/publishing-ui.json",
         "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
         "docs/evidence/social.json",
@@ -278,6 +281,26 @@
         "docs/evidence/connections.json"
       ],
       "blocked_reason": "Actual local browser/session/business setup, server callback, private provisioning worker, PostgreSQL RLS and Temporal tested with explicitly MOCK Postiz HTTP and LinkedIn consent. Desktop/mobile accessibility, canceled/expired/wrong-login returns, saved account refresh and business isolation are covered. No real provider consent, deployed ingress, token health, publication or full lifecycle acceptance. Operator recovery, reconnect/revoke and other channels remain incomplete."
+    },
+    "customer_publishing_ui": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/social.json",
+        "docs/evidence/publishing.json",
+        "docs/evidence/publishing-ui.json"
+      ],
+      "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
+    },
+    "business_overview": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/social.json",
+        "docs/evidence/publishing.json",
+        "docs/evidence/publishing-ui.json"
+      ],
+      "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
     }
   },
   "security": {

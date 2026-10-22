@@ -6,6 +6,8 @@ import { Wordmark, Loading, Notice, Field } from "./primitives";
 import { BrandFiles } from "./uploads";
 import { BrandIntake } from "./intake";
 import {ContentWorkspace} from "./content-workspace";
+import {PublishingScreen} from "./publishing";
+import {BusinessOverviewPanel} from "./business-overview";
 import {ConnectionsScreen} from "./connections";
 import {CanvasScreen} from "./canvas";
 import { useUnsavedChanges } from "./unsaved";
@@ -275,6 +277,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <ContentWorkspace key={`${business.id}:${section}`} business={business} inbox={section==="review"}/>
           ) : section === "canvas" ? (
             <CanvasScreen business={business}/>
+          ) : section === "publishing" ? (
+            <PublishingScreen key={business.id} business={business}/>
           ) : section === "connections" ? (
             <ConnectionsScreen key={business.id} business={business}/>
           ) : section === "memory" ? (
@@ -523,16 +527,13 @@ function Overview({
   business?: Business;
   name: string;
 }) {
-  const rows = business ? [business] : businesses;
+  if(business)return <BusinessOverviewPanel key={business.id} business={business}/>;
+  const rows = businesses;
   return (
     <>
       <PageTitle
-        eyebrow={business?.name ?? "Your marketing, together"}
-        title={
-          business
-            ? `Make room for ${business.name}.`
-            : `Welcome, ${name.split(" ")[0]}.`
-        }
+        eyebrow="Your marketing, together"
+        title={`Welcome, ${name.split(" ")[0]}.`}
       >
         <p>
           {rows.length
@@ -554,7 +555,7 @@ function Overview({
           </p>
           <a
             className="button primary"
-            href={business ? `/b/${business.id}/onboarding` : "/brands"}
+            href="/brands"
           >
             {rows.length ? "Continue brand setup" : "Add your first business"}{" "}
             <span aria-hidden="true">→</span>
@@ -583,8 +584,7 @@ function Overview({
         </>
       )}
       <p className="availability-note">
-        Generation, publishing and performance analysis are still being
-        implemented. This preview shows saved account and brand data.
+        Select a business to see its saved reviews, creative work and publishing activity.
       </p>
     </>
   );

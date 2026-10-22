@@ -44,7 +44,7 @@ export function CreativeExportPanel({business,versionId,sourceSHA,context,disabl
    {preview?<img src={preview} alt="Saved final image for approval" className="final-image-preview" onLoad={()=>setLoaded(true)} onError={()=>{setLoaded(false);setError(new Error('The saved image could not be displayed.'));}}/>:<p role="status">Loading the saved image for review…</p>}
    {!!saved.manifest.warnings?.length&&<details><summary>Check the rendered fonts</summary><ul>{saved.manifest.warnings.map((w,i)=><li key={i}>{w}</li>)}</ul></details>}
    {preview&&loaded&&<p><a href={preview} download="desvio-final.png">Download final image</a></p>}
-   {approved&&!disabled?<p role="status">Final image approved for this {context.type==='slot'?'post':'creative version'}.</p>:<>
+   {approved&&!disabled?<><p role="status">Final image approved for this {context.type==='slot'?'post':'creative version'}.</p>{context.type==='slot'&&<a href={`/b/${business.id}/publishing?slot=${context.id}`}>Review publishing options →</a>}</>:<>
     {!reviewable&&<p>Send this {context.type==='slot'?'post':'version'} for review before final approval.</p>}
     {reviewer&&reviewable&&<><label className="check-row"><input type="checkbox" checked={confirmed} disabled={busy||disabled||!loaded} onChange={e=>setConfirmed(e.target.checked)}/>I reviewed this saved image and its text.</label><button className="primary" disabled={busy||disabled||!loaded||!confirmed} onClick={()=>void act(async()=>{await api(`${root}/creative-exports/${saved.id}/approve`,{sha256:saved.sha256,source_sha256:sourceSHA,context_type:context.type,context_id:context.id,context_revision:context.revision,confirmed:true});setConfirmed(false);await onApproved();})}>Approve final image</button></>}
    </>}
