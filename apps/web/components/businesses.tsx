@@ -1,4 +1,5 @@
 "use client";
+import {VisualReview} from "./visual-review";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "./api";
@@ -853,12 +854,12 @@ export function BrandOnboarding({ business }: { business: Business }) {
         <section className="v5-panel">
           <h2>Your approved brand profile is saved.</h2>
           <p>
-            Your goals and brand evidence are preserved. Creating the first
-            content plan is not available in this build.
+            Your goals and approved brand evidence are saved. Open Content Plan to prepare your first calendar; AI planning requires a configured model and available budget.
           </p>
           <a className="button primary" href={`/b/${business.id}/memory`}>
             View brand memory
           </a>
+          <a className="button" href={`/b/${business.id}/content-plan`}>Open Content Plan</a>
         </section>
       ) : state.step === 2 ? (
         <>
@@ -1036,8 +1037,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
             </div>
           )}
           <p className="availability-note">
-            First-plan generation is still being implemented. Saving these
-            settings does not generate a plan.
+            Saving these settings does not generate a plan. After confirming your brand, you can create one in Content Plan.
           </p>
         </section>
       )}
@@ -1127,6 +1127,7 @@ function BrandReview({
   return (
     <>
       <BrandIntake business={business} onComplete={() => void load()} />
+      <VisualReview state={brain?.visuals} path={path} writable={writable} onSaved={load} />
       <section className="v5-panel">
         <div className="section-heading">
           <div>
@@ -1426,8 +1427,7 @@ function Memory({ business }: { business: Business }) {
             Review brand facts
           </a>
           <p className="availability-note">
-            Creative preferences, performance lessons and experiments are still
-            being implemented.
+            Approved visual directions appear above. Performance lessons and experiments are still being implemented.
           </p>
         </section>
       ) : (

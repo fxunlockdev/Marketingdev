@@ -194,6 +194,7 @@ class BrainController {
  @Get('sources/:id') source(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.brain.source(r.actorId,o,b,id);}
  @Post('findings') manual(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.brain.manual(r.actorId,o,b,body,key);}
  @Patch('findings/:id') review(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string,@Body() body:unknown){return this.brain.review(r.actorId,o,b,id,body);}
+ @Patch('visuals') reviewVisual(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Body() body:unknown){return this.brain.reviewVisual(r.actorId,o,b,body);}
  @Post('approve') approve(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Body() body:unknown){return this.brain.approve(r.actorId,o,b,body);}
  @Get('versions/:id') version(@Req() r:AuthRequest,@Param('org') o:string,@Param('brand') b:string,@Param('id') id:string){return this.brain.version(r.actorId,o,b,id);}
 }
