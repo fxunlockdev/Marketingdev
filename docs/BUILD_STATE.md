@@ -2,6 +2,14 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Current session — durable tenant-scoped video provider stage
+
+- Previous turn made verified progress in draft PR #20: https://github.com/fxunlockdev/Marketingdev/pull/20. Continuing on codex/pr-20-video-lifecycle with the complete objective and architecture.
+- Added migration 019: forced-RLS operator grants/reservations, immutable encrypted intent and observations. video-vault.ts, video-provider-jobs.ts and video-provider-workflow.ts implement reserve-before-submit, known-rejection release, uncertain-write holds, saved IDs, polling/cancel/deadline recovery and membership rechecks. Provider completion leaves the Desvio job running until media validation/private saving.
+- First 14 real PostgreSQL/Temporal cases pass, including a timer through worker replacement with no duplicate POST. Initial fixtures hit the three-business limit; isolated accounts fixed the tests without changing product limits. Added rollback and revoked-output cases; final verification pending.
+- Internal stage only: no customer route or ordinary worker registration until original video skills, approved reference leases and isolated FFmpeg/private versions are connected. No actual provider video/paid call. Full security image rebuild remains blocked by Docker storage; no unrelated container was stopped/pruned/restarted.
+- Railway read-back still lists only production; fresh dev creation again failed with upstream pause, captured in docs/evidence/railway-video-attempt.json. No dev app/domain. Next: complete parent video pipeline, private media validation and Canvas controls, plus deployment/live acceptance. ADR 0021 records the boundary. Goal remains active.
+
 ## Current session — Higgsfield video transport and output boundary
 
 - Continuing the active end-to-end goal from PR #19 on `codex/pr-19-video-contracts`. No architecture replacement, customer video enablement, paid call, social post or infrastructure mutation.

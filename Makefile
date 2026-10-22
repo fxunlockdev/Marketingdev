@@ -1,4 +1,4 @@
-.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load verify-social verify-connections verify-publishing verify-publishing-ui verify-deployment bootstrap-database
+.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load verify-social verify-connections verify-publishing verify-publishing-ui verify-deployment bootstrap-database verify-video-provider
 PYTHON ?= uv run --frozen python
 
 bootstrap:
@@ -47,3 +47,6 @@ verify-deployment:
 
 bootstrap-database:
 	node scripts/bootstrap-database.mjs
+
+verify-video-provider:
+	$(PYTHON) -m scripts.verify video-provider
