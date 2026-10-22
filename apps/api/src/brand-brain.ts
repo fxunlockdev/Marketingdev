@@ -8,6 +8,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { PoolClient } from "pg";
 import { TenantDatabase } from "./database.js";
 import { object, uuid } from "./workspaces.js";
+import {visualDirections,reviewVisual,approvedVisualFacts} from "./brand-visual-review.js";
 export const FIELDS = [
   "brand_name",
   "offering",
@@ -137,6 +138,7 @@ export class BrandBrain {
         )
       ).rows;
       return {
+        visuals: await visualDirections(db,org,brand),
         revision: state?.revision ?? 0,
         sources,
         findings,
@@ -286,6 +288,13 @@ export class BrandBrain {
       return result;
     });
   }
+  async reviewVisual(user:string,org:string,brand:string,input:unknown){
+    return this.run(user,org,brand,true,async db=>{
+      const result=await reviewVisual(db,user,org,brand,input);
+      await this.audit(db,user,org,brand,`brain.visual_${result.status}`,result.id);
+      return result;
+    });
+  }
   async approve(user: string, org: string, brand: string, input: unknown) {
     const { revision } = object(input, ["revision"]);
     if (!Number.isSafeInteger(revision) || Number(revision) < 1)
@@ -348,9 +357,10 @@ export class BrandBrain {
         throw new ConflictException(
           "Confirm the brand name, offering and audience before approving",
         );
+      const visualFacts = await approvedVisualFacts(db,org,brand);
       const snapshot = {
           schema_version: 1,
-          facts: accepted,
+          facts: [...accepted,...visualFacts],
           missing_fields: FIELDS.filter((field) => !values.has(field)),
         },
         serialized = canonicalJSON(snapshot),

@@ -678,7 +678,7 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   await expect(
     alice.getByText("BROWSER FIXTURE: generous spacing around the headline.", {
       exact: false,
-    }),
+    }).first(),
   ).toBeVisible();
   await expect(
     alice.getByRole("link", { name: "Source page", exact: true }),
@@ -720,6 +720,36 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
     accessibility.violations.map((v) => v.id),
     [],
   );
+  await alice.getByRole("button",{name:"Back to brand review",exact:true}).click();
+  const visual=alice.getByRole('article',{name:'Visual direction: composition'});
+  await expect(visual.getByText('Needs review',{exact:true})).toBeVisible();
+  await visual.getByRole('button',{name:'Edit',exact:true}).click();
+  await visual.getByLabel('Edit visual composition').fill('Use spacious layouts with calm typography.');
+  const visualRoute=`**/api/v1/workspaces/${target.organization_id}/brands/${target.id}/brain/visuals`;
+  await alice.route(visualRoute,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Temporary save failure'})}),{times:1});
+  await visual.getByRole('button',{name:'Save visual correction'}).click();
+  await expect(visual.getByRole('alert')).toBeVisible();
+  await expect(visual.getByLabel('Edit visual composition')).toHaveValue('Use spacious layouts with calm typography.');
+  await visual.getByRole('button',{name:'Save visual correction'}).click();
+  await expect(visual.getByText('edited',{exact:true})).toBeVisible();
+  await alice.reload();
+  await expect(visual.getByText('Use spacious layouts with calm typography.',{exact:true})).toBeVisible();
+  const brainURL=`${base}/api/v1/workspaces/${target.organization_id}/brands/${target.id}/brain`;
+  // Complete the text evidence fixture; visual correction above uses the actual UI/API.
+  for(const [field,value] of [['brand_name','Dental scheduling'],['audience','Dental practices']]){
+    const added=await alice.request.post(brainURL+'/findings',{headers:{origin:base,'idempotency-key':randomUUID()},data:{field,value}});
+    assert.equal(added.status(),201);
+  }
+  let draft=await (await alice.request.get(brainURL)).json();
+  for(const f of draft.findings){const reviewed=await alice.request.patch(brainURL+'/findings/'+f.id,{headers:{origin:base},data:{revision:f.revision,decision:'correct'}});assert.equal(reviewed.status(),200);}
+  const deniedVisual=await bob.request.patch(brainURL+'/visuals',{headers:{origin:base},data:{}});assert.equal(deniedVisual.status(),403);
+  await alice.getByRole('button',{name:'Save & continue to goals →'}).click();
+  await alice.getByRole('button',{name:'Confirm brand profile',exact:true}).click();
+  await expect(alice.getByText('Your approved brand profile is saved.',{exact:true})).toBeVisible();
+  await alice.getByRole('link',{name:'View brand memory',exact:true}).click();
+  await expect(alice.getByText('Use spacious layouts with calm typography.',{exact:true})).toBeVisible();
+  draft=await (await alice.request.get(brainURL)).json();
+  assert.equal(draft.active.snapshot.facts.find(f=>f.field==='visual_direction_composition').value,'Use spacious layouts with calm typography.');
   await alice.screenshot({
     path: "work/browser/v5-ai-prefill.png",
     fullPage: true,

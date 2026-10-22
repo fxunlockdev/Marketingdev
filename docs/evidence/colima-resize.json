@@ -1,0 +1,163 @@
+{
+  "recorded_at": "2026-10-22T08:49:30.452315+00:00",
+  "authorization": "User explicitly approved expand and restart now, preserving data and CPU/memory",
+  "before": {
+    "display_name": "colima",
+    "driver": "macOS Virtualization.Framework",
+    "arch": "aarch64",
+    "runtime": "docker",
+    "mount_type": "virtiofs",
+    "docker_socket": "unix:///Users/viloljoshi/.colima/default/docker.sock",
+    "containerd_socket": "unix:///Users/viloljoshi/.colima/default/containerd.sock",
+    "kubernetes": false,
+    "cpu": 4,
+    "memory": 6442450944,
+    "disk": 32212254720
+  },
+  "after": {
+    "display_name": "colima",
+    "driver": "macOS Virtualization.Framework",
+    "arch": "aarch64",
+    "runtime": "docker",
+    "mount_type": "virtiofs",
+    "docker_socket": "unix:///Users/viloljoshi/.colima/default/docker.sock",
+    "containerd_socket": "unix:///Users/viloljoshi/.colima/default/containerd.sock",
+    "kubernetes": false,
+    "cpu": 4,
+    "memory": 6442450944,
+    "disk": 85899345920
+  },
+  "filesystem": "Filesystem      Size  Used Avail Use% Mounted on\n/dev/vdb1        79G   29G   47G  38% /var/lib/docker",
+  "containers": [
+    {
+      "name": "rf-crm-cron",
+      "before_status": "running",
+      "before_health": null,
+      "after_status": "running",
+      "after_health": null,
+      "same_container": true
+    },
+    {
+      "name": "rf-crm-fresh",
+      "before_status": "running",
+      "before_health": null,
+      "after_status": "running",
+      "after_health": null,
+      "same_container": true
+    },
+    {
+      "name": "rf-crm-pg2",
+      "before_status": "running",
+      "before_health": null,
+      "after_status": "running",
+      "after_health": null,
+      "same_container": true
+    },
+    {
+      "name": "marketingbus-brand-tests",
+      "before_status": "running",
+      "before_health": null,
+      "after_status": "running",
+      "after_health": null,
+      "same_container": true
+    },
+    {
+      "name": "rf-crm-pg",
+      "before_status": "running",
+      "before_health": null,
+      "after_status": "running",
+      "after_health": null,
+      "same_container": true
+    },
+    {
+      "name": "marketingbus-postgres",
+      "before_status": "running",
+      "before_health": null,
+      "after_status": "running",
+      "after_health": null,
+      "same_container": true
+    },
+    {
+      "name": "supabase_db_PierreProject",
+      "before_status": "restarting",
+      "before_health": "unhealthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_pg_meta_PierreProject",
+      "before_status": "running",
+      "before_health": "healthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_storage_PierreProject",
+      "before_status": "running",
+      "before_health": "healthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_rest_PierreProject",
+      "before_status": "running",
+      "before_health": null,
+      "after_status": "running",
+      "after_health": null,
+      "same_container": true
+    },
+    {
+      "name": "supabase_realtime_PierreProject",
+      "before_status": "restarting",
+      "before_health": "unhealthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_inbucket_PierreProject",
+      "before_status": "running",
+      "before_health": "healthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_auth_PierreProject",
+      "before_status": "running",
+      "before_health": "healthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_kong_PierreProject",
+      "before_status": "running",
+      "before_health": "unhealthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_vector_PierreProject",
+      "before_status": "running",
+      "before_health": "healthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    },
+    {
+      "name": "supabase_analytics_PierreProject",
+      "before_status": "running",
+      "before_health": "unhealthy",
+      "after_status": "running",
+      "after_health": "healthy",
+      "same_container": true
+    }
+  ],
+  "data_deleted": false,
+  "live_provider_calls": false
+}

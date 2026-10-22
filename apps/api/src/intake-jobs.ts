@@ -561,8 +561,9 @@ export class IntakeJobs {
           "UPDATE app.brand_review_state SET finding_count=finding_count+$3 WHERE organization_id=$1 AND brand_id=$2",
           [j.organization_id, j.brand_id, fresh.length],
         );
-        await bumpReview(db, j.organization_id, j.brand_id);
       }
+      // Even an empty new analysis supersedes earlier visual suggestions.
+      await bumpReview(db, j.organization_id, j.brand_id);
       if (call.result.recommendation)
         await db.query(
           "INSERT INTO app.onboarding_recommendations(id,organization_id,brand_id,job_id,review_revision,model,recommendation) VALUES($1,$2,$3,$4,$5,$6,$7)",
@@ -571,7 +572,7 @@ export class IntakeJobs {
             j.organization_id,
             j.brand_id,
             j.id,
-            revision + (fresh.length ? 1 : 0),
+            revision + 1,
             call.model,
             JSON.stringify(call.result.recommendation),
           ],

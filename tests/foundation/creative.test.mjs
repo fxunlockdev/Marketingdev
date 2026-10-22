@@ -110,6 +110,7 @@ async function standard(url, init) {
       value.brand.facts.find((f) => f.field === "brand_name").value,
       "Acme Dental",
     );
+    assert.equal(value.brand.facts.find(f=>f.field==='visual_direction_composition').value,'Use generous spacing and restrained typography.');
     assert.ok(body.input.some((m) => m.content?.includes("image")));
     assert.ok(!JSON.stringify(body).includes(config.storage.secretAccessKey));
     return response(
@@ -191,6 +192,12 @@ before(async () => {
       decision: "correct",
       revision: f.revision,
     });
+  // Explicit visual-analysis fixture; review/approval and the downstream skill broker are real.
+  const visualJob=randomUUID(),visualSuggestion={category:'composition',observation:'TEST FIXTURE: open spacing',creative_direction:'Use generous spacing and restrained typography.',image_ids:['fixture:overview']};
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'brand.analyze','succeeded')",[visualJob,org.id,brand.id,alice]);
+  await admin.query("INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,result) VALUES($1,$2,$3,$4,'explicit-fixture',$5)",[visualJob,org.id,brand.id,randomUUID(),JSON.stringify({visual_guidance:[visualSuggestion],visual_manifest:[{id:'fixture:overview',website_url:'https://example.org/',source_sha256:'a'.repeat(64)}]})]);
+  const direction=(await brain.read(alice,org.id,brand.id)).visuals.directions[0];
+  await brain.reviewVisual(alice,org.id,brand.id,{analysis_job_id:visualJob,index:0,evidence_sha256:direction.evidence_sha256,revision:0,decision:'correct'});
   state = await brain.read(alice, org.id, brand.id);
   await brain.approve(alice, org.id, brand.id, { revision: state.revision });
   thread = await canvas.createThread(
