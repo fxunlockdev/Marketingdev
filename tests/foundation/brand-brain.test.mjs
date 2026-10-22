@@ -503,6 +503,36 @@ test("actual PPTX extraction and a 50-page PDF keep source page coverage; blank 
   assert.ok(!(await brain()).sources.some((s) => s.asset_id === blank.id));
 });
 
+test("scanned guidelines persist real OCR provenance through owner correction and approved memory", async () => {
+  const previousBrand = brand;
+  try {
+    const created = await request(`/api/v1/workspaces/${org.id}/brands`, { method: "POST", key: randomUUID(), body: { name: "Scanned brand" } });
+    assert.equal(created.status, 201);
+    brand = created.body;
+    const asset = await upload("scanned-guidelines.pdf");
+    await waitJob(await extract(asset));
+    let state = await brain();
+    assert.equal(state.sources[0].coverage.type, "embedded_text_with_ocr");
+    assert.deepEqual(state.sources[0].coverage.ocr_pages, [1]);
+    assert.ok(state.findings.some(f => f.field === "brand_name" && f.value === "Olive and Field"));
+    const evidence = await request(`${path()}/brain/sources/${state.sources[0].id}`);
+    assert.ok(evidence.body.chunks.some(c => c.bbox.method === "ocr_eng" && Number.isFinite(c.bbox.confidence)));
+    const outsider = await signup("scan-outsider");
+    assert.equal((await request(`${path()}/brain`, { cookie: outsider.cookie })).status, 404);
+    assert.equal((await approve(state.revision)).status, 409);
+    for (const finding of state.findings) {
+      const result = await review(finding, finding.field === "voice" ? "edited" : "correct", finding.field === "voice" ? "Warm and concise" : undefined);
+      assert.equal(result.status, 200);
+    }
+    const approved = await approve((await brain()).revision);
+    assert.equal(approved.status, 201, JSON.stringify(approved.body));
+    assert.ok(approved.body.snapshot.facts.some(f => f.field === "voice" && f.value === "Warm and concise"));
+    assert.ok(approved.body.snapshot.facts.every(f => f.page === 1 && f.source_sha256));
+    state = await brain();
+    assert.equal(state.active.sha256, approved.body.sha256);
+  } finally { brand = previousBrand; }
+});
+
 test("canceled and revoked extraction jobs leave the saved file and prior approved brain intact", async () => {
   const active = (await brain()).active.id;
   await stopWorker();

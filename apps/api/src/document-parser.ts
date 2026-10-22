@@ -2,14 +2,15 @@ import { spawn, execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promisify } from "node:util";
 import { digest, MAX_UPLOAD_BYTES } from "./object-store.js";
-export const PARSER_VERSION = "docling-native-2.141.0/desvio-v1";
+export const PARSER_VERSION = "docling-native-2.141.0/tesseract-5.5.0/desvio-v2";
 export type ParsedDocument = {
   parserVersion: string;
   sha256: string;
   pages: number;
   textPages: number[];
   kind: "pdf" | "pptx";
-  coverage: "embedded_text_only";
+  coverage: "embedded_text_only" | "embedded_text_with_ocr";
+  ocrPages: number[];
   chunks: {
     text: string;
     page: number;
@@ -43,6 +44,13 @@ export function parseDocumentOutput(
       "DOCUMENT_PARSE_FAILED",
       "INVALID_DOCUMENT_PROVENANCE",
       "DOCUMENT_NEEDS_OCR_OR_MANUAL_REVIEW",
+      "DOCUMENT_NATIVE_FAILED",
+      "DOCUMENT_CONVERSION_FAILED",
+      "DOCUMENT_OCR_OUTPUT_INVALID",
+      "DOCUMENT_RENDER_FAILED",
+      "DOCUMENT_PAGE_DIMENSIONS_INVALID",
+      "PRESENTATION_EXTERNAL_RESOURCE_UNSUPPORTED",
+      "PRESENTATION_EMBEDDED_OBJECT_UNSUPPORTED",
     ];
     throw new DocumentError(
       codes.includes(v.error) ? v.error : "DOCUMENT_PARSE_FAILED",
@@ -53,7 +61,7 @@ export function parseDocumentOutput(
     v.parserVersion !== PARSER_VERSION ||
     v.sha256 !== digest(bytes) ||
     v.kind !== kind ||
-    v.coverage !== "embedded_text_only" ||
+    !["embedded_text_only", "embedded_text_with_ocr"].includes(v.coverage) ||
     !Number.isInteger(v.pages) ||
     v.pages < 1 ||
     v.pages > 50 ||
@@ -64,6 +72,7 @@ export function parseDocumentOutput(
     throw invalid();
   let size = 0;
   const pages = new Set<number>();
+  const ocrPages = new Set<number>();
   for (const c of v.chunks) {
     if (
       !c ||
@@ -84,9 +93,15 @@ export function parseDocumentOutput(
       throw invalid();
     size += c.text.length;
     pages.add(c.page);
+    if (c.bbox.method !== undefined) {
+      if (c.bbox.method !== "ocr_eng" || !Number.isFinite(c.bbox.confidence) || c.bbox.confidence < 0 || c.bbox.confidence > 100 || c.bbox.coord_origin !== "TOPLEFT" || !c.anchor.startsWith(`#/ocr/${c.page}/`)) throw invalid();
+      ocrPages.add(c.page);
+    } else if (c.anchor.startsWith("#/ocr/")) throw invalid();
   }
   if (
     size > 250000 ||
+    JSON.stringify(v.ocrPages) !== JSON.stringify([...ocrPages].sort((a, b) => a - b)) ||
+    v.coverage !== (ocrPages.size ? "embedded_text_with_ocr" : "embedded_text_only") ||
     !Array.isArray(v.textPages) ||
     JSON.stringify(v.textPages) !==
       JSON.stringify([...pages].sort((a, b) => a - b))
@@ -99,6 +114,7 @@ export function parseDocumentOutput(
     textPages: v.textPages,
     kind,
     coverage: v.coverage,
+    ocrPages: v.ocrPages,
     chunks: v.chunks.map((c: any) => ({
       text: c.text,
       page: c.page,
@@ -109,6 +125,7 @@ export function parseDocumentOutput(
         r: c.bbox.r,
         b: c.bbox.b,
         coord_origin: c.bbox.coord_origin,
+        ...(c.bbox.method ? { method: c.bbox.method, confidence: c.bbox.confidence } : {}),
       },
     })),
   };

@@ -4,7 +4,7 @@ COPY requirements.lock /opt/requirements.lock
 RUN pip install --no-cache-dir --require-hashes -r /opt/requirements.lock
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/browsers
 RUN python -m playwright install --with-deps chromium
-COPY extract.py website.py visual.py /opt/
+COPY extract.py website.py visual.py document_visuals.py document_native.py /opt/
 USER 65534:65534
 WORKDIR /tmp
 ENTRYPOINT ["python","/opt/extract.py"]

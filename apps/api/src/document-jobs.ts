@@ -131,8 +131,9 @@ export class DocumentJobs {
               type: document.coverage,
               pages: document.pages,
               text_pages: document.textPages,
+              ocr_pages: document.ocrPages,
               warning:
-                "Images, scanned text, tables and visual design require additional review.",
+                "English OCR is used on pages without embedded text and may contain errors. Image-only regions on other pages, tables and visual design require additional review.",
             }),
           ],
         );

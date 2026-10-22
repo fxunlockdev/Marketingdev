@@ -1,0 +1,38 @@
+{
+  "suite": "document-visuals",
+  "scope": "Actual pinned PDFium, LibreOffice and English Tesseract in a baked network-disabled, read-only, non-root container. Synthetic real PDF/PPTX rendering, scanned text OCR, hidden slide/image composition and malformed/external-resource denial. Real local authenticated upload, malware scan, private S3, Temporal extraction, PostgreSQL/RLS, source-backed Correct/Wrong/Edit and approved memory, including an image-only PDF. OCR fallback covers pages without native text; full document visual persistence/model interpretation, mixed-page OCR, broader languages and deployed/live acceptance remain incomplete.",
+  "checked_at": "2026-10-22T11:48:50.641302+00:00",
+  "source_sha256": "39346015279cb07510e83de8e71341a4feb1acf4d752babcbcf7005f3983dc32",
+  "source_sha256_start": "39346015279cb07510e83de8e71341a4feb1acf4d752babcbcf7005f3983dc32",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/document-visual-test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "Sending build context to Docker daemon  125.4MB\n\nStep 1/9 : ARG BASE_IMAGE\nStep 2/9 : FROM ${BASE_IMAGE}\n ---> e2839876e091\nStep 3/9 : USER root\n ---> Using cache\n ---> 5b5c9f0d4da3\nStep 4/9 : COPY debs /opt/document-debs\n ---> Using cache\n ---> 4a6f2724241a\nStep 5/9 : ENV DEBIAN_FRONTEND=noninteractive\n ---> Using cache\n ---> 1cba0b564a09\nStep 6/9 : RUN test \"$(dpkg --print-architecture)\" = arm64 && find /opt/document-debs -name '*.deb' ! -name 'libreoffice*' -exec dpkg -i {} + && dpkg -i /opt/document-debs/libreoffice-common_*.deb /opt/document-debs/libreoffice-style-*.deb /opt/document-debs/libreoffice-uiconfig-*.deb && dpkg -i /opt/document-debs/libreoffice*.deb && rm -rf /opt/document-debs\n ---> Using cache\n ---> 713888f4fe48\nStep 7/9 : COPY document_visuals.py document_native.py /opt/\n ---> Using cache\n ---> f0ae95a51d84\nStep 8/9 : USER 65534:65534\n ---> Using cache\n ---> 0fc60c5930a6\nStep 9/9 : WORKDIR /tmp\n ---> Using cache\n ---> 58df9e7ef046\nSuccessfully built 58df9e7ef046\nSuccessfully tagged desvio-document-native:local\nIsolated Docling/OCR test image sha256:58df9e7ef0465df8dd04a85cbef777a9fbd545d1a7fe5ed3a87c4980b76ac52a; no network, no credentials, non-root, bounded CPU/memory\nDocument rendering component only; isolated image sha256:58df9e7ef0465df8dd04a85cbef777a9fbd545d1a7fe5ed3a87c4980b76ac52a; no provider calls\nDEPRECATED: The legacy builder is deprecated and will be removed in a future release.\n            Install the buildx component to build images with BuildKit:\n            https://docs.docker.com/go/buildx/\n\ntest_fifty_pages_keep_page_identity (__main__.DocumentVisualTests.test_fifty_pages_keep_page_identity) ... ok\ntest_invalid_or_excessive_input_is_rejected (__main__.DocumentVisualTests.test_invalid_or_excessive_input_is_rejected) ... ok\ntest_output_budget_fails_instead_of_truncating (__main__.DocumentVisualTests.test_output_budget_fails_instead_of_truncating) ... ok\ntest_page_limit_fails_before_emitting_partial_document (__main__.DocumentVisualTests.test_page_limit_fails_before_emitting_partial_document) ... ok\ntest_page_without_text_is_rendered_not_rejected (__main__.DocumentVisualTests.test_page_without_text_is_rendered_not_rejected) ... ok\ntest_real_pages_have_exact_provenance_and_decodable_pixels (__main__.DocumentVisualTests.test_real_pages_have_exact_provenance_and_decodable_pixels) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.352s\n\nOK\ntest_external_media_fails_before_conversion (__main__.NativeDocumentTests.test_external_media_fails_before_conversion) ... ok\ntest_full_slide_conversion_includes_hidden_slide_and_picture (__main__.NativeDocumentTests.test_full_slide_conversion_includes_hidden_slide_and_picture) ... ok\ntest_invalid_ocr_rows_fail_closed (__main__.NativeDocumentTests.test_invalid_ocr_rows_fail_closed) ... ok\ntest_scanned_pdf_has_no_text_but_real_ocr_recovers_brand_lines (__main__.NativeDocumentTests.test_scanned_pdf_has_no_text_but_real_ocr_recovers_brand_lines) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 1.621s\n\nOK\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--documents"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\nSending build context to Docker daemon  125.4MB\n\nStep 1/9 : ARG BASE_IMAGE\nStep 2/9 : FROM ${BASE_IMAGE}\n ---> e2839876e091\nStep 3/9 : USER root\n ---> Using cache\n ---> 5b5c9f0d4da3\nStep 4/9 : COPY debs /opt/document-debs\n ---> Using cache\n ---> 4a6f2724241a\nStep 5/9 : ENV DEBIAN_FRONTEND=noninteractive\n ---> Using cache\n ---> 1cba0b564a09\nStep 6/9 : RUN test \"$(dpkg --print-architecture)\" = arm64 && find /opt/document-debs -name '*.deb' ! -name 'libreoffice*' -exec dpkg -i {} + && dpkg -i /opt/document-debs/libreoffice-common_*.deb /opt/document-debs/libreoffice-style-*.deb /opt/document-debs/libreoffice-uiconfig-*.deb && dpkg -i /opt/document-debs/libreoffice*.deb && rm -rf /opt/document-debs\n ---> Using cache\n ---> 713888f4fe48\nStep 7/9 : COPY document_visuals.py document_native.py /opt/\n ---> Using cache\n ---> f0ae95a51d84\nStep 8/9 : USER 65534:65534\n ---> Using cache\n ---> 0fc60c5930a6\nStep 9/9 : WORKDIR /tmp\n ---> Using cache\n ---> 58df9e7ef046\nSuccessfully built 58df9e7ef046\nSuccessfully tagged desvio-document-native:local\nIsolated Docling/OCR test image sha256:58df9e7ef0465df8dd04a85cbef777a9fbd545d1a7fe5ed3a87c4980b76ac52a; no network, no credentials, non-root, bounded CPU/memory\nActual local Garage 2.4.1, ClamAV 1.5.4 and Temporal CLI 1.9.1 services ready; no paid providers\nTemporal CLI 1.9.1 (Server 1.32.0, UI 2.54.1)\n\nTemporal Server:      localhost:49759\nTemporal Persistence: /Users/viloljoshi/Documents/Codex/2026-10-21/i-want-you-to-design-blaze-2/work/Marketingdev/work/asset-services-ADdNvl/temporal.db\nTemporal Metrics:     http://localhost:49768/metrics\n\u2714 actual PDF upload, malware validation, durable sandbox extraction and tenant-bound provenance (5696.829375ms)\n\u2714 Correct/Wrong/Edit decisions use revision conflicts and immutable owner-approved snapshots (302.157625ms)\n\u2714 review roles, manual idempotency and immutable original evidence enforce client boundaries (117.139ms)\n\u2714 actual PPTX extraction and a 50-page PDF keep source page coverage; blank scanned-like pages fail clearly (7365.95425ms)\n\u2714 scanned guidelines persist real OCR provenance through owner correction and approved memory (3867.832041ms)\n\u2714 canceled and revoked extraction jobs leave the saved file and prior approved brain intact (4655.248083ms)\n\u2714 parser rejects malformed, oversized and unconfigured inputs and forged parser output (4223.760791ms)\n\u2714 V5 standard account starts empty, initializes once and concurrent fourth-business creation is denied (191.403792ms)\n\u2139 tests 8\n\u2139 suites 0\n\u2139 pass 8\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 27326.601708\nDEPRECATED: The legacy builder is deprecated and will be removed in a future release.\n            Install the buildx component to build images with BuildKit:\n            https://docs.docker.com/go/buildx/\n\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}

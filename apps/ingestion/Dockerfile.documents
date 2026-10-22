@@ -1,0 +1,11 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+USER root
+COPY debs /opt/document-debs
+# Acquisition and SHA-256 validation happen before the build. Package scripts
+# have no network or customer input; runtime returns to the unprivileged user.
+ENV DEBIAN_FRONTEND=noninteractive
+RUN test "$(dpkg --print-architecture)" = arm64 && find /opt/document-debs -name '*.deb' ! -name 'libreoffice*' -exec dpkg -i {} + && dpkg -i /opt/document-debs/libreoffice-common_*.deb /opt/document-debs/libreoffice-style-*.deb /opt/document-debs/libreoffice-uiconfig-*.deb && dpkg -i /opt/document-debs/libreoffice*.deb && rm -rf /opt/document-debs
+COPY document_visuals.py document_native.py /opt/
+USER 65534:65534
+WORKDIR /tmp
