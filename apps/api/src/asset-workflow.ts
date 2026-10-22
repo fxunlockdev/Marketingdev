@@ -38,3 +38,9 @@ type SocialActivities={syncSocial(scope:JobScope):Promise<string>;failSocial(sco
 const social=proxyActivities<SocialActivities>({startToCloseTimeout:'60 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'30 seconds',maximumInterval:'2 minutes',maximumAttempts:3}});
 const socialFinalization=proxyActivities<SocialActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
 export async function syncSocialWorkflow(scope:JobScope){try{return await social.syncSocial(scope);}catch{return await socialFinalization.failSocial(scope);}}
+
+
+type OAuthActivities={authorizeSocial(scope:JobScope):Promise<string>;failSocialOAuth(scope:JobScope):Promise<string>};
+const oauth=proxyActivities<OAuthActivities>({startToCloseTimeout:'120 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'30 seconds',maximumInterval:'2 minutes',maximumAttempts:3}});
+const oauthFinalization=proxyActivities<OAuthActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function authorizeSocialWorkflow(scope:JobScope){try{return await oauth.authorizeSocial(scope);}catch{return await oauthFinalization.failSocialOAuth(scope);}}
