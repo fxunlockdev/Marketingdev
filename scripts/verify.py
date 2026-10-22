@@ -11,9 +11,10 @@ from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
+    "social": [["npm", "run", "build"], ["node", "--test", "tests/contracts/postiz.test.mjs"], ["node", "scripts/foundation-test.mjs", "--social"]],
     "offline": [["npm", "run", "build"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/offline", "-v"]],
     "browser": [["npm", "run", "build"], ["npm", "run", "test:browser"]],
-    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs", "tests/contracts/creative.test.mjs", "tests/contracts/planning.test.mjs", "tests/contracts/local-calendar.test.mjs"]],
+    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs", "tests/contracts/creative.test.mjs", "tests/contracts/planning.test.mjs", "tests/contracts/local-calendar.test.mjs", "tests/contracts/postiz.test.mjs"]],
     "security": [["npm", "run", "build"], ["npm", "audit", "--prefix", "apps/media", "--omit=dev", "--audit-level=moderate", "--json"], ["npm", "run", "test:foundation"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/security", "-v"]],
 }
 
@@ -90,6 +91,12 @@ def write_status():
     integrations["canonical_creative_exports"] = {"state": "ADAPTER_READY" if creative_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/security.json", "docs/evidence/browser.json"],
         "blocked_reason": "Actual isolated Fabric/node renderer, pinned fonts, private immutable PNG, Temporal recovery, tenant isolation and explicit exact-pixel approvals tested locally. Font substitutions are disclosed and saved pixels are authoritative. No deployed renderer, publishing proof or video/carousel exports."}
+    social_path = EVIDENCE / "social.json"
+    social = json.loads(social_path.read_text()) if social_path.exists() else {}
+    social_ready = social.get("passed") is True and social.get("source_sha256") == source_hash()
+    integrations["postiz_connection_boundary"] = {"state": "ADAPTER_READY" if social_ready else "NOT_IMPLEMENTED", "live_test": False,
+        "evidence": ["docs/evidence/social.json"],
+        "blocked_reason": "Pinned-source transport contracts use a MOCK Postiz HTTP server. Actual local auth/PostgreSQL RLS/Temporal prove encrypted per-business binding, queued account refresh, permission/rotation/cancel boundaries and snapshot recovery. No real Postiz organization/OAuth/token health or publishing acceptance. Provisioning, session-bound callback workflow, customer UI and authorized live tests remain incomplete."}
     update_matrix(ROOT, foundation_passed and browser_passed, creative_ready)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
@@ -113,6 +120,7 @@ def run_suite(name):
     scopes = {"browser": "Actual Chromium through V5 business UI and Canvas to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; actual isolated owner skills, MOCK OpenAI generation/edit, Fabric edits/export, version approval and uncertain-outcome holds; calendar planning, linked creative generation/revision, feedback and bulk channel review with MOCK providers; manual onboarding/approved memory, scope, quota, recovery, accessibility and persisted AI-prefill/visual-guidance fixtures; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned OpenAI/Higgsfield SDKs with MOCK transports", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; plus Crawl4AI/Chromium screenshots, private visual storage, SSRF controls and AI reservation/recovery and multimodal image provenance/budget guards with MOCK model/resource transports; plus actual isolated owner-skill planning, MOCK OpenAI create/edit, creative media/version approval, cost holds, cancellation, stale edits and replay isolation; plus real HTTP/PostgreSQL 30-slot persistence, per-channel version approvals, atomic bulk reviews, date/DST boundaries and edit/history rollback; plus actual isolated marketing-plan runtime and Temporal 30-slot generation with MOCK Responses, approved-context integrity, per-business grants, unknown-result holds and atomic promotion recovery; no external model provider or deployed generation-worker proof"}
     if name in ("browser", "security"):
         scopes[name] += "; canonical saved PNG exports use actual network-disabled Fabric/node rendering, private storage, exact-pixel/context approval and failure recovery; no social publication"
+    scopes["social"] = "Real local authentication, PostgreSQL forced RLS, encrypted per-business credentials and Temporal connection-refresh jobs; audited Postiz HTTP contracts against an explicitly MOCK local server; no social OAuth or publication to an external provider"
     finished_hash = source_hash()
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,

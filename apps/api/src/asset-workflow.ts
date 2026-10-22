@@ -33,3 +33,8 @@ type ExportActivities={exportCreative(scope:JobScope):Promise<string>;failExport
 const exports=proxyActivities<ExportActivities>({startToCloseTimeout:'100 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
 const exportFinalization=proxyActivities<ExportActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
 export async function exportCreativeWorkflow(scope:JobScope){try{return await exports.exportCreative(scope);}catch{return await exportFinalization.failExport(scope);}}
+
+type SocialActivities={syncSocial(scope:JobScope):Promise<string>;failSocial(scope:JobScope):Promise<string>};
+const social=proxyActivities<SocialActivities>({startToCloseTimeout:'60 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'30 seconds',maximumInterval:'2 minutes',maximumAttempts:3}});
+const socialFinalization=proxyActivities<SocialActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function syncSocialWorkflow(scope:JobScope){try{return await social.syncSocial(scope);}catch{return await socialFinalization.failSocial(scope);}}
