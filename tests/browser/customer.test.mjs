@@ -755,3 +755,67 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
     fullPage: true,
   });
 });
+
+test('retained visual styles stay editable without AI and unsaved edits survive replacement or empty background analysis',async()=>{
+ const target=(await(await alice.request.get(base+'/api/v1/businesses')).json()).businesses.find(b=>b.id!==firstBusiness&&b.id!==secondBusiness);
+ const brainURL=`${base}/api/v1/workspaces/${target.organization_id}/brands/${target.id}/brain`;
+ const user=(await admin.query('SELECT id FROM auth."user" WHERE email=$1',[email])).rows[0];
+ const prior=(await admin.query('SELECT result FROM app.intake_requests WHERE brand_id=$1 ORDER BY job_id LIMIT 1',[target.id])).rows[0].result;
+ async function background(guidance){
+  const id=randomUUID();
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'brand.analyze','succeeded')",[id,target.organization_id,target.id,user.id]);
+  await admin.query("INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,result) VALUES($1,$2,$3,$4,'BROWSER FIXTURE',$5)",[id,target.organization_id,target.id,randomUUID(),JSON.stringify({visual_guidance:guidance,visual_manifest:prior.visual_manifest})]);
+  await admin.query('UPDATE app.brand_review_state SET revision=revision+1 WHERE brand_id=$1',[target.id]);
+ }
+ await background([]);
+ await alice.goto(`${base}/b/${target.id}/onboarding`);
+ await alice.getByRole('button',{name:'Back to brand review',exact:true}).click();
+ let card=alice.getByRole('article',{name:'Visual direction: composition',exact:true});
+ await expect(card.getByText('Previously approved style · editable without another AI analysis')).toBeVisible();
+ const count=(await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='brand.analyze'",[target.id])).rows[0].n;
+ await card.getByRole('button',{name:'Edit',exact:true}).click();
+ await card.getByLabel('Edit visual composition').fill('Strong typography with spacious margins.');
+ const next=alice.getByRole('button',{name:'Save & continue to goals →'});
+ await expect(next).toBeDisabled();
+ let releaseSave;const saveGate=new Promise(resolve=>{releaseSave=resolve;});
+ await alice.route(`**/api/v1/workspaces/${target.organization_id}/brands/${target.id}/brain/visuals`,async route=>{await saveGate;await route.continue();},{times:1});
+ try{await card.getByRole('button',{name:'Save visual correction'}).click();await expect(card.getByLabel('Edit visual composition')).toHaveJSProperty('readOnly',true);await expect(next).toBeDisabled();}finally{releaseSave();}
+ await expect(next).toBeEnabled();await next.click();
+ await alice.getByRole('button',{name:'Confirm brand profile',exact:true}).click();
+ await alice.getByRole('link',{name:'View brand memory',exact:true}).click();
+ await expect(alice.getByText('Strong typography with spacious margins.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='brand.analyze'",[target.id])).rows[0].n,count);
+ await alice.getByRole('link',{name:'Review brand facts'}).click();
+ await alice.getByRole('button',{name:'Back to brand review',exact:true}).click();
+ card=alice.getByRole('article',{name:'Visual direction: composition',exact:true});
+ await card.getByRole('button',{name:'Edit',exact:true}).click();
+ await card.getByLabel('Edit visual composition').fill('Keep this unsaved correction.');
+ await background([{...prior.visual_guidance[0],creative_direction:'BROWSER FIXTURE: new composition suggestion'}]);
+ await alice.getByRole('button',{name:'Refresh evidence',exact:true}).click();
+ let orphan=alice.getByRole('article',{name:'Unsaved visual direction: composition',exact:true});
+ await expect(orphan.getByLabel('Edit visual composition')).toHaveValue('Keep this unsaved correction.');
+ await expect(orphan.getByRole('button',{name:'Save visual correction'})).toBeDisabled();
+ await expect(next).toBeDisabled();
+ await orphan.getByRole('button',{name:'Discard edit & reload suggestion'}).click();
+ await expect(orphan).toHaveCount(0);await expect(next).toBeEnabled();
+ card=alice.getByRole('article',{name:'Visual direction: composition',exact:true});
+ await card.getByRole('button',{name:'Edit',exact:true}).click();
+ await card.getByLabel('Edit visual composition').fill('Keep this when new analysis has no suggestions.');
+ await background([]);await alice.getByRole('button',{name:'Refresh evidence',exact:true}).click();
+ orphan=alice.getByRole('article',{name:'Unsaved visual direction: composition',exact:true});
+ await expect(orphan.getByLabel('Edit visual composition')).toHaveValue('Keep this when new analysis has no suggestions.');
+ await expect(next).toBeDisabled();
+ await alice.screenshot({path:'work/browser/v5-visual-draft-preserved.png',fullPage:true});
+ await orphan.getByRole('button',{name:'Discard edit & reload suggestion'}).click();
+ card=alice.getByRole('article',{name:'Visual direction: composition',exact:true});
+ await card.getByRole('button',{name:'Remove style'}).click();
+ await expect(card.getByText('Marked for removal',{exact:true})).toBeVisible();
+ await card.getByRole('button',{name:'Restore approved style'}).click();
+ await expect(card.getByText('Strong typography with spacious margins.',{exact:true})).toBeVisible();
+ const a11y=await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(a11y.violations.map(v=>v.id),[]);
+ await card.getByRole('button',{name:'Remove style'}).click();await next.click();
+ await alice.getByRole('button',{name:'Confirm brand profile',exact:true}).click();
+ await expect(alice.getByText('Your approved brand profile is saved.',{exact:true})).toBeVisible();
+ const approved=await(await alice.request.get(brainURL)).json();
+ assert.ok(!approved.active.snapshot.facts.some(f=>f.field==='visual_direction_composition'));
+});

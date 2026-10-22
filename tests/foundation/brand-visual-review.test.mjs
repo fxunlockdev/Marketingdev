@@ -97,3 +97,36 @@ test('empty or partial AI analysis cannot silently erase previously approved vis
  await brain.reviewVisual(owner,org.id,brand.id,body(d));
  assert.equal((await approve()).snapshot.facts.filter(f=>f.evidence_type==='approved_visual_direction').length,2);
 });
+
+test('retained styles can be edited and removed without another model call; old approved snapshots remain intact',async()=>{
+ let d=(await analysis()).directions[0];await brain.reviewVisual(owner,org.id,brand.id,body(d,'edited','Calm typography and generous spacing.'));const original=await approve();
+ await analysis([]);
+ let state=(await brain.read(owner,org.id,brand.id)).visuals;
+ let retained=state.retained_directions.find(d=>d.suggestion.category==='composition');
+ assert.equal(retained.approved_value,'Calm typography and generous spacing.');
+ const edit=body(retained,'edited','Bold typography with generous spacing.');
+ const saved=await brain.reviewVisual(owner,org.id,brand.id,edit);
+ assert.deepEqual(await brain.reviewVisual(owner,org.id,brand.id,edit),saved);
+ const revised=await approve();
+ assert.equal(revised.snapshot.facts.find(f=>f.field==='visual_direction_composition').value,'Bold typography with generous spacing.');
+ assert.equal((await brain.version(owner,org.id,brand.id,original.id)).snapshot.facts.find(f=>f.field==='visual_direction_composition').value,'Calm typography and generous spacing.');
+ retained=(await brain.read(owner,org.id,brand.id)).visuals.retained_directions.find(d=>d.suggestion.category==='composition');
+ await brain.reviewVisual(owner,org.id,brand.id,body(retained,'wrong'));
+ assert.ok(!(await approve()).snapshot.facts.some(f=>f.field==='visual_direction_composition'));
+ await assert.rejects(brain.reviewVisual(owner,org.id,brand.id,body(retained,'edited','Bring it back')),/not found/);
+});
+test('a replacement analysis prevents a stale retained-style edit and business access is rechecked',async()=>{
+ let d=(await analysis()).directions[0];await brain.reviewVisual(owner,org.id,brand.id,body(d));await approve();await analysis([]);
+ const retained=(await brain.read(owner,org.id,brand.id)).visuals.retained_directions.find(d=>d.suggestion.category==='composition');
+ await assert.rejects(brain.reviewVisual(viewer,org.id,brand.id,body(retained,'edited','Changed')));
+ await assert.rejects(brain.reviewVisual(owner,org.id,other.id,body(retained,'edited','Changed')));
+ await analysis([{...suggestion,creative_direction:'A replacement suggestion'}]);
+ await assert.rejects(brain.reviewVisual(owner,org.id,brand.id,body(retained,'edited','Stale edit')),/not found/);
+});
+test('retained provenance must still match the immutable approved evidence digest',async()=>{
+ const d=(await analysis()).directions[0];await brain.reviewVisual(owner,org.id,brand.id,body(d));await approve();await analysis([]);
+ const retained=(await brain.read(owner,org.id,brand.id)).visuals.retained_directions.find(d=>d.suggestion.category==='composition');
+ await admin.query("UPDATE app.brand_visual_reviews SET suggestion=jsonb_set(suggestion,'{observation}','\"Tampered fixture\"') WHERE id=$1",[retained.review.id]);
+ try{await assert.rejects(brain.read(owner,org.id,brand.id),/could not be verified/);await assert.rejects(approve(),/could not be verified/);}
+ finally{await admin.query('UPDATE app.brand_visual_reviews SET suggestion=$2 WHERE id=$1',[retained.review.id,JSON.stringify(retained.suggestion)]);}
+});
