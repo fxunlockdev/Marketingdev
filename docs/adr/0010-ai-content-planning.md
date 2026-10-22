@@ -1,6 +1,6 @@
 # Durable skill-driven 30-day planning
 
-Status: backend implemented; eight targeted local integration cases and four provider/schema contracts pass. Full final-source regression verification is pending. No live model quality, deployment or module completion is claimed.
+Status: backend implemented; eight targeted local integration cases and four provider/schema contracts pass. All 114 final-source offline/contract/security/browser checks pass at edec068. Release remains BLOCKED for full product/deployed/live acceptance. No live model quality, deployment or module completion is claimed.
 
 ## Product behavior
 

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "bbf1e7989e5f2962e856a4eab21f407c1f0eabd6",
-  "checked_at": "2026-10-22T03:18:41.537670+00:00",
+  "code_commit": "edec068a7be8ed2adb52f096420bd6e3efc624c3",
+  "checked_at": "2026-10-22T03:41:48.334358+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "ADAPTER_READY",
@@ -210,6 +210,15 @@
         "docs/evidence/security.json"
       ],
       "blocked_reason": "Backend-only manual plan persistence and channel-specific exact-version review tested with real HTTP sessions/PostgreSQL RLS and explicit creative fixtures. No AI 30-day strategy generation, customer calendar/inbox UI, OAuth/publishing or deployed/live evidence."
+    },
+    "ai_content_planning": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json",
+        "docs/evidence/contracts.json"
+      ],
+      "blocked_reason": "Actual isolated original marketing-plan/social/product-marketing skills, Temporal, immutable approved context, MOCK OpenAI Responses, bounded 30-slot generation, PostgreSQL persistence/RLS, budget holds and failure recovery tested. Customer calendar/inbox and Canvas slot-generation linkage, deployed/runtime proof and paid quality verification remain incomplete."
     }
   },
   "security": {
