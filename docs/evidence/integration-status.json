@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "6c08abcb4f00d06f6333ab213c4fe4c9366be26d",
-  "checked_at": "2026-10-22T09:43:15.878091+00:00",
+  "code_commit": "11e5c7cbd57b62ccf9addb8ef5b5f06112edc317",
+  "checked_at": "2026-10-22T10:05:03.883207+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "ADAPTER_READY",
@@ -349,7 +349,7 @@
       "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
     },
     "deployment_bootstrap": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/deployment.json"

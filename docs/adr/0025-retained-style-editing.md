@@ -1,6 +1,6 @@
 # ADR 0025 — Edit retained style and preserve interrupted review drafts
 
-Status: implemented; final local verification in progress. No live provider evidence.
+Status: implemented and locally verified by four source-bound suites (258 checks plus six security guards). No live provider evidence.
 
 ## Decision
 
