@@ -94,8 +94,9 @@ test('publication requires auth, exact approval, explicit consent and a scoped s
  const unapproved=await approvedPost();await admin.query('DELETE FROM app.creative_export_approvals WHERE export_id=$1',[unapproved.e.id]);await assert.rejects(queuePost(unapproved),/final saved image/);
  await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");try{await assert.rejects(queuePost(f),/not authorized/);}finally{await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");}
  await assert.rejects(publisher.submit(alice.id,brand.id,{...f.body,revision:99},randomUUID()),/current/);
+ const ready=await publisher.ready(alice.id,brand.id);assert.ok(ready.posts.some(p=>p.slot_id===f.slot.id&&p.export_id===f.e.id));assert.ok(!ready.posts.some(p=>p.slot_id===unapproved.slot.id));assert.ok(!JSON.stringify(ready).includes('object_key'));assert.equal((await publisher.ready(alice.id,sibling.id)).posts.length,0);
  const results=await Promise.all([api(endpoint,{body:f.body,method:'POST',key}),api(endpoint,{body:f.body,method:'POST',key})]);results.forEach(r=>assert.equal(r.status,201,JSON.stringify(r.body)));assert.equal(results[0].body.id,results[1].body.id);const j=results[0].body;
- await assert.rejects(queuePost(f),/already/);await assert.rejects(publisher.submit(alice.id,brand.id,{...f.body,channel_id:randomUUID()},key),/another publication/);
+ assert.ok(!(await publisher.ready(alice.id,brand.id)).posts.some(p=>p.slot_id===f.slot.id));await assert.rejects(queuePost(f),/already/);await assert.rejects(publisher.submit(alice.id,brand.id,{...f.body,channel_id:randomUUID()},key),/another publication/);
  await publisher.cancel(alice.id,brand.id,j.id);const count=uploads;assert.equal(await handler.run(scope(j)),'rejected');assert.equal(uploads,count);assert.equal((await record(j)).phase,'canceled');
 });
 test('actual Temporal workflow uploads exact approved PNG, submits once and records a proven remote publication',async()=>{
@@ -105,7 +106,7 @@ test('actual Temporal workflow uploads exact approved PNG, submits once and reco
  const dispatchPool=new Pool({connectionString:config.jobs.dispatcherDatabaseUrl});
  try{const client=new Client({connection,namespace:config.jobs.namespace}),dispatcher=new JobDispatcher(dispatchPool,client,taskQueue);await admin.query('UPDATE app.job_dispatch SET dispatched_at=now() WHERE job_id<>$1',[j.id]);assert.equal(await temporal.runUntil(async()=>{assert.equal(await dispatcher.runOnce(),true);return client.workflow.getHandle('desvio-publish-'+j.id).result();}),'published');}finally{await dispatchPool.end();await native.close();await connection.close();}
  const r=await record(j);assert.equal(r.phase,'accepted');assert.equal(r.observed_state,'published');assert.equal(r.release_id,'MOCK_RELEASE');assert.equal(digest(lastUpload),f.e.sha256);assert.equal(submissions,count+1);assert.equal(await handler.run(scope(j)),'accepted');assert.equal(submissions,count+1);
- await assert.rejects(publisher.cancel(alice.id,brand.id,j.id),/already/);const list=await publisher.list(alice.id,brand.id);assert.ok(!JSON.stringify(list).includes(credential));assert.ok(!JSON.stringify(list).includes('object_key'));assert.ok(!JSON.stringify(list).includes('remote_media'));
+ await assert.rejects(publisher.cancel(alice.id,brand.id,j.id),/already/);const list=await publisher.list(alice.id,brand.id);assert.equal(list.publications.find(p=>p.id===j.id).account_name,'MOCK staging profile');assert.ok(!JSON.stringify(list).includes(credential));assert.ok(!JSON.stringify(list).includes('object_key'));assert.ok(!JSON.stringify(list).includes('remote_media'));
 });
 test('accepted is not published; reconciliation preserves observations on failures and reports missing or changed remote posts',async()=>{
  const f=await approvedPost(),j=await queuePost(f);assert.equal(await handler.run(scope(j)),'accepted');assert.equal((await record(j)).observed_state,'unconfirmed');assert.equal((await handler.reconcile(scope(j))).state,'queued');
@@ -147,4 +148,9 @@ test('publication is disabled by default, holds daily reservations, and stores i
  const f=await approvedPost();await assert.rejects(new Publication(new SocialConnections(businesses,true),exports).submit(alice.id,brand.id,f.body,randomUUID()),/not been enabled/);
  await admin.query('UPDATE app.publication_grants SET daily_limit=1');try{await assert.rejects(queuePost(f),/daily publishing limit/);}finally{await admin.query('UPDATE app.publication_grants SET daily_limit=100');}
  const j=await queuePost(f);remoteState='PUBLISHED';await handler.run(scope(j));await handler.reconcile(scope(j));mode='listMissing';await handler.reconcile(scope(j));const history=await publisher.history(alice.id,brand.id,j.id);assert.deepEqual(history.observations.map(x=>x.state),['missing','published']);assert.equal(history.observations[1].release_id,'MOCK_RELEASE');await assert.rejects(publisher.history(bob.id,brand.id,j.id));await assert.rejects(workerPool.query('DELETE FROM app.publication_observations'),e=>e.code==='42501');
+});
+
+test('overview aggregates actual business records and denies foreign tenants',async()=>{
+ const r=await api(path('overview'));assert.equal(r.status,200);assert.equal(r.body.business_id,brand.id);assert.equal(r.body.analytics_available,false);
+ const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);
 });

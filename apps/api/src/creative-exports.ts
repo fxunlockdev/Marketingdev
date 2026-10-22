@@ -4,6 +4,10 @@ import {randomUUID} from 'node:crypto';
 import {Canvas} from './canvas.js';
 import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
+export const publicationProofSQL=`SELECT DISTINCT e.*,s.id AS slot_id,s.revision AS slot_revision,s.planned_at,v.caption,s.channel,p.id AS project_id FROM app.content_slots s JOIN app.creative_versions v ON v.id=s.creative_version_id JOIN app.creative_projects p ON p.id=v.project_id
+   JOIN app.creative_exports e ON e.version_id=v.id AND e.source_sha256=s.creative_sha256
+   JOIN app.creative_export_approvals a ON a.export_id=e.id AND a.context_type='slot' AND a.context_id=s.id AND a.context_revision=s.revision
+   WHERE s.state='approved' AND s.approved_by IS NOT NULL AND s.creative_sha256=v.sha256 AND p.latest_version_id=v.id AND e.renderer_image=$1`;
 export class CreativeExports {
  constructor(readonly canvas:Canvas,readonly image?:string){}
  get configured(){return !!this.image&&/^sha256:[a-f0-9]{64}$/.test(this.image);}
@@ -63,10 +67,7 @@ export class CreativeExports {
  // Publication must recheck this proof in its own locked transaction immediately
  // before submitting approved bytes. Historical approvals alone are insufficient.
  async publicationProof(db:any,slotId:string){
-  const proof=(await db.query(`SELECT e.* FROM app.content_slots s JOIN app.creative_versions v ON v.id=s.creative_version_id JOIN app.creative_projects p ON p.id=v.project_id
-   JOIN app.creative_exports e ON e.version_id=v.id AND e.source_sha256=s.creative_sha256
-   JOIN app.creative_export_approvals a ON a.export_id=e.id AND a.context_type='slot' AND a.context_id=s.id AND a.context_revision=s.revision
-   WHERE s.id=$1 AND s.state='approved' AND s.approved_by IS NOT NULL AND s.creative_sha256=v.sha256 AND p.latest_version_id=v.id AND e.renderer_image=$2 LIMIT 1`,[slotId,this.image])).rows[0];
+  const proof=(await db.query(publicationProofSQL+' AND s.id=$2 LIMIT 1',[this.image,slotId])).rows[0];
   if(!proof)throw new ConflictException('Review and approve the current post and final saved image before publishing');return proof;
  }
 

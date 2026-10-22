@@ -2,6 +2,15 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas and calendar/channel-review workflows are implemented locally. Prior checkpoint: 124 checks passed at 35b86cc. Current Connections UI checkpoint passes source-bound offline, contracts, focused social and Connections browser verification; full security/browser evidence is stale or failed for this source. Approved-image publishing/reconciliation backend is now implemented locally with MOCK upstream; no live generation, social publication or dev app deployment is claimed.
 
+## Current session — customer publishing and genuine business overview
+
+- Continuing the full end-to-end goal on `codex/pr-17-publishing-ui`, stacked on PR #17. No migration or architecture change. Added `apps/web/components/publishing.tsx` and `business-overview.tsx`, backed by exact-approved-image ready-list APIs and `apps/api/src/business-overview.ts`. Connections and exact-image approval now link to the real publishing screen.
+- Confirmation requires the hash-checked private canonical image to display, exact destination selection and explicit image/caption/time consent. Persisted status/history, cancellation before submission and status checks are wired to real jobs. Unknown writes and stale approvals prevent duplicate confirmation. Overview aggregates genuine business-scoped records and never supplies fake engagement metrics.
+- Ten focused backend tests and five actual browser journeys passed during implementation. Upstream Postiz remains MOCK. Accessibility initially caught a link label mismatch; removed the redundant label and the subsequent five-journey run passed. Additional final-image screenshots and destination labels are being verified before the final source-bound checkpoint. Final evidence below supersedes these development runs.
+- Added `make verify-publishing-ui`, source-bound customer publishing/overview capability evidence and ADR 0018. Full security/browser gates remain open; focused evidence cannot replace them. Full document runtime rebuild remains constrained by the full local Docker disk; consent to restart/expand Colima is still pending, with unrelated containers preserved.
+- Fresh Railway MCP discovery still shows only production; create-dev again failed “Deploys have been paused due to an upstream issue.” No dev domain or application rollout. No paid/live calls or real publication occurred.
+- Next: finish the focused source-bound checkpoint, then operator recovery/lifecycle and deployment, Higgsfield/video, analytics/learning and remaining V5 account modules. The end-to-end goal remains active.
+
 ## Current session — approved-image publication and reconciliation backend
 
 - Previous turn made verified progress in draft PR #16. Draft PR #17: https://github.com/fxunlockdev/Marketingdev/pull/17. Continuing the full end-to-end goal on `codex/pr-16-publishing`, based on PR #16; implementation 6d0e66a, evidence deb472b. Existing architecture retained. No customer publishing UI was added before backend proof, and no real social publish/paid model call was performed.
