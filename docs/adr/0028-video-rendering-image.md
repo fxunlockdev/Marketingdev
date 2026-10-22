@@ -1,6 +1,6 @@
 # Packaged video renderer and timed overlays
 
-Status: local implementation; no customer video enablement or live provider claim.
+Status: local implementation verified at `3271363`; video-runtime (22), offline (4) and contracts (74) pass at matching unchanged source. Full security/browser regression remains pending for the connected workflow. No customer video enablement or live provider claim.
 
 The existing normalization stage depended on test-only host mounts and discarded the timed overlays produced by the video skill. It now builds into an exact ARM64 image and composes the bounded caption/CTA recipe. The Node adapter supplies bytes over stdin and validates the returned source hash, image digest, video/poster hashes, dimensions, duration, MIME and exact recipe. Runtime has no network, credentials or host application mounts.
 

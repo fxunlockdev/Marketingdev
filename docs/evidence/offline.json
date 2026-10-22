@@ -1,9 +1,9 @@
 {
   "suite": "offline",
   "scope": "TypeScript build and M0 skill archive/middleware probes",
-  "checked_at": "2026-10-22T13:21:12.626198+00:00",
-  "source_sha256": "2611380a65dcc833afd7f0aa7c1202ca510edea87aafa5e81634496020a6ca99",
-  "source_sha256_start": "2611380a65dcc833afd7f0aa7c1202ca510edea87aafa5e81634496020a6ca99",
+  "checked_at": "2026-10-22T13:37:28.714511+00:00",
+  "source_sha256": "4dc469f46274088c8183c8afbf94791c3f6389f04dee3412a04b7945a91e7f4a",
+  "source_sha256_start": "4dc469f46274088c8183c8afbf94791c3f6389f04dee3412a04b7945a91e7f4a",
   "source_unchanged": true,
   "results": [
     {
@@ -26,7 +26,7 @@
         "-v"
       ],
       "exit_code": 0,
-      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\ntest_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved (test_video_bundle.VideoBundleGuard.test_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 1.377s\n\nOK\n"
+      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\ntest_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved (test_video_bundle.VideoBundleGuard.test_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved) ... ok\n\n----------------------------------------------------------------------\nRan 4 tests in 1.216s\n\nOK\n"
     }
   ],
   "passed": true,
