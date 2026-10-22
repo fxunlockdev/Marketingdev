@@ -1,0 +1,11 @@
+# Planning inside Canvas conversations
+
+Migration 030 links an optional Canvas conversation to each planning request with a composite business foreign key. Calendar-originated planning remains independent. Canvas can select an existing conversation or explicitly request a new one; the thread, request, user message and durable jobs are created atomically. Request replay returns the same thread and job, and a different thread changes the idempotency hash. Existing conversation limits and business/role checks remain applicable.
+
+A successful planning worker saves the actual validated strategy summary as an assistant message in the same transaction as the generated calendar. A worker message policy requires that job's exact request/thread link. Replaying a completed job does not duplicate messages. Future loop cycles stay in the initiating conversation. Failed, canceled or uncertain jobs do not create successful assistant replies; the conversation API exposes their actual persisted state separately.
+
+The Canvas UI presents planning inside the conversation, retains image generation/revision controls, and links completed planning runs to their calendar. Thread polling includes due planning runs but excludes future and canceled occurrences. This connection uses the existing original-skill planning service, provider selection, funding, video approval and final review paths. No model-generated arbitrary tool dispatch or hidden approval bypass is introduced.
+
+This is shared conversation history and explicit planning actions. It is not yet automatic natural-language intent routing across every Canvas operation, and it does not imply that arbitrary follow-up text automatically inherits a prior plan's contents. Those orchestration semantics require additional typed contracts and tests. Paid providers remain MOCK in local tests; deployed/live acceptance remains open.
+
+At unchanged source `dbc49ea51c944cb899b33843cfa217b1f3b47c393dec780d5534d4a8a98dcd0b`, offline (4), contracts (78), video/export cases (9), Canvas/calendar browser journeys (6), security (24 account + 144 application cases), six guards and root/media audits pass. Seventeen planning cases are included in security. The conversation UI was visually inspected. Broad browser evidence remains historical; deployed/live product E2E is unfinished and release remains blocked.

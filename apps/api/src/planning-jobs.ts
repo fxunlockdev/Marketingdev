@@ -119,6 +119,7 @@ export class PlanningJobs {
      await db.query(`INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,feedback,snapshot)
        VALUES($1,$2,$3,$4,1,'created',$5,'',$6)`,[randomUUID(),j.organization_id,j.brand_id,sid,j.requested_by,JSON.stringify(snapshot)]);
     }
+    if(request.thread_id)await db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'assistant',$6)",[randomUUID(),j.organization_id,j.brand_id,request.thread_id,j.id,`${result.plan.title}\n${result.plan.strategy}\nPrepared ${result.plan.slots.length} draft posts starting ${input.preferences.starts_on}. Open the day-by-day plan to create and review its posts.`]);
     await db.query('UPDATE app.planning_requests SET output_plan_id=$2 WHERE job_id=$1',[j.id,planId]);
     return this.finish(db,j,'succeeded');
    });

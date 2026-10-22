@@ -757,6 +757,7 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
 test('Canvas creates a custom four-day plan and opens its actual saved calendar post',async()=>{
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'gemini',true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY')",[org,brand]);
  await page.goto(`${base}/b/${brand}/canvas`);
+ await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
  await page.getByText('Plan content in Canvas',{exact:true}).click();
  await page.getByLabel('Planning model',{exact:true}).selectOption('gemini');
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
@@ -771,6 +772,9 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await expect(preview.getByRole('listitem')).toHaveCount(4,{timeout:60000});
  const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'gemini');
  await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('listitem')).toHaveCount(4);
+ await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('TEST four-day launch sequence');
+ await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Prepared 4 draft posts');
+ await expect(page.getByRole('region',{name:'Conversation plans'}).getByRole('link',{name:'Open calendar · 2026-12-01'})).toBeVisible();
  await expect(page.getByRole('region',{name:'Planning loops'})).toContainText('1 of 3 plans prepared');
  await page.getByRole('button',{name:'Stop planning loop',exact:true}).click();
  await expect(page.getByRole('region',{name:'Planning loops'})).toContainText('Stopped');

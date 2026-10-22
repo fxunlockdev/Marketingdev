@@ -262,3 +262,17 @@ test('dispatcher waits for the persisted loop due time and submits the occurrenc
   assert.equal(await dispatcher.runOnce(),true);assert.equal(sent,1);assert.equal(await dispatcher.runOnce(),false);assert.equal(sent,1);
  }finally{await dispatchPool.end();}
 });
+
+
+test('Canvas planning saves the request, genuine result and calendar link in one isolated conversation',async()=>{
+ const {Canvas}=await import('../../dist/canvas.js'),canvas=new Canvas(businesses,null),b=await fresh();await grant(b);
+ const body={starts_on:'2090-02-01',duration_days:7,post_count:7,brief:'Plan a launch week for this business',canvas_thread_id:null},key=randomUUID();
+ const j=await planning.submit(alice,b.id,body,key);assert.ok(j.thread_id);assert.equal((await planning.submit(alice,b.id,body,key)).thread_id,j.thread_id);
+ let c=await canvas.thread(alice,b.id,j.thread_id);assert.equal(c.messages.length,1);assert.equal(c.messages[0].role,'user');assert.ok(c.messages[0].content.includes(body.brief));assert.equal(c.planning_runs[0].status,'queued');assert.equal(c.projects.length,0);
+ assert.equal(await handler.run(scope(b,j)),'succeeded');c=await canvas.thread(alice,b.id,j.thread_id);assert.equal(c.messages.length,2);assert.equal(c.messages[1].role,'assistant');assert.ok(c.messages[1].content.includes('Prepared 7 draft posts'));assert.ok(c.planning_runs[0].output_plan_id);
+ assert.equal(await handler.run(scope(b,j)),'finished');assert.equal((await canvas.thread(alice,b.id,j.thread_id)).messages.length,2);
+ const follow=await planning.submit(alice,b.id,{...body,canvas_thread_id:j.thread_id,brief:'Now focus this week on our audience'},randomUUID());assert.equal(follow.thread_id,j.thread_id);assert.equal(await handler.run(scope(b,follow)),'succeeded');assert.equal((await canvas.thread(alice,b.id,j.thread_id)).messages.length,4);
+ const other=await fresh();await assert.rejects(planning.submit(alice,other.id,{...body,canvas_thread_id:j.thread_id},randomUUID()),/Conversation not found/);await assert.rejects(canvas.thread(bob,b.id,j.thread_id));
+ const alien=await canvas.createThread(alice,b.id,{title:'Different conversation'},randomUUID());
+ await assert.rejects(jobs.transaction(scope(b,j),db=>db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'assistant','forged')",[randomUUID(),org.id,b.id,alien.id,j.id])),e=>e.code==='42501');
+});

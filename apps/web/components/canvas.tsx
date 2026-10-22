@@ -36,6 +36,7 @@ type Conversation = {
   thread: Thread;
   messages: { id: string; role: string; content: string }[];
   runs: Run[];
+  planning_runs: {id:string;status:string;cancel_requested:boolean;output_plan_id:string|null;scheduled_at:string;starts_on:string}[];
   projects: { id: string; title: string; latest_version_id: string | null }[];
 };
 type Version = {
@@ -159,7 +160,7 @@ export function CanvasScreen({ business }: { business: Business }) {
             ? p
             : (value.projects.find((x) => x.latest_version_id)?.id ?? ""),
         );
-        if (value.runs.some((r) => running(r))) timer = setTimeout(load, 2500);
+        if (value.runs.some((r) => running(r))||value.planning_runs.some(r=>['queued','running','retrying'].includes(r.status)&&!r.cancel_requested&&Date.parse(r.scheduled_at)<=Date.now())) timer = setTimeout(load, 2500);
       } catch (e) {
         if (active) setError(e);
       }
@@ -177,6 +178,7 @@ export function CanvasScreen({ business }: { business: Business }) {
       !confirm("Leave your unsaved edits and draft message?")
     )
       return;
+    setPlanningThread("");
     setThreadId(id);
     setConversation(undefined);
     setProjectId("");
@@ -188,6 +190,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     submitKey.current = crypto.randomUUID();
     threadKey.current = crypto.randomUUID();
   }
+  const [planningThread,setPlanningThread]=useState("");
   const held = conversation?.runs.some(
     (r) => running(r) || r.status === "unknown",
   );
@@ -254,7 +257,6 @@ export function CanvasScreen({ business }: { business: Business }) {
       )}
       <Notice error={error} />
       <CanvasVideoContext businessId={business.id}/>
-      <CanvasPlanner key={business.id} business={business}/>
       <div className="studio-layout">
         <aside className="studio-conversations" aria-label="Conversations">
           <button disabled={!write || busy} onClick={() => choose("")}>
@@ -332,6 +334,8 @@ export function CanvasScreen({ business }: { business: Business }) {
               ))}
             </div>
           )}
+          {!!conversation?.planning_runs.length&&<section aria-label="Conversation plans">{conversation.planning_runs.map(r=><p key={r.id}>{r.output_plan_id?<a href={`/b/${business.id}/content-plan?start=${r.starts_on}`}>Open calendar · {r.starts_on}</a>:r.cancel_requested?'Planning canceled':r.status==='queued'&&Date.parse(r.scheduled_at)>Date.now()?`Planning scheduled for ${r.starts_on}`:r.status==='unknown'?'Planning needs reconciliation before another request.':`Planning ${r.status}`}</p>)}</section>}
+          <CanvasPlanner key={business.id+threadId} business={business} threadId={threadId} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>
           <form className="studio-composer" onSubmit={send}>
             <fieldset
               disabled={!write || busy || held || !business.has_approved_brand}
