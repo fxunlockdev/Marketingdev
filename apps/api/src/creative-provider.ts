@@ -19,7 +19,7 @@ export class CreativeProvider {
   get configured() {
     return !!this.sdk;
   }
-  plannerRequest(request: PlannerRequest, model: string) {
+  plannerRequest(request: PlannerRequest, model: string, maxOutputTokens:4000|16000=4000) {
     if (
       !Number.isInteger(request.step) ||
       request.step < 1 ||
@@ -64,7 +64,7 @@ export class CreativeProvider {
     const body = {
       model,
       store: false as const,
-      max_output_tokens: 4000,
+      max_output_tokens: maxOutputTokens,
       input,
       tools: request.tools.map((t) => ({
         type: "function" as const,
@@ -81,13 +81,13 @@ export class CreativeProvider {
       body,
       sha256: hash(canonicalJSON(body)),
       maxInputTokens: bytes + 2048,
-      maxOutputTokens: 4000,
+      maxOutputTokens,
     };
   }
-  async plan(request: PlannerRequest, model: string): Promise<PlannerResponse> {
+  async plan(request: PlannerRequest, model: string, maxOutputTokens:4000|16000=4000): Promise<PlannerResponse> {
     if (!this.sdk) throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const response = await this.sdk.responses.create(
-      this.plannerRequest(request, model).body,
+      this.plannerRequest(request, model, maxOutputTokens).body,
       { timeout: 60000 },
     );
     if (

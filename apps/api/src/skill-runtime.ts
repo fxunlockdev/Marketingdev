@@ -1,3 +1,4 @@
+import {validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
@@ -14,10 +15,13 @@ export class SkillRuntime {
   get configured() {
     return !!this.image && /^sha256:[a-f0-9]{64}$/.test(this.image);
   }
-  async plan(
-    input: CreativeInput,
-    model: (request: PlannerRequest) => Promise<PlannerResponse>,
-  ): Promise<SkillResult> {
+  plan(input:CreativeInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<SkillResult> {
+    return this.run(input,model,value=>validateSkillResult(value,input));
+  }
+  contentPlan(input:PlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<PlanningResult> {
+    return this.run(input,model,value=>validatePlanningResult(value,input));
+  }
+  private async run<T>(input:CreativeInput|PlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,validate:(value:any)=>T):Promise<T> {
     if (!this.configured)
       throw new CreativeError("SKILL_RUNTIME_NOT_CONFIGURED");
     const encoded = JSON.stringify(input);
@@ -59,7 +63,7 @@ export class SkillRuntime {
           ],
           { stdio: ["pipe", "pipe", "pipe"], env: { PATH: process.env.PATH } },
         );
-        const done = (error?: Error, result?: SkillResult) => {
+        const done = (error?: Error, result?: T) => {
           if (settled) return;
           settled = true;
           clearTimeout(timer);
@@ -122,7 +126,7 @@ export class SkillRuntime {
               if (pending || value.model_calls !== step)
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               try {
-                done(undefined, validateSkillResult(value, input));
+                done(undefined, validate(value));
               } catch (error) {
                 done(error as Error);
               }

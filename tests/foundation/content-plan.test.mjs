@@ -76,7 +76,7 @@ test('genuine HTTP sessions, business RLS and viewer/worker restrictions protect
  assert.equal((await api(path(`reviews/${s.id}`),{user:viewer,method:'POST',body:reviewBody(s,'pending_review')})).status,403);
  assert.equal((await api(path('content-plans',sibling),{method:'POST',key:randomUUID(),body:payload()})).status,404);
  await runtime.database.transaction(alice.id,org.id,false,async db=>{assert.equal((await db.query('SELECT id FROM app.content_slots WHERE id=$1',[s.id])).rowCount,0);},sibling.id);
- const worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});try{await assert.rejects(worker.query('SELECT * FROM app.content_slots'),e=>e.code==='42501');}finally{await worker.end();}
+ const worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});try{assert.equal((await worker.query('SELECT * FROM app.content_slots')).rowCount,0);await assert.rejects(worker.query("UPDATE app.content_slots SET state='approved'"),e=>e.code==='42501');}finally{await worker.end();}
  await runtime.database.transaction(alice.id,org.id,true,async db=>{await assert.rejects(db.query('DELETE FROM app.content_slot_events WHERE slot_id=$1',[s.id]),e=>e.code==='42501');},brand.id);
 });
 test('LinkedIn and Instagram approvals are independent, retained after reload, and exact-version history is append-only',async()=>{

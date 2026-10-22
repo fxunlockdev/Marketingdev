@@ -2,6 +2,16 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas plus the initial content-plan/channel-review backend are implemented locally; all 102 final local checks passed against unchanged source at implementation commit bbf1e79. No live generation, social publication or dev app deployment is claimed.
 
+## Current session — AI content planning backend
+
+- Previous turn made verified progress: persistent plans/channel reviews and 102 source-bound checks in PR #9. Full end-to-end scope stays active.
+- Branch `codex/pr-09-ai-content-planning`, stacked on PR #9. Migration 012 plus `planning.ts`, `planning-jobs.ts`, `planning-contracts.ts` implement authenticated enqueue/status/cancel, actual Temporal `plan.generate`, original marketing-plan/social/product-marketing execution, approved Brand Brain/goal snapshots and atomic 30-slot plan persistence. Existing architecture is unchanged.
+- Four planning contracts and eight targeted local integration tests pass. Actual isolated Deep Agents and Temporal execute; OpenAI Responses is MOCK. Runtime planning has a 16,000-token/three-step bound; image-brief calls remain 4,000. Plans require distinct channel drafts, all four weeks, valid local dates and approved citation IDs. No image, approval or social connection is invented.
+- Operator-only expiring grants and conservative per-call reservations gate spending; uncertain results block new planning, cancellation cannot erase them, successful output survives promotion failure without repeating a model call. Worker RLS permits only new bound-job drafts/events, never approval. Existing original manual plans and later onboarding edits are preserved.
+- The new suite initially reached the real three-business cap. Its setup now explicitly grants a larger test entitlement for isolated failure scenarios; product defaults remain three. The unscoped content-slot worker test now proves zero visible rows (new scoped generation permission), retaining UPDATE denial. Final full-source regression verification is next, including failure halfway through slot promotion.
+- ADR 0010 records exact routes/configuration/proof limits. Calendar/Review Inbox UI and Canvas slot-generation linkage are still missing; no module is complete. UI skills/accessibility guidance was consulted in preparation, but no screen was added before the backing workflow.
+- Next: connect each planned slot to real Canvas generation/revision and safely attach the resulting version, then implement/test calendar and channel inbox screens. Continue canonical exports, social OAuth/publishing, Higgsfield, analytics/learning, setup/billing/team/profile and deployment/live acceptance. No model key, paid test or social publication was requested/performed this session.
+
 ## Current session — Content Plan and per-channel review backend
 
 - Previous goal turn made verified progress: Canvas checkpoint and 92 source-bound checks, PR #8; the goal remains end-to-end and active.
