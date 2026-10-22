@@ -55,12 +55,18 @@ export class Canvas {
       ).rows,
     }));
   }
-  createThread(user: string, id: string, body: unknown, requestKey: unknown) {
+  createThread(
+    user: string,
+    id: string,
+    body: unknown,
+    requestKey: unknown,
+    scoped?: { db: any; b: any },
+  ) {
     const v = object(body, ["title"]),
       title = plain(v.title, 140),
       k = key(requestKey),
       sha = hash(canonicalJSON({ title }));
-    return this.scope(user, id, true, async (db, b) => {
+    const action = async (db: any, b: any) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         `canvas:${id.toLowerCase()}`,
       ]);
@@ -94,7 +100,10 @@ export class Canvas {
         [thread, b.organization_id, id, title, user, k, sha],
       );
       return { id: thread };
-    });
+    };
+    return scoped
+      ? action(scoped.db, scoped.b)
+      : this.scope(user, id, true, action);
   }
   thread(user: string, id: string, threadId: string) {
     threadId = uuid(threadId);
@@ -135,6 +144,7 @@ export class Canvas {
     threadId: string,
     body: unknown,
     requestKey: unknown,
+    scoped?: { db: any; b: any },
   ) {
     threadId = uuid(threadId);
     const v = object(body, [
@@ -168,7 +178,7 @@ export class Canvas {
           parent,
         }),
       );
-    return this.scope(user, id, true, async (db, b) => {
+    const action = async (db: any, b: any) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         `canvas:${id.toLowerCase()}`,
       ]);
@@ -293,7 +303,10 @@ export class Canvas {
         [b.organization_id, id, user, job],
       );
       return { id: job, status: "queued" };
-    });
+    };
+    return scoped
+      ? action(scoped.db, scoped.b)
+      : this.scope(user, id, true, action);
   }
   project(user: string, id: string, projectId: string) {
     projectId = uuid(projectId);

@@ -1,3 +1,7 @@
+import {PlanningJobs} from '../../dist/planning-jobs.js';
+import {Businesses} from '../../dist/businesses.js';
+import {Workspaces} from '../../dist/workspaces.js';
+import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
 // Browser integration proof uses real auth, RLS, Temporal, S3, Fabric and isolated
 // owner skills. Only the paid OpenAI transport is MOCK; no provider request leaves this test.
 import { test, before, after } from "node:test";
@@ -166,7 +170,7 @@ before(async () => {
       fetch: async (url, init) => {
         if (String(url).startsWith("data:")) return fetch(url, init);
         if (new URL(url).pathname === "/v1/responses") {
-          planned++;
+
           const body = JSON.parse(init.body),
             entry = body.input.find(
               (m) =>
@@ -179,6 +183,8 @@ before(async () => {
           assert.ok(
             input.brand.facts.every((f) => !f.value.includes("OTHER BUSINESS")),
           );
+          if(input.task==='content_plan')return modelResponse(generatedPlan(input));
+          planned++;
           const brief = {
             headline:
               planned === 1
@@ -231,6 +237,7 @@ before(async () => {
     new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),
     provider,
   );
+  const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider);
   native = await NativeConnection.connect({ address: config.jobs.address });
   connection = await Connection.connect({ address: config.jobs.address });
   temporal = await Worker.create({
@@ -241,6 +248,8 @@ before(async () => {
       new URL("../../dist/asset-workflow.js", import.meta.url),
     ),
     activities: {
+      generatePlan:scope=>planner.run(scope),
+      failPlan:scope=>planner.fail(scope),
       generateCreative: async (scope) => {
         const context = Context.current(),
           timer = setInterval(() => context.heartbeat(), 1000);
@@ -586,4 +595,67 @@ test("Canvas displays an uncertain provider result and holds further generation 
   ).toBeDisabled();
   assert.equal(generated, 3);
   assert.deepEqual(errors, []);
+});
+
+test('calendar generates a saved 30-day plan and a linked creative through real jobs; channel inbox persists feedback and bulk approval (MOCK OpenAI)',async()=>{
+ // Explicit test-operator resolution of the preceding simulated lost response.
+ await admin.query("UPDATE app.jobs SET status='rejected' WHERE brand_id=$1 AND status='unknown'",[brand]);failImages=false;
+ const businesses=new Businesses(runtime.database,new Workspaces(runtime.database));
+ await businesses.onboarding(actor,brand,{revision:0,step:3,goal:'awareness',timezone:'Asia/Kuala_Lumpur',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY')",[org,brand]);
+ await page.goto(`${base}/b/${brand}/content-plan`);
+ await page.getByRole('button',{name:'Create 30-day plan',exact:true}).click();
+ await page.getByLabel('Plan starts on').fill('2026-11-01');
+ await page.getByLabel('Anything to focus on?').fill('TEST FIXTURE: explain refillable soap');
+ await page.getByRole('button',{name:'Generate draft plan',exact:true}).click();
+ await expect(page.getByText('30 posts in this view',{exact:true})).toBeVisible({timeout:30000});
+ await page.screenshot({path:'work/browser/content-plan-desktop.png',fullPage:true});
+ await page.getByRole('button',{name:'LinkedIn',exact:true}).click();
+ await expect(page.getByText('15 posts in this view',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Open LinkedIn post: TEST FIXTURE hook 1',exact:true}).click();
+ await page.getByRole('button',{name:'Create creative',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});
+ const postSlot=(await admin.query("SELECT s.* FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.brand_id=$1 AND s.hook='TEST FIXTURE hook 1'",[brand])).rows[0];
+ assert.ok(postSlot.creative_version_id);assert.equal(postSlot.state,'draft_ready');
+ await page.getByLabel('Creative brief').fill('TEST FIXTURE: owner revised brief');
+ await page.getByLabel('Planned date & time (Asia/Kuala_Lumpur)').fill('2026-11-03T10:00');
+ await page.route(`**/content-slots/${postSlot.id}`,route=>route.request().method()==='PATCH'?route.fulfill({status:503,contentType:'application/json',body:'{}'}):route.continue());
+ await page.getByRole('button',{name:'Save post changes',exact:true}).click();await expect(page.locator('.slot-panel .notice.error')).toBeVisible();await expect(page.getByLabel('Creative brief')).toHaveValue('TEST FIXTURE: owner revised brief');
+ await page.unroute(`**/content-slots/${postSlot.id}`);
+ await page.getByRole('button',{name:'Save post changes',exact:true}).click();await expect(page.getByText('Post changes saved.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query('SELECT planned_at FROM app.content_slots WHERE id=$1',[postSlot.id])).rows[0].planned_at.toISOString(),'2026-11-03T02:00:00.000Z');
+ await page.getByRole('button',{name:'Send for review',exact:true}).click();await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeVisible();
+ await page.getByLabel('Feedback or creative direction').fill('TEST FIXTURE: calmer image');await page.getByRole('button',{name:'Request changes',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Revise creative',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});await page.getByRole('button',{name:'Send for review',exact:true}).click();await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeEnabled();
+ await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');
+ await page.getByRole('button',{name:'Instagram',exact:true}).click();await expect(page.getByText('Nothing waiting here',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'LinkedIn',exact:true}).click();await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();
+ await expect(page.getByRole('button',{name:'Confirm bulk approval',exact:true})).toBeDisabled();await page.getByLabel('I have reviewed these 1 posts and approve their saved versions.').check();
+ await page.getByRole('button',{name:'Confirm bulk approval',exact:true}).click();await expect(page.getByText('1 post approved. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[postSlot.id])).rows[0].state,'approved');
+ await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeDisabled();
+ await page.screenshot({path:'work/browser/review-inbox-desktop.png',fullPage:true});
+ assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
+ await page.setViewportSize({width:390,height:844});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:'work/browser/review-inbox-mobile.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+ assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+ await page.setViewportSize({width:1440,height:1000});assert.deepEqual(errors,[]);
+});
+
+test('Canvas manual edits require explicit approved-post reset; other businesses cannot see the saved plan or review',async()=>{
+ const before=(await admin.query("SELECT * FROM app.content_slots WHERE brand_id=$1 AND hook='TEST FIXTURE hook 1'",[brand])).rows[0];
+ await page.getByRole('link',{name:'Edit in Canvas',exact:true}).click();
+ await page.getByLabel('Post caption').fill('TEST FIXTURE: Manual revision from review');
+ await page.getByRole('button',{name:'Save new version',exact:true}).click();await expect(page.getByText('Saved as a new draft version.',{exact:true})).toBeVisible();
+ await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();
+ await expect(page.getByRole('button',{name:'Attach latest Canvas version',exact:true})).toBeDisabled();
+ await expect(page.locator('.slot-caption')).not.toContainText('Manual revision from review');
+ await page.getByLabel('I understand that changing this post resets approval and requires a new review.').check();
+ await page.getByRole('button',{name:'Attach latest Canvas version',exact:true}).click();await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();
+ await expect(page.locator('.slot-caption')).toHaveText('TEST FIXTURE: Manual revision from review');
+ const after=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.notEqual(after.creative_version_id,before.creative_version_id);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='approved'",[before.id])).rows[0].n,1);
+ const other=(await admin.query("SELECT id FROM app.brands WHERE organization_id=$1 AND name='OTHER BUSINESS'",[org])).rows[0].id;
+ await page.goto(`${base}/b/${other}/content-plan`);await page.getByLabel('Calendar date').fill('2026-11-01');await expect(page.getByText('Space for your next ideas',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Post details',exact:true})).toHaveCount(0);
+ const denied=await page.request.get(`${base}/api/v1/businesses/${other}/content-slots/${before.id}`);assert.equal(denied.status(),404);assert.deepEqual(errors,[]);
 });

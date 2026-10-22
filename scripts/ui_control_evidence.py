@@ -36,6 +36,24 @@ CANVAS = {
     'CV-20': ('CanvasScreen', 'GET /api/v1/businesses/:id/canvas/threads/:thread', 'app.canvas_threads + canvas_messages', 'scoped persisted conversations survive reload'),
 }
 
+PLANNING = {
+    'PL-01': 'Saved month/7-day/list views with stable pagination and business timezone',
+    'PL-02': 'Previous/next period and arbitrary real dates, never a fixed seed date',
+    'PL-03': 'Saved channel filter and real scoped counts',
+    'PL-04': 'Actual original-skill/Temporal 30-slot plan using approved context; MOCK OpenAI',
+    'PL-05': 'Saved slot detail, exact private creative and decision history',
+    'RV-02': 'Arbitrary start date and 1/7/30-day period in business timezone',
+    'RV-03': 'Server-filtered pending queue and counts',
+    'RV-04': 'Server-filtered exact approved versions; no publication implication',
+    'RV-05': 'Persisted change requests and feedback history',
+    'RV-07': 'Exact revision/hash approval; owner/admin only; stale version denied',
+    'RV-08': 'Mandatory feedback and saved rejection decision',
+    'RV-09': 'Free-text change request saved and used in the next creative job',
+    'RV-10': 'Bound slot/version/feedback job; MOCK create/edit with private prior pixels',
+    'RV-11': 'Actual saved Canvas thread; newer versions require explicit attachment and approval reset',
+    'RV-12': 'Explicit selection/confirmation and atomic approval of at most 30 exact versions',
+}
+
 def update_matrix(root: Path, ready: bool, creative_ready: bool = False):
     path = root / 'docs/UI_CONTROL_MATRIX.csv'
     if not path.exists():
@@ -57,5 +75,10 @@ def update_matrix(root: Path, ready: bool, creative_ready: bool = False):
             row.update(status='ADAPTER_READY' if creative_ready else 'NOT_IMPLEMENTED',component_path=f'apps/web/components/{component_file}.tsx#{component}',api_or_worker=api,persistent_object=db,
                 automated_test='tests/browser/canvas.test.mjs; tests/foundation/creative.test.mjs; tests/contracts/creative.test.mjs',
                 implementation_evidence=f'Fresh source-bound local evidence required; {scope}. No LIVE_VERIFIED or LAUNCH_READY.')
+        if row['id'] in PLANNING:
+            row.update(status='ADAPTER_READY' if creative_ready else 'NOT_IMPLEMENTED',component_path='apps/web/components/content-workspace.tsx',
+                api_or_worker='Authenticated /api/v1/businesses/:id/content-plan, content-slots and review APIs; Temporal',persistent_object='app.content_plans + content_slots + content_slot_generations + creative_versions + content_slot_events',
+                automated_test='tests/browser/canvas.test.mjs; tests/foundation/content-plan.test.mjs; tests/foundation/creative.test.mjs; tests/foundation/planning-generation.test.mjs',
+                implementation_evidence=f'Fresh source-bound local evidence required; {PLANNING[row["id"]]}. No LIVE_VERIFIED or LAUNCH_READY.')
     with path.open('w',newline='') as stream:
         writer=csv.DictWriter(stream,fieldnames=fields,lineterminator="\n");writer.writeheader();writer.writerows(rows)
