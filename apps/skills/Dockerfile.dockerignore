@@ -1,0 +1,10 @@
+**
+!apps
+!apps/skills
+!apps/skills/Dockerfile
+!apps/skills/runtime.py
+!apps/skills/requirements.lock
+!scripts
+!scripts/skill_audit.py
+!inputs
+!inputs/marketingskills-main.zip

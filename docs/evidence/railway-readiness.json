@@ -1,0 +1,44 @@
+{
+  "generated_by": "bounded CLI status/create result extraction",
+  "checked_at": "2026-10-22T02:48:49.124186+00:00",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "cli_version": "5.71.0",
+  "authenticated_read_succeeded": true,
+  "environments": [
+    {
+      "id": "0ca68498-6559-4b95-9788-34a5ff703dc0",
+      "name": "production",
+      "services": [
+        {
+          "id": "bcf5a8b7-3824-49f3-8577-7118fb2c6604",
+          "name": "Postgres",
+          "deployment_status": "SUCCESS",
+          "runtime_health_verified": false
+        },
+        {
+          "id": "58984527-d1cf-41da-a733-a2ac0ab01d48",
+          "name": "desvio-postiz",
+          "deployment_status": "SUCCESS",
+          "runtime_health_verified": false
+        },
+        {
+          "id": "c7f947aa-8a6b-4b2e-953f-eaaa089dd950",
+          "name": "desvio-temporal",
+          "deployment_status": "SUCCESS",
+          "runtime_health_verified": false
+        },
+        {
+          "id": "1c6513b1-a6f0-40bd-8f7b-1180444ea969",
+          "name": "Redis",
+          "deployment_status": "SUCCESS",
+          "runtime_health_verified": false
+        }
+      ]
+    }
+  ],
+  "dev_environment_present": false,
+  "dev_create_error": "> Environment name dev\nPaused temporarily",
+  "dev_app_deployed": false,
+  "official_incident_url": "https://status.railway.com/incident/QH8L8B3E",
+  "launch_ready": false
+}

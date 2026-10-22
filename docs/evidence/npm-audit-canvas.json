@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-22T02:56:31.491985+00:00",
+  "status": "UNAVAILABLE",
+  "command": "npm audit --json",
+  "exit_code": 1,
+  "reason": "Network timeout at npm advisory bulk endpoint; no current vulnerability clearance inferred.",
+  "scope": "Current Canvas/Fabric lock; prior M1 audit is historical only."
+}

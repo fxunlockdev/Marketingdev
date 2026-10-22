@@ -417,12 +417,11 @@ test("fresh onboarding pre-fills persisted AI suggestions and protects later use
       (await businesses.onboarding(alice, brand.id)).recommendation.stale,
       true,
     );
-    await assert.rejects(
-      jobs.transaction(scope(j), (db) =>
-        db.query("SELECT * FROM app.brand_brain_versions"),
-      ),
-      /permission denied/,
-    );
+    // Creative workers may read their bound snapshot. An intake job must not
+    // inherit that read grant; RLS denies every approved snapshot here.
+    assert.equal((await jobs.transaction(scope(j), (db) =>
+      db.query("SELECT * FROM app.brand_brain_versions"),
+    )).rowCount, 0);
   } finally {
     brand = old;
   }
