@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "da7677142b0a7019342f6d01ac046cc66257201c",
-  "checked_at": "2026-10-22T02:57:20.003083+00:00",
+  "code_commit": "bbf1e7989e5f2962e856a4eab21f407c1f0eabd6",
+  "checked_at": "2026-10-22T03:18:41.537670+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "ADAPTER_READY",
@@ -202,6 +202,14 @@
         "docs/evidence/browser.json"
       ],
       "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, canonical server export/publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
+    },
+    "content_slot_reviews": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json"
+      ],
+      "blocked_reason": "Backend-only manual plan persistence and channel-specific exact-version review tested with real HTTP sessions/PostgreSQL RLS and explicit creative fixtures. No AI 30-day strategy generation, customer calendar/inbox UI, OAuth/publishing or deployed/live evidence."
     }
   },
   "security": {
