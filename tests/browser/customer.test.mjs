@@ -626,8 +626,8 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   execFileSync('uv',['run','--project','apps/ingestion','--frozen','python','-c',"import sys; from pathlib import Path; sys.path.insert(0,'apps/ingestion'); from document_visuals import render_pdf; Path('work/document-fixtures/browser-page.jpg').write_bytes(next(render_pdf(Path('work/document-fixtures/guidelines.pdf').read_bytes()))['bytes'])"],{stdio:'pipe'});
   const documentBytes=await readFile('work/document-fixtures/guidelines.pdf'),pageBytes=await readFile('work/document-fixtures/browser-page.jpg');
   const documentId=randomUUID(),sourceId=randomUUID(),documentJob=randomUUID(),visualId=randomUUID();
-  const documentKey=`evidence/${target.organization_id}/${target.id}/documents/${documentId}/original`;
-  const pageKey=`evidence/${target.organization_id}/${target.id}/documents/${documentId}/page-1`;
+  const documentKey=`evidence/${target.organization_id}/${target.id}/documents/${documentId}/original/${digest(documentBytes)}`;
+  const pageKey=`evidence/${target.organization_id}/${target.id}/documents/${documentId}/page-1/${digest(pageBytes)}`;
   const objectStore=new ObjectStore(config.storage);
   try {await objectStore.persist(documentKey,documentBytes,'application/pdf',digest(documentBytes));await objectStore.persist(pageKey,pageBytes,'image/jpeg',digest(pageBytes));}finally{objectStore.close();}
   const dimensions=await sharp(pageBytes).metadata();

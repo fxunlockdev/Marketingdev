@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { Notice } from "./primitives";
+import { PrivateVisual } from "./private-visual";
 const active = (j: any) => ["queued", "running", "retrying"].includes(j.status);
 const messages: Record<string, string> = {
   AI_NOT_CONFIGURED:
@@ -39,7 +40,6 @@ export function BrandIntake({
   };
   onComplete: () => void;
 }) {
-  const [previews, setPreviews] = useState<Record<string, string>>({});
   const [state, setState] = useState<any>(),
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false);
@@ -243,31 +243,9 @@ export function BrandIntake({
                 }{" "}
                 logo candidates.
               </p></>}
-              <button
-                onClick={async () => {
-                  try {
-                    const r = await api(
-                      `/api/v1/businesses/${business.id}/visuals/${v.id}`,
-                    );
-                    setPreviews((p) => ({ ...p, [v.id]: r.url }));
-                  } catch (e) {
-                    setError(e);
-                  }
-                }}
-              >
-                View {v.document_page ? `document page ${v.document_page}` : `${v.viewport} capture`}
-              </button>
-              {previews[v.id] && (
-                <div
-                  style={{ maxHeight: 600, overflow: "auto", marginTop: 16 }}
-                >
-                  <img
-                    src={previews[v.id]}
-                    alt={v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}
-                    style={{ width: "100%", height: "auto" }}
-                  />
-                </div>
-              )}
+              <PrivateVisual businessId={business.id} visualId={v.id}
+                label={`View ${v.document_page ? `document page ${v.document_page}` : `${v.viewport} capture`}`}
+                alt={v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}/>
             </article>
           ))}
         </details>

@@ -58,7 +58,7 @@ export class Intake {
       async (db) => {
         const v = (
           await db.query(
-            "SELECT object_key,viewport FROM app.website_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3 UNION ALL SELECT object_key,'document-page-'||page FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+            "SELECT object_key,viewport,sha256,bytes FROM app.website_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3 UNION ALL SELECT object_key,'document-page-'||page,sha256,bytes FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
             [b.organization_id, id, visualId],
           )
         ).rows[0];
@@ -71,6 +71,8 @@ export class Intake {
             "image/jpeg",
           ),
           expiresIn: 60,
+          sha256: v.sha256,
+          bytes: v.bytes,
         };
       },
       id,

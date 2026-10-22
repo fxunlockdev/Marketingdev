@@ -1,6 +1,7 @@
 "use client";
 import {useEffect,useState} from 'react';
 import {api} from './api';
+import {PrivateVisual} from './private-visual';
 import {Field,Notice} from './primitives';
 import {useUnsavedChanges} from './unsaved';
 const identity=(d:any)=>`${d.analysis_job_id}:${d.index}`;
@@ -24,7 +25,6 @@ function Direction({direction,obsolete,stale,path,writable,onSaved,onEditing}:{d
  const [editing,setEditing]=useState(false),[value,setValue]=useState(''),[base,setBase]=useState<any>(),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[saved,setSaved]=useState('');
  useUnsavedChanges(editing);
  const category=direction.suggestion.category.replaceAll('_',' ');
- const [previews,setPreviews]=useState<Record<string,string>>({});
  const changed=obsolete||(editing&&base&&(base.evidence_sha256!==direction.evidence_sha256||(base.review?.revision??0)!==(direction.review?.revision??0)));
  async function decide(decision:string,replacement?:string){
   const d=editing?base:direction;
@@ -43,7 +43,7 @@ function Direction({direction,obsolete,stale,path,writable,onSaved,onEditing}:{d
   <p className="status neutral">{direction.review?.status==='wrong'&&direction.retained?'Marked for removal':direction.review?.status??'Needs review'}</p>
   <p><strong>Observed:</strong> {direction.suggestion.observation}</p>
   {editing?<Field label={`Edit visual ${category}`} hint="Describe the style you want Desvio to follow.">{(id,hint)=><textarea id={id} aria-describedby={hint} readOnly={busy} required maxLength={1500} value={value} onChange={e=>setValue(e.target.value)}/>}</Field>:<p>{direction.review?.value??direction.suggestion.creative_direction}</p>}
-  <details><summary>Supporting visual evidence</summary><ul>{direction.manifest.filter((r:any)=>direction.suggestion.image_ids.includes(r.id)).map((r:any)=><li key={r.id}>{r.document_page ? <><button type="button" onClick={async()=>{try{const result=await api(`/api/v1/businesses/${path.split('/').at(-1)}/visuals/${r.visual_id}`);setPreviews(previous=>({...previous,[r.id]:result.url}));}catch(e){setError(e);}}}>View document page {r.document_page}</button>{previews[r.id]&&<img src={previews[r.id]} alt={`Source guideline page ${r.document_page}`} style={{width:'100%',height:'auto'}}/>}</> : <a href={r.website_url} target="_blank" rel="noopener noreferrer">{r.viewport} · {r.view} · source page</a>}</li>)}</ul></details>
+  <details><summary>Supporting visual evidence</summary><ul>{direction.manifest.filter((r:any)=>direction.suggestion.image_ids.includes(r.id)).map((r:any)=><li key={r.id}>{r.document_page ? <PrivateVisual businessId={path.split('/').at(-1)!} visualId={r.visual_id} label={`View document page ${r.document_page}`} alt={`Source guideline page ${r.document_page}`}/> : <a href={r.website_url} target="_blank" rel="noopener noreferrer">{r.viewport} · {r.view} · source page</a>}</li>)}</ul></details>
   <Notice error={error}/>{saved&&<p role="status">{saved}</p>}
   {changed&&<p role="status">This suggestion changed while you were editing. Your text is retained so you can copy it. Discard this edit before reviewing the latest suggestion.</p>}
   {writable&&<div className="actions">{editing?<>
