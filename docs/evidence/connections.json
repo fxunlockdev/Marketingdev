@@ -1,0 +1,30 @@
+{
+  "suite": "connections",
+  "scope": "Actual Next/Nest/Better Auth/PostgreSQL/Temporal/private provisioning worker browser journey; explicitly MOCK Postiz HTTP and LinkedIn consent; no external OAuth, paid models, deployment or publishing. Focused suite does not replace full browser/security gates.",
+  "checked_at": "2026-10-22T05:40:56.553032+00:00",
+  "source_sha256": "f006321d49320f52631185ad26c3e3fdd73d8eac6fbce43853da7245644f9eca",
+  "source_sha256_start": "f006321d49320f52631185ad26c3e3fdd73d8eac6fbce43853da7245644f9eca",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--social-web"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\nActual local Garage 2.4.1, ClamAV 1.5.4 and Temporal CLI 1.9.1 services ready; no paid providers\nTemporal CLI 1.9.1 (Server 1.32.0, UI 2.54.1)\n\nTemporal Server:      localhost:55798\nTemporal Persistence: /Users/viloljoshi/Documents/Codex/2026-10-21/i-want-you-to-design-blaze-2/work/Marketingdev/work/asset-services-lK3OWp/temporal.db\nTemporal Metrics:     http://localhost:55808/metrics\nActual local connections browser proof: Next/Nest/Better Auth/Postgres/Temporal/isolated provisioner, explicitly MOCK social consent and Postiz HTTP.\n\u2714 business setup \u2192 private authorization \u2192 consent \u2192 clean callback \u2192 saved account, with reload/mobile/accessibility (21975.350459ms)\n\u2714 refresh shows actual failed/missing observations without erasing the saved account; business switch isolates results (12138.477459ms)\n\u2714 local cancel and declined provider consent show genuine canceled outcomes without exchanging a code (13237.959208ms)\n\u2714 callback rejects expired/wrong-login/duplicate parameters and never leaks codes into redirects or HTML (5127.487417ms)\n\u2714 unknown setup is held, readonly business grants hide management, and unavailable bindings cannot reconnect (4956.323458ms)\n\u2139 tests 5\n\u2139 suites 0\n\u2139 pass 5\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 61489.434125\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}

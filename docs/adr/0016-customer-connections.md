@@ -1,6 +1,6 @@
 # 0016 — Business-scoped Connections and server OAuth return
 
-Status: implemented locally; final focused verification pending. No live-provider or launch claim.
+Status: implemented locally at e83258a; source-bound offline/contracts/social/Connections verification passes, with zero skips. No live-provider or launch claim.
 
 ## Customer flow and unchanged architecture
 
@@ -27,3 +27,5 @@ The API derives an omitted timezone from the saved business IANA zone (UTC fallb
 The focused browser harness uses actual Next/Nest/Better Auth/Postgres/Temporal/private storage and separate workers, with an explicitly MOCK Postiz server and intercepted MOCK LinkedIn consent. It checks setup, authorization, clean return, business timezone, persistent observations, failure/missing account refresh, business switching, foreign-user denial, selected-business read access, cancellation, declined consent, wrong-login/expired/duplicate callbacks, unknown setup, disabled binding, desktop/mobile accessibility and browser secret leakage.
 
 No provider login, test-social connection, posting authority, publication, real token health, deployed callback or launch acceptance is inferred. Account/page selection, reconnect/revoke, uncertain-setup operator recovery, credential rotation/retention and the remaining V5 modules still require implementation and acceptance.
+
+Final proof: 3 offline + 39 contracts + 26 social integration + 5 Connections browser tests (73 distinct checks); the social suite also repeats 15 contracts. All four source fingerprints are f006321d49320f52631185ad26c3e3fdd73d8eac6fbce43853da7245644f9eca. Six security guard tests pass separately. Full security/browser reports remain failed or stale; release remains BLOCKED.
