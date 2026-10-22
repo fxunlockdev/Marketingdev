@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "26f178c00bfa08f49cdf732f176ba9770ac9c0a8",
-  "checked_at": "2026-10-22T15:44:54.329710+00:00",
+  "code_commit": "1bb1caed66f0de1fde91754f861f3cb8b6096f7b",
+  "checked_at": "2026-10-22T16:14:01.120814+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -288,7 +288,17 @@
         "docs/evidence/security.json",
         "docs/evidence/contracts.json"
       ],
-      "blocked_reason": "Actual isolated original marketing-plan/social/product-marketing skills, Temporal, immutable approved context, MOCK OpenAI Responses, bounded 30-slot generation, PostgreSQL persistence/RLS, budget holds and failure recovery tested. Deployed runtime, paid strategy/creative quality, semantic claim validation, broader channels and full product acceptance remain incomplete."
+      "blocked_reason": "Actual isolated original marketing-plan/social/product-marketing skills, Temporal, immutable approved context, MOCK OpenAI/Gemini official SDKs, immutable provider/model choice, provider-specific budget holds, signed Gemini tool context and bounded mixed-format generation, PostgreSQL persistence/RLS, budget holds and failure recovery tested. Deployed runtime, paid strategy/creative quality, semantic claim validation, broader channels and full product acceptance remain incomplete."
+    },
+    "gemini_text_planning": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json",
+        "docs/evidence/contracts.json",
+        "docs/evidence/video-canvas.json"
+      ],
+      "blocked_reason": "Pinned official Google Gen AI SDK, signed read_file context through actual original skills, immutable OpenAI/Gemini choice, separate provider funding, unknown-outcome holds and Canvas model-selection browser flow use MOCK Gemini responses. Gemini for direct creative/video-script requests, authorized live quality/cost proof and deployed worker acceptance remain open."
     },
     "planning_review_ui": {
       "state": "NOT_IMPLEMENTED",

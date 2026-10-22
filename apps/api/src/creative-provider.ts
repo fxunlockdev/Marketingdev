@@ -34,6 +34,7 @@ export class CreativeProvider {
       throw new CreativeError("SKILL_BROKER_INVALID");
     const input: any[] = [];
     for (const m of request.messages) {
+      if(m.provider_context)throw new CreativeError("SKILL_BROKER_INVALID");
       if (
         !["system", "user", "assistant", "tool"].includes(m.role) ||
         typeof m.content !== "string"

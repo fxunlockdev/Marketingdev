@@ -30,7 +30,9 @@ export type CreativeInput = {
     cta: string;
   };
 };
+export type ProviderContext={provider:'gemini';parts:unknown[]};
 export type PlannerMessage = {
+  provider_context?:ProviderContext;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   tool_calls?: { id: string; name: string; args: Record<string, unknown> }[];
@@ -43,6 +45,7 @@ export type PlannerRequest = {
   tools: any[];
 };
 export type PlannerResponse = {
+  provider_context?:ProviderContext;
   content: string;
   tool_calls: { id: string; name: string; args: Record<string, unknown> }[];
   response_id?: string;

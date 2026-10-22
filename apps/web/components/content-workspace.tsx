@@ -48,7 +48,7 @@ function jobText(j: any) {
   if (j.status === "rejected" || j.status === "failed") {
     if (
       j.error_code?.includes("APPROVAL_REQUIRED") ||
-      j.error_code?.includes("NOT_CONFIGURED")
+      j.error_code?.includes("NOT_CONFIGURED") || j.error_code?.includes("CONFIG_CHANGED")
     )
       return "AI setup is required. Contact your workspace administrator.";
     if (j.error_code?.includes("BUDGET"))
@@ -107,7 +107,7 @@ export function ContentWorkspace({
   const [generate, setGenerate] = useState(false),
     [start, setStart] = useState(""),
     [planDays,setPlanDays]=useState(30),
-    [postCount,setPostCount]=useState(30),[videoCount,setVideoCount]=useState(0),
+    [planningProvider,setPlanningProvider]=useState('openai'),[postCount,setPostCount]=useState(30),[videoCount,setVideoCount]=useState(0),
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
   useEffect(()=>{const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
@@ -209,7 +209,7 @@ export function ContentWorkspace({
     setBusy(true);
     setError(undefined);
     try {
-      const body = { starts_on: start, brief, duration_days:planDays,post_count:postCount,video_count:videoCount };
+      const body = { provider:planningProvider,starts_on: start, brief, duration_days:planDays,post_count:postCount,video_count:videoCount };
       await api(
         `${root}/content-plan/generate`,
         body,
@@ -309,6 +309,7 @@ export function ContentWorkspace({
               }}
             >
               <Field label="Plan duration (days)">{id=><input id={id} type="number" min={1} max={90} required value={planDays} onChange={e=>{setPlanDays(Number(e.target.value));setPostCount(Number(e.target.value));}}/>}</Field>
+              <Field label="Planning model">{id=><select id={id} value={planningProvider} onChange={e=>setPlanningProvider(e.target.value)}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
               <Field label="Videos in this plan">{id=><input id={id} type="number" min={0} max={Math.min(postCount,30)} required value={videoCount} onChange={e=>setVideoCount(Number(e.target.value))}/>}</Field>
               <Field label="Draft post count">{id=><input id={id} type="number" min={1} max={90} required value={postCount} onChange={e=>setPostCount(Number(e.target.value))}/>}</Field>
               <Field label="Plan starts on">

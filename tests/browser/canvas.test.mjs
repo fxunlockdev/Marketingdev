@@ -1,3 +1,5 @@
+import {GoogleGenAI} from '@google/genai';
+import {GeminiPlanner} from '../../dist/gemini-planner.js';
 import {ContentPlan} from '../../dist/content-plan.js';
 import {VideoJobs} from '../../dist/video-jobs.js';
 import {VideoReferences} from '../../dist/video-references.js';
@@ -253,7 +255,11 @@ before(async () => {
     new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),
     provider,
   );
-  const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider);
+  const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
+   assert.equal(new URL(url).pathname,'/v1beta/models/gemini-fixture:generateContent');const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
+   return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(generatedPlan(input))}]},finishReason:'STOP'}]});
+  }}}));
+  const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider,gemini);
   const exporter=new ExportJobs(jobs,new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE));
   const videoImage=prepareVideoImage(),videoKey='ab'.repeat(32);
   const clip=Buffer.from(execFileSync('docker',['run','--rm','--network','none','--read-only','--cap-drop=ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--entrypoint','python',videoImage,'-c',"import sys,base64; sys.path.insert(0,'/runtime'); import runtime as r; r.command('ffmpeg',['-v','error','-f','lavfi','-i','color=blue:size=320x180:duration=3:rate=24','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','/tmp/test.mp4']); print(base64.b64encode(open('/tmp/test.mp4','rb').read()).decode())"],{encoding:'utf8',timeout:30000}).trim(),'base64');
@@ -749,8 +755,10 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
 });
 
 test('Canvas creates a custom four-day plan and opens its actual saved calendar post',async()=>{
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'gemini',true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY')",[org,brand]);
  await page.goto(`${base}/b/${brand}/canvas`);
  await page.getByText('Plan content in Canvas',{exact:true}).click();
+ await page.getByLabel('Planning model',{exact:true}).selectOption('gemini');
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
  await page.getByLabel('Planning days',{exact:true}).fill('4');
  await page.getByLabel('Videos in this plan',{exact:true}).fill('2');
@@ -758,7 +766,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByRole('button',{name:'Plan my content',exact:true}).click();
  const preview=page.getByRole('region',{name:'Planned posts',exact:true});
  await expect(preview.getByRole('listitem')).toHaveCount(4,{timeout:60000});
- const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);
+ const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'gemini');
  await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('listitem')).toHaveCount(4);
  await preview.getByRole('link',{name:'Edit or review this post',exact:true}).first().click();
  await expect(page.getByLabel('Calendar date',{exact:true})).toHaveValue('2026-12-01');
