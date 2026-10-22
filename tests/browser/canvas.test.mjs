@@ -25,7 +25,7 @@ import OpenAI from "openai";
 import sharp from "sharp";
 import { createApplication } from "../../dist/app.js";
 import { BrandBrain } from "../../dist/brand-brain.js";
-import { ObjectStore } from "../../dist/object-store.js";
+import { ObjectStore, digest } from "../../dist/object-store.js";
 import { AssetJobs, JobDispatcher } from "../../dist/jobs.js";
 import { CreativeJobs } from "../../dist/creative-jobs.js";
 import { CreativeProvider } from "../../dist/creative-provider.js";
@@ -58,7 +58,7 @@ let runtime,
   generated = 0,
   planned = 0,
   latestMedia,
-  failImages = false;
+  failImages = false,referenceBytes,referenceUploads=0;
 const png = await sharp({
   create: { width: 1024, height: 1024, channels: 3, background: "#e6d5bb" },
 })
@@ -224,8 +224,11 @@ before(async () => {
         }
         generated++;
         if (failImages) throw new TypeError("MOCK lost response");
-        if (new URL(url).pathname === "/v1/images/edits")
-          assert.equal(init.body.get("image").type, "image/png");
+        if (new URL(url).pathname === "/v1/images/edits") {
+          const references=init.body.getAll('image[]');
+          if(references.length){assert.equal(references.length,1);assert.deepEqual(await sharp(Buffer.from(await references[0].arrayBuffer())).raw().toBuffer(),await sharp(referenceBytes).raw().toBuffer());referenceUploads++;}
+          else assert.equal(init.body.get("image").type, "image/png");
+        }
         else assert.equal(new URL(url).pathname, "/v1/images/generations");
         return Response.json({
           created: 1,
@@ -383,7 +386,17 @@ after(async () => {
   await Promise.all([admin.end(), workerPool.end(), dispatchPool.end()]);
 });
 test("Canvas browser creates a real queued job, renders a private creative and saves editable Fabric layers (MOCK OpenAI)", async () => {
+  const visualId=randomUUID(),sourceId=randomUUID(),captureJob=randomUUID();
+  referenceBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
+  const key=`evidence/${org}/${brand}/browser-reference/${digest(referenceBytes)}`;
+  await store.persist(key,referenceBytes,'image/jpeg',digest(referenceBytes));
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'website.extract','succeeded')",[captureJob,org,brand,actor]);
+  await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,'explicit-browser-fixture','{}','https://example.org/')",[sourceId,org,brand,digest(referenceBytes)]);
+  await admin.query("INSERT INTO app.website_visuals(id,organization_id,brand_id,source_id,job_id,viewport,parser_version,object_key,sha256,bytes,width,height,observations,coverage) VALUES($1,$2,$3,$4,$5,'desktop','explicit-browser-fixture',$6,$7,$8,1440,900,'{}','{}')",[visualId,org,brand,sourceId,captureJob,key,digest(referenceBytes),referenceBytes.length]);
+  const approval=await page.request.post(`${base}/api/v1/businesses/${brand}/canvas/references`,{headers:{origin:base},data:{kind:'website',visual_id:visualId,label:'Botanical brand reference',consent:true}});assert.equal(approval.status(),201);
   await page.goto(`${base}/b/${brand}/canvas`);
+  await page.getByText('Brand image references',{exact:true}).click();
+  await page.getByRole('checkbox',{name:'Botanical brand reference',exact:true}).check();
   await page
     .getByLabel("Describe your creative")
     .fill("TEST FIXTURE: Create a calm botanical soap launch");
@@ -398,6 +411,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
     page.getByRole("button", { name: "Download PNG" }),
   ).toBeEnabled();
   assert.equal(generated, 1);
+  assert.equal(referenceUploads,1);
   assert.equal(planned, 1);
   const job = (
     await admin.query(

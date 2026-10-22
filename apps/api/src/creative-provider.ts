@@ -156,6 +156,7 @@ export class CreativeProvider {
     quality: string,
     safetyIdentifier: string,
     parent?: Buffer,
+    references: Buffer[] = [],
   ) {
     if (!this.sdk) throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const body = this.imageRequest(
@@ -165,17 +166,18 @@ export class CreativeProvider {
       quality,
       safetyIdentifier,
     );
-    if (parent) {
-      const m = await sharp(parent, { limitInputPixels: 4_000_000 }).metadata();
-      if (m.format !== "png" || parent.length > 20 * 1024 * 1024)
-        throw new CreativeError("CREATIVE_REFERENCE_INVALID");
+    if(references.length>3)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
+    const images=[...(parent?[parent]:[]),...references];
+    for(const bytes of images){
+      if(!Buffer.isBuffer(bytes)||bytes.length>20*1024*1024)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
+      const m=await sharp(bytes,{limitInputPixels:4_000_000}).metadata();
+      if(m.format!=='png')throw new CreativeError('CREATIVE_REFERENCE_INVALID');
+      await sharp(bytes,{limitInputPixels:4_000_000}).raw().toBuffer();
     }
-    const response = parent
+    const response = images.length
       ? await this.sdk.images.edit({
           ...body,
-          image: await toFile(parent, "previous-version.png", {
-            type: "image/png",
-          }),
+          image: references.length ? await Promise.all(images.map((bytes,i)=>toFile(bytes,`reference-${i+1}.png`,{type:'image/png'}))) : await toFile(parent!, 'previous-version.png', {type:'image/png'}),
         })
       : await this.sdk.images.generate(body);
     const base64 = response.data?.[0]?.b64_json;

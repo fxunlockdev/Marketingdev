@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { Notice } from "./primitives";
+import {BrandReferences} from "./brand-references";
 import { PrivateVisual } from "./private-visual";
 const active = (j: any) => ["queued", "running", "retrying"].includes(j.status);
 const messages: Record<string, string> = {
@@ -250,6 +251,7 @@ export function BrandIntake({
           ))}
         </details>
       )}
+      {!!state?.visuals?.length && <BrandReferences businessId={business.id} writable={writable} sources={state.visuals}/>}
       {visualAnalysis && (
         <details>
           <summary>Visual style & creative inspiration</summary>

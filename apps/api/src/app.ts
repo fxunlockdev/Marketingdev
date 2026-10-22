@@ -132,6 +132,9 @@ class ContentPlanController {
 @UseGuards(SessionGuard)
 class CanvasController {
  constructor(@Inject(Canvas) private readonly service:Canvas){}
+ @Get('canvas/references') references(@Req() r:AuthRequest,@Param('id') id:string){return this.service.references(r.actorId,id);}
+ @Post('canvas/references') approveReference(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.approveReference(r.actorId,id,body);}
+ @Post('canvas/references/:referenceId/revoke') revokeReference(@Req() r:AuthRequest,@Param('id') id:string,@Param('referenceId') ref:string){return this.service.revokeReference(r.actorId,id,ref);}
  @Get('canvas/threads') list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
  @Post('canvas/threads') create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.createThread(r.actorId,id,body,key);}
  @Get('canvas/threads/:threadId') thread(@Req() r:AuthRequest,@Param('id') id:string,@Param('threadId') t:string){return this.service.thread(r.actorId,id,t);}

@@ -693,6 +693,13 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   await alice.getByRole('button',{name:'View document page 1',exact:true}).click();
   await expect(alice.getByAltText('Uploaded guideline page 1')).toBeVisible();
   await expect.poll(()=>alice.getByAltText('Uploaded guideline page 1').evaluate(image=>image.naturalWidth)).toBeGreaterThan(0);
+  await alice.getByText('Approve images for future creatives',{exact:true}).click();
+  const referenceApproval=alice.getByRole('region',{name:'Approve reference: Document page 1'});
+  await expect(referenceApproval.getByRole('button',{name:'Approve image reference'})).toBeDisabled();
+  await referenceApproval.getByLabel('Reference name',{exact:true}).fill('My guideline reference');
+  await referenceApproval.getByRole('checkbox').check();
+  await referenceApproval.getByRole('button',{name:'Approve image reference'}).click();
+  await expect(alice.getByRole('button',{name:'Remove approval for My guideline reference'})).toBeVisible();
   const privatePreview=`${base}/api/v1/businesses/${target.id}/visuals/${visualId}`;
   assert.equal((await bob.request.get(privatePreview)).status(),404);
   await alice
@@ -781,6 +788,16 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
     path: "work/browser/v5-ai-prefill.png",
     fullPage: true,
   });
+  await alice.goto(`${base}/b/${target.id}/canvas`);
+  await alice.getByText('Brand image references',{exact:true}).click();
+  await alice.getByRole('checkbox',{name:'My guideline reference',exact:true}).check();
+  await expect(alice.getByRole('checkbox',{name:'My guideline reference',exact:true})).toBeChecked();
+  await alice.getByRole('button',{name:'Preview My guideline reference',exact:true}).click();
+  await expect.poll(()=>alice.getByAltText('My guideline reference',{exact:true}).evaluate(image=>image.naturalWidth)).toBeGreaterThan(0);
+  await alice.screenshot({path:'work/browser/brand-reference-selection.png',fullPage:true});
+  await alice.getByRole('button',{name:'Remove approval for My guideline reference'}).click();
+  await expect(alice.getByRole('checkbox',{name:'My guideline reference',exact:true})).toHaveCount(0);
+
 });
 
 test('retained visual styles stay editable without AI and unsaved edits survive replacement or empty background analysis',async()=>{

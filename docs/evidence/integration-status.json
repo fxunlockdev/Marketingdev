@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "30f62c6805a598d47455e73e6578521b29377e7a",
-  "checked_at": "2026-10-22T12:54:06.577192+00:00",
+  "code_commit": "19b9fc8e240ecd1fc2abf2dda52238fa188c1dd8",
+  "checked_at": "2026-10-22T13:21:19.457101+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "ADAPTER_READY",
@@ -358,6 +358,16 @@
         "docs/evidence/deployment.json"
       ],
       "blocked_reason": "Actual disposable PostgreSQL role/migration bootstrap, rollback/replay/credential-drift rejection, cloud-address API startup and real generated standalone Next/browser/proxy/shutdown smoke tested on the host. Pinned Node registry manifests and Dockerfiles are prepared, not container-build/deployed proof. Railway dev creation, Linux image acceptance, private sandbox workers, operator setup, cloud security and live providers remain incomplete."
+    },
+    "creative_reference_selection": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json",
+        "docs/evidence/browser.json",
+        "docs/evidence/contracts.json"
+      ],
+      "blocked_reason": "Local business-scoped source-image approval, private previews, up to three selected references, real skill/Temporal generation and ordered multipart image bytes through the official SDK with MOCK OpenAI responses. Immutable source links, saved input hashes, replay, revoked-approval rejection and pre-call corruption checks are covered. Whole captured pages only; uploaded product-image selection/cropping, broader creative formats, deployed workers and real provider fidelity/cost acceptance remain incomplete."
     }
   },
   "security": {
