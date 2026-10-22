@@ -81,8 +81,8 @@ export class PlanningJobs {
     if((await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0].n>=36)throw new CreativeError('PLAN_LIMIT_REACHED');
     const planId=randomUUID(),reserved=(await db.query('SELECT sum(reserved_micros)::text AS n FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0].n;
     const manifest={skills:result.skills,reads:result.reads,runtime:result.version,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,input_sha256:request.input_sha256,helpers_executed:false};
-    await db.query(`INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,origin,created_by,request_key,request_hash,job_id,brain_id,strategy,skill_manifest)
-      VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14)`,[planId,j.organization_id,j.brand_id,result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify(result.plan),JSON.stringify(manifest)]);
+    await db.query(`INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,origin,created_by,request_key,request_hash,job_id,brain_id,strategy,skill_manifest,duration_days)
+      VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify(result.plan),JSON.stringify(manifest),input.duration_days??30]);
     for(const [index,s] of result.plan.slots.entries()){
      const sid=randomUUID();
      await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index)

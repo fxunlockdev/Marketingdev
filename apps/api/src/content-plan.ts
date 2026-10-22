@@ -29,12 +29,12 @@ function instant(v:unknown):string {
  if(iso!==v&&iso.replace('.000Z','Z')!==v)throw new BadRequestException('Choose a valid planned time');
  return iso;
 }
-export function planTime(value:unknown,startsOn:string,timezone:string):string {
+export function planTime(value:unknown,startsOn:string,timezone:string,days=30):string {
  const iso=instant(value),parts=new Intl.DateTimeFormat('en',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(iso));
  const part=(type:string)=>parts.find(p=>p.type===type)!.value;
  const local=`${part('year')}-${part('month')}-${part('day')}`;
- const end=new Date(Date.parse(startsOn)+30*86400000).toISOString().slice(0,10);
- if(local<startsOn||local>=end)throw new BadRequestException('Planned time must fall within this plan’s 30 local calendar days');
+ const end=new Date(Date.parse(startsOn)+days*86400000).toISOString().slice(0,10);
+ if(local<startsOn||local>=end)throw new BadRequestException(`Planned time must fall within this plan’s ${days} local calendar days`);
  return iso;
 }
 type Business={organization_id:string};
@@ -132,12 +132,12 @@ export class ContentPlan {
   if(!['planned_at','brief','pillar','hook','cta','creative_version_id'].some(k=>k in v))throw new BadRequestException('Include a content change');
   if(v.reset_approval!==undefined&&typeof v.reset_approval!=='boolean')throw new BadRequestException('Invalid approval confirmation');
   return this.scope(user,id,true,async(db,b)=>{
-   const s=(await db.query('SELECT s.*,p.starts_on::text,p.timezone FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.organization_id=$1 AND s.brand_id=$2 AND s.id=$3',[b.organization_id,id,slotId])).rows[0];
+   const s=(await db.query('SELECT s.*,p.starts_on::text,p.timezone,p.duration_days FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.organization_id=$1 AND s.brand_id=$2 AND s.id=$3',[b.organization_id,id,slotId])).rows[0];
    if(!s)throw new NotFoundException('Content slot not found');
    if(s.revision!==rev)throw new ConflictException('This post changed. Reload before editing');
    if(s.state==='cancelled')throw new ConflictException('This content slot was cancelled');
    if(s.state==='approved'&&v.reset_approval!==true)throw new ConflictException('Confirm that editing this approved post requires a new review');
-   const when='planned_at' in v?planTime(v.planned_at,s.starts_on,s.timezone):s.planned_at;
+   const when='planned_at' in v?planTime(v.planned_at,s.starts_on,s.timezone,s.duration_days):s.planned_at;
    const creative='creative_version_id' in v?(v.creative_version_id===null?null:await this.creative(db,b.organization_id,id,v.creative_version_id,s.format)):s.creative_version_id?await this.creative(db,b.organization_id,id,s.creative_version_id,s.format):null;
    const result=(await db.query(`UPDATE app.content_slots SET planned_at=$2,brief=$3,pillar=$4,hook=$5,cta=$6,creative_version_id=$7,creative_sha256=$8,state=$9,revision=revision+1,approved_by=NULL,approved_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`,[slotId,when,'brief' in v?text(v.brief,4000):s.brief,'pillar' in v?text(v.pillar,140,true):s.pillar,'hook' in v?text(v.hook,500,true):s.hook,'cta' in v?text(v.cta,500,true):s.cta,creative?.id??null,creative?.sha256??null,creative?'draft_ready':'content_needed'])).rows[0];
    await this.event(db,user,result,'edited');

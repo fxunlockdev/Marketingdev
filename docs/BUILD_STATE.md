@@ -2,6 +2,14 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective updated by owner: complete Desvio end to end except Billing, retaining the original architecture and all other V5 modules. The requested remaining-usage/time target is not evidence of readiness. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Current session — custom-duration planning from Canvas
+
+- Billing is excluded by the owner's revised goal. All other original product scope remains active.
+- Migration 025 persists a generated plan's 1–90 day horizon. `planning.ts`, `planning-contracts.ts`, `planning-jobs.ts`, `content-plan.ts` and the original skill runtime accept explicit duration/post count, retain 30-day defaults, validate exact post counts, channel/week coverage and reject edits outside the saved horizon.
+- `canvas-planner.tsx` adds daily/weekly/30-day presets, custom duration/count, a natural-language planning brief, persisted request status, current day-by-day static post cards and calendar/post links. The existing calendar generator also accepts custom durations. This does not yet generate mixed video plans, choose Gemini or schedule recurring loops.
+- API/web compilation, seven focused planning/timezone contracts and nine actual planning-service tests pass. The initial new negative test used an async assertion for synchronous validation; corrected the assertion without relaxing validation. All six Canvas/calendar browser journeys pass, including actual video playback/approval and the new four-day Canvas → reload → calendar-post flow (`work/custom-plan-browser.log`). Calendar post UI was visually inspected. The final button label was clarified to “Create content plan” with the matching test locator.
+- Existing video evidence at `0348715` remains valid for that checkpoint; it is historical after these planning changes. Next: mixed video calendar attachment/review, Gemini and recurring planning. Deployment and live provider acceptance remain open.
+
 ## Current session — Canvas video prompt approval, generation and final review
 
 - User clarified that pre-generation prompt approval applies only to video. Static generation remains direct, with final creative approval before publication.

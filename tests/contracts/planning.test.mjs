@@ -35,3 +35,13 @@ test('thirty-day planning crosses month/year boundaries and leap days without be
   assert.notEqual(plan.slots[0].planned_at.slice(0,7),plan.slots[29].planned_at.slice(0,7));
  }
 });
+
+test('daily, weekly and custom horizons preserve exact counts and reject out-of-period drafts',()=>{
+ for(const [days,count] of [[1,1],[1,2],[4,4],[6,12],[7,7],[90,90]]){
+  const context={...structuredClone(input),duration_days:days,post_count:count},result=generatedPlan(context);
+  assert.equal(validateGeneratedPlan(result,context).slots.length,count);
+  result.slots[0].planned_at=new Date(Date.parse(context.preferences.starts_on)+days*86400000).toISOString();
+  assert.throws(()=>validateGeneratedPlan(result,context),/PLAN_OUTPUT_INVALID/);
+ }
+ for(const days of [0,91,1.5,NaN])assert.throws(()=>validateGeneratedPlan(generatedPlan(input),{...input,duration_days:days}),/PLAN_OUTPUT_INVALID/);
+});

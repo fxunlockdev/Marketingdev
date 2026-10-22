@@ -669,7 +669,7 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await businesses.onboarding(actor,brand,{revision:0,step:3,goal:'awareness',timezone:'Asia/Kuala_Lumpur',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY')",[org,brand]);
  await page.goto(`${base}/b/${brand}/content-plan`);
- await page.getByRole('button',{name:'Create 30-day plan',exact:true}).click();
+ await page.getByRole('button',{name:'Create content plan',exact:true}).click();
  await page.getByLabel('Plan starts on').fill('2026-11-01');
  await page.getByLabel('Anything to focus on?').fill('TEST FIXTURE: explain refillable soap');
  await page.getByRole('button',{name:'Generate draft plan',exact:true}).click();
@@ -728,4 +728,21 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  const other=(await admin.query("SELECT id FROM app.brands WHERE organization_id=$1 AND name='OTHER BUSINESS'",[org])).rows[0].id;
  await page.goto(`${base}/b/${other}/content-plan`);await page.getByLabel('Calendar date').fill('2026-11-01');await expect(page.getByText('Space for your next ideas',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Post details',exact:true})).toHaveCount(0);
  const denied=await page.request.get(`${base}/api/v1/businesses/${other}/content-slots/${before.id}`);assert.equal(denied.status(),404);assert.deepEqual(errors,[]);
+});
+
+test('Canvas creates a custom four-day plan and opens its actual saved calendar post',async()=>{
+ await page.goto(`${base}/b/${brand}/canvas`);
+ await page.getByText('Plan content in Canvas',{exact:true}).click();
+ await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
+ await page.getByLabel('Planning days',{exact:true}).fill('4');
+ await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2026-12-01');
+ await page.getByRole('button',{name:'Plan my content',exact:true}).click();
+ const preview=page.getByRole('region',{name:'Planned posts',exact:true});
+ await expect(preview.getByRole('listitem')).toHaveCount(4,{timeout:60000});
+ const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);
+ await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('listitem')).toHaveCount(4);
+ await preview.getByRole('link',{name:'Edit or review this post',exact:true}).first().click();
+ await expect(page.getByLabel('Calendar date',{exact:true})).toHaveValue('2026-12-01');
+ await expect(page.getByRole('region',{name:'Post details',exact:true})).toBeVisible();
+ await page.screenshot({path:'work/browser/canvas-custom-plan.png',fullPage:true});assert.deepEqual(errors,[]);
 });

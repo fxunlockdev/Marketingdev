@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import {CanvasPlanner} from './canvas-planner';
 import {CanvasVideos} from './video-canvas';
 import {BrandReferences} from "./brand-references";
 import { api } from "./api";
@@ -252,6 +253,7 @@ export function CanvasScreen({ business }: { business: Business }) {
         </div>
       )}
       <Notice error={error} />
+      <CanvasPlanner key={business.id} business={business}/>
       <div className="studio-layout">
         <aside className="studio-conversations" aria-label="Conversations">
           <button disabled={!write || busy} onClick={() => choose("")}>

@@ -149,3 +149,15 @@ test('planning job scope, immutable approved input and per-business funding cann
   await assert.rejects(db.query("UPDATE app.planning_requests SET input='{}'::jsonb WHERE job_id=$1",[ja.id]),e=>e.code==='42501');
  },a.id);
 });
+
+test('custom-duration plan persists its horizon, rejects rescheduling outside it and keeps tenant isolation',async()=>{
+ const b=await fresh();await grant(b);const body={starts_on:'2026-11-01',brief:'TEST four-day launch',duration_days:4,post_count:4},key=randomUUID();
+ const j=await planning.submit(alice,b.id,body,key);assert.equal((await planning.submit(alice,b.id,body,key)).id,j.id);
+ await assert.rejects(planning.submit(alice,b.id,{...body,duration_days:6},key));
+ assert.equal(await handler.run(scope(b,j)),'succeeded');
+ const p=(await admin.query('SELECT * FROM app.content_plans WHERE job_id=$1',[j.id])).rows[0];assert.equal(p.duration_days,4);
+ const saved=await plans.list(alice,b.id,{...range,plan_id:p.id});assert.equal(saved.slots.length,4);
+ const slot=saved.slots[0];await assert.rejects(plans.edit(alice,b.id,slot.id,{revision:slot.revision,planned_at:'2026-11-05T08:00:00Z'}));
+ assert.equal((await planning.detail(alice,b.id,p.id)).duration_days,4);await assert.rejects(planning.detail(bob,b.id,p.id));
+ for(const duration_days of [0,91,1.5])assert.throws(()=>planning.submit(alice,b.id,{...body,duration_days},randomUUID()));
+});

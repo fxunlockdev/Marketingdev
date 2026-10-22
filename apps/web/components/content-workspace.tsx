@@ -105,8 +105,11 @@ export function ContentWorkspace({
     trigger = useRef<HTMLElement | null>(null);
   const [generate, setGenerate] = useState(false),
     [start, setStart] = useState(""),
+    [planDays,setPlanDays]=useState(30),
+    [postCount,setPostCount]=useState(30),
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
+  useEffect(()=>{const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
   const canWrite = business.role !== "viewer",
     canReview = ["owner", "admin"].includes(business.role);
   useUnsavedChanges(!!brief || busy);
@@ -117,7 +120,8 @@ export function ContentWorkspace({
         if (active) {
           setPrefs(p);
           const today = localMinute(Date.now(), p.timezone).slice(0, 10);
-          setAnchor(today);
+          const requested=new URLSearchParams(location.search).get('start');
+          setAnchor(requested&&/^\d{4}-\d{2}-\d{2}$/.test(requested)&&Number.isFinite(Date.parse(requested))?requested:today);
           setStart(today);
         }
       })
@@ -204,7 +208,7 @@ export function ContentWorkspace({
     setBusy(true);
     setError(undefined);
     try {
-      const body = { starts_on: start, brief };
+      const body = { starts_on: start, brief, duration_days:planDays,post_count:postCount };
       await api(
         `${root}/content-plan/generate`,
         body,
@@ -274,7 +278,7 @@ export function ContentWorkspace({
             aria-controls="plan-generator"
             onClick={() => setGenerate((v) => !v)}
           >
-            Create 30-day plan
+            Create content plan
           </button>
         )}
       </div>
@@ -282,9 +286,9 @@ export function ContentWorkspace({
       {message && <p role="status">{message}</p>}
       {generate && (
         <section id="plan-generator" className="v5-panel">
-          <h2>Plan the next 30 days</h2>
+          <h2>Plan the next {planDays} days</h2>
           <p>
-            Your approved brand and saved goals guide 30 draft posts across your
+            Your approved brand and saved goals guide {postCount} draft posts across your
             selected channels. Nothing publishes automatically.
           </p>
           {!business.has_approved_brand || prefs?.step !== 3 ? (
@@ -301,6 +305,8 @@ export function ContentWorkspace({
                 void plan();
               }}
             >
+              <Field label="Plan duration (days)">{id=><input id={id} type="number" min={1} max={90} required value={planDays} onChange={e=>{setPlanDays(Number(e.target.value));setPostCount(Number(e.target.value));}}/>}</Field>
+              <Field label="Draft post count">{id=><input id={id} type="number" min={1} max={90} required value={postCount} onChange={e=>setPostCount(Number(e.target.value))}/>}</Field>
               <Field label="Plan starts on">
                 {(id) => (
                   <input
