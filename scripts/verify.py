@@ -11,6 +11,7 @@ from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
+    "connections": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--social-web"]],
     "social": [["npm", "run", "build"], ["node", "--test", "tests/contracts/postiz.test.mjs", "tests/contracts/provisioning.test.mjs"], ["node", "scripts/foundation-test.mjs", "--social"]],
     "offline": [["npm", "run", "build"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/offline", "-v"]],
     "browser": [["npm", "run", "build"], ["npm", "run", "test:browser"]],
@@ -96,13 +97,19 @@ def write_status():
     social_ready = social.get("passed") is True and social.get("source_sha256") == source_hash()
     integrations["postiz_connection_boundary"] = {"state": "ADAPTER_READY" if social_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/social.json"],
-        "blocked_reason": "Pinned-source transport contracts use a MOCK Postiz HTTP server. Actual local auth/PostgreSQL RLS/Temporal prove encrypted per-business binding, queued account refresh, permission/rotation/cancel boundaries and snapshot recovery. No real Postiz organization/OAuth/token health or publishing acceptance. Session-bound callback workflows are also tested locally. Provisioning, customer UI and authorized live tests remain incomplete."}
+        "blocked_reason": "Pinned-source transport contracts use a MOCK Postiz HTTP server. Actual local auth/PostgreSQL RLS/Temporal prove encrypted per-business binding, queued account refresh, permission/rotation/cancel boundaries and snapshot recovery. No real Postiz organization/OAuth/token health or publishing acceptance. Session-bound callback workflows are also tested locally. Provisioning and customer UI have separate focused local evidence; authorized live tests remain incomplete."}
     integrations["social_oauth_workflow"] = {"state": "ADAPTER_READY" if social_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/social.json"],
-        "blocked_reason": "Actual local auth sessions, forced PostgreSQL RLS and Temporal prove LinkedIn start/callback with 256-bit state, encrypted code, expiry, single-session ownership, one-time exchange, revoked access and uncertain-outcome recovery. Upstream HTTP is explicitly MOCK. No provider login/consent or deployed callback UI has been tested. Provisioning, customer UI, account selection/reconnect/revoke and live acceptance remain incomplete."}
+        "blocked_reason": "Actual local auth sessions, forced PostgreSQL RLS and Temporal prove LinkedIn start/callback with 256-bit state, encrypted code, expiry, single-session ownership, one-time exchange, revoked access and uncertain-outcome recovery. Upstream HTTP is explicitly MOCK. No real provider login/consent or deployed callback UI has been tested. Customer UI has separate focused evidence; account selection/reconnect/revoke and live acceptance remain incomplete."}
     integrations["social_account_provisioning"] = {"state": "ADAPTER_READY" if social_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/social.json"],
-        "blocked_reason": "Actual local auth/RLS/Temporal and separate provisioning role prove idempotent setup enqueue, encrypted candidate capture, remote identity/name verification, retryable read-only confirmation, binding recovery and cross-business denial. Enterprise Postiz HTTP is MOCK. No real provisioning/deployment proof. Operator resolution of unknown/lost responses, customer UI, credential lifecycle and live acceptance remain incomplete."}
+        "blocked_reason": "Actual local auth/RLS/Temporal and separate provisioning role prove idempotent setup enqueue, encrypted candidate capture, remote identity/name verification, retryable read-only confirmation, binding recovery and cross-business denial. Enterprise Postiz HTTP is MOCK. No real provisioning/deployment proof. Customer UI has separate focused evidence. Operator resolution of unknown/lost responses, credential lifecycle and live acceptance remain incomplete."}
+    connections_path = EVIDENCE / "connections.json"
+    connections = json.loads(connections_path.read_text()) if connections_path.exists() else {}
+    connections_ready = social_ready and connections.get("passed") is True and connections.get("source_sha256") == source_hash()
+    integrations["customer_connections_ui"] = {"state": "ADAPTER_READY" if connections_ready else "NOT_IMPLEMENTED", "live_test": False,
+        "evidence": ["docs/evidence/social.json", "docs/evidence/connections.json"],
+        "blocked_reason": "Actual local browser/session/business setup, server callback, private provisioning worker, PostgreSQL RLS and Temporal tested with explicitly MOCK Postiz HTTP and LinkedIn consent. Desktop/mobile accessibility, canceled/expired/wrong-login returns, saved account refresh and business isolation are covered. No real provider consent, deployed ingress, token health, publication or full lifecycle acceptance. Operator recovery, reconnect/revoke and other channels remain incomplete."}
     update_matrix(ROOT, foundation_passed and browser_passed, creative_ready)
     status = {"schema_version": 1, "generated_by": "python -m scripts.verify", "environment": "offline_dev",
               "code_commit": commit.stdout.strip() if commit.returncode == 0 else "uncommitted-M0",
@@ -127,6 +134,7 @@ def run_suite(name):
     if name in ("browser", "security"):
         scopes[name] += "; canonical saved PNG exports use actual network-disabled Fabric/node rendering, private storage, exact-pixel/context approval and failure recovery; no social publication"
     scopes["social"] = "Real local authentication, PostgreSQL forced RLS, encrypted per-business credentials and Temporal connection-refresh jobs; audited Postiz HTTP contracts against an explicitly MOCK local server; session-bound authorization/callback jobs with MOCK Postiz; no social OAuth or publication to an external provider"
+    scopes["connections"] = "Actual Next/Nest/Better Auth/PostgreSQL/Temporal/private provisioning worker browser journey; explicitly MOCK Postiz HTTP and LinkedIn consent; no external OAuth, paid models, deployment or publishing. Focused suite does not replace full browser/security gates."
     finished_hash = source_hash()
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,

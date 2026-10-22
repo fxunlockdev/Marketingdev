@@ -4,14 +4,17 @@ import {Businesses} from './businesses.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {uuid} from './workspaces.js';
 export class SocialConnections {
- constructor(readonly businesses:Businesses,readonly enabled:boolean){}
+ constructor(readonly businesses:Businesses,readonly enabled:boolean,readonly features:{provisioning:boolean;authorization:boolean}={provisioning:false,authorization:false}){}
  async scope<T>(user:string,id:string,write:boolean,action:(db:any,b:any)=>Promise<T>){const b=await this.businesses.resolve(user,id);return this.businesses.database.transaction(user,b.organization_id,write,async db=>{if(write&&!(await db.query('SELECT app.social_manager($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed)throw new ForbiddenException('Only a business owner or administrator can manage social connections');return action(db,b);},id);}
- read(user:string,id:string){return this.scope(user,id,false,async db=>{
+ read(user:string,id:string,session?:string){return this.scope(user,id,false,async(db,b)=>{
+  const can_manage=(await db.query('SELECT app.social_manager($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed;
+  if(session)await db.query("SELECT set_config('app.oauth_session',$1,true)",[uuid(session)]);
+  const authorization=session?(await db.query('SELECT id,phase,expires_at FROM app.social_authorizations ORDER BY created_at DESC LIMIT 1')).rows[0]??null:null;
   const account=(await db.query('SELECT revision,enabled,identity_verified_at FROM app.postiz_accounts WHERE brand_id=$1',[id])).rows[0];
   const channels=(await db.query('SELECT id,provider,name,profile,observed_state,token_health,last_seen_at,last_checked_at FROM app.social_channels ORDER BY provider,name,id')).rows;
   const jobs=(await db.query("SELECT id,status,error_code,cancel_requested,created_at,updated_at FROM app.jobs WHERE kind='social.sync' ORDER BY created_at DESC LIMIT 20")).rows;
-  const provisioning=(await db.query('SELECT p.job_id AS id,p.phase,j.status,j.error_code FROM app.social_provisioning p JOIN app.jobs j ON j.id=p.job_id ORDER BY p.created_at DESC LIMIT 1')).rows[0]??null;
-  return {provisioning,configured:this.enabled&&!!account?.enabled&&!!account?.identity_verified_at,channels,jobs};
+  const provisioning=(await db.query('SELECT p.job_id AS id,p.phase,j.status,j.error_code,j.cancel_requested FROM app.social_provisioning p JOIN app.jobs j ON j.id=p.job_id ORDER BY p.created_at DESC LIMIT 1')).rows[0]??null;
+  return {can_manage,authorization,setup_available:this.enabled&&this.features.provisioning&&!account,authorization_available:this.enabled&&this.features.authorization&&!!account?.enabled&&!!account.identity_verified_at,setup_status:!this.enabled?'unavailable':account?.enabled&&account.identity_verified_at?'ready':account?'disabled':'not_prepared',provisioning,configured:this.enabled&&!!account?.enabled&&!!account?.identity_verified_at,channels,jobs};
  });}
  refresh(user:string,id:string,key:unknown){if(typeof key!=='string'||! /^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('Include a valid request key');return this.scope(user,id,true,async(db,b)=>{
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`social:${id.toLowerCase()}`]);

@@ -1,4 +1,4 @@
-.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load
+.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load verify-social verify-connections
 PYTHON ?= uv run --frozen python
 
 bootstrap:
@@ -32,3 +32,6 @@ dev verify-load:
 
 verify-social:
 	$(PYTHON) -m scripts.verify social
+
+verify-connections:
+	$(PYTHON) -m scripts.verify connections

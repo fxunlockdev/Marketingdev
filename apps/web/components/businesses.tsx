@@ -6,6 +6,7 @@ import { Wordmark, Loading, Notice, Field } from "./primitives";
 import { BrandFiles } from "./uploads";
 import { BrandIntake } from "./intake";
 import {ContentWorkspace} from "./content-workspace";
+import {ConnectionsScreen} from "./connections";
 import {CanvasScreen} from "./canvas";
 import { useUnsavedChanges } from "./unsaved";
 type Business = {
@@ -274,6 +275,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <ContentWorkspace key={`${business.id}:${section}`} business={business} inbox={section==="review"}/>
           ) : section === "canvas" ? (
             <CanvasScreen business={business}/>
+          ) : section === "connections" ? (
+            <ConnectionsScreen key={business.id} business={business}/>
           ) : section === "memory" ? (
             <Memory business={business} />
           ) : (
