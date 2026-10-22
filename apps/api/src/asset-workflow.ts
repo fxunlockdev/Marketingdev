@@ -28,3 +28,8 @@ type PlanningActivities={generatePlan(scope:JobScope):Promise<string>;failPlan(s
 const planning=proxyActivities<PlanningActivities>({startToCloseTimeout:'6 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
 const planningFinalization=proxyActivities<PlanningActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
 export async function generatePlanWorkflow(scope:JobScope){try{return await planning.generatePlan(scope);}catch{return await planningFinalization.failPlan(scope);}}
+
+type ExportActivities={exportCreative(scope:JobScope):Promise<string>;failExport(scope:JobScope):Promise<string>};
+const exports=proxyActivities<ExportActivities>({startToCloseTimeout:'100 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
+const exportFinalization=proxyActivities<ExportActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function exportCreativeWorkflow(scope:JobScope){try{return await exports.exportCreative(scope);}catch{return await exportFinalization.failExport(scope);}}

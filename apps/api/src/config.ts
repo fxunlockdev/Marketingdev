@@ -11,6 +11,7 @@ export type Config = {
   mailEncryptionKey: string;
   smtp: {host:string;port:number;secure:boolean;user?:string;password?:string;from:string};
   storage: StorageConfig;
+  renderImage?:string;
 };
 
 export function configFromEnv(env = process.env): Config {
@@ -37,7 +38,8 @@ export function configFromEnv(env = process.env): Config {
   if(!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(smtp.from)) throw new Error('SMTP_FROM must be a single email address');
   if(mode==='staging' && (!smtp.user || !smtp.password)) throw new Error('Authenticated SMTP required for staging');
   const storage=storageFromEnv(env);
-  return { mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
+  return {renderImage, mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }
@@ -60,5 +62,6 @@ export function workerConfigFromEnv(env=process.env){
   const jobs={workerDatabaseUrl:required('WORKER_DATABASE_URL'),dispatcherDatabaseUrl:required('DISPATCHER_DATABASE_URL'),address:required('TEMPORAL_ADDRESS'),namespace:required('TEMPORAL_NAMESPACE'),taskQueue:required('TEMPORAL_TASK_QUEUE')};
   const documentImage=env.DOCUMENT_PARSER_IMAGE;if(documentImage&&!/^sha256:[a-f0-9]{64}$/.test(documentImage))throw new Error('DOCUMENT_PARSER_IMAGE must be an exact local image digest');
   const skillImage=env.SKILL_RUNTIME_IMAGE;if(skillImage&&!/^sha256:[a-f0-9]{64}$/.test(skillImage))throw new Error('SKILL_RUNTIME_IMAGE must be an exact local image digest');
-  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage};
+  const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
+  return {storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage};
 }

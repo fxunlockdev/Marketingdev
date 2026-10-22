@@ -32,6 +32,7 @@ CANVAS = {
     'CV-12': ('CanvasScreen', 'GET /api/v1/businesses/:id/canvas/threads/:thread', 'app.jobs', 'actual queued/running/terminal status; unknown outcome holds generation'),
     'CV-13': ('CanvasScreen', 'POST /api/v1/businesses/:id/creative-jobs/:job/cancel', 'app.jobs.cancel_requested', 'durable local cancellation prevents promotion; no claim of remote paid-call cancellation'),
     'CV-16': ('CreativeProject', 'POST /api/v1/businesses/:id/creative-projects/:project/versions', 'app.creative_versions + creative_projects', 'versioned bounded design/caption/media IDs; stale edits denied'),
+    'CV-17': ('CreativeExportPanel', 'POST /api/v1/businesses/:id/creative-versions/:version/exports; GET /creative-exports/:id/download', 'app.creative_exports + creative_export_approvals', 'actual isolated deterministic PNG, private signed download and exact-pixel review; static images only'),
     'CV-18': ('CreativeProject', 'POST /api/v1/businesses/:id/creative-versions/:version/review', 'app.creative_reviews + creative_versions', 'exact-version review, owner/admin approval, immutable prior approval; no publication'),
     'CV-20': ('CanvasScreen', 'GET /api/v1/businesses/:id/canvas/threads/:thread', 'app.canvas_threads + canvas_messages', 'scoped persisted conversations survive reload'),
 }
@@ -71,9 +72,9 @@ def update_matrix(root: Path, ready: bool, creative_ready: bool = False):
                 implementation_evidence=f'Fresh local browser/security evidence required; {scope}. No LIVE_VERIFIED or LAUNCH_READY.')
         if row['id'] in CANVAS:
             component,api,db,scope=CANVAS[row['id']]
-            component_file='creative-editor' if component=='CreativeEditor' else 'canvas'
+            component_file='creative-export' if component=='CreativeExportPanel' else 'creative-editor' if component=='CreativeEditor' else 'canvas'
             row.update(status='ADAPTER_READY' if creative_ready else 'NOT_IMPLEMENTED',component_path=f'apps/web/components/{component_file}.tsx#{component}',api_or_worker=api,persistent_object=db,
-                automated_test='tests/browser/canvas.test.mjs; tests/foundation/creative.test.mjs; tests/contracts/creative.test.mjs',
+                automated_test='tests/browser/canvas.test.mjs; tests/foundation/creative.test.mjs; tests/foundation/exports.test.mjs; tests/contracts/creative.test.mjs',
                 implementation_evidence=f'Fresh source-bound local evidence required; {scope}. No LIVE_VERIFIED or LAUNCH_READY.')
         if row['id'] in PLANNING:
             row.update(status='ADAPTER_READY' if creative_ready else 'NOT_IMPLEMENTED',component_path='apps/web/components/content-workspace.tsx',

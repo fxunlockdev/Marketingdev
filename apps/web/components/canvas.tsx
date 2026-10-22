@@ -9,6 +9,7 @@ import {
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor, type Design } from "./creative-editor";
+import {CreativeExportPanel} from './creative-export';
 import { useUnsavedChanges } from "./unsaved";
 type Business = {
   id: string;
@@ -36,6 +37,7 @@ type Conversation = {
 };
 type Version = {
   id: string;
+  sha256: string;
   parent_id: string | null;
   media_id: string;
   design: Design;
@@ -798,6 +800,7 @@ export function CreativeProject({
             </div>
           ))}
       </section>
+      <CreativeExportPanel key={business.id+version.id} business={business} versionId={version.id} sourceSHA={version.sha256} context={{type:'canvas',id:version.id,revision:version.review_revision,state:version.status}} disabled={dirty||busy||!latest} onApproved={async()=>{await load(selected);setFeedback('');setNotice('This saved version is approved. It has not been published.');}}/>
     </article>
   );
 }

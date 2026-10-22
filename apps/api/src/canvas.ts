@@ -406,7 +406,7 @@ export class Canvas {
       return { id: version };
     });
   }
-  review(user: string, id: string, versionId: string, body: unknown) {
+  review(user: string, id: string, versionId: string, body: unknown, scoped?:{db:any;b:any}) {
     versionId = uuid(versionId);
     const v = object(body, ["decision", "feedback", "revision"]);
     if (
@@ -420,7 +420,7 @@ export class Canvas {
       throw new BadRequestException(
         "Check the review decision and saved revision",
       );
-    return this.scope(user, id, true, async (db, b) => {
+    const action=async (db:any,b:any)=>{
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         `canvas:${id.toLowerCase()}`,
       ]);
@@ -482,7 +482,8 @@ export class Canvas {
         status: v.decision,
         revision: Number(v.revision) + 1,
       };
-    });
+    };
+    return scoped?action(scoped.db,scoped.b):this.scope(user,id,true,action);
   }
   media(user: string, id: string, mediaId: string) {
     mediaId = uuid(mediaId);

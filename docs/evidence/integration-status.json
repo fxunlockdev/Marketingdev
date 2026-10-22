@@ -2,11 +2,11 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "35b86ccf07d00d38731a1d8315db037413c469a4",
-  "checked_at": "2026-10-22T04:07:16.988666+00:00",
+  "code_commit": "ebae869d73cf6d5ae3b6c6fbf83496f6861e3bc9",
+  "checked_at": "2026-10-22T04:34:15.419076+00:00",
   "integrations": {
     "crawl4ai": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -16,7 +16,7 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "docling": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -24,24 +24,24 @@
       "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Full business roles, deployed sandbox, document vision and live provider journey remain incomplete."
     },
     "deepagents": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
         "docs/evidence/contracts.json",
         "docs/evidence/browser.json"
       ],
-      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, canonical server export/publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
+      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "openai_images": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
         "docs/evidence/contracts.json",
         "docs/evidence/browser.json"
       ],
-      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, canonical server export/publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
+      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "higgsfield_video": {
       "state": "NOT_IMPLEMENTED",
@@ -55,14 +55,14 @@
       "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
     },
     "creative_editor": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
         "docs/evidence/contracts.json",
         "docs/evidence/browser.json"
       ],
-      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, canonical server export/publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
+      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "postiz_publish": {
       "state": "NOT_IMPLEMENTED",
@@ -98,7 +98,7 @@
       "blocked_reason": "Auth/workspace/brand/team APIs and RLS are implemented locally; deployed private storage, generation-worker authorization and deployed tenant journey remain incomplete."
     },
     "workspace_auth": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -106,7 +106,7 @@
       "blocked_reason": "Local HTTP/PostgreSQL/SMTP foundation tests only. External deployment, actual sender/delivery validation, invitation UX and broader tenant runtime remain incomplete."
     },
     "account_email": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -114,7 +114,7 @@
       "blocked_reason": "Encrypted queue, verification/reset/invitations and SMTP error paths tested against a local server only. Real sender credentials, deliverability, UI and operator retry/monitoring remain unverified/incomplete."
     },
     "private_assets": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -122,7 +122,7 @@
       "blocked_reason": "Actual local Garage/ClamAV/Temporal tests only. Production IAM/CORS/TLS, retention, cleanup, UI, intake sandbox and deployed/provider workflows remain incomplete."
     },
     "durable_asset_jobs": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -130,7 +130,7 @@
       "blocked_reason": "Actual local Garage/ClamAV/Temporal tests only. Production IAM/CORS/TLS, retention, cleanup, UI, intake sandbox and deployed/provider workflows remain incomplete."
     },
     "customer_workspace_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/browser.json",
@@ -139,7 +139,7 @@
       "blocked_reason": "Real local browser account/client/brand/team/upload flows only. Deployed ingress/CORS, email delivery, generation, editor and publishing UI remain incomplete."
     },
     "brand_evidence": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -147,7 +147,7 @@
       "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Full business roles, deployed sandbox, document vision and live provider journey remain incomplete."
     },
     "business_accounts": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -155,7 +155,7 @@
       "blocked_reason": "Real local document/parser/Temporal/RLS and account quota tests only. Docling coverage is embedded text, not OCR/visual/semantic inference. Full business roles, deployed sandbox, document vision and live provider journey remain incomplete."
     },
     "v5_business_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -164,7 +164,7 @@
       "blocked_reason": "Business navigation, scoped records, source review and saved goals/prefill fixtures are tested locally. Actual AI output quality, strategy/plan and creative/social workflows remain incomplete; unavailable controls are labeled honestly."
     },
     "website_visual_evidence": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -174,7 +174,7 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "ai_brand_onboarding": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -184,27 +184,27 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "canvas_runtime": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
         "docs/evidence/contracts.json",
         "docs/evidence/browser.json"
       ],
-      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, canonical server export/publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
+      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "creative_review": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
         "docs/evidence/contracts.json",
         "docs/evidence/browser.json"
       ],
-      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, canonical server export/publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
+      "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "content_slot_reviews": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json"
@@ -212,7 +212,7 @@
       "blocked_reason": "Manual/AI plan persistence and channel-specific exact-version review tested locally. Slot generation attaches safely, preserves newer edits and recovers cached output; worker cannot approve. Calendar/channel inbox use real local APIs and MOCK models. OAuth/publishing and deployed/live evidence remain missing."
     },
     "ai_content_planning": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -221,7 +221,7 @@
       "blocked_reason": "Actual isolated original marketing-plan/social/product-marketing skills, Temporal, immutable approved context, MOCK OpenAI Responses, bounded 30-slot generation, PostgreSQL persistence/RLS, budget holds and failure recovery tested. Deployed runtime, paid strategy/creative quality, semantic claim validation, broader channels and full product acceptance remain incomplete."
     },
     "planning_review_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -229,6 +229,15 @@
         "docs/evidence/browser.json"
       ],
       "blocked_reason": "Real local browser calendar/channel filtering, 30-day skill-driven plan, slot creative creation/revision, private preview, saved feedback, local-time rescheduling and confirmed bulk approval. MOCK OpenAI only. Full V5 formats, connected identities, exports/bulk submission, deployed runtime and live quality remain incomplete."
+    },
+    "canonical_creative_exports": {
+      "state": "NOT_IMPLEMENTED",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/security.json",
+        "docs/evidence/browser.json"
+      ],
+      "blocked_reason": "Actual isolated Fabric/node renderer, pinned fonts, private immutable PNG, Temporal recovery, tenant isolation and explicit exact-pixel approvals tested locally. Font substitutions are disclosed and saved pixels are authoritative. No deployed renderer, publishing proof or video/carousel exports."
     }
   },
   "security": {
