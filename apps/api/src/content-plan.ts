@@ -45,8 +45,8 @@ export class ContentPlan {
   return this.businesses.database.transaction(user,b.organization_id,write,async db=>{
    if(write){
     // Same order as Canvas promotion; serialize link/approval with version changes.
-    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${id}`]);
-    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${id}`]);
+    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${id.toLowerCase()}`]);
+    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${id.toLowerCase()}`]);
    }
    return action(db,b);
   },id);

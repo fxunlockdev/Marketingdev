@@ -142,3 +142,32 @@ test('failed history append rolls back the edit and concurrent saves never lose 
  const results=await Promise.all(['A','B'].map(brief=>api(path(`content-slots/${s.id}`),{method:'PATCH',body:{revision:1,brief}})));
  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);saved=(await plans.list(alice.id,brand.id,{...range,plan_id:s.plan_id})).slots[0];assert.equal(saved.brief,results.find(r=>r.status===200).body.brief);assert.equal((await plans.history(alice.id,brand.id,s.id)).events.length,2);
 });
+
+// PostgreSQL UUIDs are case-insensitive. Advisory lock keys must identify the same
+// business for either URL spelling, or concurrent changes could bypass serialization.
+test('uppercase business URLs share the exact Canvas and content review locks',async()=>{
+ const [s]=await create();
+ const lock=await admin.connect();
+ try {
+  for(const operation of ['content','canvas']) {
+   await lock.query('BEGIN');
+   await lock.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${brand.id}`]);
+   let settled=false;
+   const pending=operation==='content'
+    ?api(`/api/v1/businesses/${brand.id.toUpperCase()}/content-slots/${s.id}`,{method:'PATCH',body:{revision:s.revision,brief:'Case-normalized update'}})
+    :api(`/api/v1/businesses/${brand.id.toUpperCase()}/creative-projects/${project}/versions`,{method:'POST',body:{parent_id:version.id,design,caption:'TEST FIXTURE uppercase URL edit'}});
+   pending.then(()=>{settled=true;},()=>{settled=true;});
+   let waiting=false;
+   try {
+    for(let i=0;i<100&&!settled;i++) {
+     waiting=(await admin.query("SELECT count(*)::int AS n FROM pg_stat_activity WHERE usename='desvio_app' AND wait_event='advisory'")).rows[0].n>0;
+     if(waiting)break;
+     await new Promise(resolve=>setTimeout(resolve,20));
+    }
+    assert.equal(waiting,true,'Request must wait on the canonical business lock');
+    assert.equal(settled,false);
+   } finally {await lock.query('COMMIT');}
+   const result=await pending;assert.equal(result.status,operation==='content'?200:201,JSON.stringify(result.body));
+  }
+ } finally {await lock.query('ROLLBACK');lock.release();}
+});
