@@ -2,6 +2,15 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective: complete Desvio end to end, retaining all eleven V5 modules and the original architecture. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Current session — Higgsfield video transport and output boundary
+
+- Continuing the active end-to-end goal from PR #19 on `codex/pr-19-video-contracts`. No architecture replacement, customer video enablement, paid call, social post or infrastructure mutation.
+- Re-audited actual pinned Higgsfield SDK and public image-to-video/edit/status/cancel/idempotency contracts. Added `apps/api/src/higgsfield-client.ts` with reviewed model allowlists, exact reference origins, immutable body fingerprint, explicit request key, fixed credential origin, bounded HTTP/JSON, sanitized failures, recoverable receipt IDs and authenticated state/cancel parsing. SDK parity and redirect behavior are tested; the documented HTTP transport avoids the SDK's unconfigurable redirect/response limits.
+- Added `apps/api/src/video-download.ts`: bounded credential-free public-address-pinned download; redirects and unsafe origins rejected. Result remains explicitly untrusted until an isolated media decoder validates it. No video asset/private version or playable output is claimed.
+- Added 30 focused MOCK contract/download tests to `make verify-contracts`. Existing source-bound verification is being refreshed for this isolated adapter change; prior UI/deployment test reports remain historical rather than proof for the new source fingerprint. Full security remains blocked by local Docker storage; no unrelated containers were removed or restarted.
+- Railway MCP still sees only the four existing foundation services; no application deployment/domain was observed. Prior dev/sandbox creation failed on Railway's upstream pause. No fresh provisioning retry was needed for this contract-only change.
+- Next: tenant-scoped video grants/ledger, immutable provider intent and reference leases, original video skill, durable Temporal lifecycle/recovery, isolated FFmpeg output validation/private versions/approval and then Canvas video controls. Public O3 media eligibility limits and operator model rates/access remain unverified. See ADR 0020. The full product goal remains active.
+
 ## Current session — database bootstrap and deployable service artifacts
 
 - Previous goal turn made verified progress in PR #18 (102 distinct checks including 24 browser journeys). Draft PR #19: https://github.com/fxunlockdev/Marketingdev/pull/19; implementation f4f3b9e. Continuing end to end on `codex/pr-18-deployment-foundation`, stacked on PR #18. No product architecture change, new provider or live operation.

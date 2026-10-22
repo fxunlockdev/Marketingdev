@@ -18,6 +18,10 @@ Use authenticated [GET /requests/{request_id}/status](https://docs.higgsfield.ai
 
 SDK webhook options include secret, but inspected `dist/v2/client.js` does not transmit it or verify a signature. [Official webhook documentation](https://docs.higgsfield.ai/docs/how-to/webhooks) establishes delivery envelopes/retries, not HMAC authentication. Treat callbacks as reconciliation signals and verify terminal state through authenticated polling. Deduplicate, preserve request IDs and copy outputs to owned storage.
 
+### Video transport checkpoint — 2026-10-22
+
+[ADR 0020](adr/0020-higgsfield-video-transport.md) supersedes the initial submission transport recommendation: the pinned SDK follows redirects and lacks bounded response controls, so the server adapter uses the official HTTP contract with fixed credentials origin and explicit status/cancel. Actual SDK parity is tested. Reviewed Kling 3 Standard image-to-video and Kling O3 edit, documented idempotency and six request states. Safe output download returns untrusted bytes only. These local MOCK tests do not establish a durable video workflow, decodable/private output, account model eligibility or live generation. See generated `higgsfield_transport` evidence separately from incomplete `higgsfield_video`.
+
 ## Deep Agents
 
 `deepagents==0.7.29` with transitive dependencies in uv.lock. Actual SkillsMiddleware(backend=...,sources=['/skills/'],tools=[]) discovers social, product-marketing, ad-creative, image and video. Per-run read-only memory mount contains selected skill trees and /.agents/product-marketing.md only. Tests verify reference bytes and two separate brand mounts. No CLI/host shell/credentials are mounted.
