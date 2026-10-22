@@ -2,6 +2,13 @@
 
 Updated 2026-10-22 (Asia/Kuala_Lumpur). Active objective updated by owner: complete Desvio end to end except Billing, retaining the original architecture and all other V5 modules. The requested remaining-usage/time target is not evidence of readiness. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Current session — saved videos in calendar and review
+
+- Migration 026 adds separate video identities and exact hashes to calendar slots/events, composite business foreign keys and mutually exclusive image/video constraints. Existing image request hashes remain compatible.
+- Canvas can add a saved video at a chosen local date/time. Calendar and Review Inbox display static/video labels, verified private playback, saved captions and feedback links. Replacing a video explicitly resets approval; stale versions, wrong channels and cross-business references are rejected. The static image generator rejects video slots.
+- This is a saved-video bridge, not mixed-format AI planning or video publication. The current add action creates a manual plan, subject to the existing 36-plan limit. Existing-plan insertion, Gemini, recurring planning, broader modules and dev/live deployment remain open.
+- Verification: API/web typechecks and 11 calendar integration tests pass. Frozen-source `verify-video-canvas` passes all 9 video/export service cases and 6 Canvas/calendar browser journeys; offline (4) and contracts (75) pass at source `ebe4f09d84f56a5fce118308b7ec004f89f2ac4b0ad648f5f757fb1805970f81`. The video test now uses a separate month so the existing 30-static-post fixture keeps its asserted count. Calendar video UI was visually inspected. Security passes at that same unchanged source: 24 account + 136 application checks, six guards and the media dependency audit. Release gate remains BLOCKED for stale broader browser evidence, incomplete product E2E, deployed provider-worker isolation and trusted live verification. Focused Canvas/calendar browser evidence is current. No live calls or publication ran.
+
 ## Current session — custom-duration planning from Canvas
 
 - Billing is excluded by the owner's revised goal. All other original product scope remains active.

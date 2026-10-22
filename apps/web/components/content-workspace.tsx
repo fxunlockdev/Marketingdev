@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor } from "./creative-editor";
+import {VideoReview} from './video-canvas';
 import {CreativeExportPanel} from './creative-export';
 import { useUnsavedChanges } from "./unsaved";
 import {
@@ -240,6 +241,8 @@ export function ContentWorkspace({
           revision: s.revision,
           creative_version_id: s.creative_version_id,
           creative_sha256: s.creative_sha256,
+          video_version_id: s.video_version_id,
+          video_sha256: s.video_sha256,
         })),
       });
       setMessage(
@@ -567,6 +570,7 @@ export function ContentWorkspace({
                                 11,
                               )}
                             </span>
+                            <span>{s.format === 'video' ? 'Video' : 'Static post'}</span>
                             <strong>{s.hook || s.brief}</strong>
                             <span className={`plan-state state-${s.state}`}>
                               {labels[s.state]}
@@ -607,7 +611,8 @@ export function ContentWorkspace({
                         <span>
                           {name(s.channel)} · {when(s)} ({s.timezone})
                         </span>
-                        <strong>{s.hook || s.brief}</strong>
+                        <span>{s.format === 'video' ? 'Video' : 'Static post'}</span>
+                            <strong>{s.hook || s.brief}</strong>
                         <span>{s.caption || s.brief}</span>
                         <span className={`plan-state state-${s.state}`}>
                           {labels[s.state]}
@@ -748,6 +753,7 @@ function SlotPanel({
         draft.hook !== s.hook ||
         draft.cta !== s.cta ||
         draft.local !== localMinute(s.planned_at, s.timezone));
+  useEffect(()=>setReady(false),[s?.creative_version_id,s?.video_version_id]);
   dirtyRef.current = dirty;
   useUnsavedChanges(dirty || !!feedback || busy);
   useEffect(
@@ -795,6 +801,8 @@ function SlotPanel({
           revision: s.revision,
           creative_version_id: s.creative_version_id,
           creative_sha256: s.creative_sha256,
+          video_version_id: s.video_version_id,
+          video_sha256: s.video_sha256,
           decision,
           feedback,
         }),
@@ -845,7 +853,7 @@ function SlotPanel({
           </p>
           <div className="slot-columns">
             <div>
-              {s.design ? (
+              {s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/canvas?thread=${s.thread_id}`}>Give video feedback in Canvas</a></> : s.design ? (
                 <>
                   <CreativeEditor
                     businessId={business.id}
@@ -895,7 +903,7 @@ function SlotPanel({
                             `${root}/content-slots/${slotId}`,
                             {
                               revision: s.revision,
-                              creative_version_id: s.latest_version_id,
+                              [s.format==='video'?'video_version_id':'creative_version_id']: s.latest_version_id,
                               reset_approval: reset,
                             },
                             "PATCH",
@@ -1050,7 +1058,7 @@ function SlotPanel({
                 {dirty && (
                   <p>Save your post changes before creating or reviewing.</p>
                 )}
-                {canWrite && s.state !== "cancelled" && (
+                {canWrite && s.format !== "video" && s.state !== "cancelled" && (
                   <button
                     className="primary"
                     disabled={

@@ -207,6 +207,24 @@ test('approved export to original video skills, durable provider stage, actual m
  assert.equal((await api(endpoint)).body.status,'approved');
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_reviews WHERE version_id=$1',[version.id])).rows[0].n,2);
  await assert.rejects(service.version(bob.id,brand.id,version.id));assert.equal((await service.list(alice.id,sibling.id)).projects.length,0);
+ const calendarBody={title:'Video calendar test',objective:'Review saved video',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:body.channel,format:'video',planned_at:'2026-11-05T08:00:00Z',brief:'TEST saved video',video_version_id:version.id}]};
+ const calendarKey=randomUUID(),calendar=await plans.create(alice.id,brand.id,calendarBody,calendarKey);
+ assert.equal((await plans.create(alice.id,brand.id,calendarBody,calendarKey)).id,calendar.id);
+ await assert.rejects(plans.create(alice.id,sibling.id,calendarBody,randomUUID()),/Video version not found/);
+ await assert.rejects(plans.create(viewer.id,brand.id,calendarBody,randomUUID()));
+ assert.throws(()=>plans.create(alice.id,brand.id,{...calendarBody,slots:[{...calendarBody.slots[0],format:'static'}]},randomUUID()),/Match the saved media/);
+ const calendarRange={start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:calendar.id};
+ let videoSlot=(await plans.list(alice.id,brand.id,calendarRange)).slots[0];
+ assert.equal(videoSlot.video_version_id,version.id);assert.equal(videoSlot.creative_version_id,null);assert.equal(videoSlot.caption,version.caption);
+ const decide=(slot,decision)=>({revision:slot.revision,video_version_id:slot.video_version_id,video_sha256:slot.video_sha256,decision});
+ await assert.rejects(plans.review(alice.id,brand.id,videoSlot.id,{...decide(videoSlot,'pending_review'),video_sha256:'0'.repeat(64)}),/current post/);
+ videoSlot=await plans.review(editor.id,brand.id,videoSlot.id,decide(videoSlot,'pending_review'));
+ assert.equal((await plans.list(alice.id,brand.id,calendarRange,true)).slots[0].id,videoSlot.id);
+ await assert.rejects(plans.review(editor.id,brand.id,videoSlot.id,decide(videoSlot,'approved')),/owner or admin/);
+ videoSlot=await plans.review(alice.id,brand.id,videoSlot.id,decide(videoSlot,'approved'));
+ assert.equal(videoSlot.state,'approved');
+ const detail=await api(path(`content-slots/${videoSlot.id}`));assert.equal(detail.status,200);assert.equal(detail.body.slot.video_version_id,version.id);
+ assert.equal((await api(path(`content-slots/${videoSlot.id}/generate-creative`),{method:'POST',key:randomUUID(),body:{revision:videoSlot.revision,feedback:'Change it',reset_approval:true}})).status,400);
  const revisionKey=randomUUID(),revisionJob=await service.regenerate(alice.id,brand.id,version.id,{feedback:'Change the camera motion'},revisionKey);
  assert.equal((await service.regenerate(alice.id,brand.id,version.id,{feedback:'Change the camera motion'},revisionKey)).id,revisionJob.id);
  assert.equal(await pipeline.step(scope(revisionJob)),'awaiting_approval');assert.equal(submits,1);
@@ -215,6 +233,11 @@ test('approved export to original video skills, durable provider stage, actual m
  const history=(await admin.query('SELECT id,status FROM app.video_versions WHERE project_id=$1 ORDER BY created_at',[version.project_id])).rows;
  assert.equal(history.length,2);assert.equal(history[0].status,'approved');assert.equal(history[1].status,'draft');assert.notEqual(history[1].id,version.id);assert.equal(submits,2);
  const latest=(await service.list(alice.id,brand.id)).projects.find(p=>p.id===version.project_id);assert.equal(latest.latest_version_id,history[1].id);
+ assert.equal((await plans.list(alice.id,brand.id,calendarRange)).slots[0].has_newer_version,true);
+ await assert.rejects(plans.edit(alice.id,brand.id,videoSlot.id,{revision:videoSlot.revision,video_version_id:history[1].id}),/new review/);
+ videoSlot=await plans.edit(alice.id,brand.id,videoSlot.id,{revision:videoSlot.revision,video_version_id:history[1].id,reset_approval:true});
+ assert.equal(videoSlot.state,'draft_ready');assert.equal(videoSlot.approved_by,null);assert.equal(videoSlot.video_version_id,history[1].id);
+ const events=(await plans.history(alice.id,brand.id,videoSlot.id)).events;assert.equal(events.at(-1).video_version_id,history[1].id);assert.equal(events[0].video_version_id,version.id);
  const canceled=await service.regenerate(alice.id,brand.id,history[1].id,{feedback:'Cancel this draft before any charge'},randomUUID());await service.cancel(alice.id,brand.id,canceled.id);assert.equal(await pipeline.step(scope(canceled)),'canceled');assert.equal(submits,2);
 
 });

@@ -548,6 +548,19 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   await expect(page.getByRole('region',{name:'Video review'}).getByRole('status')).toHaveText('approved');
   const savedVideo=(await admin.query('SELECT status,manifest FROM app.video_versions WHERE brand_id=$1',[brand])).rows[0];assert.equal(savedVideo.status,'approved');assert.equal(savedVideo.manifest.plan.brief.video_prompt,'TEST user edited video prompt');
   await page.screenshot({path:'work/browser/canvas-video-approved.png',fullPage:true});
+  const canvasURL=page.url();
+  await page.getByText('Add video to calendar',{exact:true}).click();
+  await page.getByLabel(/Video calendar time/).fill('2027-01-06T12:00');
+  await page.getByRole('button',{name:'Add saved video to calendar',exact:true}).click();
+  await page.getByRole('link',{name:'Open video in calendar',exact:true}).click();
+  await expect(page.getByLabel('Saved video preview',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Send for review',exact:true}).click();
+  await page.getByRole('button',{name:'Approve post',exact:true}).click();
+  await expect(page.getByText('Approved this saved version. It has not been published.',{exact:true})).toBeVisible();
+  const calendarVideo=(await admin.query("SELECT state,video_version_id,creative_version_id FROM app.content_slots WHERE brand_id=$1 AND format='video'",[brand])).rows[0];assert.equal(calendarVideo.state,'approved');assert.ok(calendarVideo.video_version_id);assert.equal(calendarVideo.creative_version_id,null);
+  await page.screenshot({path:'work/browser/calendar-video-approved.png',fullPage:true});
+  await page.goto(canvasURL);
+
 
 
   await page.getByRole("button", { name: "Revise image with AI" }).click();

@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import {Field,Notice} from './primitives';
+import {localCandidates} from '../../api/src/local-calendar';
 import {useUnsavedChanges} from './unsaved';
 type Business={id:string;role:string};
 const active=(status:string)=>['queued','running','retrying'].includes(status);
@@ -28,7 +29,7 @@ export function CanvasVideos({business,threadId}:{business:Business;threadId:str
  if(!projects.length&&error===undefined)return null;
  return <section className="studio-projects" aria-label="Videos"><h2>Videos</h2>{error!==undefined&&<Notice error={error}/>}
  {projects.map((p:any)=>{const run=state.runs.find((r:any)=>r.project_id===p.id);return <article key={p.id} className="creative-review"><h3>{p.title}</h3>
- {run?.awaiting_approval&&!run.cancel_requested&&<VideoDraft key={run.id+run.draft_revision} business={business} jobId={run.id} onSaved={load}/>}
+ {run?.awaiting_approval&&active(run.status)&&!run.cancel_requested&&<VideoDraft key={run.id+run.draft_revision} business={business} jobId={run.id} onSaved={load}/>}
  {run&&!run.awaiting_approval&&!p.latest_version_id&&<p role="status">{run.approved_revision&&active(run.status)?'Generating your approved video…':active(run.status)?'Preparing your script and prompt…':run.status==='unknown'?'Generation needs reconciliation before another paid request.':`Video ${run.status}. Your saved work is retained.`}</p>}
  {run&&active(run.status)&&business.role!=='viewer'&&<button type="button" disabled={run.cancel_requested} onClick={()=>void api(`${root}/video-jobs/${run.id}/cancel`,{}).then(load).catch(setError)}>{run.cancel_requested?'Canceling video request…':'Cancel video request'}</button>}
  {p.latest_version_id&&<VideoHistory business={business} latest={p.latest_version_id} versions={state.versions.filter((v:any)=>v.project_id===p.id)}/>}</article>;})}</section>;
@@ -54,16 +55,30 @@ function VideoHistory({business,latest,versions}:{business:Business;latest:strin
  const [selected,setSelected]=useState(latest);useEffect(()=>setSelected(latest),[latest]);
  return <><Field label="Saved video version">{id=><select id={id} value={selected} onChange={e=>setSelected(e.target.value)}>{versions.map((v,i)=><option key={v.id} value={v.id}>{v.id===latest?'Latest':'Previous'} · {v.status.replaceAll('_',' ')} · {new Date(v.created_at).toLocaleString()}</option>)}</select>}</Field><VideoReview key={selected} business={business} id={selected} historical={selected!==latest}/></>;
 }
-function VideoReview({business,id,historical=false}:{business:Business;id:string;historical?:boolean}){
+export function VideoReview({business,id,historical=false,previewOnly=false,onReady}:{business:Business;id:string;historical?:boolean;previewOnly?:boolean;onReady?:(ready:boolean)=>void}){
  const root=`/api/v1/businesses/${business.id}/video-versions/${id}`;const requestKey=useRef(crypto.randomUUID());const [version,setVersion]=useState<any>(),[url,setUrl]=useState(''),[loaded,setLoaded]=useState(false),[feedback,setFeedback]=useState(''),[confirmed,setConfirmed]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>();useUnsavedChanges(!!feedback||busy);
  useEffect(()=>{let valid=true,blob='';const controller=new AbortController();void(async()=>{const v=await api(root),grant=await api(root+'/download');const response=await fetch(grant.url,{signal:controller.signal,cache:'no-store'});if(!response.ok)throw new Error('Could not load the saved video.');const bytes=await response.arrayBuffer();if(bytes.byteLength>64*1024*1024||bytes.byteLength!==grant.bytes)throw new Error('Video integrity check failed.');const sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(n=>n.toString(16).padStart(2,'0')).join('');if(sha!==v.sha256||sha!==grant.sha256)throw new Error('Video integrity check failed.');if(valid){blob=URL.createObjectURL(new Blob([bytes],{type:'video/mp4'}));setVersion(v);setUrl(blob);}})().catch(e=>{if(valid)setError(e);});return()=>{valid=false;controller.abort();if(blob)URL.revokeObjectURL(blob);};},[root]);
  async function review(decision:string){setBusy(true);setError(undefined);try{await api(root+'/review',{decision,feedback,revision:version.review_revision,sha256:version.sha256,confirmed});setVersion(await api(root));setFeedback('');setConfirmed(false);}catch(e){setError(e);}finally{setBusy(false);}}
  async function regenerate(){setBusy(true);setError(undefined);try{await api(root+'/regenerate',{feedback},'POST',requestKey.current);requestKey.current=crypto.randomUUID();setFeedback('');window.dispatchEvent(new Event('desvio-video-refresh'));}catch(e){setError(e);}finally{setBusy(false);}}
  return <section aria-label="Video review">{error!==undefined&&<Notice error={error}/>}<p role="status">{version?.status.replaceAll('_',' ')??'Loading saved video…'}</p>
- {url&&<><video controls preload="auto" src={url} aria-label="Saved video preview" onLoadedData={()=>setLoaded(true)} onError={()=>setError(new Error('The saved video could not be played.'))} style={{width:'100%',maxWidth:640,maxHeight:480,aspectRatio:`${version.width}/${version.height}`}}/><p>{version.caption}</p><a href={url} download="desvio-video.mp4">Download video</a></>}
- {historical&&<p>This previous version is kept for reference. Select the latest version to give feedback or approve.</p>}{version&&!historical&&business.role!=='viewer'&&<fieldset disabled={busy}><Field label="Video feedback">{field=><textarea id={field} value={feedback} maxLength={2000} onChange={e=>{setFeedback(e.target.value);requestKey.current=crypto.randomUUID();}}/>}</Field>
+ {url&&<><video controls preload="auto" src={url} aria-label="Saved video preview" onLoadedData={()=>{setLoaded(true);onReady?.(true);}} onError={()=>{setLoaded(false);onReady?.(false);setError(new Error('The saved video could not be played.'));}} style={{width:'100%',maxWidth:640,maxHeight:480,aspectRatio:`${version.width}/${version.height}`}}/><p>{version.caption}</p><a href={url} download="desvio-video.mp4">Download video</a></>}
+ {historical&&!previewOnly&&<p>This previous version is kept for reference. Select the latest version to give feedback or approve.</p>}{version&&!historical&&!previewOnly&&business.role!=='viewer'&&<fieldset disabled={busy}><Field label="Video feedback">{field=><textarea id={field} value={feedback} maxLength={2000} onChange={e=>{setFeedback(e.target.value);requestKey.current=crypto.randomUUID();}}/>}</Field>
  <button type="button" disabled={!feedback.trim()} onClick={()=>void regenerate()}>Draft a revised video from feedback</button><p>Your existing clip is kept. Review the new prompt before generating another video.</p>
  {['draft','changes_requested'].includes(version.status)&&<button type="button" onClick={()=>void review('in_review')}>Send video for review</button>}
  {version.status==='in_review'&&['owner','admin'].includes(business.role)&&<><label className="check-row"><input type="checkbox" disabled={!loaded} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I reviewed this saved video and caption.</label><button type="button" disabled={!loaded||!confirmed} onClick={()=>void review('approved')}>Approve final video</button><button type="button" onClick={()=>void review('changes_requested')}>Request video changes</button><button type="button" onClick={()=>void review('rejected')}>Reject video</button></>}
- </fieldset>}{version?.reviews?.filter((r:any)=>r.feedback).map((r:any)=><blockquote key={r.revision}><strong>{r.decision.replaceAll('_',' ')}</strong><p>{r.feedback}</p></blockquote>)}</section>;
+ </fieldset>}{version&&!historical&&!previewOnly&&business.role!=='viewer'&&<VideoCalendar business={business} version={version} id={id}/>} {version?.reviews?.filter((r:any)=>r.feedback).map((r:any)=><blockquote key={r.revision}><strong>{r.decision.replaceAll('_',' ')}</strong><p>{r.feedback}</p></blockquote>)}</section>;
+}
+
+function VideoCalendar({business,version,id}:{business:Business;version:any;id:string}){
+ const [local,setLocal]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[saved,setSaved]=useState('');
+ const key=useRef(crypto.randomUUID());const timezone=Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+ async function save(){setBusy(true);setError(undefined);try{
+  const candidates=localCandidates(local,timezone);if(candidates.length!==1)throw new Error('Choose an unambiguous local time outside the daylight-saving change.');
+  const root=`/api/v1/businesses/${business.id}`,starts=local.slice(0,10);
+  const plan=await api(root+'/content-plans',{title:'Video content',objective:'Review and prepare this saved video',starts_on:starts,timezone,slots:[{channel:version.channel,planned_at:candidates[0],format:'video',brief:version.caption||'Review this saved video',video_version_id:id}]},'POST',key.current);
+  const result=await api(root+'/content-plan?'+new URLSearchParams({start:candidates[0],end:new Date(Date.parse(candidates[0])+86400000).toISOString(),plan_id:plan.id}));
+  setSaved(`/b/${business.id}/content-plan?start=${starts}&slot=${result.slots[0].id}`);
+ }catch(e){setError(e);}finally{setBusy(false);}}
+ return <details><summary>Add video to calendar</summary><p>This adds a draft for review. It does not schedule or publish it.</p>{error!==undefined&&<Notice error={error}/>}<fieldset disabled={busy||!!saved}><Field label={`Video calendar time (${timezone})`}>{field=><input id={field} type="datetime-local" value={local} onChange={e=>{setLocal(e.target.value);key.current=crypto.randomUUID();}}/>}</Field><button type="button" disabled={!local} onClick={()=>void save()}>Add saved video to calendar</button></fieldset>{saved&&<a href={saved}>Open video in calendar</a>}</details>;
 }
