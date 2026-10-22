@@ -124,7 +124,8 @@ async function standard(url, init) {
         await store.read(
           (
             await admin.query(
-              "SELECT object_key FROM app.creative_media ORDER BY created_at LIMIT 1",
+              "SELECT object_key FROM app.creative_media WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+              [org.id, brand.id, version.media_id],
             )
           ).rows[0].object_key,
         ),

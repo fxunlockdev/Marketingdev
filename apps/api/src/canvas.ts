@@ -62,7 +62,7 @@ export class Canvas {
       sha = hash(canonicalJSON({ title }));
     return this.scope(user, id, true, async (db, b) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
-        `canvas:${id}`,
+        `canvas:${id.toLowerCase()}`,
       ]);
       const prior = (
         await db.query(
@@ -170,7 +170,7 @@ export class Canvas {
       );
     return this.scope(user, id, true, async (db, b) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
-        `canvas:${id}`,
+        `canvas:${id.toLowerCase()}`,
       ]);
       if (
         !(
@@ -330,7 +330,7 @@ export class Canvas {
       throw new BadRequestException("Use a caption of at most 3000 characters");
     return this.scope(user, id, true, async (db, b) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
-        `canvas:${id}`,
+        `canvas:${id.toLowerCase()}`,
       ]);
       const p = (
         await db.query(
@@ -409,7 +409,7 @@ export class Canvas {
       );
     return this.scope(user, id, true, async (db, b) => {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
-        `canvas:${id}`,
+        `canvas:${id.toLowerCase()}`,
       ]);
       const version = (
         await db.query(
