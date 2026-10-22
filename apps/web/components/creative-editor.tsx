@@ -12,12 +12,14 @@ export function CreativeEditor({
   design,
   onChange,
   readOnly = false,
+  previewOnly = false,
   onExportReady,
 }: {
   businessId: string;
   design: Design;
   onChange: (design: Design) => void;
   readOnly?: boolean;
+  previewOnly?: boolean;
   onExportReady: (download: (() => void) | null) => void;
 }) {
   const host = useRef<HTMLDivElement>(null),
@@ -235,7 +237,7 @@ export function CreativeEditor({
         >
           <canvas
             ref={element}
-            aria-label="Visual preview. Use the text layer fields to edit with a keyboard."
+            aria-label={readOnly ? "Saved creative preview" : "Visual preview. Use the text layer fields to edit with a keyboard."}
           />
         </div>
         {!ready && !error && <p role="status">Loading your private image…</p>}
@@ -250,7 +252,7 @@ export function CreativeEditor({
             : "Drag text to position it, or use the fields below."}
         </p>
       </section>
-      <fieldset className="creative-layer-controls" disabled={readOnly}>
+      {!previewOnly && <fieldset className="creative-layer-controls" disabled={readOnly}>
         <legend>Text layers</legend>
         <Field label="Selected layer">
           {(id) => (
@@ -390,7 +392,7 @@ export function CreativeEditor({
         >
           Add text layer
         </button>
-      </fieldset>
+      </fieldset>}
     </div>
   );
 }

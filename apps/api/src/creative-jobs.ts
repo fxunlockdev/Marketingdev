@@ -148,6 +148,25 @@ export class CreativeJobs {
             [j.id],
           )
         ).rows[0];
+        const link = (
+          await db.query(
+            "SELECT g.source_revision,s.revision,s.state,s.creative_version_id FROM app.content_slot_generations g JOIN app.content_slots s ON s.id=g.slot_id WHERE g.job_id=$1",
+            [j.id],
+          )
+        ).rows[0];
+        if (
+          link &&
+          (link.source_revision !== link.revision ||
+            ["approved", "cancelled"].includes(link.state) ||
+            link.creative_version_id !== request.parent_version_id) &&
+          !(
+            await db.query(
+              "SELECT 1 FROM app.creative_calls WHERE job_id=$1 LIMIT 1",
+              [j.id],
+            )
+          ).rowCount
+        )
+          throw new CreativeError("CREATIVE_SLOT_CHANGED");
         const brain = (
           await db.query(
             "SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE id=$1",
@@ -331,6 +350,17 @@ export class CreativeJobs {
         await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
           `canvas:${j.brand_id}`,
         ]);
+        const link = (
+          await db.query(
+            "SELECT * FROM app.content_slot_generations WHERE job_id=$1",
+            [j.id],
+          )
+        ).rows[0];
+        if (link)
+          await db.query(
+            "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+            [`plan:${j.brand_id}`],
+          );
         const project = (
           await db.query(
             "SELECT latest_version_id FROM app.creative_projects WHERE id=$1 FOR UPDATE",
@@ -406,6 +436,59 @@ export class CreativeJobs {
             plan.brief.caption,
           ],
         );
+        if (link) {
+          const attached = (
+            await db.query(
+              `UPDATE app.content_slots SET creative_version_id=$2,creative_sha256=$3,revision=revision+1,state='draft_ready',updated_at=now()
+            WHERE id=$1 AND revision=$4 AND state NOT IN ('approved','cancelled') AND approved_by IS NULL AND creative_version_id IS NOT DISTINCT FROM $5::uuid RETURNING *`,
+              [
+                link.slot_id,
+                version,
+                sha,
+                link.source_revision,
+                request.parent_version_id,
+              ],
+            )
+          ).rows[0];
+          if (attached) {
+            const snapshot = {
+              plan_id: attached.plan_id,
+              channel: attached.channel,
+              planned_at: attached.planned_at,
+              format: attached.format,
+              brief: attached.brief,
+              pillar: attached.pillar,
+              hook: attached.hook,
+              cta: attached.cta,
+              state: attached.state,
+              creative_version_id: version,
+              creative_sha256: sha,
+            };
+            await db.query(
+              `INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,creative_version_id,creative_sha256,feedback,snapshot)
+              VALUES($1,$2,$3,$4,$5,'creative_attached',$6,$7,$8,'',$9)`,
+              [
+                randomUUID(),
+                j.organization_id,
+                j.brand_id,
+                attached.id,
+                attached.revision,
+                j.requested_by,
+                version,
+                sha,
+                JSON.stringify(snapshot),
+              ],
+            );
+          }
+          await db.query(
+            "UPDATE app.content_slot_generations SET attachment_status=$2,attached_version_id=$3 WHERE job_id=$1",
+            [
+              j.id,
+              attached ? "attached" : "needs_attachment",
+              attached ? version : null,
+            ],
+          );
+        }
         return this.finish(db, j, "succeeded");
       });
     } catch (error) {

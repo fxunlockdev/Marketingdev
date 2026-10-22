@@ -5,6 +5,7 @@ import { api } from "./api";
 import { Wordmark, Loading, Notice, Field } from "./primitives";
 import { BrandFiles } from "./uploads";
 import { BrandIntake } from "./intake";
+import {ContentWorkspace} from "./content-workspace";
 import {CanvasScreen} from "./canvas";
 import { useUnsavedChanges } from "./unsaved";
 type Business = {
@@ -269,6 +270,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             />
           ) : section === "onboarding" ? (
             <BrandOnboarding business={business} />
+          ) : ["content-plan","review"].includes(section) ? (
+            <ContentWorkspace key={`${business.id}:${section}`} business={business} inbox={section==="review"}/>
           ) : section === "canvas" ? (
             <CanvasScreen business={business}/>
           ) : section === "memory" ? (

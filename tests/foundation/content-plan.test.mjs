@@ -76,7 +76,7 @@ test('genuine HTTP sessions, business RLS and viewer/worker restrictions protect
  assert.equal((await api(path(`reviews/${s.id}`),{user:viewer,method:'POST',body:reviewBody(s,'pending_review')})).status,403);
  assert.equal((await api(path('content-plans',sibling),{method:'POST',key:randomUUID(),body:payload()})).status,404);
  await runtime.database.transaction(alice.id,org.id,false,async db=>{assert.equal((await db.query('SELECT id FROM app.content_slots WHERE id=$1',[s.id])).rowCount,0);},sibling.id);
- const worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});try{assert.equal((await worker.query('SELECT * FROM app.content_slots')).rowCount,0);await assert.rejects(worker.query("UPDATE app.content_slots SET state='approved'"),e=>e.code==='42501');}finally{await worker.end();}
+ const worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});try{assert.equal((await worker.query('SELECT * FROM app.content_slots')).rowCount,0);assert.equal((await worker.query("UPDATE app.content_slots SET state='approved'")).rowCount,0);}finally{await worker.end();}
  await runtime.database.transaction(alice.id,org.id,true,async db=>{await assert.rejects(db.query('DELETE FROM app.content_slot_events WHERE slot_id=$1',[s.id]),e=>e.code==='42501');},brand.id);
 });
 test('LinkedIn and Instagram approvals are independent, retained after reload, and exact-version history is append-only',async()=>{
@@ -170,4 +170,16 @@ test('uppercase business URLs share the exact Canvas and content review locks',a
    const result=await pending;assert.equal(result.status,operation==='content'?200:201,JSON.stringify(result.body));
   }
  } finally {await lock.query('ROLLBACK');lock.release();}
+});
+test('authenticated slot detail/generation routes preserve revision, idempotency and business authorization',async()=>{
+ const [s]=await create([slot('instagram',null)]),endpoint=`content-slots/${s.id}`,key=randomUUID(),body={revision:s.revision};
+ assert.equal((await api(path(endpoint),{user:null})).status,401);
+ assert.equal((await api(path(endpoint),{user:bob})).status,404);
+ assert.equal((await api(path(endpoint,sibling))).status,404);
+ assert.equal((await api(path(`${endpoint}/generate-creative`),{method:'POST',user:viewer,key,body})).status,403);
+ assert.equal((await api(path(`${endpoint}/generate-creative`),{method:'POST',origin:'https://attacker.invalid',key,body})).status,403);
+ const queued=await api(path(`${endpoint}/generate-creative`),{method:'POST',key,body});assert.equal(queued.status,201,JSON.stringify(queued.body));assert.ok(queued.body.thread_id);
+ const replay=await api(path(`${endpoint}/generate-creative`),{method:'POST',key,body});assert.equal(replay.body.id,queued.body.id);
+ const detail=await api(path(endpoint));assert.equal(detail.status,200);assert.equal(detail.body.slot.revision,s.revision+1);assert.equal(detail.body.generations[0].job_id,queued.body.id);assert.equal(detail.body.generations[0].attachment_status,'pending');
+ assert.equal((await api(path(`${endpoint}/generate-creative`),{method:'POST',key:randomUUID(),body})).status,409);
 });

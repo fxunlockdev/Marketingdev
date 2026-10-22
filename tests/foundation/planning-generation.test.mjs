@@ -93,7 +93,7 @@ test('real Temporal and isolated original skills persist 30 grounded channel dra
  await jobs.transaction(scope(b,j),async(db)=>{
   assert.equal((await db.query('SELECT id FROM app.content_slots')).rowCount,30);
   assert.equal((await db.query('SELECT id FROM app.brand_brain_versions')).rowCount,1);
-  await assert.rejects(db.query("UPDATE app.content_slots SET state='approved'"),e=>e.code==='42501');
+  assert.equal((await db.query("UPDATE app.content_slots SET state='approved'")).rowCount,0);
  });
 });
 test('unfounded facts, malformed plans and unsupported skill tools reject without saving a fake plan',async()=>{

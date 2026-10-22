@@ -569,3 +569,92 @@ test("cancellation and access loss prevent creative promotion; new user edits ar
   assert.equal((await row(changed)).error_code, "CREATIVE_VERSION_CHANGED");
   transport = undefined;
 });
+
+// Slot workflows use real database roles, isolated skills and private storage.
+// Only the provider transport is MOCK; no live creative-quality claim.
+const {ContentPlan}=await import('../../dist/content-plan.js');
+const {SlotCreatives}=await import('../../dist/slot-creatives.js');
+const plans=new ContentPlan(businesses),slotCreatives=new SlotCreatives(plans,canvas);
+async function plannedSlot(){
+ const p=await plans.create(alice,brand.id,{title:'TEST FIXTURE plan',objective:'Explain the offering',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',planned_at:'2026-11-05T08:00:00Z',format:'static',brief:'Explain our scheduling tool',pillar:'Education',hook:'A calmer day',cta:'Learn more'}]},randomUUID());
+ return (await plans.list(alice,brand.id,{start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:p.id})).slots[0];
+}
+const decision=(s,d,feedback='')=>({revision:s.revision,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,decision:d,feedback});
+let linkedSlot;
+test('planned draft generation is atomic/idempotent, privately attaches the exact creative and records review history',async()=>{
+ const s=await plannedSlot(),key=randomUUID(),body={revision:s.revision,feedback:'Keep it simple'};
+ await assert.rejects(slotCreatives.generate(viewer,brand.id,s.id,body,key),/read-only|cannot/i);
+ await assert.rejects(slotCreatives.detail(bob,brand.id,s.id),/not found/i);
+ const results=await Promise.all([slotCreatives.generate(alice,brand.id,s.id,body,key),slotCreatives.generate(alice,brand.id,s.id,body,key)]);
+ assert.equal(results[0].id,results[1].id);
+ await assert.rejects(slotCreatives.generate(alice,brand.id,s.id,{...body,feedback:'Changed'},key),/another creative/);
+ const count=imageCalls,j=results[0];
+ const unrelated=await plannedSlot();
+ await jobs.transaction(scope(j),async db=>{assert.equal((await db.query("UPDATE app.content_slots SET state='draft_ready' WHERE id=$1",[unrelated.id])).rowCount,0);});
+ await assert.rejects(jobs.transaction(scope(j),db=>db.query("UPDATE app.content_slots SET state='approved' WHERE id=$1",[s.id])),e=>e.code==='42501');
+ assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.equal(imageCalls,count+1);
+ const detail=await slotCreatives.detail(alice,brand.id,s.id);linkedSlot=detail.slot;
+ assert.equal(linkedSlot.state,'draft_ready');assert.equal(linkedSlot.approved_by,null);assert.equal(linkedSlot.revision,3);
+ assert.equal(detail.generations[0].attachment_status,'attached');assert.equal(detail.generations[0].attached_version_id,linkedSlot.creative_version_id);
+ assert.deepEqual(detail.events.map(e=>e.action),['created','generation_requested','creative_attached']);
+ assert.equal(detail.events[2].creative_sha256,linkedSlot.creative_sha256);
+ assert.equal((await fetch((await canvas.media(alice,brand.id,linkedSlot.media_id)).url)).status,200);
+ assert.equal((await slotCreatives.generate(alice,brand.id,s.id,body,key)).id,j.id);
+ await jobs.transaction(scope(j),async db=>{assert.deepEqual((await db.query('SELECT id FROM app.content_slots')).rows.map(r=>r.id),[s.id]);assert.equal((await db.query("UPDATE app.content_slots SET state='approved'")).rowCount,0);});
+ await assert.rejects(jobs.transaction(scope(j),db=>db.query('UPDATE app.content_slots SET approved_by=$1',[alice])),e=>e.code==='42501');
+});
+test('review feedback reaches the actual skill input and image editing uses the linked prior pixels without retaining approval',async()=>{
+ let s=await plans.review(editor,brand.id,linkedSlot.id,decision(linkedSlot,'pending_review'));
+ s=await plans.review(alice,brand.id,s.id,decision(s,'changes_requested','Use a calmer visual'));
+ let sawFeedback=false,sawEdit=false;
+ version=(await canvas.project(alice,brand.id,linkedSlot.project_id)).versions.find(v=>v.id===s.creative_version_id);
+ transport=async(url,init)=>{const path=new URL(url).pathname;if(path==='/v1/responses'){const payload=JSON.parse(init.body);sawFeedback=JSON.stringify(payload).includes('Use a calmer visual')&&JSON.stringify(payload).includes('Less clutter');}if(path==='/v1/images/edits')sawEdit=true;return standard(url,init);};
+ try{
+  const j=await slotCreatives.generate(editor,brand.id,s.id,{revision:s.revision,feedback:'Less clutter'},randomUUID());
+  assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.ok(sawFeedback&&sawEdit);
+ }finally{transport=undefined;}
+ linkedSlot=(await slotCreatives.detail(alice,brand.id,s.id)).slot;assert.equal(linkedSlot.state,'draft_ready');assert.notEqual(linkedSlot.creative_version_id,s.creative_version_id);assert.equal(linkedSlot.approved_by,null);
+ let approved=await plans.review(alice,brand.id,s.id,decision(linkedSlot,'pending_review'));approved=await plans.review(alice,brand.id,s.id,decision(approved,'approved'));
+ const before=(await canvas.list(alice,brand.id)).threads.length;
+ await assert.rejects(slotCreatives.generate(alice,brand.id,s.id,{revision:approved.revision},randomUUID()),/requires a new review/);
+ assert.equal((await canvas.list(alice,brand.id)).threads.length,before);
+ const j=await slotCreatives.generate(alice,brand.id,s.id,{revision:approved.revision,reset_approval:true},randomUUID());
+ assert.equal((await slotCreatives.detail(alice,brand.id,s.id)).slot.approved_by,null);
+ await canvas.cancel(alice,brand.id,j.id);await handler.run(scope(j));
+});
+test('newer plan edits or cancellation during generation preserve the resulting Canvas draft without attaching it',async()=>{
+ for(const cancel of [false,true]){
+  const original=await plannedSlot();let queued;
+  transport=async(url,init)=>{const output=await standard(url,init);if(new URL(url).pathname.startsWith('/v1/images/')){
+   const s=(await slotCreatives.detail(alice,brand.id,original.id)).slot;
+   queued=cancel?await plans.review(alice,brand.id,s.id,decision(s,'cancelled')):await plans.edit(alice,brand.id,s.id,{revision:s.revision,brief:'Newer owner brief'});
+  }return output;};
+  try{const j=await slotCreatives.generate(alice,brand.id,original.id,{revision:original.revision},randomUUID());assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));}
+  finally{transport=undefined;}
+  const d=await slotCreatives.detail(alice,brand.id,original.id);assert.equal(d.slot.revision,queued.revision);assert.equal(d.slot.state,queued.state);assert.equal(d.slot.brief,queued.brief);assert.equal(d.slot.creative_version_id,null);
+  assert.equal(d.generations[0].attachment_status,'needs_attachment');assert.ok(d.generations[0].output_version_id);assert.ok(!d.events.some(e=>e.action==='creative_attached'));
+  const p=await canvas.project(alice,brand.id,d.generations[0].project_id);assert.equal(p.project.latest_version_id,d.generations[0].output_version_id);
+ }
+});
+test('a changed plan before execution is rejected without spending; link insertion failure rolls back all queued state',async()=>{
+ const s=await plannedSlot(),j=await slotCreatives.generate(alice,brand.id,s.id,{revision:s.revision},randomUUID());
+ await plans.edit(alice,brand.id,s.id,{revision:s.revision+1,brief:'Changed before execution'});
+ const calls=planCalls+imageCalls;assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await row(j)).error_code,'CREATIVE_SLOT_CHANGED');assert.equal(planCalls+imageCalls,calls);
+ const other=await plannedSlot();const before=(await admin.query('SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1',[brand.id])).rows[0].n;
+ await admin.query("CREATE FUNCTION app.test_fail_slot_link() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'TEST link persistence failed'; END$$");
+ await admin.query('CREATE TRIGGER test_fail_slot_link BEFORE INSERT ON app.content_slot_generations FOR EACH ROW EXECUTE FUNCTION app.test_fail_slot_link()');
+ try{await assert.rejects(slotCreatives.generate(alice,brand.id,other.id,{revision:other.revision},randomUUID()),/TEST link persistence failed/);}
+ finally{await admin.query('DROP TRIGGER test_fail_slot_link ON app.content_slot_generations');await admin.query('DROP FUNCTION app.test_fail_slot_link()');}
+ const d=await slotCreatives.detail(alice,brand.id,other.id);assert.equal(d.slot.revision,other.revision);assert.equal(d.events.length,1);assert.equal(d.generations.length,0);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1',[brand.id])).rows[0].n,before);
+});
+test('slot promotion failure rolls back version/attachment/event and retries cached provider output without another paid call',async()=>{
+ const s=await plannedSlot(),j=await slotCreatives.generate(alice,brand.id,s.id,{revision:s.revision},randomUUID());
+ await admin.query("CREATE FUNCTION app.test_fail_slot_attach() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN IF NEW.action='creative_attached' THEN RAISE EXCEPTION 'TEST attachment failed'; END IF; RETURN NEW; END$$");
+ await admin.query('CREATE TRIGGER test_fail_slot_attach BEFORE INSERT ON app.content_slot_events FOR EACH ROW EXECUTE FUNCTION app.test_fail_slot_attach()');
+ try{await assert.rejects(handler.run(scope(j)),/TEST attachment failed/);}
+ finally{await admin.query('DROP TRIGGER test_fail_slot_attach ON app.content_slot_events');await admin.query('DROP FUNCTION app.test_fail_slot_attach()');}
+ const d=await slotCreatives.detail(alice,brand.id,s.id);assert.equal(d.slot.creative_version_id,null);assert.equal(d.generations[0].output_version_id,null);assert.equal(d.generations[0].attachment_status,'pending');
+ const calls=planCalls+imageCalls;assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.equal(planCalls+imageCalls,calls);
+ const saved=await slotCreatives.detail(alice,brand.id,s.id);assert.equal(saved.generations[0].attachment_status,'attached');assert.equal(saved.events.filter(e=>e.action==='creative_attached').length,1);
+});
