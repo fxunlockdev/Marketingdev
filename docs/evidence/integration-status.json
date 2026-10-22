@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "5cd94005509092fe74c2e93f32478d73155945af",
-  "checked_at": "2026-10-22T08:21:16.286844+00:00",
+  "code_commit": "59b1c6b8c9a1f670ceed29db6627accdcfcaaf1d",
+  "checked_at": "2026-10-22T08:36:52.449057+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
         "docs/evidence/deployment.json",
@@ -84,6 +85,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
         "docs/evidence/deployment.json",
@@ -102,6 +104,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/video-storage.json",
         "docs/evidence/video-runtime.json",
         "docs/evidence/video-provider.json",
         "docs/evidence/deployment.json",
@@ -218,6 +221,14 @@
         "docs/evidence/contracts.json"
       ],
       "blocked_reason": "Real disposable PostgreSQL forced RLS, encrypted immutable intents, per-business funded-grant fixtures/reservations, MOCK Higgsfield submit/status/cancel, unknown-write holds and durable Temporal timer/worker replacement. This is an internal pipeline stage without a customer route or ordinary worker registration. Original video skill, approved reference leases/lineage, media validation/private versions, Canvas controls, deployed runtime and paid/live acceptance remain incomplete. Provider completion does not mark a Desvio job succeeded."
+    },
+    "canonical_video_object_storage": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/video-storage.json"
+      ],
+      "blocked_reason": "Real local private S3-compatible storage verifies bounded 64 MiB canonical MP4 byte persistence, replay/concurrency/lost acknowledgements and a fault-injected conditional-write race; existing authenticated upload/scanner/tenant/Temporal worker-recovery regression is included. Synthetic byte fixtures are not decoded videos or provider output. Customer uploads retain 20 MiB limits. Video database/version persistence, approved-reference leases, parent jobs, deployed storage and live generation remain incomplete."
     },
     "video_planning_media_stage": {
       "state": "ADAPTER_READY",

@@ -11,6 +11,7 @@ from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
+    "video-storage": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--video-storage"]],
     "video-runtime": [["npm", "run", "build"], ["node", "--test", "tests/runtime/video-skills.test.mjs"], ["node", "scripts/video-media-test.mjs"]],
     "video-provider": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--video-provider"]],
     "deployment": [["npm", "run", "build"], ["node", "scripts/deployment-test.mjs"], ["node", "scripts/foundation-test.mjs", "--accounts"]],
@@ -90,6 +91,12 @@ def write_status():
     integrations["video_provider_stage"] = {"state": "ADAPTER_READY" if video_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/video-provider.json", "docs/evidence/contracts.json"],
         "blocked_reason": "Real disposable PostgreSQL forced RLS, encrypted immutable intents, per-business funded-grant fixtures/reservations, MOCK Higgsfield submit/status/cancel, unknown-write holds and durable Temporal timer/worker replacement. This is an internal pipeline stage without a customer route or ordinary worker registration. Original video skill, approved reference leases/lineage, media validation/private versions, Canvas controls, deployed runtime and paid/live acceptance remain incomplete. Provider completion does not mark a Desvio job succeeded."}
+    storage_path = EVIDENCE / "video-storage.json"
+    storage = json.loads(storage_path.read_text()) if storage_path.exists() else {}
+    storage_ready = storage.get("passed") is True and storage.get("source_sha256") == source_hash()
+    integrations["canonical_video_object_storage"] = {"state": "ADAPTER_READY" if storage_ready else "NOT_IMPLEMENTED", "live_test": False,
+        "evidence": ["docs/evidence/video-storage.json"],
+        "blocked_reason": "Real local private S3-compatible storage verifies bounded 64 MiB canonical MP4 byte persistence, replay/concurrency/lost acknowledgements and a fault-injected conditional-write race; existing authenticated upload/scanner/tenant/Temporal worker-recovery regression is included. Synthetic byte fixtures are not decoded videos or provider output. Customer uploads retain 20 MiB limits. Video database/version persistence, approved-reference leases, parent jobs, deployed storage and live generation remain incomplete."}
     runtime_path = EVIDENCE / "video-runtime.json"
     runtime = json.loads(runtime_path.read_text()) if runtime_path.exists() else {}
     runtime_ready = video_contracts_ready and runtime.get("passed") is True and runtime.get("source_sha256") == source_hash()
@@ -181,6 +188,7 @@ def run_suite(name):
     scopes["deployment"] = "Actual disposable PostgreSQL bootstrap and six distinct service logins; unrelated database/role refusal, transaction rollback, checksum/privilege/password drift, concurrent replay, API dual-stack startup and shutdown; generated standalone Next package serving real API proxy and browser sign-in; configuration mismatch rejection. Existing real account/tenant/email integration regression also runs through the refactored migration wrapper. Host-built artifact only: no Linux container build, Railway deployment, external SMTP, paid providers or social publication."
     scopes["video-provider"] = "Actual disposable PostgreSQL migrations/forced RLS, separate runtime roles, immutable encrypted provider intents, business-scoped grant fixtures and budget reservation races, MOCK Higgsfield create/edit/status/cancel HTTP, failed commits/unknown-write holds, cancellation/access loss, private-state tampering and real Temporal durable timer/worker replacement. Internal provider stage only; no customer video route, original video skill, approved reference lineage, decoded/private output, complete Canvas workflow, cloud deployment or paid/live provider evidence."
     scopes["video-runtime"] = "Real network-disabled Deep Agents runtime loading exact original video/ad-creative/product-marketing/social skills with MOCK model responses, reference/context isolation, denied helper/tools, bounded broker and image/30-day-plan regression. Actual pinned ARM64 FFmpeg in a pinned Python container with verified Debian archives and read-only dependency/runtime test mounts; synthetic MP4 complete decode/re-encode, poster, metadata removal, duration/codec/format/size/rotation/color/stream rejection and sanitized stdio protocol. No built/deployed media image, complete parent job/private version or overlay compositor, Canvas video UI, paid model/provider output or live acceptance."
+    scopes["video-storage"] = "Actual local private S3-compatible storage with synthetic byte fixtures through 64 MiB; concurrency, replay/new-client recovery, lost acknowledgement after real write, injected 404/412 race with real saved bytes, corruption/size denial and unchanged 20 MiB upload boundary. Existing real authenticated API/forced PostgreSQL RLS/ClamAV/private storage/Temporal worker-process death and cancellation tests also run. Not actual provider media, decoded video, database video versions, parent generation workflow, deployed storage or live acceptance."
     finished_hash = source_hash()
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,

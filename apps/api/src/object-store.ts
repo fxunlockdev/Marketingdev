@@ -5,6 +5,8 @@ import type {Readable} from 'node:stream';
 import type {StorageConfig} from './config.js';
 
 export const MAX_UPLOAD_BYTES=20*1024*1024;
+// Canonical video only; customer upload limits stay at 20 MiB.
+export const MAX_CANONICAL_VIDEO_BYTES=64*1024*1024;
 export const digest=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 export class InvalidAsset extends Error {constructor(readonly code:string){super(code);}}
 export class ObjectStore {
@@ -22,6 +24,7 @@ export class ObjectStore {
       ResponseContentDisposition:`attachment; filename="${filename}"`,ResponseContentType:type}),{expiresIn:60});
   }
   async read(key:string,limit=MAX_UPLOAD_BYTES):Promise<Buffer> {
+    if(!Number.isSafeInteger(limit)||limit<1||limit>MAX_CANONICAL_VIDEO_BYTES)throw new InvalidAsset('OBJECT_READ_LIMIT_INVALID');
     const result=await this.client.send(new GetObjectCommand({Bucket:this.config.bucket,Key:key}),{abortSignal:AbortSignal.timeout(15000)});
     const stream=result.Body as Readable;
     if(!stream) throw new InvalidAsset('EMPTY_OBJECT');
@@ -32,11 +35,13 @@ export class ObjectStore {
     return Buffer.concat(chunks);
   }
   async persist(key:string,bytes:Buffer,type:string,hash:string) {
+    const limit=type==='video/mp4'?MAX_CANONICAL_VIDEO_BYTES:MAX_UPLOAD_BYTES;
+    if(!Buffer.isBuffer(bytes)||bytes.length<1||bytes.length>limit)throw new InvalidAsset('CANONICAL_SIZE_INVALID');
     // Content-addressed canonical keys: every permitted writer of this key must
     // supply exactly these bytes. Some S3-compatible services ignore If-None-Match.
     if(digest(bytes)!==hash || key.split('/').at(-1)!==hash)throw new InvalidAsset('CANONICAL_INTEGRITY_CONFLICT');
     try {
-      const existing=await this.read(key);
+      const existing=await this.read(key,limit);
       if(digest(existing)!==hash)throw new InvalidAsset('CANONICAL_INTEGRITY_CONFLICT');
       return 'existing-verified';
     }catch(error){if((error as {$metadata?:{httpStatusCode?:number}}).$metadata?.httpStatusCode!==404)throw error;}
@@ -47,7 +52,7 @@ export class ObjectStore {
     } catch(error) {
       if((error as {$metadata?:{httpStatusCode?:number}}).$metadata?.httpStatusCode!==412) throw error;
       // A worker may have persisted the object before losing its DB commit/heartbeat.
-      if(digest(await this.read(key))!==hash) throw new InvalidAsset('CANONICAL_INTEGRITY_CONFLICT');
+      if(digest(await this.read(key,limit))!==hash) throw new InvalidAsset('CANONICAL_INTEGRITY_CONFLICT');
       return 'existing-verified';
     }
   }

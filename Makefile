@@ -1,4 +1,4 @@
-.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load verify-social verify-connections verify-publishing verify-publishing-ui verify-deployment bootstrap-database verify-video-provider verify-video-runtime
+.PHONY: bootstrap audit-skills verify-offline verify-browser verify-contracts verify-security verify-live release-gate dev verify-load verify-social verify-connections verify-publishing verify-publishing-ui verify-deployment bootstrap-database verify-video-provider verify-video-runtime verify-video-storage
 PYTHON ?= uv run --frozen python
 
 bootstrap:
@@ -53,3 +53,6 @@ verify-video-provider:
 
 verify-video-runtime:
 	$(PYTHON) -m scripts.verify video-runtime
+
+verify-video-storage:
+	$(PYTHON) -m scripts.verify video-storage

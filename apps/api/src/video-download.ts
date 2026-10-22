@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { SafeWeb, websiteURL } from './safe-web.js';
+import {MAX_CANONICAL_VIDEO_BYTES} from './object-store.js';
 
-export const MAX_VIDEO_DOWNLOAD_BYTES = 64 * 1024 * 1024;
+export const MAX_VIDEO_DOWNLOAD_BYTES = MAX_CANONICAL_VIDEO_BYTES;
 export class VideoDownloadError extends Error {
   constructor(readonly code: string) { super(code); this.name = 'VideoDownloadError'; }
 }
