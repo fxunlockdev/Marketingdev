@@ -1,0 +1,7 @@
+{
+  "commit": "651876e24317c2d8e717262cf98267ec6f699180",
+  "archive_sha256": "bd49678a77a9f38ee27e4305b6201c83e310044e50e9972ddeec3f3eab5a18ef",
+  "dockerfile_sha256": "8a9001465201942a355d24366ac00de8a5873362430ff7eadc995182de708f76",
+  "source_modified": false,
+  "scope": "Exact upstream source plus separate headless deployment Dockerfile; no runtime equivalence or license clearance claim."
+}

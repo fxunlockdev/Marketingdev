@@ -1,5 +1,15 @@
 # Desvio build state
 
+## Exact-source Postiz dev build — running
+
+Current Railway discovery confirms Postiz, Redis and its PostgreSQL have no deployments in dev. The older production Postiz service/image remains untouched and cannot be substituted for audited source equivalence. The clean sibling checkout still matches `651876e24317c2d8e717262cf98267ec6f699180`.
+
+`scripts/postiz-build-context.mjs` exports only that exact Git commit and a pinned headless build recipe; no working-tree secrets or customer-facing Postiz frontend build. `infra/postiz/Dockerfile` pins the existing audited Node 22 amd64 base and pnpm 10.6.1, installs the frozen upstream lock, explicitly rebuilds bcrypt/generates Prisma, then builds backend/orchestrator. Source-export hashes are in `postiz-build-context.json`. This is a build candidate, not a deployed/verified service.
+
+The actual local amd64 Docker build is active in exec session **74981**, image tag `desvio-postiz:651876e-headless`, context metadata `work/postiz-build-context.json`. Base/native tooling installation passed; frozen lockfile is accepted and dependency installation is progressing. Resume that exact session; do not start a duplicate build because observation times out. No other heavy tests or builds should run alongside it.
+
+Next: finish/repair this build, verify runtime entrypoints/native modules and source/image identity; then dev-only PostgreSQL/Redis/Temporal namespace and private Postiz backend/orchestrator, restricted Desvio provisioner, genuine A/B API isolation. Source review confirmed local uploads and OAuth callback both use FRONTEND_URL, so keep the callback in Desvio and implement a bounded approved-media route/private media gateway; do not expose the Postiz UI or invent a separate upstream media-origin setting. Real social OAuth and posting still wait on owner app/account consent. No model key request or paid call.
+
 ## Coordinated activation and real API renderer-pin repair
 
 `activation.mjs` and `activate-dev.mjs` implement exact preview/apply, a remote operator lock, idle-job preflight, repeated drift checks, unique worker rollback preservation, worker registration checks, API flag/pin synchronization and exact redeployment verification. Unknown recovery retains the lock and safe journal. `start-dev.mjs` now exposes the existing loader/inspection/start operations for reuse without executing on import. No paid credentials, business grants or social flags are auto-enabled.
