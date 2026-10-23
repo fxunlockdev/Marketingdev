@@ -96,3 +96,7 @@ verify-review-reopen:
 .PHONY: verify-operator
 verify-operator:
 	$(PYTHON) -m scripts.verify operator
+
+.PHONY: verify-native-amd64
+verify-native-amd64:
+	$(PYTHON) -m scripts.verify native-amd64

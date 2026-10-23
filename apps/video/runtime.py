@@ -7,6 +7,7 @@ import base64
 import hashlib
 import json
 import math
+import platform
 import re
 import textwrap
 from pathlib import Path
@@ -19,7 +20,10 @@ import tempfile
 MAX_BYTES = 64 * 1024 * 1024
 MAX_REQUEST = ((MAX_BYTES + 2) // 3) * 4 + 4096
 VERSION = "desvio-video-render-v2/ffmpeg-7.1.5"
-LIB = "/opt/video-deps/usr/lib/aarch64-linux-gnu"
+_LIBRARY = {"aarch64": "aarch64-linux-gnu", "x86_64": "x86_64-linux-gnu"}.get(platform.machine())
+if _LIBRARY is None:
+    raise RuntimeError("Unsupported isolated video architecture")
+LIB = "/opt/video-deps/usr/lib/" + _LIBRARY
 ENV = {"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LANG": "C.UTF-8",
        "LD_LIBRARY_PATH": ":".join([LIB, LIB+"/pulseaudio", LIB+"/blas", LIB+"/lapack"])}
 INPUT_OPTIONS = ["-protocol_whitelist", "file", "-format_whitelist", "mov", "-f", "mov",
