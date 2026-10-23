@@ -64,3 +64,7 @@ verify-video-storage:
 .PHONY: verify-video-canvas
 verify-video-canvas:
 	$(PYTHON) -m scripts.verify video-canvas
+
+.PHONY: verify-team
+verify-team:
+	$(PYTHON) -m scripts.verify team

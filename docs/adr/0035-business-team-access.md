@@ -1,0 +1,9 @@
+# 0035 — Business-specific invitations and team access
+
+Reuse existing authenticated accounts, encrypted email outbox and `business_memberships`; no new identity provider or separate client accounts. Migration 032 keeps legacy account-wide invitations explicit and adds bounded selected-business identities. Acceptance rechecks the verified recipient, expiry, active account-level inviter authority and exact tenant-owned business set. It atomically creates/extends a selected-only seat, independent business grants and acceptance history. Replay does not restore access removed after acceptance; reactivating an inactive seat first disables old grants.
+
+The account membership of a selected seat is a container for scoped permissions, not its effective business role. Business listings now return the individual grant. Admin approval/publishing checks consult that grant; selected seats cannot administer the account. Role changes/removal are locked with invitation acceptance, audit the affected business, and cannot modify account-wide owners through business controls. Existing account-wide owner protections remain intact.
+
+The V5 Team screen exposes actual members, scopes, invitations and email delivery states; selected-business invitations, replacement/resend/revoke; persisted role changes, removal/restoration and access history. A single invitation may cover multiple businesses; revoking it revokes that whole pending invitation, which the UI states. Emails name the selected businesses and role. No token is returned in API results or stored in browser storage.
+
+This stage supports Admin, Editor and Viewer. Reviewer/Analyst contracts and scoped-admin delegation remain required work, not aliases that silently inherit broader permission. Test evidence uses actual local email/auth/RLS and Chromium; external email delivery/deployment are unverified. Scoped browser/service coverage is followed by the full security regression because authorization changed.

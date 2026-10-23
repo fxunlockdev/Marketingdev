@@ -43,12 +43,12 @@ export class Businesses {
         async (db) =>
           (
             await db.query(
-              `SELECT b.id,b.organization_id,b.name,b.website,b.revision,EXISTS(SELECT 1 FROM app.brand_brain_versions v WHERE v.organization_id=b.organization_id AND v.brand_id=b.id) AS has_approved_brand FROM app.brands b WHERE b.organization_id=$1 ORDER BY b.created_at,b.id LIMIT 100`,
+              `SELECT b.id,b.organization_id,b.name,b.website,b.revision,CASE WHEN m.business_scope='all' THEN m.role ELSE bm.role END AS role,EXISTS(SELECT 1 FROM app.brand_brain_versions v WHERE v.organization_id=b.organization_id AND v.brand_id=b.id) AS has_approved_brand FROM app.brands b JOIN app.memberships m ON m.organization_id=b.organization_id AND m.user_id=app.actor() LEFT JOIN app.business_memberships bm ON bm.organization_id=b.organization_id AND bm.brand_id=b.id AND bm.user_id=app.actor() WHERE b.organization_id=$1 ORDER BY b.created_at,b.id LIMIT 100`,
               [org.id],
             )
           ).rows,
       );
-      businesses.push(...rows.map((row) => ({ ...row, role: org.role })));
+      businesses.push(...rows);
     }
     return { businesses };
   }

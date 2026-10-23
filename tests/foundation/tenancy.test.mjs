@@ -389,3 +389,32 @@ test('concurrent email workers, corrupt ciphertext, expired mail and interrupted
   await assert.rejects(runtime.mailWorker.db.query('SELECT * FROM app.brands'),e=>e.code==='42501');
   await assert.rejects(runtime.database.pool.query('SET ROLE desvio_access'),e=>e.code==='42501');
 });
+
+
+test('business invitations grant only selected clients, preserve independent roles and reject foreign scopes',async()=>{
+ const owner=await signup('scoped-owner'),seat=await signup('scoped-seat'),org=await createOrg(owner,'Selected business team');
+ const create=async name=>{const r=await request(`/api/v1/workspaces/${org.id}/brands`,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{name}});assert.equal(r.status,201);return r.body;};
+ const a=await create('Selected A'),b=await create('Selected B'),c=await create('Private C'),endpoint=`/api/v1/workspaces/${org.id}/invitations`;
+ const send=async(ids,role)=>{const r=await request(endpoint,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{email:seat.email,role,business_ids:ids}});assert.equal(r.status,201,JSON.stringify(r.body));await drainMail();const link=messageLink(smtp.messages.findLast(m=>m.to.value[0].address===seat.email&&m.subject==='Your Desvio client invitation'));return new URLSearchParams(link.hash.slice(1)).get('token');};
+ assert.equal((await request(endpoint,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{email:seat.email,role:'viewer',business_ids:[brandA.id]}})).status,404);
+ const token=await send([a.id],'viewer');for(let i=0;i<2;i++)assert.equal((await request('/api/v1/invitations/accept',{method:'POST',cookie:seat.cookie,body:{token}})).status,201);
+ let list=(await request('/api/v1/businesses',{cookie:seat.cookie})).body.businesses;assert.deepEqual(list.filter(x=>x.organization_id===org.id).map(x=>[x.id,x.role]),[[a.id,'viewer']]);
+ assert.equal((await request(`/api/v1/workspaces/${org.id}/members`,{cookie:seat.cookie})).status,403);
+ assert.equal((await request(endpoint,{cookie:seat.cookie,method:'POST',key:randomUUID(),body:{email:owner.email,role:'admin',business_ids:[c.id]}})).status,403);
+ const second=await send([b.id],'editor');assert.equal((await request('/api/v1/invitations/accept',{method:'POST',cookie:seat.cookie,body:{token:second}})).status,201);
+ list=(await request('/api/v1/businesses',{cookie:seat.cookie})).body.businesses;assert.deepEqual(new Map(list.filter(x=>x.organization_id===org.id).map(x=>[x.id,x.role])),new Map([[a.id,'viewer'],[b.id,'editor']]));assert.ok(!list.some(x=>x.id===c.id));
+ const direct=new TenantDatabase(runtime.database.pool);await assert.rejects(direct.transaction(seat.id,org.id,true,async()=>{},a.id));await direct.transaction(seat.id,org.id,true,async()=>{},b.id);await assert.rejects(direct.transaction(seat.id,org.id,false,async()=>{},c.id));
+ assert.equal((await request(`/api/v1/workspaces/${org.id}/members/${seat.id}`,{cookie:owner.cookie,method:'PATCH',body:{role:'owner',active:true}})).status,403);
+ await assert.rejects(direct.transaction(seat.id,org.id,false,db=>db.query('SELECT * FROM app.team_members()')));
+ const teamPath=`/api/v1/businesses/${b.id}/team`;
+ const team=(await request(teamPath,{cookie:owner.cookie}));assert.equal(team.status,200,JSON.stringify(team.body));assert.equal(team.body.can_manage,true);assert.ok(team.body.members.some(m=>m.user_id===seat.id&&m.role==='editor'));
+ assert.equal((await request(teamPath+'/members/'+seat.id,{cookie:seat.cookie,method:'PATCH',body:{role:'admin',active:true}})).status,403);
+ assert.equal((await request(teamPath+'/members/'+owner.id,{cookie:owner.cookie,method:'PATCH',body:{role:'viewer',active:false}})).status,403);
+ assert.equal((await request(teamPath+'/members/'+seat.id,{cookie:owner.cookie,method:'PATCH',body:{role:'admin',active:true}})).status,200);
+ await direct.transaction(seat.id,org.id,false,async db=>{assert.equal((await db.query('SELECT app.social_manager($1,$2) AS allowed',[org.id,b.id])).rows[0].allowed,true);assert.equal((await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[org.id,a.id])).rows[0].allowed,false);},b.id);
+ assert.equal((await request(teamPath+'/members/'+seat.id,{cookie:owner.cookie,method:'PATCH',body:{role:'viewer',active:false}})).status,200);
+ assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:second}})).status,201);
+ assert.equal((await request(teamPath,{cookie:seat.cookie})).status,404);assert.equal((await request(`/api/v1/businesses/${a.id}/team`,{cookie:seat.cookie})).status,200);
+ assert.ok((await request(teamPath,{cookie:owner.cookie})).body.activity.some(e=>e.action==='business.member_removed'));
+ const third=await send([c.id],'viewer');const pending=(await request(endpoint,{cookie:owner.cookie})).body.invitations.find(i=>i.status==='pending');await request(endpoint+'/'+pending.id+'/revoke',{cookie:owner.cookie,method:'POST',body:{}});assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:third}})).status,404);
+});

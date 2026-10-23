@@ -1,4 +1,5 @@
 "use client";
+import {BusinessTeam} from "./business-team";
 import {VisualReview} from "./visual-review";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -282,6 +283,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <PublishingScreen key={business.id} business={business}/>
           ) : section === "connections" ? (
             <ConnectionsScreen key={business.id} business={business}/>
+          ) : section === "team" ? (
+            <BusinessTeam key={business.id} business={business}/>
           ) : section === "memory" ? (
             <Memory business={business} />
           ) : (

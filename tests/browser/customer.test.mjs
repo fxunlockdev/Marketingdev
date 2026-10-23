@@ -863,3 +863,16 @@ test('retained visual styles stay editable without AI and unsaved edits survive 
  const approved=await(await alice.request.get(brainURL)).json();
  assert.ok(!approved.active.snapshot.facts.some(f=>f.field==='visual_direction_composition'));
 });
+
+test('business Team invites through real email, accepts selected access, changes roles and removes only that business',async()=>{
+ await alice.goto(base+`/b/${firstBusiness}/team`);await expect(alice.getByRole('heading',{name:'Team',exact:true})).toBeVisible();
+ await alice.getByLabel('Teammate’s email').fill('browser-bob@example.test');await alice.getByLabel('Business role',{exact:true}).selectOption('viewer');await alice.getByRole('button',{name:'Send invitation',exact:true}).click();
+ await expect(alice.getByText('Invitation saved and email queued.',{exact:false})).toBeVisible();const link=await emailLink('browser-bob@example.test','Your Desvio client invitation');
+ await bob.goto(link);await bob.getByRole('button',{name:'Accept invitation',exact:true}).click();await expect(bob.getByRole('heading',{name:/^Welcome,/})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(2);
+ await alice.getByRole('button',{name:'Refresh team',exact:true}).click();await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption('editor');await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByText('Business role saved.',{exact:true})).toBeVisible();
+ await alice.reload();await expect(alice.getByRole('region',{name:'People with access'}).getByText('editor',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-desktop.png',fullPage:true});
+ await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-mobile.png',fullPage:true});
+ await bob.goto(base+`/b/${firstBusiness}/team`);await expect(bob.getByRole('heading',{name:'Team',exact:true})).toBeVisible();await expect(bob.getByRole('button',{name:'Send invitation'})).toHaveCount(0);
+ await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByRole('button',{name:'Remove access',exact:true}).click();await alice.getByRole('button',{name:'Confirm removal',exact:true}).click();await expect(alice.getByText('Access to this business removed.',{exact:false})).toBeVisible();
+ await bob.reload();await expect(bob.getByRole('heading',{name:'Business unavailable'})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(1);await expect(bob.locator('.v5-business-card')).toContainText('Juniper Goods');await alice.setViewportSize({width:1440,height:1100});
+});

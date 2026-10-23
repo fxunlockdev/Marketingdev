@@ -86,7 +86,11 @@ class SocialController {
 @Controller('api/v1')
 @UseGuards(SessionGuard)
 class BusinessController {
- constructor(@Inject(Businesses) private readonly service:Businesses,@Inject(Intake) private readonly intake:Intake,@Inject(BusinessOverview) private readonly overview:BusinessOverview){}
+ constructor(@Inject(Businesses) private readonly service:Businesses,@Inject(Intake) private readonly intake:Intake,@Inject(BusinessOverview) private readonly overview:BusinessOverview,@Inject(Team) private readonly team:Team){}
+ @Get('businesses/:id/team') businessTeam(@Req() r:AuthRequest,@Param('id') id:string){return this.team.businessList(r.actorId,id);}
+ @Post('businesses/:id/team/invitations') businessInvite(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.team.businessInvite(r.actorId,id,body,key);}
+ @Post('businesses/:id/team/invitations/:invitation/revoke') businessRevoke(@Req() r:AuthRequest,@Param('id') id:string,@Param('invitation') invitation:string){return this.team.businessRevoke(r.actorId,id,invitation);}
+ @Patch('businesses/:id/team/members/:target') businessChange(@Req() r:AuthRequest,@Param('id') id:string,@Param('target') target:string,@Body() body:unknown){return this.team.businessChange(r.actorId,id,target,body);}
  @Get('businesses/:id/overview') businessOverview(@Req() r:AuthRequest,@Param('id') id:string){return this.overview.read(r.actorId,id);}
  @Get('businesses/:id/visuals/:visualId') visualReference(@Req() r:AuthRequest,@Param('id') id:string,@Param('visualId') visualId:string){return this.intake.visual(r.actorId,id,visualId);}
  @Get('businesses/:id/intake') intakeStatus(@Req() r:AuthRequest,@Param('id') id:string){return this.intake.read(r.actorId,id);}

@@ -9,7 +9,7 @@ export class SocialJobs {
  #vault?:PostizVault;
  constructor(readonly jobs:AssetJobs,readonly config?:SocialWorkerConfig){if(config)this.#vault=new PostizVault(config.encryptionKey);}
  finish(db:any,j:any,status:string,code:string|null=null){return db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]).then(()=>status);}
- async permitted(db:any,j:any){if(!await this.jobs.permitted(db,j))return false;const member=(await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[j.organization_id,j.requested_by])).rows[0];if(!member||!['owner','admin'].includes(member.role))return false;if(member.business_scope==='selected')return (await db.query("SELECT 1 FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3 AND active AND role='admin'",[j.organization_id,j.brand_id,j.requested_by])).rowCount===1;return true;}
+ async permitted(db:any,j:any){if(!await this.jobs.permitted(db,j))return false;const member=(await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[j.organization_id,j.requested_by])).rows[0];if(!member)return false;if(member.business_scope==='selected')return (await db.query("SELECT 1 FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3 AND active AND role='admin'",[j.organization_id,j.brand_id,j.requested_by])).rowCount===1;return ['owner','admin'].includes(member.role);}
  async run(scope:JobScope):Promise<string>{
   try{
    const input=await this.jobs.transaction(scope,async(db,j)=>{
