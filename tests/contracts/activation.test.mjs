@@ -47,9 +47,9 @@ test('API verification failure rolls back both services and recovery ambiguity r
  await assert.rejects(activate(p,p.preview_sha256,b.io),/ROLLBACK_REQUIRES_RECONCILIATION/);assert.equal(b.calls.at(-1),'reconcile_required');assert.ok(!b.calls.includes('unlock'));
 });
 test('social activation preserves publication opt-in and disables active APIs before worker swap',async()=>{
- const s=snapshot();s.spec.values.VIDEO_ENABLED='false';s.api.variables.VIDEO_ENABLED='false';s.spec.values.POSTIZ_ENABLED='true';s.spec.values.POSTIZ_PUBLISHING_ENABLED='false';s.api.variables.POSTIZ_ENABLED='true';s.api.variables.POSTIZ_PROVISIONING_ENABLED='true';
+ const s=snapshot();s.spec.values.VIDEO_ENABLED='false';s.api.variables.VIDEO_ENABLED='false';s.spec.values.POSTIZ_ENABLED='true';s.spec.values.POSTIZ_PUBLISHING_ENABLED='false';s.api.variables.POSTIZ_ENABLED='true';s.api.variables.POSTIZ_PROVISIONING_ENABLED='true';s.api.variables.POSTIZ_OAUTH_ENABLED='true';
  const p=activationPlan(s),a=adapter(s),sets=[];a.io.setAPI=async v=>{sets.push(v);a.calls.push('set');};
  await activate(p,p.preview_sha256,a.io);
- assert.equal(sets[0].POSTIZ_ENABLED,'false');assert.equal(sets[0].POSTIZ_PROVISIONING_ENABLED,'false');assert.equal(sets.at(-1).POSTIZ_ENABLED,'true');assert.equal(sets.at(-1).POSTIZ_PUBLISHING_ENABLED,'false');assert.ok(a.calls.indexOf('set')<a.calls.indexOf('swap'));
+ assert.equal(sets[0].POSTIZ_OAUTH_ENABLED,'false');assert.equal(sets.at(-1).POSTIZ_OAUTH_ENABLED,'true');assert.equal(sets[0].POSTIZ_ENABLED,'false');assert.equal(sets[0].POSTIZ_PROVISIONING_ENABLED,'false');assert.equal(sets.at(-1).POSTIZ_ENABLED,'true');assert.equal(sets.at(-1).POSTIZ_PUBLISHING_ENABLED,'false');assert.ok(a.calls.indexOf('set')<a.calls.indexOf('swap'));
  s.spec.values.POSTIZ_ENABLED='false';s.spec.values.POSTIZ_PUBLISHING_ENABLED='true';assert.throws(()=>activationPlan(s),/SOCIAL_FLAGS_INVALID/);
 });

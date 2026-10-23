@@ -31,7 +31,7 @@ async function bind(b,key){const account={organization_id:b.organization_id,bran
 const queue=(b=brandA,u=alice)=>service.refresh(u.id,b.id,randomUUID());
 const read=(b=brandA,u=alice)=>service.read(u.id,b.id);
 before(async()=>{
- config.socialEnabled=true;config.oauthEncryptionKey=oauthKey;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);service=new SocialConnections(new Businesses(app.database,ws),true);
+ config.socialEnabled=true;config.socialAuthorizationEnabled=true;config.oauthEncryptionKey=oauthKey;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);service=new SocialConnections(new Businesses(app.database,ws),true);
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();selected=await signup();orgA=await ws.create(alice.id,{name:'MOCK customer A'});orgB=await ws.create(bob.id,{name:'MOCK customer B'});
  brandA={...await ws.createBrand(alice.id,orgA.id,{name:'MOCK brand A'},randomUUID()),organization_id:orgA.id};sibling={...await ws.createBrand(alice.id,orgA.id,{name:'MOCK sibling'},randomUUID()),organization_id:orgA.id};brandB={...await ws.createBrand(bob.id,orgB.id,{name:'MOCK brand B'},randomUUID()),organization_id:orgB.id};
  for(const [u,role] of [[editor,'editor'],[viewer,'viewer'],[selected,'admin']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,$3,$4)',[orgA.id,u.id,role,u===selected?'selected':'all']);

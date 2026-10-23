@@ -1,5 +1,9 @@
 # Desvio build state
 
+## OAuth readiness separation — 2026-10-24
+
+The API previously treated the presence of an internal OAuth encryption key as readiness to authorize a real LinkedIn account. Added explicit `POSTIZ_OAUTH_ENABLED` (default false), validated against enabled Postiz and a valid encryption key. Both customer availability and OAuth initiation now stay unavailable until explicit app readiness; provisioning remains independently implemented. Coordinated activation preserves the explicit flag and disables/restores it with other features during worker replacement. No new credentials or grants were enabled. Ten configuration/activation tests and 27 real local social database/queue tests passed with MOCK remote OAuth, including a verified binding with encryption configured but OAuth disabled: the endpoint returns 409 and creates no authorization job. API deployment pending exact observation; see `work/railway-oauth-readiness-deploy.json`.
+
 ## Actual durable provisioning acceptance — 2026-10-24
 
 `check-provisioning-job.mjs` now exercises a synthetic business through real scoped Desvio service methods, outbox, Temporal, isolated provisioner, actual private Postiz enterprise API and encrypted account binding. The dev job succeeded; identity verification, idempotent submission, foreign-business denial and credential-free customer result passed. No browser/session, OAuth consent, model or publication acceptance is implied. Probe state is retained for reconciliation; the runner refuses to create another over it. Exact completed-workflow/fixture cleanup is separate and leaves the remote synthetic Postiz organization and normal Temporal history intact. Evidence: `railway-provisioning-job.json` and cleanup report. This closes the gap between direct enterprise transport checks and actual durable provisioning; customer OAuth and paid generation remain unverified.

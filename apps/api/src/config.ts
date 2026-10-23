@@ -20,7 +20,15 @@ export type Config = {
   publishingEnabled?:boolean;
   oauthEncryptionKey?:string;
   socialProvisioningEnabled?:boolean;
+  socialAuthorizationEnabled?:boolean;
 };
+
+export function socialAuthorizationFromEnv(env:NodeJS.ProcessEnv):boolean {
+  if(env.POSTIZ_OAUTH_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_OAUTH_ENABLED))throw new Error('POSTIZ_OAUTH_ENABLED must be true or false');
+  const enabled=env.POSTIZ_OAUTH_ENABLED==='true';
+  if(enabled&&(env.POSTIZ_ENABLED!=='true'||!/^[a-f0-9]{64}$/i.test(env.OAUTH_ENCRYPTION_KEY??'')))throw new Error('Social authorization requires enabled Postiz and a valid OAuth encryption key');
+  return enabled;
+}
 
 export function configFromEnv(env = process.env): Config {
   const mode = env.APP_MODE;
@@ -47,7 +55,7 @@ export function configFromEnv(env = process.env): Config {
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(env.POSTIZ_PROVISIONING_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_PROVISIONING_ENABLED))throw new Error('POSTIZ_PROVISIONING_ENABLED must be true or false');
   const videoRenderImage=env.VIDEO_RUNTIME_IMAGE;if(videoRenderImage&&!/^sha256:[a-f0-9]{64}$/.test(videoRenderImage))throw new Error('VIDEO_RUNTIME_IMAGE must be an exact local image digest');
-  return {videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  return {socialAuthorizationEnabled:socialAuthorizationFromEnv(env),videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }

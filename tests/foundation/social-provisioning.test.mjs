@@ -28,7 +28,7 @@ async function prepare(b,user=alice,key=randomUUID()){const r=await api(endpoint
 const read=async(b,user=alice)=>(await api(endpoint(b),{user})).body;
 function created(payload){const result={id:'provisioned-'+randomUUID(),apiKey:'MOCK_ORG_KEY_'+randomBytes(24).toString('hex')};remote.set(result.apiKey,{id:result.id,name:provisionedName(payload.id)});return result;}
 before(async()=>{
- config.socialEnabled=true;config.socialProvisioningEnabled=true;config.oauthEncryptionKey=oauthKey;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);
+ config.socialEnabled=true;config.socialAuthorizationEnabled=true;config.socialProvisioningEnabled=true;config.oauthEncryptionKey=oauthKey;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);
  alice=await signup();bob=await signup();viewer=await signup();editor=await signup();selected=await signup();orgA=await ws.create(alice.id,{name:'Provisioning fixture A'});orgB=await ws.create(bob.id,{name:'Provisioning fixture B'});
  // Additional fixtures are isolated businesses; the customer default stays three.
  for(const org of [orgA,orgB])await admin.query('INSERT INTO app.account_entitlements(organization_id,max_active_businesses) VALUES($1,100) ON CONFLICT(organization_id) DO UPDATE SET max_active_businesses=100',[org.id]);
@@ -95,4 +95,15 @@ test('cancellation before submission avoids creation, and in-flight permission l
 test('known pre-creation rejection can be retried within a cap; existing disabled bindings cannot be re-enabled by setup',async()=>{
  const b=await business();createBehavior=(req,res)=>json(res,{success:false});for(let i=0;i<3;i++){const j=(await prepare(b)).job;assert.equal(await handler.run(scope(j,b)),'rejected');}assert.equal((await api(endpoint(b)+'/prepare',{method:'POST',body:{},key:randomUUID()})).status,409);
  createBehavior=(req,res,p)=>json(res,created(p));const other=await business(),j=(await prepare(other)).job;assert.equal(await handler.run(scope(j,other)),'succeeded');await admin.query('UPDATE app.postiz_accounts SET enabled=false WHERE brand_id=$1',[other.id]);assert.equal((await api(endpoint(other)+'/prepare',{method:'POST',body:{},key:randomUUID()})).status,409);assert.equal((await read(other)).configured,false);
+});
+
+test('unconfigured OAuth stays unavailable despite a verified binding and encryption key',async()=>{
+ const b=await business(),j=(await prepare(b)).job;assert.equal(await handler.run(scope(j,b)),'succeeded');
+ const disabled=await createApplication({...config,socialAuthorizationEnabled:false});
+ try{
+  await disabled.app.listen(0,'127.0.0.1');const url=await disabled.app.getUrl();
+  const state=await fetch(url+endpoint(b),{headers:{cookie:alice.cookie}});assert.equal(state.status,200);const data=await state.json();assert.equal(data.configured,true);assert.equal(data.authorization_available,false);assert.equal(data.setup_available,false);
+  const response=await fetch(url+endpoint(b)+'/oauth/linkedin',{method:'POST',headers:{cookie:alice.cookie,origin:config.origin,'content-type':'application/json','idempotency-key':randomUUID()},body:'{}'});assert.equal(response.status,409);
+  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='social.authorize'",[b.id])).rows[0].n,0);
+ }finally{await disabled.close();}
 });
