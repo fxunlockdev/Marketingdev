@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-10-23T16:44:21.633Z",
+  "passed": true,
+  "business_id": "c1797e10-ae08-47bc-8c7b-29112a7426bd",
+  "three_step_manual_onboarding": true,
+  "reviewed_facts_persisted": true,
+  "goals_persisted": true,
+  "approved_memory_persisted": true,
+  "foreign_business_denied": true,
+  "scope": "Actual public dev Chromium login → business creation → manual fact review → goals → approved memory, with foreign-session API denial. No crawling/AI-prefill, model generation, editing, OAuth or publication acceptance. Synthetic fixture pending cleanup."
+}

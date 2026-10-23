@@ -10,7 +10,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | --- | --- | --- |
 | Shared foundation | Password sessions, default three businesses, business scope/RLS, private media, durable queue/worker, restricted service roles | Full local security suite passes; comprehensive deployed tenant flows, operational hardening and release gate |
 | Overview | Business switcher and persisted publishing/approval/activity counts; saved results and reviewed recommendations | Real provider-derived metrics/learning and deployed customer journey |
-| Brands & onboarding | Website/document ingestion, visual evidence, proposed brand facts, correction and approved Brand Brain | Real AI-prefill acceptance, deployed crawler/document coverage and quality evaluation; no paid test performed |
+| Brands & onboarding | Website/document ingestion, visual evidence, proposed brand facts, correction and approved Brand Brain | Deployed manual onboarding/fact approval passed; real AI-prefill acceptance, deployed crawler/document coverage and quality evaluation; no paid test performed |
 | Content Plan | Configurable days/posts, OpenAI/Gemini planning, calendar edits, recurring planning with limits and approval, Canvas linkage | Provider activation and actual model output/loop acceptance |
 | Review Inbox | Channel-based review, feedback, exact image/video/carousel versions, approval invalidation after edits | Broader deployed customer flow and real generated-media acceptance |
 | Canvas | Brand-guided planning, static image creation/editing, editable projects, video storyline/script/prompt approval before generation, video editing/rendering, carousels and ZIP download | Provider keys, business allowances and video runtime activation; real image create/edit and video create/edit acceptance |
@@ -28,7 +28,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 - `docs/evidence/railway-worker-rollout.json` and `railway-worker-job-carousel046.json`: exact deployed worker, queue/role registration, actual storage/scan job, replay and foreign-scope denial. Synthetic fixture cleanup recorded separately.
 - `docs/evidence/carousel-publication-backend.json`: 17 real local publication/security/recovery cases with MOCK Postiz.
 - `docs/evidence/carousel-publishing-browser.json`: nine local image/video/carousel publishing browser journeys with MOCK Postiz; accessibility/mobile checks.
-- `docs/evidence/contracts.json`: 89 passing provider/input/media contracts at the recorded source snapshot.
+- `docs/evidence/contracts.json`: 91 passing provider/input/media contracts at the recorded source snapshot.
 - `docs/evidence/security.json`: passed at unchanged source on 23 October, with 29 account cases, 169 foundation cases, six Python boundary cases and both production dependency audits. Scanner readiness now allows bounded slower emulated startup and preserves failure diagnostics. All 37 full browser journeys also pass at this same source.
 
 ## Immediate sequence
@@ -49,3 +49,7 @@ Private Postiz application deployment is SUCCESS; backend/orchestrator health an
 - Scheduled-removal transport is implemented and passes MOCK contracts. It reports only an unconfirmed removal request. Durable remote cancellation, UI controls, race handling and actual social acceptance remain incomplete.
 
 - Fixed visual onboarding setup: `max_tokens_per_image` can now be explicitly configured through the guided/atomic operator path. Previously the tool could not enable screenshot analysis. 28 configuration and nine database tests pass; no live allowance or model call was enabled.
+
+- Public dev manual onboarding → reviewed facts → saved goals → approved Memory passed, including reload and foreign-session denial. Synthetic fixture cleanup passed. Real AI-prefill/generation remains unverified; see the owner test sequence in `OPERATOR_PROVIDER_SETUP.md`.
+
+- Current full browser regression: 37/37 passed with MOCK providers; current contracts: 91/91 passed; offline checks passed. Full security retry passed (29 account, 172 foundation, six boundary tests and both dependency audits) after the initial local Temporal startup failure during a concurrent run. No new LIVE_VERIFIED status.

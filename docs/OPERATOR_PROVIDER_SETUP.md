@@ -1,5 +1,17 @@
 # Staging provider permissions
 
+## Owner test sequence
+
+The dev app is https://desvio-dev-web-dev.up.railway.app. Add model credentials in Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12` → **dev** → **desvio-dev-worker-settings** → **Variables**. Start with `OPENAI_API_KEY` for onboarding, planning and image creation/editing. `GEMINI_API_KEY` is optional for supported text workflows; Higgsfield setup is separate below. Never add these to the web service.
+
+1. Sign in and create a business. Add a website or brand files. Manual facts and brand approval can be tested without model keys.
+2. Save the server key, then run the guided setup's **activate saved Railway settings** option. The settings service is configuration storage: saving a key there does not update the running worker by itself.
+3. Use **configure business allowance** for onboarding, creative and planning. Enter eligible model IDs, verified rates, your chosen spending caps and expiry. For visual onboarding, include the verified image-token ceiling. These are distinct capability caps, not a shared total budget.
+4. In onboarding, run brand analysis, review/correct the extracted facts and confirm the brand profile. In Canvas, generate a plan or image, edit the saved creative, and approve the resulting exact version in Review Inbox. An edit invalidates the previous approval.
+5. For video, complete the explicit Higgsfield/video settings and allowance below. Approve the video prompt before paid generation, then approve the finished asset separately. Static images do not need video-style prompt preapproval.
+
+This is the setup path for owner testing, not proof that live model calls have passed. Social OAuth/publishing stays separately gated; Meta channels are not yet implemented merely by supplying a Meta app. No paid request or social post is made by the setup wizard.
+
 ## Guided local setup
 
 Run `npm run setup:dev` from this repository in an interactive terminal. Choose activation to preview/apply saved Railway settings, or allowance setup to select an existing business and enter one capability’s model, verified prices, lifetime USD cap and expiry. No JSON editing is required. Each capability has its own cap; these are not a shared total, and prior usage counts toward the lifetime limit. Video draft text and paid video rendering need their respective separate allowances.

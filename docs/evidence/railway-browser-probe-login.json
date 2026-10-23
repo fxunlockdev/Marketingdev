@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-23T16:36:19.338Z",
+  "passed": true,
+  "user_id": "fd38427b-2ee6-4785-abe1-ba8ac06fc1e8",
+  "password_login": true,
+  "business_access": true,
+  "verification_basis": "synthetic internal test account; no email delivery claimed",
+  "scope": "Synthetic internal test account provisioning and private API password/session/business access. Public browser journey and cleanup are recorded separately in railway-onboarding-browser.json and railway-onboarding-browser-cleanup.json. No customer account or email delivery claim."
+}
