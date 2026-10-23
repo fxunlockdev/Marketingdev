@@ -931,3 +931,25 @@ test('Profile saves identity, revokes a separate session and changes the real pa
   await alice.screenshot({path:'work/browser/profile-desktop.png',fullPage:true});await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await alice.screenshot({path:'work/browser/profile-mobile.png',fullPage:true});
  }finally{await other.close();}
 });
+
+test('Profile authenticator setup → gated sign-in → recovery code → replacement and disable',async()=>{
+ const {createOTP}=await import('@better-auth/utils/otp'),{base32}=await import('@better-auth/utils/base32');
+ await alice.goto(base+'/profile');const panel=alice.getByRole('region',{name:'Two-factor authentication',exact:true});
+ await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('button',{name:'Set up authenticator app',exact:true}).click();
+ const qr=panel.getByRole('img',{name:'Scan this QR code with your authenticator app'});await expect(qr).toBeVisible();assert.ok((await qr.getAttribute('src')).startsWith('data:image/png;base64,'));
+ await panel.getByText('Enter a setup key manually',{exact:true}).click();const secret=await panel.getByLabel('Authenticator setup key').inputValue(),otp=createOTP(new TextDecoder().decode(base32.decode(secret))),codes=await panel.getByRole('list',{name:'Recovery codes',exact:true}).getByRole('listitem').allTextContents();assert.equal(codes.length,10);
+ await expect(panel.getByRole('button',{name:'Enable two-factor authentication',exact:true})).toBeDisabled();
+ assert.deepEqual((await new AxeBuilder({page:alice}).analyze()).violations,[]);assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await panel.screenshot({path:'work/browser/mfa-setup-mobile.png',mask:[qr,panel.getByLabel('Authenticator setup key'),panel.getByRole('list',{name:'Recovery codes',exact:true})]});
+ await panel.getByRole('checkbox',{name:'I saved these recovery codes somewhere secure.'}).check();await panel.getByLabel('Confirm authenticator code').fill(await otp.totp());await panel.getByRole('button',{name:'Enable two-factor authentication',exact:true}).click();await expect(panel.getByText('Enabled · authenticator app',{exact:true})).toBeVisible();
+ const context=await browser.newContext(),loginPage=await context.newPage();
+ async function signIn(){await loginPage.goto(base+'/sign-in');await loginPage.getByLabel('Email address',{exact:true}).fill(email);await loginPage.getByLabel('Password',{exact:true}).fill(password+'-profile');await loginPage.getByRole('button',{name:'Sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:'Verify it’s you.',exact:true})).toBeVisible();}
+ try{
+  await signIn();assert.equal(await(await loginPage.request.get(base+'/api/auth/get-session')).json(),null);assert.equal((await loginPage.request.get(base+'/api/v1/businesses')).status(),401);
+  assert.deepEqual((await new AxeBuilder({page:loginPage}).analyze()).violations,[]);await loginPage.screenshot({path:'work/browser/mfa-sign-in.png',fullPage:true});
+  await loginPage.getByLabel('Authenticator code',{exact:true}).fill(await otp.totp());await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^Welcome,/})).toBeVisible();
+  await loginPage.request.post(base+'/api/auth/sign-out',{headers:{origin:base},data:{}});await admin.query('DELETE FROM auth."rateLimit"');await signIn();await loginPage.getByRole('button',{name:'Use a recovery code',exact:true}).click();await loginPage.getByLabel('Recovery code',{exact:true}).fill(codes[0]);await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^Welcome,/})).toBeVisible();
+  await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('checkbox',{name:/I understand replacing codes/}).check();await panel.getByRole('button',{name:'Replace recovery codes',exact:true}).click();await expect(panel.getByRole('heading',{name:'Recovery codes',exact:true})).toBeVisible();const replacements=await panel.getByRole('list',{name:'Recovery codes',exact:true}).getByRole('listitem').allTextContents();assert.equal(replacements.length,10);assert.ok(replacements.every(c=>!codes.includes(c)));await panel.getByRole('button',{name:'I saved my new recovery codes',exact:true}).click();
+  await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('checkbox',{name:/I understand replacing codes/}).check();await panel.getByRole('button',{name:'Disable two-factor authentication',exact:true}).click();await expect(panel.getByText('Not enabled',{exact:true})).toBeVisible();
+  assert.deepEqual(await alice.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});
+ }finally{await context.close();}
+});

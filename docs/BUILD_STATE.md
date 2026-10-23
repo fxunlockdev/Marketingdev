@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Profile authenticator MFA — locally verified
+
+Pinned Better Auth authenticator enrollment, recovery-code replacement/disable and pending sign-in verification are connected in Profile and sign-in. Migration 041 adds the provider’s auth-only schema; it is not applied to Railway. QR images are generated locally in the browser, with a manual-key fallback. Secrets remain out of browser persistent storage. Existing sessions retain their prior access; protection applies to future sign-ins.
+
+Frozen-source acceptance passed at `673ef1d5a0bf719b17fc80128772eee86bd124d294828240ffe5850f344d5052`: 28 account-service cases and 13 customer browser journeys; full security 28 account plus 161 application cases, six guards and both dependency audits; offline five and contracts 83. Coverage includes encrypted storage, auth-role isolation, pending-session denial, single-use/replaced recovery codes, five-attempt lockout and fresh sign-in after expiry. Mobile layout/accessibility and masked setup screenshot inspected. See `docs/evidence/mfa.json` and ADR 0048. These are local results, not deployed MFA or live model/social acceptance.
+
+Remaining account lifecycle/preferences, deployed app acceptance and authorized model/social verification remain open. Billing remains excluded.
+
 ## Hosted queued-job restart recovery — verified
 
 The dev worker was confirmed idle, stopped, and restored automatically. A synthetic upload remained queued with zero attempts and an undispatched outbox record during the outage, then completed in one attempt after the same worker container restarted. Signed upload, canonical/normalized readback, replay and foreign/anonymous denial checks also passed. Running-container state, both Temporal pollers and worker/dispatcher logins were verified afterward. This proves queued-job recovery across a worker restart, not replacement of the entire host or a crash during a paid provider request.

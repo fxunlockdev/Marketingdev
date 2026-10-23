@@ -499,3 +499,42 @@ test('delegated business admins manage scoped teammates without account or sibli
  await assert.rejects(direct.transaction(manager.id,org.id,true,db=>db.query('SELECT app.change_business_member($1,$2,$3,$4)',[b.id,member.id,'editor',true])));
  assert.equal((await admin.query('SELECT role FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3',[org.id,a.id,member.id])).rows[0].role,'analyst');
 });
+
+test('authenticator enrollment, pending sign-in, one-use recovery and disabling use real identity provider',async()=>{
+ const {createOTP}=await import('@better-auth/utils/otp'),{base32}=await import('@better-auth/utils/base32');
+ const user=await signup('mfa-'+randomUUID()),password='a-strong-test-password-2026';
+ // Isolate provider behavior from the separate HTTP throttling window.
+ const post=async(path,body,cookie=user.cookie)=>{await admin.query('DELETE FROM auth."rateLimit"');return request('/api/auth/two-factor/'+path,{method:'POST',cookie,body});};
+ assert.equal((await post('enable',{password:'incorrect-password',method:'totp'})).status,400);
+ const enabled=await post('enable',{password,method:'totp'});assert.equal(enabled.status,200);assert.equal(enabled.body.method,'totp');assert.equal(enabled.body.backupCodes.length,10);
+ const encoded=new URL(enabled.body.totpURI).searchParams.get('secret'),secret=new TextDecoder().decode(base32.decode(encoded)),otp=createOTP(secret);
+ assert.equal((await request('/api/auth/get-session',{cookie:user.cookie})).body.user.twoFactorEnabled,false);
+ const raw=(await admin.query('SELECT secret,"backupCodes" FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0];assert.notEqual(raw.secret,secret);assert.ok(!raw.backupCodes.includes(enabled.body.backupCodes[0]));
+ assert.equal((await post('verify-totp',{code:'invalid'})).status,401);
+ const verified=await post('verify-totp',{code:await otp.totp()});assert.equal(verified.status,200);user.cookie=verified.cookie;
+ assert.equal((await request('/api/auth/get-session',{cookie:user.cookie})).body.user.twoFactorEnabled,true);
+ const challenge=()=>request('/api/auth/sign-in/email',{method:'POST',body:{email:user.email,password}});
+ let pending=await challenge();assert.equal(pending.body.twoFactorRedirect,true);assert.ok(pending.body.twoFactorMethods.includes('totp'));
+ assert.equal((await request('/api/auth/get-session',{cookie:pending.cookie})).body,null);assert.equal((await request('/api/v1/workspaces',{cookie:pending.cookie})).status,401);
+ assert.equal((await post('verify-totp',{code:'invalid'},pending.cookie)).status,401);
+ let login=await post('verify-totp',{code:await otp.totp()},pending.cookie);assert.equal(login.status,200);assert.equal((await request('/api/auth/get-session',{cookie:login.cookie})).body.user.id,user.id);
+ pending=await challenge();login=await post('verify-backup-code',{code:enabled.body.backupCodes[0]},pending.cookie);assert.equal(login.status,200);assert.equal((await request('/api/auth/get-session',{cookie:login.cookie})).body.user.id,user.id);
+ pending=await challenge();assert.equal((await post('verify-backup-code',{code:enabled.body.backupCodes[0]},pending.cookie)).status,401);assert.equal((await request('/api/auth/get-session',{cookie:pending.cookie})).body,null);
+ const replaced=await post('generate-backup-codes',{password},login.cookie);assert.equal(replaced.status,200);assert.equal(replaced.body.backupCodes.length,10);
+ assert.equal((await post('verify-backup-code',{code:enabled.body.backupCodes[1]},pending.cookie)).status,401);
+ // Account-level lockout survives HTTP limiter resets and spans factor types.
+ let failures=(await admin.query('SELECT "failedVerificationCount" AS n FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0].n;
+ for(;failures<5;failures++)assert.equal((await post('verify-totp',{code:'invalid'},pending.cookie)).status,401);
+ assert.equal((await post('verify-totp',{code:await otp.totp()},pending.cookie)).status,429);
+ const locked=(await admin.query('SELECT "lockedUntil" FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0];assert.ok(new Date(locked.lockedUntil).getTime()>Date.now()+14*60*1000);
+ assert.equal((await request('/api/auth/get-session',{cookie:pending.cookie})).body,null);
+ // Advance only fixture expiry; exhausted challenges require a fresh password sign-in.
+ await admin.query(`UPDATE auth."twoFactor" SET "lockedUntil"=now()-interval '1 second' WHERE "userId"=$1`,[user.id]);
+ pending=await challenge();
+ assert.equal((await post('verify-totp',{code:await otp.totp()},pending.cookie)).status,200);
+ assert.equal((await admin.query('SELECT "failedVerificationCount" AS n FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0].n,0);
+ assert.equal((await post('disable',{password:'incorrect-password'},login.cookie)).status,400);
+ const disabled=await post('disable',{password},login.cookie);assert.equal(disabled.status,200);
+ assert.equal((await challenge()).body.twoFactorRedirect,undefined);
+ const appPool=new Pool({connectionString:config.appDatabaseUrl});try{await assert.rejects(appPool.query('SELECT * FROM auth."twoFactor"'),e=>e.code==='42501');}finally{await appPool.end();}
+});

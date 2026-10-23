@@ -44,11 +44,15 @@ export async function api<T = any>(
   if (!response.ok) {
     const safe =
       response.status === 401
-        ? path.startsWith("/api/auth/")
+        ? path.startsWith("/api/auth/two-factor/")
+          ? "This verification was not accepted. Check your code or sign in again."
+          : path.startsWith("/api/auth/")
           ? "Email or password was not accepted. Check your details and try again."
           : "Your session has ended. Sign in again to continue."
         : response.status === 429
-          ? "Too many requests. Wait a moment before trying again."
+          ? data.code === "ACCOUNT_TEMPORARILY_LOCKED"
+            ? "Too many incorrect verification attempts. Wait 15 minutes, then sign in again."
+            : "Too many requests. Wait a moment before trying again."
           : response.status >= 500
             ? "We couldn’t save or load your work. Please try again."
             : (data.error ??
