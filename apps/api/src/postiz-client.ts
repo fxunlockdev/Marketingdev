@@ -1,3 +1,4 @@
+import {postMetrics} from './post-analytics.js';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 export const POSTIZ_CONTRACT_COMMIT='651876e24317c2d8e717262cf98267ec6f699180';
@@ -93,6 +94,10 @@ export class PostizClient {
   const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:[media]}],settings:{__type:'linkedin',post_as_images_carousel:false}}]};
   const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
   return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
+ }
+ async postAnalytics(postId:string,days=30){
+  remoteId(postId);if(!Number.isInteger(days)||days<1||days>90)throw new PostizError('POSTIZ_DATE_RANGE_INVALID');
+  await this.verify();return postMetrics(await this.request(`public/v1/analytics/post/${encodeURIComponent(postId)}?date=${days}`));
  }
  async listPosts(start:string,end:string):Promise<PostizPost[]>{
   let from:string,to:string;try{from=iso(start);to=iso(end);if(Date.parse(to)<Date.parse(from)||Date.parse(to)-Date.parse(from)>31*86400000)throw new Error();}catch{throw new PostizError('POSTIZ_DATE_RANGE_INVALID');}

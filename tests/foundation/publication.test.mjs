@@ -69,6 +69,7 @@ async function setupProvider(){
  provider=createServer(async(req,res)=>{const parts=[];for await(const p of req)parts.push(p);const raw=Buffer.concat(parts);assert.equal(req.headers.authorization,credential);
   if(req.url==='/api/public/v1/me')return reply(res,{organization:{id:binding.remote_organization_id,name:'MOCK org'}});
   if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false}]);
+  if(req.url.startsWith('/api/public/v1/analytics/post/'))return reply(res,mode==='analyticsFail'?{}:mode==='analyticsEmpty'?[]:[{label:'Impressions',data:[{date:'2026-10-23',total:120}],percentageChange:0}],mode==='analyticsFail'?503:200);
   if(req.url==='/api/public/v1/upload'){uploads++;const start=raw.indexOf(Buffer.from('Content-Type: image/png\r\n\r\n'))+'Content-Type: image/png\r\n\r\n'.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);assert.equal((await sharp(lastUpload).metadata()).format,'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+'.png'});}
   if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:'linkedin'},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
   if(req.url.startsWith('/api/public/v1/posts?')){if(mode==='listFail')return reply(res,{},503);return reply(res,{posts:mode==='listMissing'?[]:mode==='listMismatch'?postRows.map(p=>({...p,integration:{...p.integration,id:'foreign-channel'}})):postRows});}reply(res,{},404);
@@ -153,4 +154,21 @@ test('publication is disabled by default, holds daily reservations, and stores i
 test('overview aggregates actual business records and denies foreign tenants',async()=>{
  const r=await api(path('overview'));assert.equal(r.status,200);assert.equal(r.body.business_id,brand.id);assert.equal(r.body.analytics_available,false);
  const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);
+});
+
+
+test('analytics observations persist independently of publishing status and stay business-scoped',async()=>{
+ const f=await approvedPost(),j=await queuePost(f);remoteState='PUBLISHED';
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal((await handler.reconcile(scope(j))).state,'published');
+ let result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);
+ assert.equal((await publisher.analytics(alice.id,brand.id,{channel:'instagram'})).posts.length,0);assert.equal((await publisher.analytics(alice.id,brand.id,{format:'video'})).posts.length,0);assert.throws(()=>publisher.analytics(alice.id,brand.id,{from:'2026-02-30'}),/valid publication/);
+ assert.equal(result.state,'available');assert.equal(result.series[0].points[0].value,120);assert.equal(result.semantics,'provider_reported');
+ assert.equal((await api(path('analytics'),{user:viewer})).status,200);
+ assert.equal((await api(path('analytics'),{user:bob})).status,404);
+ assert.equal((await publisher.analytics(alice.id,sibling.id)).posts.length,0);
+ mode='analyticsFail';const check=await publisher.reconcile(alice.id,brand.id,j.id,randomUUID());assert.equal((await handler.reconcile(scope(check))).state,'published');
+ result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);assert.equal(result.state,'error');assert.deepEqual(result.series,[]);assert.equal((await record(j)).observed_state,'published');
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.post_analytics WHERE publication_id=$1 AND state='available'",[j.id])).rows[0].n,1);
+ mode='analyticsEmpty';await handler.reconcile(scope(j));result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);assert.equal(result.state,'unavailable');assert.deepEqual(result.series,[]);
+ await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.post_analytics SET state='available' WHERE publication_id=$1",[j.id]),brand.id),e=>e.code==='42501');
 });

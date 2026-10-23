@@ -83,3 +83,14 @@ test('canonical MP4 upload uses the pinned multipart contract and video-specific
  await assert.rejects(c.uploadMP4(png,hash),e=>e.code==='POSTIZ_MEDIA_INVALID');await assert.rejects(c.uploadMP4(mp4,'0'.repeat(64)),e=>e.code==='POSTIZ_MEDIA_INVALID');assert.equal(uploaded,1);
  handler=(req,res)=>json(res,{id:'wrong-kind',path:base+'/media/wrong.png'});await assert.rejects(c.uploadMP4(mp4,sha),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');
 });
+
+test('post analytics verifies identity, preserves unknown data and rejects malformed numeric series',async()=>{
+ requests=[];handler=(req,res)=>{assert.equal(req.url,'/api/public/v1/analytics/post/post-a?date=30');json(res,[{label:'Impressions',data:[{date:'2026-10-23',total:'120'},{date:'2026-10-22',total:100}],percentageChange:999,token:'SECRET'}]);};
+ assert.deepEqual(await client().postAnalytics('post-a'),{state:'available',series:[{label:'Impressions',points:[{date:'2026-10-22',value:100},{date:'2026-10-23',value:120}]}]});
+ assert.deepEqual(requests.map(r=>r.path),['/api/public/v1/me','/api/public/v1/analytics/post/post-a?date=30']);
+ for(const value of [[],[{label:'Likes',data:[]}]]){handler=(req,res)=>json(res,value);assert.deepEqual(await client().postAnalytics('post-a'),{state:'unavailable',series:[]});}
+ handler=(req,res)=>json(res,{missing:true});assert.equal((await client().postAnalytics('post-a')).state,'missing');
+ for(const value of [[{label:'Likes',data:[{date:'2026-02-30',total:2}]}],[{label:'Likes',data:[{date:'2026-10-23',total:''}]}],[{label:'Likes',data:[{date:'2026-10-23',total:-1}]}],[{label:'Likes',data:[{date:'2026-10-23',total:1},{date:'2026-10-23',total:2}]}],[{label:'Likes',data:[]},{label:'likes',data:[]}],{missing:false}]){handler=(req,res)=>json(res,value);await assert.rejects(client().postAnalytics('post-a'),e=>e.code==='POSTIZ_ANALYTICS_INVALID');}
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).postAnalytics('post-a'),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+ await assert.rejects(client().postAnalytics('../other'),e=>e.code==='POSTIZ_RESPONSE_INVALID');await assert.rejects(client().postAnalytics('post-a',91),e=>e.code==='POSTIZ_DATE_RANGE_INVALID');
+});

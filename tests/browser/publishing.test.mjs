@@ -78,6 +78,7 @@ async function setupProvider(){
  provider=createServer(async(req,res)=>{const parts=[];for await(const p of req)parts.push(p);const raw=Buffer.concat(parts);assert.equal(req.headers.authorization,credential);
   if(req.url==='/api/public/v1/me')return reply(res,{organization:{id:binding.remote_organization_id,name:'MOCK org'}});
   if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false}]);
+  if(req.url.startsWith('/api/public/v1/analytics/post/'))return reply(res,mode==='analyticsFail'?{}:mode==='analyticsEmpty'?[]:[{label:'Impressions',data:[{date:'2026-10-23',total:120}],percentageChange:0}],mode==='analyticsFail'?503:200);
   if(req.url==='/api/public/v1/upload'){uploads++;const video=raw.includes(Buffer.from('Content-Type: video/mp4')),marker=Buffer.from(`Content-Type: ${video?'video/mp4':'image/png'}\r\n\r\n`),start=raw.indexOf(marker)+marker.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);if(video)assert.equal(lastUpload.subarray(4,8).toString(),'ftyp');else assert.equal((await sharp(lastUpload).metadata()).format,'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+(video?'.mp4':'.png')});}
   if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:'linkedin'},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
   if(req.url.startsWith('/api/public/v1/posts?')){if(mode==='listFail')return reply(res,{},503);return reply(res,{posts:mode==='listMissing'?[]:mode==='listMismatch'?postRows.map(p=>({...p,integration:{...p.integration,id:'foreign-channel'}})):postRows});}reply(res,{},404);
@@ -148,4 +149,18 @@ test('approved video preview → explicit exact-media consent → one MP4 upload
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-video-confirm.png'});
  await page.getByLabel(/I authorize this exact video/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.deepEqual(lastUpload,f.bytes);
  await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
+});
+
+
+test('performance shows saved metrics, filters posts and distinguishes upstream failure from zero engagement',async()=>{
+ await page.goto(url(brand));const panel=page.getByRole('region',{name:'Post performance',exact:true});
+ await expect(panel.getByRole('cell',{name:'120',exact:true}).first()).toBeVisible({timeout:30000});
+ await panel.getByLabel('Performance channel',{exact:true}).selectOption('instagram');await expect(panel.getByText('No confirmed published posts match these filters.',{exact:true})).toBeVisible();
+ await panel.getByLabel('Performance channel',{exact:true}).selectOption('linkedin');await panel.getByLabel('Performance format',{exact:true}).selectOption('video');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);
+ await panel.getByLabel('Performance format',{exact:true}).selectOption('');
+ mode='analyticsFail';const record=(await publisher.list(alice.id,brand.id)).publications.find(r=>r.observed_state==='published');
+ const check=await publisher.reconcile(alice.id,brand.id,record.id,randomUUID());await handler.reconcile(scope(check));await panel.getByRole('button',{name:'Refresh saved metrics'}).click();
+ await expect(panel.getByText('The latest metrics check failed.',{exact:false})).toBeVisible();
+ mode='analyticsEmpty';const next=await publisher.reconcile(alice.id,brand.id,record.id,randomUUID());await handler.reconcile(scope(next));await panel.getByRole('button',{name:'Refresh saved metrics'}).click();await expect(panel.getByText('The platform returned no metrics. This does not mean zero engagement.',{exact:true})).toBeVisible();
+ await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await panel.screenshot({path:'work/browser/post-performance-mobile.png'});
 });

@@ -1,4 +1,5 @@
 "use client";
+import {PostAnalytics} from './post-analytics';
 import {useCallback,useEffect,useId,useRef,useState} from 'react';
 import {api} from './api';
 import {Field,Loading,Notice} from './primitives';
@@ -60,7 +61,7 @@ export function PublishingScreen({business}:{business:Business}){
    <section className="v5-panel publication-activity" aria-labelledby="activity-title"><h2 id="activity-title">Publishing activity</h2><p>Your latest 100 requests. A saved request is separate from a confirmed publication.</p><div className="publication-filters" role="group" aria-label="Filter publishing activity">{[['all','All'],['submitting','Submitting'],['scheduled','Scheduled'],['published','Published'],['attention','Needs attention'],['canceled','Canceled']].map(([key,label])=><button key={key} aria-pressed={filter===key} onClick={()=>setFilter(key)}>{label}</button>)}</div>
     {data.publications.filter(r=>filter==='all'||status(r).key===filter).length?<ul className="publication-list">{data.publications.filter(r=>filter==='all'||status(r).key===filter).map(r=>{const s=status(r);return <li key={r.id}><div className="publication-record-heading"><div><strong>{r.account_name} · LinkedIn</strong><p>{formatDate(r.scheduled_at,zone)} · {zone}</p></div><span className={'publication-status '+s.key}>{s.label}</span></div><p className="publication-caption">{r.caption}</p><p>{s.detail}</p>{r.last_checked_at&&<p className="hint">Last observed {formatDate(r.last_checked_at,zone)}</p>}<div className="publication-record-actions">{data.can_manage&&['queued','uploaded'].includes(r.phase)&&!['failed','rejected','canceled','succeeded'].includes(r.status)&&<button disabled={busy||r.cancel_requested||!!loadError} onClick={()=>void act(r,'cancel')}>{r.cancel_requested?'Cancellation requested':'Cancel request'}</button>}{data.can_manage&&r.phase==='accepted'&&<button disabled={busy||!!loadError} onClick={()=>void act(r,'reconcile')}>Check post status</button>}{s.key==='published'&&r.release_url&&<a href={r.release_url} target="_blank" rel="noopener noreferrer">View published post ↗</a>}</div><History root={root} record={r} zone={zone}/></li>;})}</ul>:<p className="connection-empty">No publishing requests match this view.</p>}
    </section>
-   <section className="publication-analytics"><p className="eyebrow">Performance</p><h2>Analytics will start with real results</h2><p>Engagement metrics and AI performance recommendations are not connected yet. Publishing status above comes from saved service observations.</p></section>
+   <PostAnalytics key={business.id} businessId={business.id}/>
   </>}
  </>;
 }

@@ -57,6 +57,13 @@ class SafeErrors implements ExceptionFilter {
   }
 }
 
+@Controller('api/v1/businesses/:id/analytics')
+@UseGuards(SessionGuard)
+class AnalyticsController {
+ constructor(@Inject(Publication) private readonly service:Publication){}
+ @Get() read(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.analytics(r.actorId,id,query);}
+}
+
 @Controller('api/v1/businesses/:id/publications')
 @UseGuards(SessionGuard)
 class PublicationController {
@@ -289,7 +296,7 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
  {provide:VideoCanvas,useFactory:()=>{const canvas=new Canvas(new Businesses(database,workspaces),store);return new VideoCanvas(canvas,new VideoReferenceBindings(canvas,config.renderImage),config.videoEnabled===true);}},
       {provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Publication,useValue:new Publication(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),config.publishingEnabled===true,config.videoRenderImage)},{provide:SocialProvisioning,useValue:new SocialProvisioning(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialProvisioningEnabled===true)},{provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.oauthEncryptionKey)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true,{provisioning:config.socialProvisioningEnabled===true,authorization:!!config.oauthEncryptionKey})},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces)),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces)))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces))},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
