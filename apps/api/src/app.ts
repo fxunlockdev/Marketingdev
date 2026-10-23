@@ -168,6 +168,7 @@ class ContentPlanController {
  @Post('content-slots/:slotId/generate-creative') creative(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.creatives.generate(r.actorId,id,slot,body,key);}
  @Patch('content-slots/:slotId') edit(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown){return this.service.edit(r.actorId,id,slot,body);}
  @Get('content-slots/:slotId/history') history(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string){return this.service.history(r.actorId,id,slot);}
+ @Post('reviews/bulk-submit') submitReview(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.bulkSubmit(r.actorId,id,body);}
  @Post('reviews/bulk-approve') bulk(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.bulkApprove(r.actorId,id,body);}
  @Post('reviews/:slotId') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown){return this.service.review(r.actorId,id,slot,body);}
 }

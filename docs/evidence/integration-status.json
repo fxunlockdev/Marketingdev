@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "7ccab909bd124ce5bb234b890b778f512b76b7e5",
-  "checked_at": "2026-10-23T04:04:39.358105+00:00",
+  "code_commit": "287d9d1971aef1d9993a2d6387a58a09bf141eb5",
+  "checked_at": "2026-10-23T04:18:34.422647+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/planning.json",
         "docs/evidence/team.json",
         "docs/evidence/document-visuals.json",
         "docs/evidence/video-canvas.json",
@@ -88,6 +89,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/planning.json",
         "docs/evidence/team.json",
         "docs/evidence/document-visuals.json",
         "docs/evidence/video-canvas.json",
@@ -110,6 +112,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/planning.json",
         "docs/evidence/team.json",
         "docs/evidence/document-visuals.json",
         "docs/evidence/video-canvas.json",
@@ -215,7 +218,7 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "higgsfield_transport": {
-      "state": "NOT_IMPLEMENTED",
+      "state": "ADAPTER_READY",
       "live_test": false,
       "evidence": [
         "docs/evidence/contracts.json"

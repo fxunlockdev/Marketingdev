@@ -725,7 +725,12 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByRole('button',{name:'Send for review',exact:true}).click();await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeVisible();
  await page.getByLabel('Feedback or creative direction').fill('TEST FIXTURE: calmer image');await page.getByRole('button',{name:'Request changes',exact:true}).click();
  await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Revise creative',exact:true}).click();
- await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});await page.getByRole('button',{name:'Send for review',exact:true}).click();await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});
+ await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-01`);
+ await page.getByRole('button',{name:'Select drafts for review',exact:true}).click();
+ await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();
+ await page.getByRole('button',{name:'Send selected drafts for review',exact:true}).click();
+ await expect(page.getByText('1 post sent for review. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
  await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');
  await page.getByRole('button',{name:'Instagram',exact:true}).click();await expect(page.getByText('Nothing waiting here',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'LinkedIn',exact:true}).click();await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();

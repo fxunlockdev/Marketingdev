@@ -2,7 +2,13 @@
 
 Updated 2026-10-23 (Asia/Kuala_Lumpur). Active objective updated by owner: complete Desvio end to end except Billing, retaining the original architecture and all other V5 modules. The requested remaining-usage/time target is not evidence of readiness. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Current work — calendar batch submission
+
+Content Plan now offers selection of up to 30 saved drafts and atomic submission to Review Inbox. Owner/admin/editor permissions, exact slot/media revisions, duplicate rejection and rollback are enforced; final approval and publishing remain separate. `make verify-planning` passes 13 service cases and all eight connected Canvas/calendar browser journeys, including expanded role denial and draft feedback → batch submission → review approval. Offline 4, contracts 81 and six separate security guards also pass. Focused evidence is bound to source `5fb963862766d065e4aa9a60abbb6d8cf71c699f9c8d0732f53b898f7e0e76ff`. No migration or provider contract changed. Next: finish remaining calendar/review controls and deployment packaging; live provider acceptance still requires authorized staging credentials, budgets and accounts. Full 33-browser checkpoint for the preceding Memory implementation is historical after this change.
+
 ## Current work — AI analysis and approved business learning
+
+Final full browser acceptance now passes **33/33**, zero skips, at source `1bf91aba9b7c7d6250bdf098ada4919bf4b824b5e85a9867abf37f63de18b38f`. Original isolated skills, real local services and MOCK paid/social transports. Next implementation: atomic calendar-to-review batch submission.
 
 Migration 036 adds independent analysis grants, immutable request inputs/model choices, durable call reservations, proposed memory lessons and review history. `Insights`, `InsightJobs`, the existing dispatcher/Temporal workflow and the original analytics/ab-testing/product-marketing skills now generate evidence-cited proposals through OpenAI or Gemini. The new UI in Publishing & Analytics and Memory supports evidence inspection, applicability, approval for testing, rejection and retirement. Approved hypotheses are snapshotted into future image/video/calendar requests, labelled unproven, and rechecked before subsequent paid calls. Brand Brain facts are unchanged.
 

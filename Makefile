@@ -68,3 +68,7 @@ verify-video-canvas:
 .PHONY: verify-team
 verify-team:
 	$(PYTHON) -m scripts.verify team
+
+.PHONY: verify-planning
+verify-planning:
+	$(PYTHON) -m scripts.verify planning

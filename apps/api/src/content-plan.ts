@@ -204,6 +204,17 @@ export class ContentPlan {
   await this.event(db,user,result,decision,feedback);
   return result;
  }
+ bulkSubmit(user:string,id:string,body:unknown) {
+  const v=object(body,['items']);
+  if(!Array.isArray(v.items)||!v.items.length||v.items.length>30)throw new BadRequestException('Select 1–30 saved drafts');
+  const items=v.items.map(raw=>{const i=object(raw,['id','revision','creative_version_id','creative_sha256','video_version_id','video_sha256']);return {...i,id:uuid(String(i.id))};});
+  if(new Set(items.map(i=>i.id)).size!==items.length)throw new BadRequestException('Select each post once');
+  return this.scope(user,id,true,async(db,b)=>{
+   const slots=[];
+   for(const i of items)slots.push(await this.decide(db,b,user,id,i.id,{...i,decision:'pending_review',feedback:''}));
+   return {slots};
+  });
+ }
  bulkApprove(user:string,id:string,body:unknown) {
   const v=object(body,['confirmed','items']);
   if(v.confirmed!==true||!Array.isArray(v.items)||!v.items.length||v.items.length>30)throw new BadRequestException('Confirm approval of 1–30 selected versions');

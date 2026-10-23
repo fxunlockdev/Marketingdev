@@ -68,6 +68,7 @@ test('selected reviewers decide exact posts but cannot edit, generate, publish o
   assert.equal((await api(path(`content-plan?${query()}`),{user})).status,200);
   assert.equal((await api(path(`content-plan?${query()}`,sibling),{user})).status,404);
   assert.equal((await api(path(`content-slots/${s.id}`),{user,method:'PATCH',body:{revision:s.revision,brief:'Unauthorized rewrite'}})).status,403);
+  assert.equal((await api(path('reviews/bulk-submit'),{user,method:'POST',body:{items:[{id:s.id,...reviewBody(s,'pending_review')}].map(({decision,feedback,...item})=>item)}})).status,403);
   await assert.rejects(canvas.createThread(user.id,brand.id,{title:'No paid work'},randomUUID()));
   await runtime.database.transaction(user.id,org.id,false,async db=>{assert.equal((await db.query('SELECT app.social_manager($1,$2) AS allowed',[org.id,brand.id])).rows[0].allowed,false);},brand.id);
  }
@@ -124,6 +125,21 @@ test('stale approval and unconfirmed edits are denied; confirmed edits reset app
  const changed=await api(path(`content-slots/${s.id}`),{method:'PATCH',body:{...edit,reset_approval:true}});assert.equal(changed.status,200);assert.equal(changed.body.state,'draft_ready');assert.equal(changed.body.approved_by,null);
  assert.equal((await api(path(`reviews/${s.id}`),{method:'POST',body:reviewBody(s,'approved')})).status,409);
  const history=await plans.history(alice.id,brand.id,s.id);assert.equal(history.events[2].action,'approved');assert.equal(history.events[3].snapshot.planned_at,'2026-11-06T08:00:00.000Z');
+});
+test('bulk submission is editor-only, exact-version and atomic across stale or foreign selections',async()=>{
+ const slots=await create([slot(),slot('instagram')]);
+ const item=s=>({id:s.id,revision:s.revision,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256});
+ const items=slots.map(item),route=path('reviews/bulk-submit');
+ for(const user of [viewer,bob])assert.ok([403,404].includes((await api(route,{user,method:'POST',body:{items}})).status));
+ assert.equal((await api(route,{method:'POST',body:{items:[]}})).status,400);
+ assert.equal((await api(route,{method:'POST',body:{items:[items[0],items[0]]}})).status,400);
+ assert.equal((await api(route,{method:'POST',body:{items:[items[0],{...items[1],revision:99}]}})).status,409);
+ assert.equal((await api(route,{method:'POST',body:{items:[items[0],{...items[1],id:randomUUID()}]}})).status,404);
+ assert.ok((await plans.list(alice.id,brand.id,{...range,plan_id:slots[0].plan_id})).slots.every(s=>s.state==='draft_ready'&&s.revision===1));
+ const ok=await api(route,{user:editor,method:'POST',body:{items}});assert.equal(ok.status,201,JSON.stringify(ok.body));
+ assert.ok(ok.body.slots.every(s=>s.state==='pending_review'&&s.approved_by===null));
+ assert.equal((await api(route,{user:editor,method:'POST',body:{items}})).status,409);
+ for(const s of slots)assert.deepEqual((await plans.history(alice.id,brand.id,s.id)).events.map(e=>e.action),['created','pending_review']);
 });
 test('bulk approval requires confirmation and is atomic when any selected revision is stale',async()=>{
  let slots=await create([slot(),slot('instagram')]);slots=await Promise.all(slots.map(s=>plans.review(alice.id,brand.id,s.id,reviewBody(s,'pending_review'))));

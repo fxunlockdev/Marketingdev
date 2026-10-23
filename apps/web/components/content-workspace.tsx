@@ -234,8 +234,8 @@ export function ContentWorkspace({
     setBusy(true);
     setError(undefined);
     try {
-      await api(`${root}/reviews/bulk-approve`, {
-        confirmed,
+      await api(`${root}/reviews/${inbox ? "bulk-approve" : "bulk-submit"}`, {
+        ...(inbox ? {confirmed} : {}),
         items: selection.map((s) => ({
           id: s.id,
           revision: s.revision,
@@ -246,7 +246,7 @@ export function ContentWorkspace({
         })),
       });
       setMessage(
-        `${selection.length} ${selection.length === 1 ? "post" : "posts"} approved. Nothing has been scheduled or published.`,
+        `${selection.length} ${selection.length === 1 ? "post" : "posts"} ${inbox ? "approved" : "sent for review"}. Nothing has been scheduled or published.`,
       );
       setSelection([]);
       setConfirmed(false);
@@ -473,6 +473,7 @@ export function ContentWorkspace({
             )}
           </Field>
           <button onClick={() => setReload((n) => n + 1)}>Refresh posts</button>
+          {!inbox && canWrite && view !== 'list' && <button onClick={() => filter(() => setView('list'))}>Select drafts for review</button>}
         </div>
         <div className="plan-actions" aria-label="Calendar navigation">
           <button
@@ -586,14 +587,13 @@ export function ContentWorkspace({
                 <ul className="plan-post-list">
                   {data.slots.map((s: any) => (
                     <li key={s.id}>
-                      {inbox &&
-                        canReview &&
-                        s.state === "pending_review" &&
+                      {(inbox ? canReview && s.state === "pending_review" : canWrite && ['draft_ready','changes_requested'].includes(s.state)) &&
                         !s.has_newer_version && (
                           <label className="plan-select">
                             <input
                               type="checkbox"
                               checked={selection.some((x) => x.id === s.id)}
+                              disabled={busy || (selection.length >= 30 && !selection.some((x) => x.id === s.id))}
                               onChange={(e) => {
                                 setSelection((old) =>
                                   e.target.checked
@@ -633,12 +633,11 @@ export function ContentWorkspace({
       </section>
       {selection.length > 0 && (
         <section className="v5-panel">
-          <h2>Approve {selection.length} selected posts</h2>
+          <h2>{inbox ? "Approve" : "Send for review:"} {selection.length} selected posts</h2>
           <p>
-            Approval applies to the selected saved versions. Any changed post
-            will stop the entire approval.
+            Select up to 30 posts. {inbox ? "Approval applies to the selected saved versions." : "Send these saved drafts to your Review Inbox. This does not approve or publish them."} Any changed post will stop the entire batch.
           </p>
-          <label>
+          {inbox && <label>
             <input
               type="checkbox"
               checked={confirmed}
@@ -646,14 +645,14 @@ export function ContentWorkspace({
             />
             I have reviewed these {selection.length} posts and approve their
             saved versions.
-          </label>
+          </label>}
           <div className="plan-actions">
             <button
               className="primary"
-              disabled={!confirmed || busy || selection.length > 30}
+              disabled={(inbox && !confirmed) || busy || selection.length > 30}
               onClick={() => void bulk()}
             >
-              Confirm bulk approval
+              {inbox ? "Confirm bulk approval" : "Send selected drafts for review"}
             </button>
             <button
               onClick={() => {
