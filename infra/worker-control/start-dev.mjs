@@ -1,8 +1,9 @@
+import {devSocialSettings} from './social-settings.mjs';
 import {providerRuntimeSettings} from './provider-settings.mjs';
 import {workerHostSpec} from '../../scripts/start-worker-host.mjs';
 import {workerReadiness,readinessProbe} from './readiness.mjs';
 import {execFileSync} from 'node:child_process';
-import {readFileSync,writeFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 const quote=s=>"'"+s.replaceAll("'","'\\''")+"'";
@@ -18,6 +19,16 @@ export function loadDevWorker(){
  const values={APP_MODE:'staging',WORKER_DATABASE_URL:url('desvio_worker','WORKER_DATABASE_PASSWORD'),DISPATCHER_DATABASE_URL:url('desvio_dispatcher','DISPATCHER_DATABASE_PASSWORD'),TEMPORAL_ADDRESS:'desvio-dev-temporal.railway.internal:7233',TEMPORAL_NAMESPACE:'desvio-dev',TEMPORAL_TASK_QUEUE:'desvio-assets',POSTIZ_PROVISION_TASK_QUEUE:'desvio-provision',S3_ENDPOINT:s3.endpoint,S3_REGION:s3.region,S3_BUCKET:s3.bucketName,S3_ACCESS_KEY_ID:s3.accessKeyId,S3_SECRET_ACCESS_KEY:s3.secretAccessKey,CLAMD_HOST:'desvio-dev-scanner.railway.internal',CLAMD_PORT:'3310',DOCUMENT_PARSER_IMAGE:image('documents'),SKILL_RUNTIME_IMAGE:image('skills'),RENDER_RUNTIME_IMAGE:image('static_renderer'),VIDEO_RUNTIME_IMAGE:image('video_renderer'),DESVIO_WORKER_IMAGE:image('trusted_worker'),VIDEO_ENABLED:'false',POSTIZ_ENABLED:'false',POSTIZ_PUBLISHING_ENABLED:'false'};
  const providers=providerRuntimeSettings(JSON.parse(call(['variables','--project',state.project_id,'--environment',state.environment_id,'--service','0d25c782-f1bf-4480-b136-b04e231e8279','--json'])));
  Object.assign(values,providers);
+ const socialPath='work/postiz-dev-infrastructure-secrets.json';
+ if(existsSync(socialPath)){
+  const social=JSON.parse(readFileSync(socialPath));
+  if(social.social_enabled===true){
+   const api=JSON.parse(call(['variables','--project',state.project_id,'--environment',state.environment_id,'--service','21260f12-2ad2-413c-9f67-2a1c4d6f8c83','--json']));
+   const settings=devSocialSettings(social,api.OAUTH_ENCRYPTION_KEY);
+   for(const probe of ['check-postiz.mjs','check-provisioner.mjs'])execFileSync('node',['infra/worker-control/'+probe],{encoding:'utf8',timeout:80000,stdio:['ignore','pipe','pipe']});
+   Object.assign(values,settings);
+  }
+ }
  return {state,values,spec:workerHostSpec(values),adminURL:db.DATABASE_URL};
 }
 export function inspectDevWorker({state,spec}){

@@ -18,6 +18,8 @@ apps/web/*
 !apps/web/components/**
 !apps/web/public/
 !apps/web/public/**
+!apps/web/lib/
+!apps/web/lib/**
 !apps/web/next.config.mjs
 !apps/web/next-env.d.ts
 !apps/web/proxy.ts

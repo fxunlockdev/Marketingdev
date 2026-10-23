@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-10-23T16:03:07.666Z",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "checks": [
+    {
+      "path": "/health",
+      "status": 200
+    },
+    {
+      "path": "/",
+      "status": 404
+    },
+    {
+      "path": "/api/",
+      "status": 200
+    },
+    {
+      "path": "/api/public/v1/me",
+      "status": 401
+    },
+    {
+      "path": "/uploads/2026/10/23/forbidden.html",
+      "status": 404
+    }
+  ],
+  "scope": "Actual private Postiz backend/orchestrator health, no exposed frontend, unauthenticated API denial and unsafe-media-path rejection. No enterprise/OAuth/publication acceptance."
+}

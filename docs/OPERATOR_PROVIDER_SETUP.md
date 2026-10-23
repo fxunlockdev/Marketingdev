@@ -52,3 +52,7 @@ The installed Railway CLI 5.5.0 returns the exact redeployment ID in JSON, verif
 ## Dedicated dev provisioning worker
 
 After dedicated Postiz dev infrastructure is configured, `node infra/worker-control/start-dev-provisioner.mjs` creates/starts the isolated provisioner from the exact trusted image. It refuses mismatched existing containers and does not enable customer provisioning, publishing, or model spending. Run `node infra/worker-control/check-provisioner.mjs` to verify both queue pollers and the restricted database role. These commands never expose the signing secret to the customer API or model worker. A registered poller is not proof of real Postiz enterprise or OAuth acceptance.
+
+## Verified dev social infrastructure (2026-10-24)
+
+Postiz, its isolated provisioner and Desvio social/provisioning flags are deployed and checked. The worker loader requires actual private Postiz/provisioner health and matching API/worker OAuth encryption keys before activation. Private state selects social settings explicitly; enterprise signing/database secrets are not forwarded to the normal worker. Publishing remains disabled. Two synthetic enterprise identities, adapter cross-binding denial, and actual uploaded PNG delivery through the web route passed. OAuth and actual posting remain unverified. Adding provider keys still requires coordinated worker activation and explicit per-business grants described above; self-service operator setup remains unfinished.
