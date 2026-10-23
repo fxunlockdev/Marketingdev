@@ -1,0 +1,51 @@
+{
+  "checked_at": "2026-10-23T08:26:12.917Z",
+  "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+  "passed": true,
+  "image": "sha256:0eef648f8282201133fcd899748b3cf0a29ab73b082e62b611f76eaae3921bfb",
+  "coverage": {
+    "pages": [
+      "https://example.com/"
+    ],
+    "skipped": [],
+    "coverage": "server_html_only",
+    "pageLimit": 5,
+    "requests": 2
+  },
+  "pages": [
+    {
+      "url": "https://example.com/",
+      "parser_version": "crawl4ai-0.9.5/desvio-v1",
+      "chunk_count": 1,
+      "visual_version": "crawl4ai-0.9.5/chromium-1248/desvio-visual-v2",
+      "requests": 1,
+      "failures": [],
+      "snapshots": [
+        {
+          "viewport": {
+            "width": 1440,
+            "height": 1000
+          },
+          "height": 1000,
+          "truncated": false,
+          "sha256": "6bbee9c6f5fd776673f6f577c7a8019a259b54a26a9170623a12a3a3610f06f7",
+          "encoded_bytes": 77732,
+          "text_present": true
+        },
+        {
+          "viewport": {
+            "width": 390,
+            "height": 844
+          },
+          "height": 876,
+          "truncated": false,
+          "sha256": "bfc0ee06d53bc5fbed4441618098ed36f88ac77b5c24398bb861b08a7e3bc419",
+          "encoded_bytes": 64096,
+          "text_present": true
+        }
+      ]
+    }
+  ],
+  "scope": "Actual private dev worker public website fetch, Crawl4AI extraction and isolated desktop/mobile Chromium rendering. Single simple public page; not brand-quality, durable job, authenticated customer or paid-model acceptance.",
+  "live_model_or_social_calls": false
+}

@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Dev schema and hosted crawl acceptance
+
+Dedicated Railway dev deployment `b0d325c0-a618-4654-adfe-c262c360cdcc` applied migration 040 with checksum-verified replay and verified all six existing runtime-role logins. Runtime passwords were reused, not rotated. Completion output is recorded in `railway-dev-migration040.json`; the one-shot deployment is REMOVED and its administrator reference plus runtime password variables were deleted. Worker/dispatcher logins and both Temporal pollers still pass after migration.
+
+`infra/worker-control/check-crawl.mjs` now verifies the actual hosted worker fetching a robots-permitted public page, extracting with Crawl4AI and rendering desktop/mobile Chromium screenshots through the credential-free document container. Both screenshots pass the production adapter’s dimensions/hash checks; the final probe has no failed resources or truncation. See `railway-worker-crawl.json`. The initial assertion wrongly required the HTML title in body text; the observed page keeps them separate, so the corrected check validates title and actual body content separately. This is a single simple public page, not broad visual-quality, durable job or paid-model acceptance.
+
+Offline five and contracts 83 pass at source `d364b2e1e4038fc9f2ff0182aba7b819132b6adcaf180951325288d1a1068a21`. API/web deployment still requires real SMTP; CORS transport discrepancy and authenticated browser/job/recovery acceptance remain open. Next: real cloud durable-job acceptance and remaining product capabilities. No paid model or social calls ran.
+
 ## Memory source provenance — locally verified
 
 Approved facts now expose their original saved excerpt through the existing tenant-scoped source API, checking the source fingerprint and exact cited chunk before displaying it. Team corrections remain distinct from original evidence. Visual interpretations show their saved observation and reference count without implying image reuse rights. A source browser links back to the existing onboarding/review flow; business switches remount Memory to avoid carrying an earlier business’s state. No model call or new authorization path was introduced.
