@@ -1,4 +1,5 @@
 "use client";
+import {MemoryEvidence,MemorySources} from './memory-evidence';
 import {PerformanceLessons} from './performance-lessons';
 import {Profile} from "./profile";
 import {BusinessTeam} from "./business-team";
@@ -288,7 +289,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           ) : section === "team" ? (
             <BusinessTeam key={business.id} business={business}/>
           ) : section === "memory" ? (
-            <Memory business={business} />
+            <Memory key={business.id} business={business} />
           ) : (
             <Unavailable section={section} business={business} title={label!} />
           )}
@@ -1395,7 +1396,7 @@ function Memory({ business }: { business: Business }) {
                 {brain.active.snapshot.facts.map((f: any) => (
                   <div key={f.id}>
                     <dt>{f.field.replaceAll("_", " ")}</dt>
-                    <dd>{f.value}</dd>
+                    <dd><span>{f.value}</span><MemoryEvidence fact={f} path={scopePath(business)}/></dd>
                   </div>
                 ))}
               </dl>
@@ -1416,6 +1417,7 @@ function Memory({ business }: { business: Business }) {
       ) : (
         !error && <Loading />
       )}
+      {brain&&<MemorySources sources={brain.sources} businessId={business.id}/>}
       <PerformanceLessons key={business.id} businessId={business.id}/>
     </>
   );

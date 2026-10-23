@@ -1,5 +1,11 @@
 # Desvio build state
 
+## Memory source provenance — locally verified
+
+Approved facts now expose their original saved excerpt through the existing tenant-scoped source API, checking the source fingerprint and exact cited chunk before displaying it. Team corrections remain distinct from original evidence. Visual interpretations show their saved observation and reference count without implying image reuse rights. A source browser links back to the existing onboarding/review flow; business switches remount Memory to avoid carrying an earlier business’s state. No model call or new authorization path was introduced.
+
+All 12 connected customer browser journeys pass at unchanged source `45cb9cdc0af84dd31241e4741e3314b506b4fa41881e235dc46c2ace255c2c0e`; source retry, saved excerpts, visual provenance, source listing and accessibility are covered. Mobile screenshot inspected. Offline five and contracts 83 pass at the same source. Initial fixture variable collision and exact-text markup regression were corrected before final acceptance. See `docs/evidence/memory.json`. Controlled experiment outcomes, broader creative preferences and deployed/live acceptance remain open.
+
 ## Overview saved results and recommendations — locally verified
 
 Overview now shows the latest saved metric values for six recent confirmed published posts, measurement dates and check timestamps. Failed/missing/unavailable observations do not become zero engagement. Values are not summed or ranked across incompatible provider windows. It also shows up to three proposed/testing performance hypotheses, their evidence counts/limitations and links to Memory, plus actual generation request/completion/uncertainty counts over 30 days. Retired lessons are excluded; request counts are not presented as billed credits.

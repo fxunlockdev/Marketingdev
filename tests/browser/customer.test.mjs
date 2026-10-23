@@ -800,6 +800,14 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   await expect(alice.getByText('Use spacious layouts with calm typography.',{exact:true})).toBeVisible();
   draft=await (await alice.request.get(brainURL)).json();
   assert.equal(draft.active.snapshot.facts.find(f=>f.field==='visual_direction_composition').value,'Use spacious layouts with calm typography.');
+  const approvedFact=draft.active.snapshot.facts.find(f=>f.field==='offering'),sourceRoute=`**/brain/sources/${approvedFact.source_id}`;
+  await alice.route(sourceRoute,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Source temporarily unavailable'})}),{times:1});
+  await alice.getByText('Evidence for offering',{exact:true}).click();await expect(alice.getByRole('button',{name:'Retry source evidence',exact:true})).toBeVisible();
+  await alice.getByRole('button',{name:'Retry source evidence',exact:true}).click();await expect(alice.locator('blockquote').filter({hasText:'offering: '+approvedFact.value})).toBeVisible();
+  await alice.getByText('Evidence for visual direction composition',{exact:true}).click();await expect(alice.getByText(/Approved visual interpretation with/)).toBeVisible();
+  const savedSources=alice.getByRole('region',{name:'Saved brand sources',exact:true});await savedSources.getByText(/Browse saved sources/).click();await expect(savedSources.getByRole('listitem')).toHaveCount(draft.sources.length);
+  assert.deepEqual((await new AxeBuilder({page:alice}).analyze()).violations,[]);
+
   await alice.screenshot({
     path: "work/browser/v5-ai-prefill.png",
     fullPage: true,
