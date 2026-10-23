@@ -33,6 +33,7 @@ try{
  assert.equal((await assets.complete(input.owner,org.id,brand.id,reserved.id)).id,job.id);
  await assert.rejects(assets.job(input.foreign,org.id,brand.id,job.id),e=>e.getStatus?.()===404);
  stage='worker';
+ if(input.recovery){await delay(5000);const queued=await assets.job(input.owner,org.id,brand.id,job.id);assert.equal(queued.status,'queued');assert.equal(queued.attempt,0);assert.equal((await admin.query('SELECT dispatched_at FROM app.job_dispatch WHERE job_id=$1',[job.id])).rows[0].dispatched_at,null);}
  let result;for(let n=0;n<60;n++){result=await assets.job(input.owner,org.id,brand.id,job.id);if(!['queued','running','retrying'].includes(result.status))break;await delay(2000);}
  assert.equal(result.status,'succeeded',result.error_code??result.status);
  stage='download';
@@ -40,6 +41,6 @@ try{
  await assert.rejects(assets.download(input.foreign,org.id,brand.id,reserved.id),e=>e.getStatus?.()===404);
  const visual=(await admin.query('SELECT object_key,sha256 FROM app.uploaded_visuals WHERE asset_id=$1',[reserved.id])).rows[0];assert.ok(visual);assert.equal(digest(await store.read(visual.object_key)),visual.sha256);
  const dispatch=(await admin.query('SELECT dispatched_at FROM app.job_dispatch WHERE job_id=$1',[job.id])).rows;assert.equal(dispatch.length,1);assert.ok(dispatch[0].dispatched_at);
- console.log(JSON.stringify({passed:true,run_id:input.run_id,owner:input.owner,foreign:input.foreign,organization_id:org.id,brand_id:brand.id,asset_id:reserved.id,job_id:job.id,job_status:result.status,attempts:result.attempt,reservation_replay:true,submission_replay:true,anonymous_denied:true,foreign_service_denied:true,canonical_readback:true,normalized_visual_readback:true,fixture_cleanup_pending:true}));
+ console.log(JSON.stringify({passed:true,run_id:input.run_id,owner:input.owner,foreign:input.foreign,organization_id:org.id,brand_id:brand.id,asset_id:reserved.id,job_id:job.id,job_status:result.status,attempts:result.attempt,...(input.recovery?{queued_during_outage:true,recovered_after_restart:true}:{}),reservation_replay:true,submission_replay:true,anonymous_denied:true,foreign_service_denied:true,canonical_readback:true,normalized_visual_readback:true,fixture_cleanup_pending:true}));
 }catch(e){console.log(JSON.stringify({passed:false,stage,run_id:input.run_id,organization_id:org?.id,brand_id:brand?.id,job_id:job?.id,error_code:/^[A-Z_]+$/.test(e.code??'')?e.code:'ACCEPTANCE_ASSERTION_OR_SERVICE_FAILURE',fixture_cleanup_pending:true}));process.exitCode=1;}
 finally{store.close();await Promise.all([admin.end(),pool.end()]);}

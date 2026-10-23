@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Hosted queued-job restart recovery — verified
+
+The dev worker was confirmed idle, stopped, and restored automatically. A synthetic upload remained queued with zero attempts and an undispatched outbox record during the outage, then completed in one attempt after the same worker container restarted. Signed upload, canonical/normalized readback, replay and foreign/anonymous denial checks also passed. Running-container state, both Temporal pollers and worker/dispatcher logins were verified afterward. This proves queued-job recovery across a worker restart, not replacement of the entire host or a crash during a paid provider request.
+
+`railway-worker-recovery.json` records the result. The workflow reached COMPLETED and its three objects and exact database fixtures were removed (`railway-worker-recovery-cleanup.json`). Normal Temporal history is retained. The runner uses separate recovery state/evidence files, refuses to overwrite unresolved runs, and restores the worker in both its timer and finalizer. Offline five and contracts 83 pass at source `d4cca068102a37f9a3f6cb3b909899e78820457f27c9c654fc3992132444dedf`.
+
+Next product work: Profile’s supported MFA flow and remaining account controls. API/web deployment remains dependent on real SMTP; live models/socials require their separately authorized credentials and allowances. No paid provider/social calls ran.
+
 ## Real hosted private-upload job — verified component flow
 
 The actual dev application service methods reserved and uploaded a synthetic PNG to private Railway storage. The running dispatcher and Temporal worker processed `asset.validate` successfully in one attempt, using real scanning and canonical storage. Reservation/submission replay stayed idempotent; unsigned object access and foreign-user service reads/downloads were denied. Canonical PNG and normalized preview checksum readback passed. This uses administrative test identities rather than browser authentication; it does not establish sign-in/email, full customer flow, worker restart recovery or live model/social readiness.

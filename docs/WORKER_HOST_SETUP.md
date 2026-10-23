@@ -19,3 +19,15 @@ The operator-only `infra/worker-control/` scripts target the existing Desvio dev
 `verify-host.mjs` checks imported IDs/architecture/users plus real clean-file acceptance, standard antivirus test rejection and fresh scanner signatures. `start-dev.mjs` reads the ignored mode-600 local role-password recovery file and Railway bucket credentials into memory, passes values through stdin and starts the guarded worker controller. No model keys or live provider grants are enabled. Never checkpoint this host after worker configuration: Docker container metadata contains runtime credentials. `check-registration.mjs` checks the two role logins and actual workflow/activity pollers; it does not imply successful customer jobs or recovery.
 
 Actual host/image/scanner/start/registration evidence is recorded separately under `docs/evidence/railway-worker-*.json`. Full deployed tenant/job/browser acceptance remains required.
+
+## Hosted component acceptance
+
+`check-crawl.mjs` exercises actual robots-aware public fetching plus isolated desktop/mobile extraction/rendering on one simple page. It does not measure broad brand-analysis quality.
+
+`check-job.mjs` creates explicitly labelled administrative fixture identities in dedicated dev, then calls real application service methods with the application database role to reserve a private PNG and submit its validation job. The real running dispatcher/Temporal worker scans and persists it. The script checks replay, unsigned/foreign denial and canonical/normalized checksums. It does not bypass verification for real users or claim browser/email acceptance.
+
+`check-job.mjs --recovery` additionally verifies an idle worker, stops it, verifies the new job stays queued and undispatched for five seconds, and automatically starts the same container after 25 seconds or on finalization. Successful output includes the restored running state. It intentionally interrupts this dedicated dev worker; never generalize it to production or a shared host. It does not simulate host loss or a crash during a paid provider request.
+
+After a successful run, use `check-job.mjs --cleanup` (or `--recovery --cleanup`) to require a completed workflow, verify exact fixture ownership, remove only its three objects and fixed scoped database rows, and retain normal Temporal history. Mode-600 manifests in ignored `work/` preserve IDs and prevent accidental repeated runs. Reconcile uncertain outcomes against the named container and manifest before any rerun. Administrator credentials enter only the separate temporary acceptance container through stdin, never the persistent worker, arguments, reports or logs.
+
+Reports are `railway-worker-job.json`, `railway-worker-recovery.json` and their cleanup reports. Registration-only reports do not supersede these broader checks. Full authenticated customer, host replacement and authorized provider acceptance remain outstanding.

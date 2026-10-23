@@ -1,5 +1,13 @@
 # Desvio module tracker
 
+## Hosted queued-job restart recovery — verified
+
+The dev worker was confirmed idle, stopped, and restored automatically. A synthetic upload remained queued with zero attempts and an undispatched outbox record during the outage, then completed in one attempt after the same worker container restarted. Signed upload, canonical/normalized readback, replay and foreign/anonymous denial checks also passed. Running-container state, both Temporal pollers and worker/dispatcher logins were verified afterward. This proves queued-job recovery across a worker restart, not replacement of the entire host or a crash during a paid provider request.
+
+`railway-worker-recovery.json` records the result. The workflow reached COMPLETED and its three objects and exact database fixtures were removed (`railway-worker-recovery-cleanup.json`). Normal Temporal history is retained. The runner uses separate recovery state/evidence files, refuses to overwrite unresolved runs, and restores the worker in both its timer and finalizer. Offline five and contracts 83 pass at source `d4cca068102a37f9a3f6cb3b909899e78820457f27c9c654fc3992132444dedf`.
+
+Next product work: Profile’s supported MFA flow and remaining account controls. API/web deployment remains dependent on real SMTP; live models/socials require their separately authorized credentials and allowances. No paid provider/social calls ran.
+
 ## Real hosted private-upload job — verified component flow
 
 The actual dev application service methods reserved and uploaded a synthetic PNG to private Railway storage. The running dispatcher and Temporal worker processed `asset.validate` successfully in one attempt, using real scanning and canonical storage. Reservation/submission replay stayed idempotent; unsigned object access and foreign-user service reads/downloads were denied. Canonical PNG and normalized preview checksum readback passed. This uses administrative test identities rather than browser authentication; it does not establish sign-in/email, full customer flow, worker restart recovery or live model/social readiness.
@@ -165,7 +173,7 @@ Historical checkpoints below are superseded by the current checkpoint above: b1d
 |---|---|
 | Better Auth / Postgres / business isolation | Real local sessions, recovery, forced RLS and concurrent quota tests. Railway dev roles and migrations through 040 verified; deployed application acceptance pending. |
 | Private S3 media / malware validation | Real local signed storage, validation, access denial and replay tests. Production bucket/IAM/CORS/retention not ready. |
-| Temporal / workers | Real local dispatch, retry/cancel and worker recovery; creative paid calls reserve once and hold uncertain results. Private cloud worker, pollers and actual durable private-upload validation/readback verified; hosted restart recovery and customer acceptance pending. |
+| Temporal / workers | Real local dispatch, retry/cancel and worker recovery; creative paid calls reserve once and hold uncertain results. Private cloud worker, pollers and actual durable private-upload validation/readback verified; Queued-job restart recovery also passes; host replacement, mid-flight recovery and authenticated customer acceptance remain pending. |
 | Crawl4AI / Docling | Real bounded local executables. Rich website screenshots/design sources captured; documents now include native text, textless-page English OCR and stored page visuals with MOCK-tested model interpretation. Actual hosted isolated website extraction/render smoke passes; durable job and broader quality coverage remain open. |
 | Deep Agents + 52 original skills | Audited original archive; allowlisted skills actually execute inside isolated per-job containers for image/video/content planning. No customer-facing agent UI or unrestricted skill helpers. Local x86_64 runtime tests and actual cloud image identity checks pass; deployed skill execution and live provider acceptance remain pending. |
 | OpenAI | Official brand/vision, 30-day planning and image create/edit adapters and MOCK contracts; no LIVE_VERIFIED results. Server keys, selected eligible models, funded cap and explicit test authorization needed before paid validation. |
