@@ -1,5 +1,9 @@
 # Desvio build state
 
+## Scheduled removal transport — 2026-10-24
+
+Added the source-audited Postiz removal request transport with exact queued-target/tenant/channel/caption/schedule checks. It explicitly returns an unconfirmed publishing-stop outcome because upstream soft deletion swallows Temporal termination errors. Fifteen mocked HTTP Postiz contracts pass; no actual DELETE, cancellation UI, durable cancellation workflow or live claim. Next implementation step is durable cancellation-request/reconciliation state with permission, unknown-outcome and publish-race handling before any customer button. Existing local pre-submission cancellation remains unchanged.
+
 ## OAuth readiness separation — 2026-10-24
 
 The API previously treated the presence of an internal OAuth encryption key as readiness to authorize a real LinkedIn account. Added explicit `POSTIZ_OAUTH_ENABLED` (default false), validated against enabled Postiz and a valid encryption key. Both customer availability and OAuth initiation now stay unavailable until explicit app readiness; provisioning remains independently implemented. Coordinated activation preserves the explicit flag and disables/restores it with other features during worker replacement. No new credentials or grants were enabled. Ten configuration/activation tests and 27 real local social database/queue tests passed with MOCK remote OAuth, including a verified binding with encryption configured but OAuth disabled: the endpoint returns 409 and creates no authorization job. API deployment `1722fc14-4ad5-466d-bc64-80dade8a0ae2` is confirmed SUCCESS. OAuth remains disabled by default; the existing private worker/provisioner remain deployed.

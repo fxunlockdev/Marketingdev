@@ -45,3 +45,5 @@ Private Postiz application deployment is SUCCESS; backend/orchestrator health an
 - `railway-provisioning-job.json`: actual scoped business submission → durable outbox/Temporal → isolated provisioner → real Postiz identity → encrypted binding passed, including replay and foreign-scope denial. This is service-level deployed acceptance, not a browser OAuth/publication claim.
 
 - OAuth readiness is now separate from encryption/provisioning: the customer flow remains unavailable until explicit social app activation. Ten configuration tests and 27 local database/queue tests passed, including rejection without creating a job when OAuth is disabled. Remote OAuth remains unverified.
+
+- Scheduled-removal transport is implemented and passes MOCK contracts. It reports only an unconfirmed removal request. Durable remote cancellation, UI controls, race handling and actual social acceptance remain incomplete.

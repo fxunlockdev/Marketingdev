@@ -108,3 +108,22 @@ test('ordered carousel submits exactly one native LinkedIn multi-image post',asy
  await assert.rejects(client().submitLinkedIn(input),e=>e.outcome==='unknown');assert.equal(requests.filter(r=>r.method==='POST').length,1);
  requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).submitLinkedIn(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.filter(r=>r.method==='POST').length,0);
 });
+
+test('scheduled removal validates exact queued target and returns unconfirmed stopping, never canceled',async()=>{
+ const scheduledAt=new Date(Date.now()+86400000).toISOString(),input={postId:'post-a',integrationId:'channel-a',scheduledAt,caption:'Approved caption'};
+ const post={id:input.postId,content:input.caption,publishDate:scheduledAt,state:'QUEUE',releaseId:null,releaseURL:null,integration:{id:'channel-a',providerIdentifier:'linkedin'}};
+ requests=[];handler=(req,res)=>req.method==='DELETE'?json(res,{id:'post-a'}):json(res,{posts:[post]});
+ assert.deepEqual(await client().requestScheduledPostRemoval(input),{postId:'post-a',status:'removal_requested',publishingStopped:false});assert.equal(requests.filter(r=>r.method==='DELETE').length,1);assert.equal(requests.at(-1).path,'/api/public/v1/posts/post-a');
+ for(const patch of [{state:'PUBLISHED',releaseId:'live'},{integration:{id:'foreign',providerIdentifier:'linkedin'}},{content:'Changed caption'},{releaseURL:'https://linkedin.com/live'}]){
+  requests=[];handler=(req,res)=>json(res,{posts:[{...post,...patch}]});await assert.rejects(client().requestScheduledPostRemoval(input),e=>e.code==='POSTIZ_REMOVAL_TARGET_UNCONFIRMED');assert.equal(requests.filter(r=>r.method==='DELETE').length,0);
+ }
+ requests=[];await assert.rejects(client().requestScheduledPostRemoval({...input,scheduledAt:new Date().toISOString()}),e=>e.code==='POSTIZ_REMOVAL_INPUT_INVALID');assert.equal(requests.length,0);
+});
+test('ambiguous removal is never retried and a mismatched acknowledgment stays unknown',async()=>{
+ const scheduledAt=new Date(Date.now()+86400000).toISOString(),input={postId:'post-a',integrationId:'channel-a',scheduledAt,caption:'Approved'};
+ for(const mode of ['network','500','wrong-id','error']){
+  requests=[];handler=(req,res)=>{if(req.method!=='DELETE')return json(res,{posts:[{id:'post-a',content:'Approved',publishDate:scheduledAt,state:'QUEUE',releaseId:null,releaseURL:null,integration:{id:'channel-a',providerIdentifier:'linkedin'}}]});if(mode==='network')return req.socket.destroy();if(mode==='500')return json(res,{secret:keyA},500);json(res,mode==='error'?{error:true}:{id:'foreign'});};
+  await assert.rejects(client().requestScheduledPostRemoval(input),e=>e.outcome==='unknown'&&!e.message.includes(keyA));assert.equal(requests.filter(r=>r.method==='DELETE').length,1);
+ }
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).requestScheduledPostRemoval(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.filter(r=>r.method==='DELETE').length,0);
+});

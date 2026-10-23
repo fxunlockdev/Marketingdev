@@ -95,6 +95,19 @@ export class PostizClient {
   const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
   return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
  }
+ // Upstream soft-deletes the post group and swallows Temporal termination errors.
+ // An accepted response cannot prove publishing stopped or remove a live social post.
+ async requestScheduledPostRemoval(input:{postId:string;integrationId:string;scheduledAt:string;caption:string}){
+  let id:string,channel:string,date:string;
+  try{id=remoteId(input.postId);channel=remoteId(input.integrationId);date=iso(input.scheduledAt);if(typeof input.caption!=='string'||input.caption.length>3000||Date.parse(date)<Date.now()+60000)throw new Error();}catch{throw new PostizError('POSTIZ_REMOVAL_INPUT_INVALID');}
+  const at=Date.parse(date),posts=await this.listPosts(new Date(at-60000).toISOString(),new Date(at+60000).toISOString());
+  const matches=posts.filter(p=>p.id===id);
+  if(matches.length!==1||matches[0].integrationId!==channel||matches[0].provider!=='linkedin'||matches[0].state!=='queued'||matches[0].releaseId!==null||matches[0].releaseURL!==null||matches[0].publishDate!==date||matches[0].content!==input.caption)throw new PostizError('POSTIZ_REMOVAL_TARGET_UNCONFIRMED');
+  if(Date.parse(date)<Date.now()+60000)throw new PostizError('POSTIZ_REMOVAL_TOO_CLOSE');
+  await this.verify();
+  const value=await this.request('public/v1/posts/'+encodeURIComponent(id),'DELETE');
+  return this.checked(value,v=>{const r=record(v);if(r.error!==undefined||remoteId(r.id)!==id)return fail();return {postId:id,status:'removal_requested' as const,publishingStopped:false as const};},true);
+ }
  async postAnalytics(postId:string,days=30){
   remoteId(postId);if(!Number.isInteger(days)||days<1||days>90)throw new PostizError('POSTIZ_DATE_RANGE_INVALID');
   await this.verify();return postMetrics(await this.request(`public/v1/analytics/post/${encodeURIComponent(postId)}?date=${days}`));
