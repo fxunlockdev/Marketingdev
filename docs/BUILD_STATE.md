@@ -1,5 +1,11 @@
 # Desvio build state
 
+## Dev Postiz dependencies — deployed and privately verified
+
+Dedicated dev-only services are now separate from production Postiz data. Database `81f8ec79-d5e2-4938-b50e-da1f500413ec` (`desvio-dev-postiz-db`), volume `8576533e-a39c-4ce6-b056-0c5486e34ea4`, deployment `a2a9dd4c-76ec-42ac-a389-8df9099bba69` SUCCESS, pinned PostgreSQL image `postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73`. Redis `cadf4da1-bc0b-4436-bcc4-bfad480daff4` (`desvio-dev-postiz-redis`), volume `af2aa990-2e8d-4554-917e-8e7d5c9c26fd`, deployment `008c829f-6e79-4cf1-aee9-9e15520bceca` SUCCESS, pinned amd64 Redis 7.2 image `redis@sha256:7cd025cf5b832cc4780477f5bb22df4c90fc6c0e0aab775593c5147b7aed3fc1`. Redis has append-only persistence and a generated password. Neither has a public domain/proxy.
+
+Actual private-network checks from the trusted worker host pass: PostgreSQL login/select, empty public schema, unauthenticated Redis denial and authenticated Redis acceptance (`docs/evidence/postiz-dev-dependencies.json`). No business, social, or model mutation. Secret values are kept only in Railway and ignored mode-0600 `work/postiz-dev-infrastructure-secrets.json`; never print or commit it. Runtime source/build and Postiz schema initialization remain pending; this is dependency readiness, not application acceptance.
+
 ## Exact-source Postiz dev build and approved-media delivery — in progress
 
 Railway read-back confirms API deployment `66d29c9e-a1a5-41eb-84b8-948834fdaf5a` SUCCESS. The screenshot's older failed deployment `b34f9064-9610-4e85-a278-42c69bbee7a4` stopped because `RESEND_API_KEY` was required; the explicit dev password-only configuration already resolves that failure. Production remains untouched.
@@ -10,9 +16,9 @@ The build now uses upstream's 4 GB heap setting, with a hard 3400 MB container m
 
 `infra/postiz/runtime/` adds a private API/media nginx gateway and supervised backend/orchestrator; the entrypoint initializes the upload volume then drops to node. No upstream application source or customer-facing Postiz frontend is included in the overlay. `scripts/postiz-build-context.mjs` records exact upstream archive and overlay hashes. Runtime execution and service health remain unverified pending the build.
 
-`apps/web/lib/published-media.mjs` and `app/uploads/[...path]/route.ts` implement the required bounded proxy for Postiz publication copies, disabled until its private upstream is configured. Canonical Desvio media remains private. Transport validates date/hash paths, origin, MIME, lengths, byte ranges, redirects and actual streamed byte count, without forwarding session headers. Five focused MOCK transport cases pass; all 89 contract cases and web TypeScript pass. This route is not deployed or proven against actual Postiz yet.
+`apps/web/lib/published-media.mjs` and `app/uploads/[...path]/route.ts` implement the required bounded proxy for Postiz publication copies, disabled until its private upstream is configured. Canonical Desvio media remains private. Transport validates date/hash paths, origin, MIME, lengths, byte ranges, redirects and actual streamed byte count, without forwarding session headers. Five focused MOCK transport cases pass; all 89 contract cases and web TypeScript pass. The full production Next build now passes and actual local HTTP GET/HEAD return uncached 404 before upstream configuration (`postiz-media-web.json`). This route is not deployed or proven against actual Postiz yet. `scripts/verify-postiz-image.mjs` prepares network-disabled native bcrypt/sharp/Prisma, exact source/overlay identity, compiled entrypoint and nginx checks; execution awaits the built image.
 
-Next: finish the bounded build and runtime checks; then dev-only Postiz database/Redis/Temporal namespace, private runtime/provisioner and genuine two-tenant API isolation. Connect/test the approved-media route before rollout. No dev Postiz deployment exists yet. Social OAuth/publication and paid model acceptance remain owner-deferred; no key request, provider call or spending grant.
+Next: finish the bounded build and runtime checks; then initialize the dedicated dev database and Temporal namespace, deploy private runtime/provisioner and genuine two-tenant API isolation. Connect/test the approved-media route before rollout. No dev Postiz deployment exists yet. Social OAuth/publication and paid model acceptance remain owner-deferred; no key request, provider call or spending grant.
 
 ## Coordinated activation and real API renderer-pin repair
 

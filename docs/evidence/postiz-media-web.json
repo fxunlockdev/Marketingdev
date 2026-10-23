@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-10-23T14:41:08.070Z",
+  "checks": [
+    {
+      "method": "GET",
+      "status": 404,
+      "cache_control": "no-store",
+      "nosniff": true
+    },
+    {
+      "method": "HEAD",
+      "status": 404,
+      "cache_control": "no-store",
+      "nosniff": true
+    }
+  ],
+  "scope": "Real production Next build and HTTP GET/HEAD confirm delivery is disabled before upstream configuration. Enabled upstream transport covered separately with mocks; no Postiz runtime or live publication claim."
+}
