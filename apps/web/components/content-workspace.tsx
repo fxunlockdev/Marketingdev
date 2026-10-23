@@ -102,6 +102,8 @@ export function ContentWorkspace({
     [selection, setSelection] = useState<any[]>([]),
     [confirmed, setConfirmed] = useState(false),
     [message, setMessage] = useState("");
+  const [moveDay, setMoveDay] = useState<string>();
+  const dragged = useRef<string | null>(null);
   const [postDirty, setPostDirty] = useState(false),
     trigger = useRef<HTMLElement | null>(null);
   const [generate, setGenerate] = useState(false),
@@ -192,7 +194,7 @@ export function ContentWorkspace({
     const timer = setInterval(() => setReload((n) => n + 1), 4000);
     return () => clearInterval(timer);
   }, [jobs]);
-  function selectPost(id: string) {
+  function selectPost(id: string, day?: string) {
     if (
       postDirty &&
       !window.confirm("Discard your unsaved post changes and feedback?")
@@ -200,6 +202,7 @@ export function ContentWorkspace({
       return;
     trigger.current = document.activeElement as HTMLElement;
     setPostDirty(false);
+    setMoveDay(day);
     setSelected(id);
   }
   function filter(change: () => void) {
@@ -490,6 +493,7 @@ export function ContentWorkspace({
           {!inbox&&<><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('csv')}>Export CSV</button><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('ics')}>Export calendar</button></>}
           {!inbox && canWrite && view !== 'list' && <button onClick={() => filter(() => setView('list'))}>Select drafts for review</button>}
         </div>
+        {!inbox&&canWrite&&view!=='list'&&<p>Drag a post to another day, then review and save the new date. You can also open any post and edit its planned date using the keyboard.</p>}
         <div className="plan-actions" aria-label="Calendar navigation">
           <button
             disabled={!first || first <= "2000-01-01"}
@@ -558,7 +562,11 @@ export function ContentWorkspace({
                   aria-label="Days in this view"
                 >
                   {calendarDays.map((day) => (
-                    <section key={day} role="listitem" className="plan-day">
+                    <section key={day} role="listitem" className="plan-day" data-calendar-day={day}
+                      onDragOver={e=>{if(canWrite&&dragged.current)e.preventDefault();}}
+                      onDrop={e=>{e.preventDefault();const id=dragged.current;dragged.current=null;
+                        if(canWrite&&id&&data.slots.some((s:any)=>s.id===id&&s.state!=='cancelled'))selectPost(id,day);
+                      }}>
                       <h2>
                         {new Intl.DateTimeFormat("en", {
                           timeZone: "UTC",
@@ -579,6 +587,9 @@ export function ContentWorkspace({
                           <button
                             key={s.id}
                             className="plan-card"
+                            draggable={canWrite&&s.state!=='cancelled'&&!busy}
+                            onDragStart={e=>{dragged.current=s.id;trigger.current=e.currentTarget;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',s.id);}}
+                            onDragEnd={()=>{dragged.current=null;}}
                             onClick={() => selectPost(s.id)}
                             aria-label={`Open ${name(s.channel)} post: ${s.hook || s.brief}`}
                           >
@@ -683,7 +694,8 @@ export function ContentWorkspace({
       )}
       {selected && (
         <SlotPanel
-          key={selected}
+          key={`${selected}:${moveDay??"open"}`}
+          moveTo={moveDay?{day:moveDay,timezone:prefs.timezone}:undefined}
           business={business}
           slotId={selected}
           onChanged={() => setReload((n) => n + 1)}
@@ -701,12 +713,14 @@ export function ContentWorkspace({
 function SlotPanel({
   business,
   slotId,
+  moveTo,
   onChanged,
   onClose,
   onDirty,
 }: {
   business: Business;
   slotId: string;
+  moveTo?: {day:string;timezone:string};
   onChanged: () => void;
   onClose: () => void;
   onDirty: (dirty: boolean) => void;
@@ -721,6 +735,7 @@ function SlotPanel({
     [message, setMessage] = useState(""),
     [ready, setReady] = useState(false),
     [chosen, setChosen] = useState("");
+  const pendingMove = useRef(moveTo);
   const dirtyRef = useRef(false),
     heading = useRef<HTMLHeadingElement>(null),
     key = useRef<{ body: string; key: string } | null>(null),
@@ -734,6 +749,14 @@ function SlotPanel({
         if (!alive.current) return;
         setData(d);
         if (replace || !dirtyRef.current) {
+          let planned = d.slot.planned_at;
+          const move = pendingMove.current;
+          if(move){
+            pendingMove.current=undefined;
+            const options=localCandidates(move.day+localMinute(planned,move.timezone).slice(10),move.timezone);
+            if(options.length===1){planned=options[0];setMessage('New date prepared. Review and save your changes to move this post. Social publishing is unchanged.');}
+            else setMessage('This date has a daylight-saving time change. Choose the planned date and time below.');
+          }
           setDraft({
             revision: d.slot.revision,
             brief: d.slot.brief,
@@ -741,9 +764,9 @@ function SlotPanel({
             hook: d.slot.hook,
             cta: d.slot.cta,
             video_draft: d.slot.video_draft,
-            local: localMinute(d.slot.planned_at, d.slot.timezone),
+            local: localMinute(planned, d.slot.timezone),
           });
-          setChosen(d.slot.planned_at);
+          setChosen(planned);
         }
       } catch (e) {
         if (alive.current) setError(e);

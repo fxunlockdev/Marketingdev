@@ -1,5 +1,12 @@
 # Desvio build state
 
+## Content Plan date dragging — locally verified
+
+Calendar cards can be dragged to another visible day by owners/admins/editors. The existing post editor opens with a proposed date and retains the original local posting time in the calendar's business timezone; nothing persists until explicit Save. Existing exact-revision checks, approved-post reset requirements and publishing guards remain authoritative. Keyboard users can open the same card and edit its planned date. Ambiguous/skipped daylight-saving times require manual selection. Canceled posts cannot be dragged. External drag payloads are not trusted.
+
+The connected browser journey now checks drag → proposed date → unchanged database before save → persisted date, then continues through generation, feedback and approval. Frozen-source acceptance passes at `882275223ee23902f4ee965be8ef1992c55bf620a95fd722fbcb0fcac02f24e2`: 14 real planning-service checks and all eight connected Canvas/calendar/video/review browser journeys. The initial broader run passed every command but is correctly marked source-changed after correcting a fixture-time expectation. The final focused rerun is unchanged-source and green; see `docs/evidence/planning.json`. Calendar screenshot inspected. No live provider calls ran. Application deployment still awaits the owner’s SMTP configuration; independent module work continues.
+
+
 ## Dev application configuration — current checkpoint
 
 Prepared `desvio-dev-api` (21260f12-2ad2-413c-9f67-2a1c4d6f8c83) and `desvio-dev-web` (a92160c2-54ef-4523-b13b-4a9a0e2dbdd2). Reserved HTTPS address: https://desvio-dev-web-dev.up.railway.app (not yet serving the app). Generated independent authentication/mail encryption keys, configured three separate database roles and private storage; secret values were sent via stdin and read back in memory. API health check is `/health`. The web backend origin uses Railway's private-domain reference, which cannot resolve until initial API deployment initializes private networking. No API/web deployment has been submitted.

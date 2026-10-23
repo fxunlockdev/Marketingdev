@@ -724,7 +724,14 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.screenshot({path:'work/browser/content-plan-desktop.png',fullPage:true});
  await page.getByRole('button',{name:'LinkedIn',exact:true}).click();
  await expect(page.getByText('15 posts in this view',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Open LinkedIn post: TEST FIXTURE hook 1',exact:true}).click();
+ const beforeMove=(await admin.query("SELECT id,planned_at FROM app.content_slots WHERE brand_id=$1 AND hook='TEST FIXTURE hook 1'",[brand])).rows[0];
+ await page.getByRole('button',{name:'Open LinkedIn post: TEST FIXTURE hook 1',exact:true}).dragTo(page.locator('[data-calendar-day="2026-11-02"]'),{targetPosition:{x:20,y:15}});
+ await expect(page.getByText('New date prepared. Review and save your changes to move this post. Social publishing is unchanged.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query('SELECT planned_at FROM app.content_slots WHERE id=$1',[beforeMove.id])).rows[0].planned_at.toISOString(),beforeMove.planned_at.toISOString(),'Drop must not persist before review/save');
+ await expect(page.getByLabel('Planned date & time (Asia/Kuala_Lumpur)')).toHaveValue('2026-11-02T16:00');
+ await page.getByRole('button',{name:'Save post changes',exact:true}).click();
+ await expect(page.getByText('Post changes saved.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query('SELECT planned_at FROM app.content_slots WHERE id=$1',[beforeMove.id])).rows[0].planned_at.toISOString(),'2026-11-02T08:00:00.000Z');
  await page.getByRole('button',{name:'Create creative',exact:true}).click();
  await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});
  const postSlot=(await admin.query("SELECT s.* FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.brand_id=$1 AND s.hook='TEST FIXTURE hook 1'",[brand])).rows[0];
