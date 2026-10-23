@@ -1,3 +1,4 @@
+import {VideoDownload} from '../../dist/video-download.js';
 // Railway settings are operator input, never authority to replace infrastructure credentials.
 const keys = ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'HIGGSFIELD_CREDENTIALS'];
 export function providerSettings(input) {
@@ -12,4 +13,21 @@ export function providerSettings(input) {
     output[key] = value;
   }
   return output;
+}
+
+// An explicit operator switch is required. Merely adding a paid credential cannot enable video.
+export function providerRuntimeSettings(input){
+ const credentials=providerSettings(input),enabled=input.VIDEO_ENABLED??'false';
+ if(!['true','false'].includes(enabled))throw Error('INVALID_VIDEO_SETTINGS');
+ if(enabled==='false')return {...credentials,VIDEO_ENABLED:'false'};
+ try{
+  if(!credentials.OPENAI_API_KEY&&!credentials.GEMINI_API_KEY)throw Error();
+  if(typeof credentials.HIGGSFIELD_CREDENTIALS!=='string'||credentials.HIGGSFIELD_CREDENTIALS.length>2048||! /^[\x21-\x39\x3b-\x7e]+:[\x21-\x39\x3b-\x7e]+$/.test(credentials.HIGGSFIELD_CREDENTIALS))throw Error();
+  if(!/^[a-f0-9]{64}$/i.test(input.VIDEO_ENCRYPTION_KEY??''))throw Error();
+  if(typeof input.HIGGSFIELD_OUTPUT_ORIGINS!=='string'||input.HIGGSFIELD_OUTPUT_ORIGINS.length>4096)throw Error();
+  const origins=input.HIGGSFIELD_OUTPUT_ORIGINS.split(',');
+  if(new Set(origins).size!==origins.length||origins.some(origin=>origin.includes('*')))throw Error();
+  new VideoDownload(origins); // Reuse the real downloader's exact-origin/SSRF configuration rules.
+  return {...credentials,VIDEO_ENABLED:'true',VIDEO_ENCRYPTION_KEY:input.VIDEO_ENCRYPTION_KEY,HIGGSFIELD_OUTPUT_ORIGINS:origins.join(',')};
+ }catch{throw Error('INVALID_VIDEO_SETTINGS');}
 }

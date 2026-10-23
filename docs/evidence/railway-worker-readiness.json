@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-23T13:30:10.477Z",
+  "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+  "status": "configuration_matches",
+  "running": true,
+  "desired_image": "sha256:1d91dc8906c70727e43fb19a858e3486b1754839f0a1fede9a825a159db25774",
+  "video_enabled": false,
+  "publishing_enabled": false,
+  "credentials_present": {
+    "OPENAI_API_KEY": false,
+    "GEMINI_API_KEY": false,
+    "HIGGSFIELD_CREDENTIALS": false
+  },
+  "changed_services": false,
+  "paid_calls": false,
+  "scope": "Exact local image inventory and desired worker configuration only. Provider access, business allowances, API flags and live acceptance are separate."
+}

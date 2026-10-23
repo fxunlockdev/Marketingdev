@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Explicit video configuration and worker readiness
+
+`providerRuntimeSettings` now accepts the video flag/key/output-origin bundle only when explicitly enabled and complete; merely adding model credentials leaves video disabled. It reuses the real downloader URL validation and additionally rejects wildcard/duplicate origins. Infrastructure and social flags cannot be overridden by the settings service. The new wildcard-origin test initially caught permissive URL parsing; explicit rejection fixed the failing case.
+
+`start-dev.mjs --check` validates desired runtime configuration and inspects the installed pinned images and exact worker identity without starting/replacing anything. `readiness.mjs` distinguishes matching, absent and replacement-required workers, returning only safe credential presence. Actual Railway check confirms the current worker is running with matching configuration, no model keys, video/publishing disabled. Evidence: `railway-worker-readiness.json`. No live provider call or settings mutation occurred.
+
+`make verify-operator` passes eight configuration/readiness contracts plus eight real local PostgreSQL setup cases at unchanged source. No app/backend runtime source changed, so broad customer suites were not repeated. Next: controlled worker replacement and coordinated API video activation, then core social setup and operator UI. These are still required before keys alone become a usable activation path.
+
 ## Railway provider allowance setup — implemented and verified
 
 `infra/worker-control/configure-providers.mjs` now wraps the existing audited administrator tool: exact dev project/environment and pinned worker image, list/preview/exact-hash apply, temporary restricted container, stdin-only administrator credential, current migration checksums, and no mutation to worker/API secrets. It never calls paid providers or creates social connections. Setup results produce `docs/evidence/railway-provider-setup.json` without credentials or customer names. Real dev read-only listing passed; zero businesses/channels existed at that observation. No dev grants were changed.
