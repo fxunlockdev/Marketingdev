@@ -1,5 +1,12 @@
 # Desvio build state
 
+## Coordinated carousel planning — locally verified runtime
+
+A dedicated carousel task now uses the existing isolated original skills and produces one shared story/visual direction/caption with 2–10 ordered slide briefs and alt text. Strict validation binds each slide to approved evidence; the same OpenAI/Gemini text adapters are used. Copywriting digests were verified from the original archive. At unchanged source `a8b0a7babaf0da93ea5d2cac7b6ef9de6fea97bf702c95318da2e0da2996a763`, three new contract checks and nine actual isolated runtime checks pass, including OpenAI/Gemini SDK transports with MOCK responses and static/calendar/video branch regression. Offline five and contracts 83 also pass. Evidence: `docs/evidence/carousel-planning.json`. The hosted skill image has not been replaced; deployed acceptance remains pending.
+
+This does not yet connect a customer whole-carousel generation button or durable image orchestration. Next: persisted parent/child jobs, existing budget holds, sequential image generation/export, partial-result recovery and promotion into the already implemented unapproved carousel composition. See ADR 0051. No paid/live calls ran. Billing excluded.
+
+
 ## Canvas carousel composition — locally verified foundation
 
 Migration 043 adds immutable ordered carousel versions with shared caption/channel, per-slide alt text, exact creative/export references and append-only review history. The service reuses existing canonical PNGs and tenant scope. Reorder/edit creates a draft; changed source images invalidate currentness. Owner/admin/reviewer approval requires the exact composition fingerprint and current images. API service acceptance passed ten export/carousel cases with real rendering/private storage. Canvas now has a connected composer, verified pixel previews, consent and review controls, source editing links and version history.

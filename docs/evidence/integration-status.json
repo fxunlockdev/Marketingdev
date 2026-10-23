@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "abb910e56cbaebae4079607a0412f135d4b37a1a",
-  "checked_at": "2026-10-23T09:55:55.073884+00:00",
+  "code_commit": "cb3a42f1570858951658f9a5e2b3e2cdbe89ab68",
+  "checked_at": "2026-10-23T10:04:47.458055+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/carousel-planning.json",
         "docs/evidence/carousels.json",
         "docs/evidence/memory-experiments.json",
         "docs/evidence/mfa.json",
@@ -102,6 +103,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/carousel-planning.json",
         "docs/evidence/carousels.json",
         "docs/evidence/memory-experiments.json",
         "docs/evidence/mfa.json",
@@ -138,6 +140,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/carousel-planning.json",
         "docs/evidence/carousels.json",
         "docs/evidence/memory-experiments.json",
         "docs/evidence/mfa.json",

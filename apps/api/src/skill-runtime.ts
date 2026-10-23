@@ -1,3 +1,4 @@
+import {validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
 import {validateInsightResult,type InsightInput} from './insight-contracts.js';
 import {validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
 import {validateVideoInput,validateVideoPlanningResult,type VideoPlanningInput,type VideoPlanningResult} from './video-planning.js';
@@ -28,7 +29,8 @@ export class SkillRuntime {
     return this.run(input,model,value=>validateVideoPlanningResult(value,input));
   }
   insights(input:InsightInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<any>{return this.run(input,model,value=>validateInsightResult(value,input));}
-  private async run<T>(input:CreativeInput|PlanningInput|VideoPlanningInput|InsightInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,validate:(value:any)=>T):Promise<T> {
+  carouselPlan(input:CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<CarouselResult>{validateCarouselInput(input);return this.run(input,model,value=>validateCarouselResult(value,input));}
+  private async run<T>(input:CreativeInput|PlanningInput|VideoPlanningInput|InsightInput|CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,validate:(value:any)=>T):Promise<T> {
     if (!this.configured)
       throw new CreativeError("SKILL_RUNTIME_NOT_CONFIGURED");
     const encoded = JSON.stringify(input);
