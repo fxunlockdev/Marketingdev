@@ -45,7 +45,7 @@ export class Team {
       return{invitations:rows};
     });
   }
-  invite(user:string,organizationId:string,input:unknown,idempotency:unknown) {
+  invite(user:string,organizationId:string,input:unknown,idempotency:unknown,businessContext?:string) {
     const org=uuid(organizationId),value=object(input,['email','role','business_ids']),role=invitationRole(value.role),requestKey=key(idempotency);
     let email:string;try{email=mailbox(value.email);}catch{throw new BadRequestException('Enter a valid email address');}
     let businessIds:string[]|null=null;
@@ -55,13 +55,16 @@ export class Team {
     return this.database.transaction(user,org,true,async db=>{
       // Same lock as role changes and acceptance: permissions cannot change mid-invitation.
       await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`members:${org}`]);
-      const actorRole=await this.admin(db,user,org);
-      if(businessIds&&(await db.query('SELECT id FROM app.brands WHERE organization_id=$1 AND id=ANY($2::uuid[])',[org,businessIds])).rowCount!==businessIds.length)throw new NotFoundException('One or more businesses are unavailable');
+      const actorRole=businessContext?'business':await this.admin(db,user,org);
+      if(!(await db.query('SELECT app.invitation_authorized($1,$2,$3,$4) AS allowed',[org,user,businessIds,role])).rows[0].allowed)throw new ForbiddenException('You can invite non-admin teammates only to businesses you administer');
+      const selectedBusinesses=businessIds?(await db.query('SELECT * FROM app.invitation_businesses($1,$2)',[org,businessIds])).rows:[];
+      if(businessIds&&selectedBusinesses.length!==businessIds.length)throw new NotFoundException('One or more businesses are unavailable');
       if(actorRole==='admin' && role==='admin') throw new ForbiddenException('Only an owner can invite another admin');
       await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`invite:${org}:${requestKey}`]);
-      const {rows:[prior]}=await db.query(`SELECT request_hash,response FROM app.idempotency WHERE organization_id=$1 AND operation='invitation.create' AND key=$2`,[org,requestKey]);
+      const requestTable=businessContext?'app.business_invitation_requests':'app.idempotency';
+      const {rows:[prior]}=await db.query(`SELECT request_hash,response FROM ${requestTable} WHERE organization_id=$1 AND operation='invitation.create' AND key=$2`,[org,requestKey]);
       if(prior) {if(prior.request_hash!==requestHash) throw new ConflictException('This request key was used for different content');return prior.response;}
-      const {rows:[count]}=await db.query(`SELECT count(*)::int AS count FROM app.invitations WHERE organization_id=$1 AND created_at>now()-interval '1 day'`,[org]);
+      const {rows:[count]}=await db.query(`SELECT app.invitation_daily_count() AS count`);
       if(count.count>=100) throw new ConflictException('This client has reached its daily invitation limit');
       // A replacement is authoritative: an older link must not retain a different grant.
       const previous=await db.query(`SELECT id FROM app.invitations WHERE organization_id=$1 AND email=$2 AND status='pending' AND expires_at>now()`,[org,email]);
@@ -69,22 +72,27 @@ export class Team {
       const {rows:[workspace]}=await db.query('SELECT name FROM app.organizations WHERE id=$1',[org]);
       const token=randomBytes(32).toString('base64url'),id=randomUUID(),expires=new Date(Date.now()+7*24*60*60*1000);
       const link=new URL('/accept-invitation',this.origin);link.hash=new URLSearchParams({token}).toString();
-      const invitationLabel=businessIds?workspace.name+' — '+(await db.query('SELECT name FROM app.brands WHERE organization_id=$1 AND id=ANY($2::uuid[]) ORDER BY name,id',[org,businessIds])).rows.map(b=>b.name).join(', ')+' ('+role+')':workspace.name;
+      const invitationLabel=businessIds?workspace.name+' — '+selectedBusinesses.map(b=>b.name).join(', ')+' ('+role+')':workspace.name;
       const mailId=await this.mail.enqueue(db,'invite',{to:email,url:link.toString(),workspace:invitationLabel},expires,org,user);
       await db.query(`INSERT INTO app.invitations(id,organization_id,email,role,invited_by,token_hash,expires_at,mail_id,business_ids) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,[id,org,email,role,user,digest(token),expires,mailId,businessIds]);
-      await db.query(`INSERT INTO app.audit_events(organization_id,actor_id,action,resource_id) VALUES($1,$2,'invitation.created',$3)`,[org,user,id]);
+      await db.query(`INSERT INTO app.audit_events(organization_id,actor_id,action,resource_id,brand_id) VALUES($1,$2,'invitation.created',$3,$4)`,[org,user,id,businessContext??null]);
       const result={id,email,role,business_ids:businessIds,status:'pending',email_status:'pending',expires_at:expires.toISOString()};
-      await db.query(`INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response) VALUES($1,'invitation.create',$2,$3,$4::jsonb)`,[org,requestKey,requestHash,JSON.stringify(result)]);
+      if(businessContext)await db.query(`INSERT INTO app.business_invitation_requests(organization_id,brand_id,actor_id,operation,key,request_hash,response) VALUES($1,$2,$3,'invitation.create',$4,$5,$6::jsonb)`,[org,businessContext,user,requestKey,requestHash,JSON.stringify(result)]);
+      else await db.query(`INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response) VALUES($1,'invitation.create',$2,$3,$4::jsonb)`,[org,requestKey,requestHash,JSON.stringify(result)]);
       return result;
-    }).catch(teamError);
+    },businessContext).catch(teamError);
   }
   private business(user:string,id:string){return new Businesses(this.database,new Workspaces(this.database)).resolve(user,id);}
   async businessList(user:string,id:string){const b=await this.business(user,id);return this.database.transaction(user,b.organization_id,false,async db=>{
-    const m=(await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[b.organization_id,user])).rows[0],canManage=m.business_scope==='all'&&['owner','admin'].includes(m.role);
-    return {members:(await db.query('SELECT * FROM app.business_team($1)',[id])).rows,can_manage:canManage,can_assign_admin:canManage&&m.role==='owner',invitations:canManage?(await db.query("SELECT i.id,i.email,i.role,i.business_ids,CASE WHEN i.status='pending' AND i.expires_at<=now() THEN 'expired' ELSE i.status END AS status,i.expires_at,o.status AS email_status FROM app.invitations i JOIN delivery.outbox o ON o.id=i.mail_id WHERE $1=ANY(i.business_ids) ORDER BY i.created_at DESC LIMIT 100",[id])).rows:[],activity:(await db.query("SELECT id,action,resource_id,created_at FROM app.audit_events WHERE brand_id=$1 AND action LIKE 'business.member_%' ORDER BY created_at DESC LIMIT 100",[id])).rows};
+    const m=(await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[b.organization_id,user])).rows[0],canManage=(await db.query('SELECT app.invitation_authorized($1,$2,$3,$4) AS allowed',[b.organization_id,user,[id],'editor'])).rows[0].allowed;
+    return {members:(await db.query('SELECT * FROM app.business_team($1)',[id])).rows,can_manage:canManage,can_assign_admin:canManage&&m.business_scope==='all'&&m.role==='owner',can_manage_account:m.business_scope==='all'&&['owner','admin'].includes(m.role),invitations:canManage?(await db.query("SELECT i.id,i.email,i.role,i.business_ids,CASE WHEN i.status='pending' AND i.expires_at<=now() THEN 'expired' ELSE i.status END AS status,i.expires_at,o.status AS email_status FROM app.invitations i JOIN delivery.outbox o ON o.id=i.mail_id WHERE $1=ANY(i.business_ids) ORDER BY i.created_at DESC LIMIT 100",[id])).rows:[],activity:(await db.query("SELECT id,action,resource_id,created_at FROM app.audit_events WHERE brand_id=$1 AND action LIKE 'business.member_%' ORDER BY created_at DESC LIMIT 100",[id])).rows};
   },id);}
-  async businessInvite(user:string,id:string,input:unknown,k:unknown){const b=await this.business(user,id),v=object(input,['email','role','business_ids']);const ids=v.business_ids??[id];if(!Array.isArray(ids)||!ids.includes(id))throw new BadRequestException('Include this business in the invitation');return this.invite(user,b.organization_id,{...v,business_ids:ids},k);}
-  async businessRevoke(user:string,id:string,invitation:string){const b=await this.business(user,id);await this.database.transaction(user,b.organization_id,false,async db=>{await this.admin(db,user,b.organization_id);if(!(await db.query('SELECT id FROM app.invitations WHERE id=$1 AND $2=ANY(business_ids)',[uuid(invitation),id])).rowCount)throw new NotFoundException('Invitation not found');},id);return this.revoke(user,b.organization_id,invitation);}
+  async businessInvite(user:string,id:string,input:unknown,k:unknown){const b=await this.business(user,id),v=object(input,['email','role','business_ids']);const ids=v.business_ids??[id];if(!Array.isArray(ids)||!ids.includes(id))throw new BadRequestException('Include this business in the invitation');return this.invite(user,b.organization_id,{...v,business_ids:ids},k,id);}
+  async businessRevoke(user:string,id:string,invitation:string){const b=await this.business(user,id);return this.database.transaction(user,b.organization_id,true,async db=>{
+    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`members:${b.organization_id}`]);
+    if(!(await db.query('SELECT id FROM app.invitations WHERE id=$1 AND $2=ANY(business_ids)',[uuid(invitation),id])).rowCount)throw new NotFoundException('Invitation not found');
+    await db.query('SELECT app.revoke_invitation($1)',[invitation]);return {status:'revoked'};
+  },id).catch(teamError);}
   async businessChange(user:string,id:string,target:string,input:unknown){const b=await this.business(user,id),v=object(input,['role','active']);if(typeof v.active!=='boolean')throw new BadRequestException('Choose an access status');const role=invitationRole(v.role);return this.database.transaction(user,b.organization_id,true,async db=>{await db.query('SELECT app.change_business_member($1,$2,$3,$4)',[id,uuid(target),role,v.active]);return {user_id:target,role,active:v.active};},id).catch(teamError);}
   accept(user:string,input:unknown) {
     const {token}=object(input,['token']);

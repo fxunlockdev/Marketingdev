@@ -1,5 +1,12 @@
 # Desvio build state
 
+## Delegated business Team administration — locally verified
+
+Migration 040 and Team now let selected-business Admins invite/manage non-admin teammates only in businesses they administer. Account-wide roles and Admin seats remain owner-controlled. Invitation acceptance revalidates the sender, multi-business scope is checked as a whole, account daily caps remain global, and request replay uses a separate actor/business-scoped table without weakening account idempotency RLS. The UI exposes only authorized businesses/actions. See ADR 0047.
+
+Frozen-source acceptance passes at `c6eb7e070ce03ff029aeecd04472da18990cfa5760fa5672fb1c751e894a4351`: Team 27 account + 12 browser journeys; full security 27 account + 161 application cases, six guards and dependency audits; offline five and contracts 83. Delegated Team screenshot and accessibility checked. The initial fixture hit the signup limiter; fixture-only rate-limit reset fixed setup. A subsequent RLS denial exposed missing business-scoped audit/replay records, fixed without relaxing account-only idempotency. The first combined run passed but was source-changed while multi-business handling was tightened; the final reports bind unchanged source. Migration 040 has not been applied to Railway; real SMTP delivery and deployed app acceptance remain pending. No live model/social calls ran.
+
+
 ## Content Plan date dragging — locally verified
 
 Calendar cards can be dragged to another visible day by owners/admins/editors. The existing post editor opens with a proposed date and retains the original local posting time in the calendar's business timezone; nothing persists until explicit Save. Existing exact-revision checks, approved-post reset requirements and publishing guards remain authoritative. Keyboard users can open the same card and edit its planned date. Ambiguous/skipped daylight-saving times require manual selection. Canceled posts cannot be dragged. External drag payloads are not trusted.
