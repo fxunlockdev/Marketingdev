@@ -1,4 +1,5 @@
 "use client";
+import {CalendarCarouselReview} from './carousels';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
@@ -260,6 +261,7 @@ export function ContentWorkspace({
           creative_sha256: s.creative_sha256,
           video_version_id: s.video_version_id,
           video_sha256: s.video_sha256,
+          carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,
         })),
       });
       setMessage(
@@ -599,7 +601,7 @@ export function ContentWorkspace({
                                 11,
                               )}
                             </span>
-                            <span>{s.format === 'video' ? 'Video' : 'Static post'}</span>
+                            <span>{s.format === 'video' ? 'Video' : s.format==='carousel'?'Carousel':'Static post'}</span>
                             <strong>{s.hook || s.brief}</strong>
                             <span className={`plan-state state-${s.state}`}>
                               {labels[s.state]}
@@ -639,7 +641,7 @@ export function ContentWorkspace({
                         <span>
                           {name(s.channel)} · {when(s)} ({s.timezone})
                         </span>
-                        <span>{s.format === 'video' ? 'Video' : 'Static post'}</span>
+                        <span>{s.format === 'video' ? 'Video' : s.format==='carousel'?'Carousel':'Static post'}</span>
                             <strong>{s.hook || s.brief}</strong>
                         <span>{s.caption || s.brief}</span>
                         <span className={`plan-state state-${s.state}`}>
@@ -794,7 +796,7 @@ function SlotPanel({
         draft.cta !== s.cta ||
         JSON.stringify(draft.video_draft)!==JSON.stringify(s.video_draft) ||
         draft.local !== localMinute(s.planned_at, s.timezone));
-  useEffect(()=>setReady(false),[s?.creative_version_id,s?.video_version_id]);
+  useEffect(()=>setReady(false),[s?.creative_version_id,s?.video_version_id,s?.carousel_version_id]);
   dirtyRef.current = dirty;
   useUnsavedChanges(dirty || !!feedback || busy);
   useEffect(
@@ -844,6 +846,7 @@ function SlotPanel({
           creative_sha256: s.creative_sha256,
           video_version_id: s.video_version_id,
           video_sha256: s.video_sha256,
+          carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,
           decision,
           feedback,
         }),
@@ -894,7 +897,7 @@ function SlotPanel({
           </p>
           <div className="slot-columns">
             <div>
-              {s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/canvas?thread=${s.thread_id}`}>Give video feedback in Canvas</a></> : s.design ? (
+              {s.carousel_version_id ? <CalendarCarouselReview businessId={business.id} projectId={s.project_id} versionId={s.carousel_version_id} canEdit={canWrite} canReview={canReview} disabled={busy||dirty} onReady={setReady} onChanged={async()=>{await load(true);changed.current();}}/> : s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/canvas?thread=${s.thread_id}`}>Give video feedback in Canvas</a></> : s.design ? (
                 <>
                   <CreativeEditor
                     businessId={business.id}
@@ -946,7 +949,7 @@ function SlotPanel({
                             `${root}/content-slots/${slotId}`,
                             {
                               revision: s.revision,
-                              [s.format==='video'?'video_version_id':'creative_version_id']: s.latest_version_id,
+                              [s.format==='carousel'?'carousel_version_id':s.format==='video'?'video_version_id':'creative_version_id']: s.latest_version_id,
                               reset_approval: reset,
                             },
                             "PATCH",
@@ -1103,7 +1106,7 @@ function SlotPanel({
                 {dirty && (
                   <p>Save your post changes before creating or reviewing.</p>
                 )}
-                {canWrite && s.format !== "video" && s.state !== "cancelled" && (
+                {canWrite && !["video","carousel"].includes(s.format) && s.state !== "cancelled" && (
                   <button
                     className="primary"
                     disabled={
@@ -1157,7 +1160,7 @@ function SlotPanel({
                       <button
                         className="primary"
                         disabled={
-                          busy || dirty || s.has_newer_version || !ready
+                          busy || dirty || s.has_newer_version || !ready || (s.format==='carousel'&&s.carousel_status!=='approved')
                         }
                         onClick={() => review("approved")}
                       >

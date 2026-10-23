@@ -6,6 +6,9 @@ import {object,uuid} from './workspaces.js';
 type Page={creative_version_id:string;export_id:string;alt_text:string};
 const plain=(v:unknown,max:number)=>typeof v==='string'&&v.trim().length>0&&v.length<=max&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
 export const carouselFingerprint=(v:any,pages:any[])=>hash(canonicalJSON({title:v.title,caption:v.caption,channel:v.channel,pages:pages.map(p=>({creative_version_id:p.creative_version_id,export_id:p.export_id,alt_text:p.alt_text,source_sha256:p.source_sha256,sha256:p.sha256}))}));
+export async function carouselPages(db:any,id:string){return (await db.query('SELECT cp.position,cp.creative_version_id,cp.export_id,cp.alt_text,e.source_sha256,e.sha256,e.width,e.height,e.renderer_image,v.brain_id,v.sha256 AS version_sha256,p.id AS project_id,p.thread_id,p.latest_version_id FROM app.carousel_pages cp JOIN app.creative_versions v ON v.id=cp.creative_version_id JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_exports e ON e.id=cp.export_id AND e.version_id=v.id WHERE cp.carousel_version_id=$1 ORDER BY cp.position',[id])).rows;}
+export function currentCarousel(pages:any[],rendererImage?:string){return pages.length>=2&&pages.length<=10&&new Set(pages.map(p=>p.project_id)).size===pages.length&&pages.every((p,i)=>p.position===i&&p.latest_version_id===p.creative_version_id&&p.source_sha256===p.version_sha256&&p.renderer_image===rendererImage&&p.width===pages[0].width&&p.height===pages[0].height&&p.brain_id===pages[0].brain_id);}
+
 export class Carousels {
  constructor(readonly canvas:Canvas,readonly rendererImage?:string){}
  async lock(db:any,brand:string){await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${brand.toLowerCase()}`]);}
@@ -15,8 +18,8 @@ export class Carousels {
   carousels:(await db.query('SELECT p.id,v.id AS version_id,v.title,v.channel,v.status,v.created_at FROM app.carousel_projects p JOIN app.carousel_versions v ON v.id=p.latest_version_id ORDER BY p.created_at DESC,p.id LIMIT 100')).rows,
   candidates:(await db.query('SELECT v.id AS creative_version_id,e.id AS export_id,e.sha256,e.width,e.height,p.id AS project_id,p.thread_id,p.title FROM app.creative_projects p JOIN app.creative_versions v ON v.id=p.latest_version_id JOIN app.creative_exports e ON e.version_id=v.id AND e.source_sha256=v.sha256 WHERE e.renderer_image=$1 ORDER BY e.created_at DESC,e.id LIMIT 100',[this.rendererImage??''])).rows
  }));}
- async pages(db:any,id:string){return (await db.query('SELECT cp.position,cp.creative_version_id,cp.export_id,cp.alt_text,e.source_sha256,e.sha256,e.width,e.height,e.renderer_image,v.brain_id,v.sha256 AS version_sha256,p.id AS project_id,p.thread_id,p.latest_version_id FROM app.carousel_pages cp JOIN app.creative_versions v ON v.id=cp.creative_version_id JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_exports e ON e.id=cp.export_id AND e.version_id=v.id WHERE cp.carousel_version_id=$1 ORDER BY cp.position',[id])).rows;}
- current(pages:any[]){return pages.length>=2&&pages.length<=10&&new Set(pages.map(p=>p.project_id)).size===pages.length&&pages.every((p,i)=>p.position===i&&p.latest_version_id===p.creative_version_id&&p.source_sha256===p.version_sha256&&p.renderer_image===this.rendererImage&&p.width===pages[0].width&&p.height===pages[0].height&&p.brain_id===pages[0].brain_id);}
+ pages(db:any,id:string){return carouselPages(db,id);}
+ current(pages:any[]){return currentCarousel(pages,this.rendererImage);}
  read(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async db=>{
   const project=(await db.query('SELECT id,latest_version_id FROM app.carousel_projects WHERE id=$1',[id])).rows[0];if(!project)throw new NotFoundException('Carousel not found');
   const versions=(await db.query('SELECT id,title,caption,channel,sha256,status,review_revision,reviewed_at,created_at FROM app.carousel_versions WHERE project_id=$1 ORDER BY created_at DESC,id DESC',[id])).rows;

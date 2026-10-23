@@ -930,5 +930,16 @@ test('Canvas generates an entire carousel, reopens it for editing and reviews sa
  const consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
  await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
  await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-generated-carousel-mobile.png',fullPage:true});
+ await panel.getByText('Add carousel to calendar',{exact:true}).click();await panel.getByLabel(/^Carousel calendar time/).fill('2026-11-03T10:00');await panel.getByRole('button',{name:'Add saved carousel to calendar',exact:true}).click();await panel.getByRole('link',{name:'Open carousel in calendar',exact:true}).click();
+ const postDetails=page.getByRole('region',{name:'Post details',exact:true});await expect(postDetails.getByRole('region',{name:'Review carousel',exact:true}).getByRole('img')).toHaveCount(2);
+ await expect(postDetails.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled();await postDetails.getByRole('button',{name:'Send for review',exact:true}).click();
+ const slotId=new URL(page.url()).searchParams.get('slot');assert.ok(slotId);
+ await page.goto(`${base}/b/${brand}/review?start=2026-11-03&slot=${slotId}`);await expect(postDetails.getByRole('button',{name:'Approve post',exact:true})).toBeEnabled();
+ await postDetails.getByLabel('Feedback or creative direction',{exact:true}).fill('Please revisit the carousel order.');await postDetails.getByRole('button',{name:'Request changes',exact:true}).click();
+ await waitFor(async()=>(await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[slotId])).rows[0].state==='changes_requested');
+ await postDetails.getByRole('button',{name:'Send for review',exact:true}).click();await postDetails.getByRole('button',{name:'Approve post',exact:true}).click();await waitFor(async()=>(await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[slotId])).rows[0].state==='approved');
+ await page.reload();await expect(postDetails.getByRole('button',{name:'Reopen review',exact:true})).toBeVisible();
+ assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/carousel-calendar-review-mobile.png',fullPage:true});
+
  assert.deepEqual(errors,[]);
 });

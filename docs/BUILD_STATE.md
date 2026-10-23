@@ -1,5 +1,18 @@
 # Desvio build state
 
+## Carousel Calendar and Review Inbox — local acceptance passed
+
+Migration 045 binds complete ordered carousel versions/fingerprints to calendar slots and immutable events. New/existing-plan attachment, local-time scheduling, exact-version review, feedback, approval reset, channel matching and source-slide invalidation are connected. Calendar approval requires the complete saved carousel’s final review. The UI previews every private saved slide in Calendar/Review Inbox and links back to the exact Canvas carousel or slide. This changes the plan, not remote publication.
+
+Backend acceptance passed all 13 export/video/carousel cases and all 14 planning cases at source `976f0f0a44371ffc9b96bacbcb61eb14c9406a699d999b4fc44de5bd83e13c59`. The combined report `carousel-calendar.json` intentionally remains failed because its browser attempt failed (first scanner startup, then a test reading state before an asynchronous save). The test now waits for persistence; the production code did not change for that correction. Final `carousel-calendar-ui.json` passes all ten browser journeys with no skips at unchanged source `ba34713b36eec078750ade0a2ce322098ac191d8560b6669cbbac59522b59ecf`. Coverage includes Canvas generation → new plan → all-slide preview → inbox feedback → approval → reload, mobile accessibility and overflow. Screenshot inspected. Offline five and contracts 83 pass for the final source. Full security/browser-wide and live/cloud acceptance remain separate.
+
+Next module: downloadable carousel bundle and multi-image publishing through the audited Postiz contract. Existing PNG/MP4 publication proofs do not accept a carousel. Migrations 043–045 remain local; Railway is through 042. No paid/live provider calls ran. Billing excluded.
+
+## Email provider choice — owner update
+
+Owner selected Resend and asked to leave email setup for later. Stop requesting generic SMTP settings. Current application transport is SMTP; Resend delivery/configuration has not been implemented or live-tested. Resolve the supported Resend setup when the owner is ready, using a server-side credential and verified sender; sign-up/reset/invitation live delivery remains pending. Continue product modules meanwhile.
+
+
 ## Connected carousel generation UI — local browser acceptance passed
 
 `apps/web/components/carousel-generation.tsx` now submits the verified durable backend, shows saved per-slide progress and partial results, supports active cancellation, blocks duplicate generation while uncertain, and opens complete output in the existing composition editor/review. OpenAI/Gemini planning choice and 2–10 slides are available; static generation has no pre-approval gate. Browser coverage was extended to actual isolated planning, generation jobs, canonical renders, final review/approval, reload and mobile accessibility with MOCK provider responses. All ten Canvas browser journeys pass with zero skips, including the new whole-carousel journey and existing image/video/calendar/reviewer flows. Mobile accessibility and overflow checks pass; screenshot inspected. Evidence `carousel-generation-ui.json` records the direct run and final source fingerprint, explicitly without a start/end source-bound claim. The backend’s formal 12-test evidence is in `carousel-generation.json`. Next module work: attach complete carousel versions to calendar/review inbox, then export/publication. Railway deployment and real provider acceptance remain pending.

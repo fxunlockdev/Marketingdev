@@ -41,7 +41,7 @@ async function fixture(overrides={}){
 async function queue(v=current){return exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},randomUUID());}
 async function render(v){const j=await queue(v);assert.equal(await handler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
 before(async()=>{
- app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses);exports=new CreativeExports(canvas,renderer.image);
+ app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses,renderer.image);exports=new CreativeExports(canvas,renderer.image);
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Render fixtures'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
  reviewer=await signup();await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org.id,reviewer.id]);await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'reviewer')",[org.id,brand.id,reviewer.id]);
  for(const [u,role] of [[editor,'editor'],[viewer,'viewer']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',[org.id,u.id,role]);
@@ -395,4 +395,33 @@ test('durable carousel uses one actual isolated plan, sequential MOCK images and
  await assert.rejects(service.cancel(alice.id,brand.id,partial.id),/Active carousel generation not found/);assert.equal(await coordinator.fail(scope(partial)),'unknown');assert.equal(images,4);
  await assert.rejects(service.submit(alice.id,brand.id,{prompt:'Must not bypass the unknown hold',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID()),/reconciliation/);
 
+});
+
+
+test('carousel calendar attachment binds exact ordered versions, requires final review, isolates businesses and invalidates edits',async()=>{
+ const {Carousels}=await import('../../dist/carousels.js'),carousels=new Carousels(canvas,renderer.image);
+ const a=await fixture(),b=await fixture(),ea=await render(a),eb=await render(b);
+ const input={project_id:null,parent_id:null,title:'Calendar carousel',caption:'TEST shared caption',channel:'linkedin',pages:[{creative_version_id:a.id,export_id:ea.id,alt_text:'First'},{creative_version_id:b.id,export_id:eb.id,alt_text:'Second'}]};
+ const c=await carousels.save(alice.id,brand.id,input,randomUUID());
+ const plan=await plans.create(alice.id,brand.id,{title:'Carousel calendar',objective:'TEST awareness',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',planned_at:'2026-11-01T10:00:00Z',format:'static',brief:'TEST placeholder planning slot'}]},randomUUID());
+ const body={carousel_version_id:c.id,planned_at:'2026-11-02T10:00:00Z',channel:'linkedin',brief:'TEST carousel story'},key=randomUUID();
+ await assert.rejects(plans.addCarousel(viewer.id,brand.id,plan.id,body,key));await assert.rejects(plans.addCarousel(bob.id,brand.id,plan.id,body,key));await assert.rejects(plans.addCarousel(alice.id,sibling.id,plan.id,body,key));
+ await assert.rejects(plans.addCarousel(alice.id,brand.id,plan.id,{...body,channel:'instagram'},key));
+ const slot=await plans.addCarousel(alice.id,brand.id,plan.id,body,key);assert.deepEqual(await plans.addCarousel(alice.id,brand.id,plan.id,body,key),slot);
+ await assert.rejects(plans.addCarousel(alice.id,brand.id,plan.id,{...body,brief:'Changed'},key));
+ const query={start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:plan.id};
+ let s=(await plans.list(alice.id,brand.id,query)).slots.find(x=>x.id===slot.id);assert.equal(s.caption,input.caption);assert.equal(s.format,'carousel');assert.equal(s.state,'draft_ready');assert.equal(s.creative_version_id,null);assert.equal(s.video_version_id,null);
+ const decision=action=>({revision:s.revision,carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,decision:action});
+ await assert.rejects(plans.review(alice.id,brand.id,s.id,{revision:s.revision,decision:'pending_review'}),/current post/);
+ s=await plans.review(alice.id,brand.id,s.id,decision('pending_review'));
+ await assert.rejects(plans.review(alice.id,brand.id,s.id,decision('approved')),/every saved carousel slide/);
+ let v=(await carousels.read(alice.id,brand.id,c.project_id)).versions[0];await carousels.review(alice.id,brand.id,v.id,{revision:1,sha256:v.sha256,decision:'in_review',feedback:'',confirmed:true});await carousels.review(alice.id,brand.id,v.id,{revision:2,sha256:v.sha256,decision:'approved',feedback:'',confirmed:true});
+ s=await plans.review(alice.id,brand.id,s.id,decision('approved'));assert.equal(s.state,'approved');
+ const events=(await plans.history(alice.id,brand.id,s.id)).events;assert.equal(events.at(-1).carousel_version_id,c.id);assert.equal(events.at(-1).snapshot.carousel_sha256,s.carousel_sha256);
+ await assert.rejects(plans.edit(alice.id,brand.id,s.id,{revision:s.revision,brief:'Revised'}),/Confirm/);
+ s=await plans.edit(alice.id,brand.id,s.id,{revision:s.revision,brief:'Revised',reset_approval:true});assert.equal(s.state,'draft_ready');assert.equal(s.approved_by,null);
+ await canvas.save(alice.id,brand.id,a.project_id,{parent_id:a.id,design:a.design,caption:'Changed source slide'});
+ assert.equal((await plans.list(alice.id,brand.id,query)).slots.find(x=>x.id===s.id).has_newer_version,true);
+ await assert.rejects(plans.review(alice.id,brand.id,s.id,decision('pending_review')),/current saved slides/);
+ await assert.rejects(plans.scope(alice.id,brand.id,false,db=>exports.publicationProof(db,s.id)));
 });

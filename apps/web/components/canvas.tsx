@@ -163,7 +163,7 @@ export function CanvasScreen({ business }: { business: Business }) {
         setProjectId((p) =>
           value.projects.some((x) => x.id === p)
             ? p
-            : (value.projects.find((x) => x.latest_version_id)?.id ?? ""),
+            : (value.projects.find(x=>x.id===new URLSearchParams(location.search).get("project")&&x.latest_version_id)?.id ?? value.projects.find((x) => x.latest_version_id)?.id ?? ""),
         );
         if (value.runs.some((r) => running(r))||value.planning_runs.some(r=>['queued','running','retrying'].includes(r.status)&&!r.cancel_requested&&Date.parse(r.scheduled_at)<=Date.now())) timer = setTimeout(load, 2500);
       } catch (e) {
