@@ -152,8 +152,8 @@ test('publication is disabled by default, holds daily reservations, and stores i
 });
 
 test('overview aggregates actual business records and denies foreign tenants',async()=>{
- const r=await api(path('overview'));assert.equal(r.status,200);assert.equal(r.body.business_id,brand.id);assert.equal(r.body.analytics_available,false);
- const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);
+ const r=await api(path('overview'));assert.equal(r.status,200);assert.equal(r.body.business_id,brand.id);assert.equal(r.body.analytics_available,(await publisher.analytics(alice.id,brand.id)).posts.some(p=>p.state==='available'));assert.equal(r.body.performance.available_count,(await publisher.analytics(alice.id,brand.id)).posts.filter(p=>p.state==='available').length);
+ const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);assert.deepEqual(other.body.performance.posts,[]);assert.deepEqual(other.body.recommendations,[]);assert.deepEqual(other.body.generation_activity,[]);
 });
 
 
@@ -163,11 +163,13 @@ test('analytics observations persist independently of publishing status and stay
  let result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);
  assert.equal((await publisher.analytics(alice.id,brand.id,{channel:'instagram'})).posts.length,0);assert.equal((await publisher.analytics(alice.id,brand.id,{format:'video'})).posts.length,0);assert.throws(()=>publisher.analytics(alice.id,brand.id,{from:'2026-02-30'}),/valid publication/);
  assert.equal(result.state,'available');assert.equal(result.series[0].points[0].value,120);assert.equal(result.semantics,'provider_reported');
+ let overview=(await api(path('overview'))).body;assert.equal(overview.performance.posts.find(p=>p.publication_id===j.id).metrics[0].value,120);assert.equal(overview.performance.posts.find(p=>p.publication_id===j.id).state,'available');
  assert.equal((await api(path('analytics'),{user:viewer})).status,200);
  assert.equal((await api(path('analytics'),{user:bob})).status,404);
  assert.equal((await publisher.analytics(alice.id,sibling.id)).posts.length,0);
  mode='analyticsFail';const check=await publisher.reconcile(alice.id,brand.id,j.id,randomUUID());assert.equal((await handler.reconcile(scope(check))).state,'published');
  result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);assert.equal(result.state,'error');assert.deepEqual(result.series,[]);assert.equal((await record(j)).observed_state,'published');
+ overview=(await api(path('overview'))).body;assert.equal(overview.performance.posts.find(p=>p.publication_id===j.id).state,'error');assert.deepEqual(overview.performance.posts.find(p=>p.publication_id===j.id).metrics,[]);
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.post_analytics WHERE publication_id=$1 AND state='available'",[j.id])).rows[0].n,1);
  mode='analyticsEmpty';await handler.reconcile(scope(j));result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);assert.equal(result.state,'unavailable');assert.deepEqual(result.series,[]);
  await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.post_analytics SET state='available' WHERE publication_id=$1",[j.id]),brand.id),e=>e.code==='42501');
@@ -191,11 +193,12 @@ test('original analytics skills produce evidence-bound proposals; human review s
  assert.equal(calls,1);assert.equal(await worker.run(scope(j)),'finished');assert.equal(calls,1);
  const saved=await service.read(alice.id,brand.id),lesson=saved.lessons[0];assert.equal(lesson.state,'proposed');assert.equal(lesson.evidence.length,1);assert.equal((await service.read(alice.id,sibling.id)).lessons.length,0);assert.equal((await api(path('insights'),{user:bob})).status,404);assert.equal((await api(path('insights'),{user:viewer})).status,200);
  const decision={revision:1,decision:'testing',applicability:'Only future LinkedIn CTA experiments',confirmed:true};await assert.rejects(service.review(editor.id,brand.id,lesson.id,decision));await assert.rejects(service.review(alice.id,sibling.id,lesson.id,decision));await service.review(alice.id,brand.id,lesson.id,decision);await assert.rejects(service.review(alice.id,brand.id,lesson.id,decision),/Refresh/);
+ const overview=(await api(path('overview'))).body;assert.ok(overview.recommendations.some(r=>r.id===lesson.id&&r.state==='testing'&&r.evidence_count===1));assert.ok(overview.generation_activity.some(r=>r.kind==='insight.generate'&&r.completed>0));
  const {assertLearningCurrent}=await import('../../dist/learning-context.js');
  const memoryThread=await canvas.createThread(alice.id,brand.id,{title:'Approved learning test'},randomUUID());
  const memoryJob=await canvas.submit(alice.id,brand.id,memoryThread.id,{prompt:'Explore this business learning',format:'static',channel:'linkedin',size:'1024x1024',parent_version_id:null},randomUUID());
  const memoryContext=(await admin.query('SELECT memory_context FROM app.creative_requests WHERE job_id=$1',[memoryJob.id])).rows[0].memory_context;assert.equal(memoryContext[0].id,lesson.id);assert.equal(memoryContext[0].kind,'unproven_hypothesis');await jobs.transaction(scope(memoryJob),db=>assertLearningCurrent(db,memoryContext));
- await service.review(alice.id,brand.id,lesson.id,{...decision,revision:2,decision:'retired'});assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.memory_reviews WHERE lesson_id=$1',[lesson.id])).rows[0].n,2);
+ await service.review(alice.id,brand.id,lesson.id,{...decision,revision:2,decision:'retired'});assert.ok(!(await api(path('overview'))).body.recommendations.some(r=>r.id===lesson.id));assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.memory_reviews WHERE lesson_id=$1',[lesson.id])).rows[0].n,2);
  await assert.rejects(jobs.transaction(scope(memoryJob),db=>assertLearningCurrent(db,memoryContext)),e=>e.code==='MEMORY_CONTEXT_CHANGED');
  assert.equal((await admin.query('SELECT sha256 FROM app.brand_brain_versions WHERE id=$1',[brainId])).rows[0].sha256,brainBefore);
  await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.memory_lessons SET content='{}' WHERE id=$1",[lesson.id]),brand.id),e=>e.code==='42501');

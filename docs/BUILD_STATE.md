@@ -1,5 +1,11 @@
 # Desvio build state
 
+## Overview saved results and recommendations — locally verified
+
+Overview now shows the latest saved metric values for six recent confirmed published posts, measurement dates and check timestamps. Failed/missing/unavailable observations do not become zero engagement. Values are not summed or ranked across incompatible provider windows. It also shows up to three proposed/testing performance hypotheses, their evidence counts/limitations and links to Memory, plus actual generation request/completion/uncertainty counts over 30 days. Retired lessons are excluded; request counts are not presented as billed credits.
+
+Focused service checks passed 13 cases. Browser acceptance, mobile accessibility and screenshot inspection pass at unchanged source `dbb2732ed1706ee4c9d9026ea9f39f5539d6cca7576d79822ff2a56e345a2f57`; offline five and contracts 83 pass at the same source. Coverage includes metric values, latest-error precedence, unavailable metrics, reviewed/retired hypotheses and sibling/foreign business isolation. All provider responses are explicitly MOCK. No deployed or live-provider success is claimed. Next: Memory source provenance, with existing approved facts kept separate from hypotheses.
+
 ## Delegated business Team administration — locally verified
 
 Migration 040 and Team now let selected-business Admins invite/manage non-admin teammates only in businesses they administer. Account-wide roles and Admin seats remain owner-controlled. Invitation acceptance revalidates the sender, multi-business scope is checked as a whole, account daily caps remain global, and request replay uses a separate actor/business-scoped table without weakening account idempotency RLS. The UI exposes only authorized businesses/actions. See ADR 0047.
