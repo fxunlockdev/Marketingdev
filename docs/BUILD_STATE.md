@@ -1,5 +1,12 @@
 # Desvio build state
 
+## Dev database through 045 — verified; app startup pending
+
+Deployment `458eba7a-4986-473e-b2f1-1e39deea69f3` completed checksum-verified migration replay through 045 and all six runtime-role login checks. It is REMOVED; all seven temporary migration/runtime credential variables were deleted and read back absent. Runtime passwords were reused. Machine evidence: `docs/evidence/railway-dev-migration045.json`.
+
+API deployment `b34f9064-9610-4e85-a278-42c69bbee7a4` built its image, but startup logs report `RESEND_API_KEY is required`. Web deployment `a6dd76d2-951c-4390-ad95-8cf9749f3db2` failed its strict backend-origin check because the undeployed API's private hostname reference resolves empty. Do not claim a usable dev domain. Next deployment steps: owner adds Resend key/verified sender, verify API startup/private DNS, rebuild web against its real private origin, update worker/skill images, then run authenticated core acceptance with authorized provider keys/caps. Carousel publication can continue independently while credentials are pending. Advanced features stay behind the usable-core priority; the complete product goal remains active.
+
+
 ## Resend configuration for usable dev access
 
 `MAIL_PROVIDER=resend` now maps `RESEND_API_KEY` and `RESEND_FROM` to Resend's documented fixed TLS SMTP transport. Existing encrypted queue, lease/uncertain-send handling and account flows are reused. Unrelated SMTP variables cannot redirect the Resend credential. Evidence `resend-configuration.json`: both new configuration tests and all 28 real local account/email tests pass at unchanged source `fed74a67001d512d404d0219829dbd7b0e00fcccc4c62462a81e7970ba005df8`. This is not external email acceptance. Owner was asked only for the Resend key and verified sender in Railway, never secrets in chat.
