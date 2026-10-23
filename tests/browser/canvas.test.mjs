@@ -884,3 +884,29 @@ test('Reviewer can give calendar feedback without editing or generation; Analyst
   assert.deepEqual((await new AxeBuilder({page:reviewPage}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
  }finally{await context.close();}
 });
+
+test('Canvas composes generated slides as one carousel, reviews exact pixels, reorders into a new draft and survives reload',async()=>{
+ await page.goto(`${base}/b/${brand}/canvas`);const root=`/api/v1/businesses/${brand}`;const slides=[];
+ for(let i=0;i<2;i++){
+  const t=await post(root+'/canvas/threads',{title:`TEST carousel slide ${i+1}`},randomUUID());assert.equal(t.status,201);
+  const j=await post(root+`/canvas/threads/${t.body.id}/messages`,{prompt:`TEST carousel slide ${i+1}: botanical soap story`,format:'static',channel:'linkedin',size:'1024x1024',parent_version_id:null},randomUUID());assert.equal(j.status,201);
+  await waitFor(async()=> (await admin.query('SELECT status FROM app.jobs WHERE id=$1',[j.body.id])).rows[0].status==='succeeded');
+  const v=(await admin.query('SELECT v.id,v.sha256 FROM app.creative_requests r JOIN app.creative_versions v ON v.id=r.output_version_id WHERE r.job_id=$1',[j.body.id])).rows[0];
+  const e=await post(root+`/creative-versions/${v.id}/exports`,{source_sha256:v.sha256},randomUUID());assert.equal(e.status,201);
+  await waitFor(async()=> (await admin.query('SELECT count(*)::int AS n FROM app.creative_exports WHERE version_id=$1',[v.id])).rows[0].n===1);
+  slides.push((await admin.query('SELECT id FROM app.creative_exports WHERE version_id=$1',[v.id])).rows[0].id);
+ }
+ await page.reload();const panel=page.getByRole('region',{name:'Carousels',exact:true});await panel.getByText('Carousels · compose and review slides',{exact:true}).click();
+ await panel.getByLabel('Carousel title',{exact:true}).fill('TEST botanical story');await panel.getByLabel('Shared carousel caption',{exact:true}).fill('A single story across two slides.');
+ for(let i=0;i<2;i++){await panel.getByRole('button',{name:'Add slide',exact:true}).click();await panel.getByLabel(`Saved image for slide ${i+1}`,{exact:true}).selectOption(slides[i]);await panel.getByLabel(`Alt text for slide ${i+1}`,{exact:true}).fill(`Botanical slide ${i+1}`);}
+ const corruptPreview='**/creative-exports/'+slides[0]+'/download';await page.route(corruptPreview,async route=>{const response=await route.fetch(),grant=await response.json();await route.fulfill({response,json:{...grant,sha256:'0'.repeat(64)}});});
+ await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(panel.getByText('Carousel saved as a draft. Review the complete slide order and caption.',{exact:true})).toBeVisible();
+ const review=panel.getByRole('region',{name:'Review carousel',exact:true}),consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});
+ await expect(review.getByText('Slide integrity check failed.',{exact:true})).toBeVisible();await expect(consent).toBeDisabled();await page.unroute(corruptPreview);await review.getByRole('button',{name:'Reload slide preview',exact:true}).click();
+ await expect(review.getByRole('button',{name:'Send carousel for review',exact:true})).toBeDisabled();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(review.getByRole('button',{name:'Approve carousel',exact:true})).toBeVisible();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await panel.getByRole('button',{name:'Move slide 2 up',exact:true}).click();await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
+ const id=await panel.getByLabel('Saved carousel',{exact:true}).inputValue();await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await panel.getByLabel('Saved carousel',{exact:true}).selectOption(id);await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
+ await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-carousel-mobile.png',fullPage:true});
+ const sibling=(await admin.query('SELECT id FROM app.brands WHERE organization_id=$1 AND id<>$2 LIMIT 1',[org,brand])).rows[0];assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/carousels/${id}`)).status(),404);
+ assert.deepEqual(errors,[]);
+});

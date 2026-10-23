@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import {CanvasCarousels} from './carousels';
 import {CanvasPlanner} from './canvas-planner';
 import {CanvasVideos,CanvasVideoContext} from './video-canvas';
 import {BrandReferences} from "./brand-references";
@@ -177,12 +178,12 @@ export function CanvasScreen({ business }: { business: Business }) {
   }, [root, threadId, revision]);
   const [planningDirty,setPlanningDirty]=useState(false);
   function choose(id: string) {
-    if (id === threadId && id) return;
+    if (id === threadId && id) return true;
     if (
       (dirty || prompt || planningDirty) &&
       !confirm("Leave your unsaved edits and draft message?")
     )
-      return;
+      return false;
     setPlanningThread("");
     setThreadId(id);
     setConversation(undefined);
@@ -194,6 +195,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     setError(undefined);
     submitKey.current = crypto.randomUUID();
     threadKey.current = crypto.randomUUID();
+    return true;
   }
   const [planningThread,setPlanningThread]=useState("");
   const held = conversation?.runs.some(
@@ -263,6 +265,7 @@ export function CanvasScreen({ business }: { business: Business }) {
       )}
       <Notice error={error} />
       <CanvasVideoContext businessId={business.id}/>
+      <CanvasCarousels key={business.id} businessId={business.id} onOpenSlide={(thread,project)=>{if(thread===threadId&&project!==projectId&&(dirty||prompt||planningDirty)&&!confirm("Leave your unsaved edits and draft message?"))return;if(choose(thread))setProjectId(project);}}/>
       <div className="studio-layout">
         <aside className="studio-conversations" aria-label="Conversations">
           <button disabled={!initialized || !write || busy} onClick={() => choose("")}>

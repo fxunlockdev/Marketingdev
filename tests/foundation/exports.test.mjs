@@ -298,3 +298,31 @@ test('approved export to original video skills, durable provider stage, actual m
 
 
 });
+
+test('carousel is one immutable ordered composition; scoped reviewers approve exact canonical slides and edits invalidate it',async()=>{
+ const {Carousels}=await import('../../dist/carousels.js'),service=new Carousels(canvas,renderer.image);
+ const a=await fixture(),b=await fixture(),ea=await render(a),eb=await render(b);
+ const input={project_id:null,parent_id:null,title:'TEST two-slide carousel',caption:'One shared caption',channel:'linkedin',pages:[{creative_version_id:a.id,export_id:ea.id,alt_text:'First slide description'},{creative_version_id:b.id,export_id:eb.id,alt_text:'Second slide description'}]},key=randomUUID();
+ for(const user of [viewer,bob,reviewer])await assert.rejects(service.save(user.id,brand.id,input,randomUUID()));
+ await assert.rejects(service.save(alice.id,sibling.id,input,randomUUID()));
+ for(const patch of [{pages:[input.pages[0]]},{pages:[input.pages[0],input.pages[0]]},{pages:[{...input.pages[0],export_id:eb.id},input.pages[1]]},{pages:[{...input.pages[0],alt_text:''},input.pages[1]]}])await assert.rejects(async()=>service.save(alice.id,brand.id,{...input,...patch},randomUUID()));
+ const saved=await api(path('carousels'),{method:'POST',body:input,key});assert.equal(saved.status,201);const result=saved.body;
+ assert.deepEqual(await service.save(alice.id,brand.id,input,key),result);await assert.rejects(service.save(alice.id,brand.id,{...input,caption:'Changed shared caption'},key),/another carousel/);
+ assert.equal((await service.list(alice.id,sibling.id)).carousels.length,0);await assert.rejects(service.read(bob.id,brand.id,result.project_id));
+ let data=await service.read(viewer.id,brand.id,result.project_id),v=data.versions[0];assert.equal(v.current,true);assert.deepEqual(v.pages.map(p=>p.creative_version_id),[a.id,b.id]);assert.equal(v.status,'draft');
+ const decision=(revision,decision)=>({revision,decision,sha256:v.sha256,confirmed:true,feedback:decision==='changes_requested'?'Please improve the second slide.':''});
+ await assert.rejects(service.review(alice.id,brand.id,v.id,decision(1,'approved')),/Submit/);
+ await service.review(editor.id,brand.id,v.id,decision(1,'in_review'));await assert.rejects(service.review(editor.id,brand.id,v.id,decision(2,'approved')));
+ await assert.rejects(service.review(reviewer.id,brand.id,v.id,decision(1,'approved')),/Refresh/);
+ await service.review(reviewer.id,brand.id,v.id,decision(2,'approved'));
+ data=await service.read(viewer.id,brand.id,result.project_id);assert.equal(data.versions[0].status,'approved');assert.equal(data.reviews.length,2);
+ await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.carousel_versions SET caption='forged' WHERE id=$1",[v.id]),brand.id),e=>e.code==='42501');
+ await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query('DELETE FROM app.carousel_pages WHERE carousel_version_id=$1',[v.id]),brand.id),e=>e.code==='42501');
+ const edited=await service.save(editor.id,brand.id,{...input,project_id:result.project_id,parent_id:v.id,pages:[input.pages[1],input.pages[0]]},randomUUID());
+ const updated=await service.read(alice.id,brand.id,result.project_id);const next=updated.versions.find(r=>r.id===edited.id);assert.equal(next.status,'draft');assert.notEqual(next.sha256,v.sha256);assert.equal(updated.versions.find(r=>r.id===v.id).current,false);assert.deepEqual(next.pages.map(p=>p.creative_version_id),[b.id,a.id]);
+ await assert.rejects(service.save(alice.id,brand.id,{...input,project_id:result.project_id,parent_id:v.id},randomUUID()),/Refresh/);
+ await canvas.save(alice.id,brand.id,a.project_id,{parent_id:a.id,design:a.design,caption:'A newer slide caption'});
+ assert.equal((await service.read(alice.id,brand.id,result.project_id)).versions.find(r=>r.id===edited.id).current,false);
+ await assert.rejects(service.review(alice.id,brand.id,edited.id,{revision:1,decision:'in_review',sha256:next.sha256,confirmed:true,feedback:''}),/Refresh/);
+ assert.equal((await api(path('carousels')+'/'+result.project_id,{user:bob})).status,404);
+});

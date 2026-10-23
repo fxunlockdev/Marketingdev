@@ -1,5 +1,12 @@
 # Desvio module tracker
 
+## Canvas carousel composition — locally verified foundation
+
+Migration 043 adds immutable ordered carousel versions with shared caption/channel, per-slide alt text, exact creative/export references and append-only review history. The service reuses existing canonical PNGs and tenant scope. Reorder/edit creates a draft; changed source images invalidate currentness. Owner/admin/reviewer approval requires the exact composition fingerprint and current images. API service acceptance passed ten export/carousel cases with real rendering/private storage. Canvas now has a connected composer, verified pixel previews, consent and review controls, source editing links and version history.
+
+Final acceptance passed at unchanged source `30536ecac71baefdd658b21d816b99408396a91c8fdf7416c45c5236df522fe6`: ten export/carousel service cases, all nine Canvas browser journeys, offline five and contracts 83. Coverage includes actual image generation jobs with MOCK OpenAI, real rendering, ordered composition, fingerprint-checked previews, corrupted-preview approval denial/recovery, review, reorder into a draft, reload, sibling denial and mobile accessibility. Mobile screenshot inspected. The preliminary run passed its commands but was correctly source-changed after fixing conversation-switch reset ordering and consent checkbox sizing. Full security/browser reports are historical after this new slice. Do not mark the full carousel feature complete. Whole-carousel AI planning/generation orchestration, calendar/review-inbox attachment, downloadable bundle and actual carousel publication remain required. Current UI assembles separately generated/rendered images. Migration 043 remains local; Railway is through 042. No live provider calls ran. Billing remains excluded.
+
+
 ## Dev database through 042 — verified
 
 Railway dev deployment `5ad6949d-a398-47af-9c19-de4f6f03e89b` reached SUCCESS and applied the tested MFA/experiment-report migrations with checksum replay and all six existing runtime-role login checks. It was then removed; MCP confirmed REMOVED and all seven temporary administrator/runtime-secret variables were deleted and read back absent. Runtime passwords were reused. Evidence: `docs/evidence/railway-dev-migration042.json`.

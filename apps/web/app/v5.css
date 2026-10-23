@@ -1303,6 +1303,6 @@ summary:focus-visible {
 
 .performance-lessons fieldset { border: 0; padding: 0; margin: 18px 0; min-width: 0; }
 .performance-lessons .learning-consent, .mfa-settings .learning-consent { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0; font-size: 14px; line-height: 1.6; }
-.performance-lessons .learning-consent input, .mfa-settings .learning-consent input { width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 2px 0 0; flex: 0 0 18px; }
+.performance-lessons .learning-consent input, .mfa-settings .learning-consent input,.carousel-composer .learning-consent input { width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 2px 0 0; flex: 0 0 18px; }
 .performance-lessons .creative-review { overflow-wrap: anywhere; }
 .performance-lessons details { margin: 16px 0; }

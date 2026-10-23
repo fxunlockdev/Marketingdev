@@ -1,0 +1,9 @@
+# 0050 — Ordered carousel compositions
+
+Reuse Canvas image generation/editing and its canonical renderer/private storage. A carousel is one ordered composition with a shared caption/channel and per-slide alt text. Migration 043 adds business-scoped project/version/page/review records; each immutable page references the exact existing creative version and canonical export with composite tenant foreign keys. No files or provider credentials are duplicated into the carousel tables.
+
+Composition fingerprints bind title, caption, channel, slide order, alt text, source fingerprint and canonical pixel hash. Save/reorder creates a new draft version; original approvals/history remain. Currentness requires latest source images, matching dimensions and approved Brand Brain revision, current renderer identity and the composition fingerprint. A slide edit makes an existing carousel stale. Only exact current submitted compositions can be approved by the existing owner/admin/reviewer roles. Editors can compose/submit but cannot approve; viewers cannot write. Workers have no carousel privileges.
+
+The initial backend joins 2–10 already generated and rendered slides. This is the composition/review foundation, not completion of automatic multi-slide generation, calendar attachment, bundle export or carousel publishing. Those paths must build on this ordered identity; independent posts are not a carousel. No new pre-generation approval is required for static images. Existing provider grants/budget reservations and unknown-result holds remain authoritative.
+
+Local foundation acceptance passed at unchanged source `30536ecac71baefdd658b21d816b99408396a91c8fdf7416c45c5236df522fe6` (ten service and nine browser journeys, offline five and contracts 83): real canonical PNG rendering, authenticated API, PostgreSQL RLS and immutable/replay/reorder/stale-image checks. No provider or production acceptance is inferred.
