@@ -1,3 +1,4 @@
+import {calendarExport} from './calendar-export.js';
 import {validateVideoConcept} from './video-concept.js';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -126,7 +127,16 @@ export class ContentPlan {
    await this.event(db,user,row,'created');return {id:row.id};
   });
  }
- list(user:string,id:string,query:unknown,inbox=false) {
+ async export(user:string,id:string,query:unknown) {
+  const q=object(query,['start','end','channel','state','plan_id','format']);
+  const {format,...filters}=q;
+  if(format!=='csv'&&format!=='ics')throw new BadRequestException('Choose CSV or calendar export');
+  const result=await this.list(user,id,filters,false,true);
+  if(result.has_more)throw new BadRequestException('Choose a smaller date range for export');
+  const file=calendarExport(result.slots,format);
+  return {...file,filename:`desvio-content-plan.${file.extension}`,count:result.slots.length};
+ }
+ list(user:string,id:string,query:unknown,inbox=false,exportAll=false) {
   const q=object(query,['start','end','channel','state','plan_id','page']);
   const start=instant(q.start),end=instant(q.end);
   if(Date.parse(end)<=Date.parse(start)||Date.parse(end)-Date.parse(start)>93*86400000)throw new BadRequestException('Choose a date range of at most 93 days');
@@ -145,10 +155,10 @@ export class ContentPlan {
     FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id
     LEFT JOIN app.creative_versions v ON v.id=s.creative_version_id LEFT JOIN app.creative_projects c ON c.id=v.project_id
     LEFT JOIN app.video_versions vv ON vv.id=s.video_version_id LEFT JOIN app.video_projects vp ON vp.id=vv.project_id
-    WHERE ${where} ORDER BY s.planned_at,s.id LIMIT 100 OFFSET $8`,[...args,(page-1)*100])).rows;
+    WHERE ${where} ORDER BY s.planned_at,s.id LIMIT $9 OFFSET $8`,[...args,exportAll?0:(page-1)*100,exportAll?10000:100])).rows;
    const counts=(await db.query(`SELECT s.channel,s.state,count(*)::int AS count FROM app.content_slots s WHERE ${where} GROUP BY s.channel,s.state`,args)).rows;
    const total=counts.reduce((n,r)=>n+r.count,0);
-   return {slots:rows,counts,total,page,has_more:page*100<total};
+   return {slots:rows,counts,total,page,has_more:(exportAll?10000:page*100)<total};
   });
  }
  history(user:string,id:string,slotId:string) {

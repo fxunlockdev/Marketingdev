@@ -1,3 +1,4 @@
+import {MalwareScanner} from '../../dist/file-validation.js';
 import {GoogleGenAI} from '@google/genai';
 import {GeminiPlanner} from '../../dist/gemini-planner.js';
 import {ContentPlan} from '../../dist/content-plan.js';
@@ -18,7 +19,7 @@ import {Workspaces} from '../../dist/workspaces.js';
 import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
 // Browser integration proof uses real auth, RLS, Temporal, S3, Fabric and isolated
 // owner skills. Only the paid OpenAI transport is MOCK; no provider request leaves this test.
-import { test, before, after } from "node:test";
+import { test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -175,7 +176,7 @@ before(async () => {
     }
   });
   store = new ObjectStore(config.storage);
-  const jobs = new AssetJobs(workerPool, store, null);
+  const jobs = new AssetJobs(workerPool, store, new MalwareScanner(config.scanner));
   const provider = new CreativeProvider(
     undefined,
     new OpenAI({
@@ -281,6 +282,8 @@ before(async () => {
       new URL("../../dist/asset-workflow.js", import.meta.url),
     ),
     activities: {
+      validate:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await jobs.validate(scope);}finally{clearInterval(timer);}},
+      fail:scope=>jobs.fail(scope),
       stepVideo:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await video.step(scope);}finally{clearInterval(timer);}},
       failVideo:scope=>video.exhausted(scope),
       exportCreative:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await exporter.run(scope);}finally{clearInterval(timer);}},
@@ -414,19 +417,26 @@ after(async () => {
   await smtp?.close();
   await Promise.all([admin.end(), workerPool.end(), dispatchPool.end()]);
 });
+afterEach(async()=>{if(errors.length)console.error('BROWSER ERRORS',JSON.stringify(errors));});
+
 test("Canvas browser creates a real queued job, renders a private creative and saves editable Fabric layers (MOCK OpenAI)", async () => {
   await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER MOCK')",[org,brand]);
-  const visualId=randomUUID(),sourceId=randomUUID(),captureJob=randomUUID();
-  referenceBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
-  const key=`evidence/${org}/${brand}/browser-reference/${digest(referenceBytes)}`;
-  await store.persist(key,referenceBytes,'image/jpeg',digest(referenceBytes));
-  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'website.extract','succeeded')",[captureJob,org,brand,actor]);
-  await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,'explicit-browser-fixture','{}','https://example.org/')",[sourceId,org,brand,digest(referenceBytes)]);
-  await admin.query("INSERT INTO app.website_visuals(id,organization_id,brand_id,source_id,job_id,viewport,parser_version,object_key,sha256,bytes,width,height,observations,coverage) VALUES($1,$2,$3,$4,$5,'desktop','explicit-browser-fixture',$6,$7,$8,1440,900,'{}','{}')",[visualId,org,brand,sourceId,captureJob,key,digest(referenceBytes),referenceBytes.length]);
-  const approval=await page.request.post(`${base}/api/v1/businesses/${brand}/canvas/references`,{headers:{origin:base},data:{kind:'website',visual_id:visualId,label:'Botanical brand reference',consent:true}});assert.equal(approval.status(),201);
+  const photoBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
   await page.goto(`${base}/b/${brand}/canvas`);
   await page.getByLabel('Creative planning model',{exact:true}).selectOption('gemini');
   await page.getByText('Brand image references',{exact:true}).click();
+  await page.getByText('Add product photos',{exact:true}).click();
+  await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'canvas-product.jpg',mimeType:'image/jpeg',buffer:photoBytes});
+  await page.getByRole('button',{name:'Upload file',exact:true}).click();
+  const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+  await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
+  await approval.getByLabel('Use part of this image',{exact:true}).check();await approval.getByRole('combobox',{name:/^Crop shape/}).selectOption('square');
+  await approval.getByRole('button',{name:'Preview selected crop',exact:true}).click();await expect(approval.getByRole('img',{name:'Selected reference crop',exact:true})).toBeVisible();
+  await approval.getByLabel('Reference name',{exact:true}).fill('Botanical brand reference');
+  await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
+  await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
+  const normalized=(await admin.query("SELECT v.object_key FROM app.uploaded_visuals v JOIN app.assets a ON a.id=v.asset_id WHERE a.brand_id=$1 AND a.filename='canvas-product.jpg'",[brand])).rows[0];
+  referenceBytes=await sharp(await store.read(normalized.object_key)).extract({left:270,top:0,width:900,height:900}).png().toBuffer();
   await page.getByRole('checkbox',{name:'Botanical brand reference',exact:true}).check();
   await page
     .getByLabel("Describe your creative")
@@ -707,6 +717,10 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByLabel('Anything to focus on?').fill('TEST FIXTURE: explain refillable soap');
  await page.getByRole('button',{name:'Generate draft plan',exact:true}).click();
  await expect(page.getByText('30 posts in this view',{exact:true})).toBeVisible({timeout:30000});
+
+ const calendarDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Export calendar',exact:true}).click();
+ const exportedCalendar=await calendarDownload;assert.equal(exportedCalendar.suggestedFilename(),'desvio-content-plan.ics');
+ const calendarText=await readFile(await exportedCalendar.path(),'utf8');assert.equal(calendarText.split('BEGIN:VEVENT').length-1,30);assert.ok(calendarText.includes('STATUS:TENTATIVE'));
  await page.screenshot({path:'work/browser/content-plan-desktop.png',fullPage:true});
  await page.getByRole('button',{name:'LinkedIn',exact:true}).click();
  await expect(page.getByText('15 posts in this view',{exact:true})).toBeVisible();
@@ -775,6 +789,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByText('Plan content in Canvas',{exact:true}).click();
  await page.getByLabel('Planning model',{exact:true}).selectOption('gemini');
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
+ await expect(page.getByText('Plan content in Canvas',{exact:true})).toHaveCount(1);
  await page.getByLabel('Set days and post counts myself',{exact:true}).check();
  await page.getByLabel('Planning days',{exact:true}).fill('4');
  await page.getByLabel('Videos in this plan',{exact:true}).fill('2');

@@ -225,3 +225,16 @@ test('authenticated slot detail/generation routes preserve revision, idempotency
  const detail=await api(path(endpoint));assert.equal(detail.status,200);assert.equal(detail.body.slot.revision,s.revision+1);assert.equal(detail.body.generations[0].job_id,queued.body.id);assert.equal(detail.body.generations[0].attachment_status,'pending');
  assert.equal((await api(path(`${endpoint}/generate-creative`),{method:'POST',key:randomUUID(),body})).status,409);
 });
+
+test('calendar export reads all filtered saved posts with authenticated business isolation',async()=>{
+ const slots=Array.from({length:101},()=>({...slot(),creative_version_id:null}));
+ const created=await api(path('content-plans'),{method:'POST',key:randomUUID(),body:payload(slots)});assert.equal(created.status,201);
+ const url=path(`content-plan/export?${query({plan_id:created.body.id,format:'ics'})}`);
+ const exported=await api(url);assert.equal(exported.status,200);assert.equal(exported.body.count,101);
+ assert.equal(exported.body.content.split('BEGIN:VEVENT').length-1,101);
+ assert.equal((await api(url,{user:bob})).status,404);
+ assert.equal((await api(url,{user:null})).status,401);
+ assert.equal((await api(path(`content-plan/export?${query({plan_id:created.body.id,format:'csv',channel:'instagram'})}`))).body.count,0);
+ assert.equal((await api(path(`content-plan/export?${query({plan_id:created.body.id,format:'csv'})}`,sibling))).body.count,0);
+ assert.equal((await api(path(`content-plan/export?${query({format:'html'})}`))).status,400);
+});

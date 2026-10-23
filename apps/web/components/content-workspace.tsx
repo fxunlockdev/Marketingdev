@@ -111,6 +111,20 @@ export function ContentWorkspace({
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
   useEffect(()=>{const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
+  const [exporting,setExporting]=useState(false),exportActive=useRef(true);
+  useEffect(()=>{exportActive.current=true;return()=>{exportActive.current=false;};},[]);
+  async function exportCalendar(format:'csv'|'ics'){
+    if(!prefs||!first||!last||exporting)return;
+    setExporting(true);setError(undefined);
+    try{
+      const query=new URLSearchParams({start:dayStart(first,prefs.timezone),end:dayStart(last,prefs.timezone),format,...(channel?{channel}:{}),...(state?{state}:{})});
+      const file=await api(`${root}/content-plan/export?${query}`);
+      if(!exportActive.current)return;
+      const url=URL.createObjectURL(new Blob([file.content],{type:file.content_type}));
+      const link=document.createElement('a');link.href=url;link.download=file.filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      setMessage(`Exported ${file.count} saved posts. This does not schedule or publish them.`);
+    }catch(e){if(exportActive.current)setError(e);}finally{if(exportActive.current)setExporting(false);}
+  }
   const canWrite = ['owner','admin','editor'].includes(business.role),
     canReview = ["owner", "admin", "reviewer"].includes(business.role);
   useUnsavedChanges(!!brief || busy);
@@ -473,6 +487,7 @@ export function ContentWorkspace({
             )}
           </Field>
           <button onClick={() => setReload((n) => n + 1)}>Refresh posts</button>
+          {!inbox&&<><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('csv')}>Export CSV</button><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('ics')}>Export calendar</button></>}
           {!inbox && canWrite && view !== 'list' && <button onClick={() => filter(() => setView('list'))}>Select drafts for review</button>}
         </div>
         <div className="plan-actions" aria-label="Calendar navigation">

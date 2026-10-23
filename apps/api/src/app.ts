@@ -162,6 +162,7 @@ class ContentPlanController {
  @Get('content-plans/:planId') detail(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string){return this.planning.detail(r.actorId,id,p);}
  @Post('planning-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.planning.cancel(r.actorId,id,j);}
  @Post('content-plans') create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,id,body,key);}
+ @Get('content-plan/export') export(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.export(r.actorId,id,query);}
  @Get('content-plan') list(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query);}
  @Get('review-inbox') inbox(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query,true);}
  @Get('content-slots/:slotId') slot(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string){return this.creatives.detail(r.actorId,id,slot);}

@@ -80,3 +80,11 @@ verify-container-images:
 .PHONY: verify-product-photos
 verify-product-photos:
 	$(PYTHON) -m scripts.verify product-photos
+
+.PHONY: verify-canvas-photos
+verify-canvas-photos:
+	$(PYTHON) -m scripts.verify canvas-photos
+
+.PHONY: verify-canvas-calendar
+verify-canvas-calendar:
+	$(PYTHON) -m scripts.verify canvas-calendar

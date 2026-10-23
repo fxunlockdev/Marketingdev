@@ -38,10 +38,12 @@ const types: Record<string, string> = {
 };
 export function BrandFiles({
   org,
-  brandId,
+  brandId, imagesOnly=false, onReady,
 }: {
   org: Workspace;
   brandId: string;
+  imagesOnly?: boolean;
+  onReady?: ()=>void;
 }) {
   const path = `/api/v1/workspaces/${org.id}/brands/${brandId}`,
     [assets, setAssets] = useState<Asset[]>(),
@@ -50,6 +52,7 @@ export function BrandFiles({
     [progress, setProgress] = useState(""),
     [error, setError] = useState<unknown>(),
     [loadError, setLoadError] = useState<unknown>();
+  const readySignature=useRef(''),readyCallback=useRef(onReady);readyCallback.current=onReady;
   const requestKey = useRef<string | null>(null),
     reservation = useRef<string | null>(null),
     input = useRef<HTMLInputElement>(null),
@@ -59,7 +62,10 @@ export function BrandFiles({
     try {
       const value = await api(path + "/assets");
       if (alive.current) {
-        setAssets(value.assets);
+        const visible=imagesOnly?value.assets.filter((a:Asset)=>a.content_type.startsWith('image/')):value.assets;
+        setAssets(visible);
+        const signature=visible.filter((a:Asset)=>a.state==='ready').map((a:Asset)=>a.id).sort().join(',');
+        if(signature!==readySignature.current){readySignature.current=signature;readyCallback.current?.();}
         setLoadError(undefined);
       }
     } catch (e) {
@@ -84,8 +90,8 @@ export function BrandFiles({
     setError(undefined);
     try {
       const type = types[file.name.split(".").at(-1)?.toLowerCase() ?? ""];
-      if (!type || file.size < 1 || file.size > 20 * 1024 * 1024)
-        throw new Error("Choose a PNG, JPEG, WebP, PDF or PPTX up to 20 MB.");
+      if (!type || (imagesOnly&&!type.startsWith('image/')) || file.size < 1 || file.size > 20 * 1024 * 1024)
+        throw new Error(imagesOnly?"Choose a PNG, JPEG or WebP up to 20 MB.":"Choose a PNG, JPEG, WebP, PDF or PPTX up to 20 MB.");
       setProgress("Preparing your file…");
       const hash = Array.from(
         new Uint8Array(
@@ -171,8 +177,8 @@ export function BrandFiles({
     <section className="file-library">
       <div className="section-heading">
         <div>
-          <h2>Brand files</h2>
-          <p className="hint">Guidelines, logos and visual references.</p>
+          <h2>{imagesOnly?"Product photos":"Brand files"}</h2>
+          <p className="hint">{imagesOnly?"Upload, preview and approve a photo before using it in a creative.":"Guidelines, logos and visual references."}</p>
         </div>
         <span className="status neutral">Private to this client</span>
       </div>
@@ -182,8 +188,8 @@ export function BrandFiles({
             ↥
           </span>
           <Field
-            label="Choose a brand file"
-            hint="PNG, JPEG, WebP, PDF or PPTX · up to 20 MB"
+            label={imagesOnly?"Choose a product photo":"Choose a brand file"}
+            hint={imagesOnly?"PNG, JPEG or WebP · up to 20 MB":"PNG, JPEG, WebP, PDF or PPTX · up to 20 MB"}
           >
             {(id, hint) => (
               <input
@@ -191,7 +197,7 @@ export function BrandFiles({
                 id={id}
                 type="file"
                 required
-                accept=".png,.jpg,.jpeg,.webp,.pdf,.pptx"
+                accept={imagesOnly?".png,.jpg,.jpeg,.webp":".png,.jpg,.jpeg,.webp,.pdf,.pptx"}
                 disabled={busy}
                 aria-describedby={hint}
                 onChange={(e) => {

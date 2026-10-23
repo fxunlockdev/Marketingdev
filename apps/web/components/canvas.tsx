@@ -16,6 +16,7 @@ import {CreativeExportPanel} from './creative-export';
 import { useUnsavedChanges } from "./unsaved";
 type Business = {
   id: string;
+  organization_id: string;
   name: string;
   role: string;
   has_approved_brand: boolean;
@@ -340,13 +341,13 @@ export function CanvasScreen({ business }: { business: Business }) {
             </div>
           )}
           {!!conversation?.planning_runs.length&&<section aria-label="Conversation plans">{conversation.planning_runs.map(r=><p key={r.id}>{r.output_plan_id?<a href={`/b/${business.id}/content-plan?start=${r.starts_on}`}>Open calendar · {r.starts_on}</a>:r.cancel_requested?'Planning canceled':r.status==='queued'&&Date.parse(r.scheduled_at)>Date.now()?`Planning scheduled for ${r.starts_on}`:r.status==='unknown'?'Planning needs reconciliation before another request.':`Planning ${r.status}`}</p>)}</section>}
-          {initialized&&<CanvasPlanner key={business.id+threadId} business={business} threadId={threadId} onDirty={setPlanningDirty} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>}
+          {initialized&&<CanvasPlanner key={`planner:${business.id}:${threadId}`} business={business} threadId={threadId} onDirty={setPlanningDirty} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>}
+          <BrandReferences key={`references:${business.id}`} businessId={business.id} writable={write} uploadWorkspace={{id:business.organization_id,name:business.name,role:business.role}} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!initialized||!write||busy||held}/>
           <form className="studio-composer" onSubmit={send}>
             <fieldset
               disabled={!initialized || !write || busy || held || !business.has_approved_brand}
             >
               <legend>{edit ? "Revise this image" : "Create an image"}</legend>
-              <BrandReferences businessId={business.id} writable={write} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!write||busy||held||!business.has_approved_brand}/>
               {edit && (
                 <p>
                   Editing the selected saved version.{" "}
