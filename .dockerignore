@@ -1,14 +1,17 @@
 # Build contexts are an explicit allowlist; credentials, user uploads, test
 # fixtures, archives, repository history and local build products stay out.
-*
+**
 !package.json
 !package-lock.json
 !tsconfig.json
 !apps/
+apps/*
 !apps/api/
+apps/api/*
 !apps/api/src/
 !apps/api/src/**
 !apps/web/
+apps/web/*
 !apps/web/app/
 !apps/web/app/**
 !apps/web/components/
@@ -24,17 +27,23 @@ apps/web/node_modules
 apps/web/.env*
 apps/web/**/*.tsbuildinfo
 !database/
+database/*
 !database/migrations/
 !database/migrations/**
 !scripts/
+scripts/*
 !scripts/bootstrap-database.mjs
 !scripts/migrate.mjs
 !scripts/build-web.mjs
 !scripts/start-web.mjs
 !infra/
+infra/*
 !infra/*.Dockerfile
 **/.env
 **/.env.*
 **/node_modules
 **/.next
 **/*.tsbuildinfo
+
+**/.venv
+**/__pycache__

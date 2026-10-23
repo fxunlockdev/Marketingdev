@@ -72,3 +72,7 @@ verify-team:
 .PHONY: verify-planning
 verify-planning:
 	$(PYTHON) -m scripts.verify planning
+
+.PHONY: verify-container-images
+verify-container-images:
+	$(PYTHON) -m scripts.verify container-images

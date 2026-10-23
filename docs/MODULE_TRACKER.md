@@ -4,6 +4,10 @@ Updated 23 October 2026. Owner updated the goal: complete the end-to-end product
 
 **Status definitions:** Implemented = backed by code and persistent state. Tested locally = specific flows proved against local services; paid upstream mocks are identified. Deployed = the exact running Railway build has been checked. Live verified = genuine authorized provider/OAuth calls succeeded. Complete = the full module's specified scope and applicable launch gates pass. A screen or a passing mocked test is not completion.
 
+## Current deployment packaging work
+
+Linux amd64 API image builds and native Sharp/Temporal/application imports pass under non-root, read-only, network-disabled container constraints. Fixed missing shared calendar/type sources in the web Docker build and narrowed the actual uploaded context from 677 MB to 1.6 MB. A real scratch-image export now verifies source-only boundaries. Both amd64 images build successfully and the actual restricted web image renders sign-in in Chromium. `verify-container-images` passes at frozen source `5130f461e3ff948cdba9be10abbba1356b352ec85c663e3720bde9e5c3566877`; `verify-deployment` also passes at that source (actual context inspection, nine bootstrap/API/web checks and 26 account cases). No cloud app deployment or worker-lifecycle acceptance is claimed. See ADR 0042.
+
 ## Calendar batch submission checkpoint
 
 Content Plan now offers selection of up to 30 saved drafts and atomic submission to Review Inbox. Owner/admin/editor permissions, exact slot/media revisions, duplicate rejection and rollback are enforced; final approval and publishing remain separate. `make verify-planning` passes 13 service cases and all eight connected Canvas/calendar browser journeys, including expanded role denial and draft feedback → batch submission → review approval. Offline 4, contracts 81 and six separate security guards also pass. Focused evidence is bound to source `5fb963862766d065e4aa9a60abbb6d8cf71c699f9c8d0732f53b898f7e0e76ff`. No migration or provider contract changed. Full 33-browser checkpoint for the preceding Memory implementation is historical after this change.

@@ -11,9 +11,9 @@ This directory prepares the existing Next/Nest/PostgreSQL architecture for an is
 | Database setup (one-shot) | API image | `node scripts/bootstrap-database.mjs` | Migration administrator and six distinct generated database passwords; never attach these to API/web |
 | Private Postiz provisioner | API image | `node dist/provisioner-main.js` | Separate provisioning DB login, Temporal queue and Postiz signing/encryption configuration from ADR 0015 |
 
-The Node 26.5.0 bookworm-slim OCI index is pinned in both Dockerfiles. `runtime-image.json` records the actual public registry manifest lookup, not a successful Linux build or vulnerability clearance. Local standalone smoke uses the host's native dependencies. Linux image builds/runtime remain to be verified; the full local Docker disk and Railway deployment pause are outstanding constraints.
+The Node 26.5.0 bookworm-slim OCI index is pinned in both Dockerfiles. `runtime-image.json` records the actual public registry manifest lookup, not a successful Linux build or vulnerability clearance. Local standalone smoke uses the host's native dependencies. The dedicated `make verify-container-images` suite builds Linux amd64 API/web images and checks their native libraries and standalone browser runtime under a non-root user, read-only filesystem and dropped capabilities. See its generated evidence for the latest result; image packaging does not establish deployed worker or provider acceptance.
 
-The Docker context is explicitly allowlisted in `.dockerignore`. Only `API_ORIGIN`, a nonsecret origin, is a web build argument. No build requires a provider key or customer database credential. Runtime images use the unprivileged `node` user.
+The Docker context is explicitly allowlisted in `.dockerignore`. Parent directories are re-excluded before child paths are included, preventing sibling Python environments from entering the context. `scripts/container-context-test.py` inspects a real scratch-image export against this allowlist and a 5 MB bound. The web build includes shared calendar/type sources in its builder stage; only traced standalone output enters its runtime image. Only `API_ORIGIN`, a nonsecret origin, is a web build argument. No build requires a provider key or customer database credential. Runtime images use the unprivileged `node` user.
 
 ## Database setup
 
@@ -37,7 +37,7 @@ Use the existing authorized project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12` and r
 
 Railway's current documentation says new services cannot use the deprecated per-service `railway.json`/`railway.toml` system. No obsolete config files are supplied. Final project-wide IaC/service provisioning must cover the complete runtime and preserve existing resources; it is still pending.
 
-The ordinary worker currently launches networkless Docker sandboxes for document parsing, rendered crawling, original-skill execution and canonical rendering. A Railway service is **not proven** to provide this boundary. No public Docker socket, privileged daemon or unisolated parser replacement is introduced. Private worker execution, ClamAV signatures, Temporal durability/TLS, bucket IAM/CORS, sender delivery, operator `/setup`, callbacks and live provider evidence remain deployment acceptance requirements. Production startup remains blocked by the release gate.
+The ordinary worker currently launches networkless Docker sandboxes for document parsing, rendered crawling, original-skill execution and canonical rendering. The earlier isolated Railway sandbox probe demonstrated this container boundary on a temporary host; a durable deployed worker lifecycle is still **not proven**. No public Docker socket, privileged daemon or unisolated parser replacement is introduced. Private worker execution, ClamAV signatures, Temporal durability/TLS, bucket IAM/CORS, sender delivery, operator `/setup`, callbacks and live provider evidence remain deployment acceptance requirements. Production startup remains blocked by the release gate.
 
 ## Evidence and authoritative contracts
 

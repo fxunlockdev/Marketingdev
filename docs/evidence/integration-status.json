@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "287d9d1971aef1d9993a2d6387a58a09bf141eb5",
-  "checked_at": "2026-10-23T04:18:34.422647+00:00",
+  "code_commit": "540d6c79c7c96db52cd1374e98e1defd827fb3ab",
+  "checked_at": "2026-10-23T04:28:40.653573+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/container-images.json",
         "docs/evidence/planning.json",
         "docs/evidence/team.json",
         "docs/evidence/document-visuals.json",
@@ -89,6 +90,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/container-images.json",
         "docs/evidence/planning.json",
         "docs/evidence/team.json",
         "docs/evidence/document-visuals.json",
@@ -112,6 +114,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/container-images.json",
         "docs/evidence/planning.json",
         "docs/evidence/team.json",
         "docs/evidence/document-visuals.json",
@@ -218,7 +221,7 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "higgsfield_transport": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/contracts.json"
@@ -387,8 +390,16 @@
       ],
       "blocked_reason": "Actual local Next/Nest/session/RLS/private canonical PNG/Temporal browser journeys verify exact image/destination/time consent, persisted status/history, cancellation before submission, ambiguous-response holds, business isolation, real overview counts and desktop/mobile accessibility. Postiz HTTP is explicitly MOCK. No genuine social publication, deployed UI/ingress, analytics/usage recommendations or full launch acceptance. Focused evidence does not replace full browser/security gates."
     },
+    "linux_application_images": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/container-images.json"
+      ],
+      "blocked_reason": "Actual Linux amd64 API/web image builds, non-root read-only native Sharp/Temporal imports and standalone Chromium sign-in render. This proves packaging only. Connected cloud API/storage/mail/jobs, durable isolated workers and live providers still require deployment acceptance."
+    },
     "deployment_bootstrap": {
-      "state": "NOT_IMPLEMENTED",
+      "state": "ADAPTER_READY",
       "live_test": false,
       "evidence": [
         "docs/evidence/deployment.json"
