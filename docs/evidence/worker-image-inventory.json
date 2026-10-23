@@ -1,0 +1,36 @@
+{
+  "checked_at": "2026-10-23T06:45:28.486195+00:00",
+  "images": [
+    {
+      "role": "trusted_worker",
+      "image_id": "sha256:a4909e4e1aeb47db7feac4ce0701002fb12e918752775b35db85a615fe4c3c6c",
+      "architecture": "amd64",
+      "user": "node"
+    },
+    {
+      "role": "documents",
+      "image_id": "sha256:0eef648f8282201133fcd899748b3cf0a29ab73b082e62b611f76eaae3921bfb",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "skills",
+      "image_id": "sha256:b25c95ed832e27d66a7a6ed20262e496607b0a9959378a70411604f42b954e9a",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "static_renderer",
+      "image_id": "sha256:58db638e690bffcf383415df6295f69ee4b0329b3a691cc462b2e8f4b154796d",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "video_renderer",
+      "image_id": "sha256:5c67acaa9ce07138248e8dae28d4f432475b31877a78e38da4a548324c36fbf7",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    }
+  ],
+  "scope": "Locally built amd64 images only; not registry upload, hosted worker or connected services proof"
+}

@@ -16,3 +16,9 @@ export function pythonRuntimeImage(architecture){
  if(!/^python:3\.12-slim@sha256:[a-f0-9]{64}$/.test(image??''))throw new Error('Missing pinned Python architecture');
  return image;
 }
+
+export function renderRuntimeImage(architecture){
+ const image=JSON.parse(readFileSync(new URL('../infra/render-runtime-image.json',import.meta.url))).images[architecture];
+ if(!/^node:22-slim@sha256:[a-f0-9]{64}$/.test(image??''))throw new Error('Missing pinned render architecture');
+ return image;
+}

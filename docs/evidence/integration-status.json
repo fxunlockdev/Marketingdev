@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "ba3142514a32fcb2d50772cda3e787343fcb7e53",
-  "checked_at": "2026-10-23T06:34:08.879908+00:00",
+  "code_commit": "7fab42a50546652fdc1c9dd6a39662c42e5540c4",
+  "checked_at": "2026-10-23T06:46:40.119779+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/creative-amd64.json",
         "docs/evidence/worker-host.json",
         "docs/evidence/native-amd64.json",
         "docs/evidence/operator.json",
@@ -97,6 +98,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/creative-amd64.json",
         "docs/evidence/worker-host.json",
         "docs/evidence/native-amd64.json",
         "docs/evidence/operator.json",
@@ -128,6 +130,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/creative-amd64.json",
         "docs/evidence/worker-host.json",
         "docs/evidence/native-amd64.json",
         "docs/evidence/operator.json",

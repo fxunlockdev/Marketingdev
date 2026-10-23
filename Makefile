@@ -104,3 +104,7 @@ verify-native-amd64:
 .PHONY: verify-worker-host
 verify-worker-host:
 	$(PYTHON) -m scripts.verify worker-host
+
+.PHONY: verify-creative-amd64
+verify-creative-amd64:
+	$(PYTHON) -m scripts.verify creative-amd64

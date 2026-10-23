@@ -1,5 +1,17 @@
 # Desvio build state
 
+## amd64 creative runtimes verified
+
+Source `0a7294f7aad6c7309e546120dceed92a34670745897c523532490f89936f0659` passes all six original-skill cases and nine real PostgreSQL/private-storage/Temporal export, final-approval and video-lineage cases with amd64 skill/static/video runtimes. Provider transports remain MOCK. Static renderer keeps its original pinned Node 22 image family; explicit architecture-specific child digests were verified from that original registry index. Five local amd64 runtime image IDs are recorded in `docs/evidence/worker-image-inventory.json`; none has yet been transferred to a hosted worker. Next is private host transfer/lifecycle, Temporal/scanner configuration and connected app deployment.
+
+
+## Dev infrastructure provisioned
+
+Dedicated dev environment `6a760b10-9ed8-4f01-9c4a-77a25919755a` now has PostgreSQL service `758bf0c1-56b5-452f-be8d-fe67af927267` (template PostgreSQL 18, deployment `70cfb553-6b50-41f9-a9c0-7c08f73d1e22` observed SUCCESS) and private bucket `9355c904-bbb8-434b-b1b9-7f7a11ff7f32`. Actual bucket write/read, replay, signed download and anonymous denial passed; the probe object was removed. See machine-generated `railway-dev-resources.json` and `railway-dev-storage.json`. Browser CORS, large media and deployed tenant authorization remain unverified.
+
+One-shot bootstrap service `45ae520d-f681-424b-8758-6cee8789b2cf` has explicit staging/target configuration and six distinct generated service passwords. Secret values were passed via stdin and checked in memory, never printed or committed; the protected local recovery file is ignored. Bootstrap deployment `c260d293-7b1f-44d8-8818-eb326edfb614` reached SUCCESS and emitted `configured` only after all six runtime login checks passed. Its active administrator/password variables were cleared and the completed one-shot deployment removed. Evidence: `docs/evidence/railway-dev-bootstrap.json`. This proves database setup on the actual dev server, not connected application or worker acceptance. Original production-named services are untouched. No app/domain/worker deployment or live model/social calls are claimed.
+
+
 ## Current work — trusted worker image and host control
 
 The worker now has an amd64 image extending the actual API artifact with the pinned official Docker 29.1.2 client. `scripts/start-worker-host.mjs` checks exact local runtime image digests/architectures, refuses administrative/API/SMTP credentials, passes only allowlisted worker environment names, requires explicit provider flags, and reconciles a fixed container identity/configuration before starting it. It does not replace a differing running worker. The host uses bounded resources, non-root/read-only execution, a private Docker socket and restart policy; untrusted child containers retain existing isolation. The recorded worker-host suite passes at source `bde2fd7976e4ef4a78fc716d6b25842854d536b06be260fbda696368ea4aa9ac`: configuration guards, actual source-context export, amd64 non-root native dependencies and a real child with no network/socket/credentials/capabilities. See `WORKER_HOST_SETUP.md`. No cloud worker, durable Railway lifecycle or provider readiness is claimed. Next: finish the boundary test, package the remaining amd64 skill/static images and provision the dedicated private dev host/services.

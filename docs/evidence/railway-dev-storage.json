@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-23T06:42:08.307Z",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "bucket_id": "9355c904-bbb8-434b-b1b9-7f7a11ff7f32",
+  "passed": true,
+  "checks": [
+    "canonical_write_and_read",
+    "content_addressed_replay",
+    "signed_download",
+    "anonymous_read_denied"
+  ],
+  "probe_object_removed": true,
+  "live_model_or_social_calls": false,
+  "scope": "Actual private Railway bucket write/read/replay/signed download and anonymous denial only. No browser CORS, tenant application authorization, large video, model or end-to-end launch claim."
+}
