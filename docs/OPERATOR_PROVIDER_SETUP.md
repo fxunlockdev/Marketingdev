@@ -1,5 +1,11 @@
 # Staging provider permissions
 
+## Guided local setup
+
+Run `npm run setup:dev` from this repository in an interactive terminal. Choose activation to preview/apply saved Railway settings, or allowance setup to select an existing business and enter one capability’s model, verified prices, lifetime USD cap and expiry. No JSON editing is required. Each capability has its own cap; these are not a shared total, and prior usage counts toward the lifetime limit. Video draft text and paid video rendering need their respective separate allowances.
+
+The wizard never asks for keys: keep those in Railway server variables. It makes no model calls or social posts. It shows the existing exact preview and requires `ACTIVATE` or `AUTHORIZE` before applying. Canceling makes no runtime/allowance changes. The saved private manifest retains its change ID for reconciliation after interrupted applies; use the existing preview/apply command with that same file rather than creating another change. Publishing authorization stays in the explicit account-bound operator tool. This is local operator guidance, not a customer/admin web UI or live provider verification.
+
 ## Railway dev command
 
 From the repository, use `node infra/worker-control/configure-providers.mjs --list` to discover exact business/channel IDs. The command is pinned to the existing Desvio dev project/environment and reads the current private sandbox and trusted image inventory. It retrieves the database credential internally through the authenticated Railway CLI, sends it only over stdin to a temporary restricted container, and never installs it on the worker or API. No provider calls occur. An empty business list means the owner must first add a business in Desvio.

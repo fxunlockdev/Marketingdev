@@ -14,7 +14,8 @@
     "dev:web": "next dev apps/web --webpack -H 127.0.0.1 -p 3000",
     "start:web": "next start apps/web -H 127.0.0.1 -p 3000",
     "test:browser": "node scripts/foundation-test.mjs --web",
-    "start:provisioner": "node dist/provisioner-main.js"
+    "start:provisioner": "node dist/provisioner-main.js",
+    "setup:dev": "node infra/worker-control/setup-wizard.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1154.0",

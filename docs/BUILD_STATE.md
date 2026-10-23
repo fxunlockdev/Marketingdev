@@ -1,5 +1,9 @@
 # Desvio build state
 
+## Guided operator setup — 2026-10-24
+
+`npm run setup:dev` now guides saved-settings activation and individual business allowance setup without hand-written JSON. Exact tenant selection, eligible model IDs, explicit verified token prices, lifetime USD cap, expiry and per-request reservations flow into the existing strict manifest/preview/apply implementation. No invented rates, paid calls, social authorization or runtime administrator credentials. Explicit confirmation is required after the exact preview; private manifests preserve change IDs for reconciliation. Six focused tests cover decimal conversion, confirmation/cancellation, selected tenant/model/rates, invalid business/over-cap inputs and video model choices. The operator web UI and real provider acceptance remain unfinished; this CLI is not their substitute. Previous turn made concrete progress: actual Postiz deployment/enterprise/media verification and coordinated worker/API activation.
+
 ## Deployment repair follow-through — 2026-10-23
 
 Postiz deployment `14da6475-7421-42b2-87cd-9d1cad1fccda` failed its new non-root build check because nginx reopened `/dev/stderr`. Using nginx's inherited `stderr` fixes this; replacement `9778406c-4960-4191-9bfd-fa4343924ffa` passed that check and built manifest `sha256:d01f04795d427595c69335c4c770077c1713410f767c5164f36c2d3e90cacfad`. Railway reports SUCCESS. Actual private health passed for backend/orchestrator, unauthenticated API denial and hidden frontend. Two synthetic businesses were created through the actual enterprise API; distinct identities and crossed-binding denial passed. Evidence: `railway-postiz-health.json`, `railway-postiz-enterprise.json`. Synthetic organizations remain for audit; no social accounts or posts were created.
