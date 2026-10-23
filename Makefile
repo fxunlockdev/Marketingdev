@@ -100,3 +100,7 @@ verify-operator:
 .PHONY: verify-native-amd64
 verify-native-amd64:
 	$(PYTHON) -m scripts.verify native-amd64
+
+.PHONY: verify-worker-host
+verify-worker-host:
+	$(PYTHON) -m scripts.verify worker-host

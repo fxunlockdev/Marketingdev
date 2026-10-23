@@ -24,7 +24,7 @@ try:
         with tarfile.open(fileobj=io.BytesIO(archive)) as contents:
             files = [m.name.removeprefix('context/') for m in contents if m.isfile() and m.name.startswith('context/')]
         exact = {'package.json','package-lock.json','tsconfig.json','apps/web/next.config.mjs','apps/web/next-env.d.ts','apps/web/proxy.ts','apps/web/tsconfig.json',
-                 'scripts/bootstrap-database.mjs','scripts/migrate.mjs','scripts/build-web.mjs','scripts/start-web.mjs'}
+                 'scripts/start-worker-host.mjs','scripts/bootstrap-database.mjs','scripts/migrate.mjs','scripts/build-web.mjs','scripts/start-web.mjs'}
         prefixes = ('apps/api/src/','apps/web/app/','apps/web/components/','apps/web/public/','database/migrations/')
         for name in files:
             assert name in exact or name.startswith(prefixes) or (name.startswith('infra/') and name.endswith('.Dockerfile')), f'Unexpected build input: {name}'

@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "76ba65a1bd5897fc7277f1e56c2c466631ef619c",
-  "checked_at": "2026-10-23T06:28:23.727347+00:00",
+  "code_commit": "ba3142514a32fcb2d50772cda3e787343fcb7e53",
+  "checked_at": "2026-10-23T06:34:08.879908+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/worker-host.json",
         "docs/evidence/native-amd64.json",
         "docs/evidence/operator.json",
         "docs/evidence/review-reopen.json",
@@ -96,6 +97,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/worker-host.json",
         "docs/evidence/native-amd64.json",
         "docs/evidence/operator.json",
         "docs/evidence/review-reopen.json",
@@ -126,6 +128,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/worker-host.json",
         "docs/evidence/native-amd64.json",
         "docs/evidence/operator.json",
         "docs/evidence/review-reopen.json",

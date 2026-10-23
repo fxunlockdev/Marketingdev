@@ -34,6 +34,7 @@ database/*
 scripts/*
 !scripts/bootstrap-database.mjs
 !scripts/migrate.mjs
+!scripts/start-worker-host.mjs
 !scripts/build-web.mjs
 !scripts/start-web.mjs
 !infra/

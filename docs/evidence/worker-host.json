@@ -1,0 +1,46 @@
+{
+  "suite": "worker-host",
+  "scope": "Actual Linux amd64 trusted worker image, pinned Docker CLI, non-root native dependency probe and real nested Docker child with no socket/network/credentials/capabilities, plus operator config guards and actual source context export. No connected cloud worker, Temporal registration, lifecycle recovery or provider readiness implied.",
+  "checked_at": "2026-10-23T06:34:07.351761+00:00",
+  "source_sha256": "bde2fd7976e4ef4a78fc716d6b25842854d536b06be260fbda696368ea4aa9ac",
+  "source_sha256_start": "bde2fd7976e4ef4a78fc716d6b25842854d536b06be260fbda696368ea4aa9ac",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "tests/contracts/worker-host.test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "\u2714 host configuration keeps exact pins, disabled providers and only allowlisted environment (1.031125ms)\n\u2714 remote Docker, extra administrative credentials, mutable images and implicit enabling are denied (0.254083ms)\n\u2139 tests 2\n\u2139 suites 0\n\u2139 pass 2\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 44.2285\n"
+    },
+    {
+      "command": [
+        "/Users/viloljoshi/Documents/Codex/2026-10-21/i-want-you-to-design-blaze-2/work/Marketingdev/.venv/bin/python3",
+        "scripts/container-context-test.py"
+      ],
+      "exit_code": 0,
+      "output": "Actual Docker context verified: 169 files, 1625600 archive bytes; source allowlist only\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/worker-image-test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "Sending build context to Docker daemon  1.619MB\n\nStep 1/16 : FROM node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb AS build\n ---> 2d49d876e962\nStep 2/16 : WORKDIR /opt/desvio\n ---> Using cache\n ---> 872a438c9623\nStep 3/16 : COPY package.json package-lock.json tsconfig.json ./\n ---> Using cache\n ---> 006f872b35ff\nStep 4/16 : RUN npm ci --ignore-scripts\n ---> Using cache\n ---> a77aa580d0b5\nStep 5/16 : COPY apps/api/src ./apps/api/src\n ---> Using cache\n ---> dcc08a05669d\nStep 6/16 : RUN npm run build && npm prune --omit=dev --ignore-scripts\n ---> Using cache\n ---> 9e45752702ff\nStep 7/16 : FROM node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb\n ---> 2d49d876e962\nStep 8/16 : WORKDIR /opt/desvio\n ---> Using cache\n ---> 872a438c9623\nStep 9/16 : ENV NODE_ENV=production LISTEN_HOST=::\n ---> Using cache\n ---> 4d150e531a17\nStep 10/16 : COPY --from=build --chown=node:node /opt/desvio/node_modules ./node_modules\n ---> Using cache\n ---> 7179652d0391\nStep 11/16 : COPY --from=build --chown=node:node /opt/desvio/dist ./dist\n ---> Using cache\n ---> af63976145eb\nStep 12/16 : COPY --chown=node:node package.json ./\n ---> Using cache\n ---> 89e4cc27cc96\nStep 13/16 : COPY --chown=node:node scripts/bootstrap-database.mjs scripts/migrate.mjs ./scripts/\n ---> Using cache\n ---> ad84050ea5e7\nStep 14/16 : COPY --chown=node:node database/migrations ./database/migrations\n ---> Using cache\n ---> fafa80454f1a\nStep 15/16 : USER node\n ---> Using cache\n ---> 25b467c11811\nStep 16/16 : CMD [\"node\",\"dist/main.js\"]\n ---> Using cache\n ---> c17e16bc8d42\nSuccessfully built c17e16bc8d42\nSuccessfully tagged desvio-api:dev-amd64\nSending build context to Docker daemon  1.619MB\n\nStep 1/7 : ARG API_IMAGE\nStep 2/7 : FROM docker:29.1.2-cli@sha256:21a1c55469066f188822c840c6524d53ee9839e22016d44ef7fbe33a9cd86d64 AS docker_cli\n ---> 21a1c5546906\nStep 3/7 : FROM ${API_IMAGE}\n ---> c17e16bc8d42\nStep 4/7 : COPY --from=docker_cli --chown=root:root /usr/local/bin/docker /usr/local/bin/docker\n ---> Using cache\n ---> c4a291b19ea9\nStep 5/7 : COPY --chown=root:root scripts/start-worker-host.mjs ./scripts/start-worker-host.mjs\n ---> c1a1d16450dc\nStep 6/7 : USER node\n ---> [Warning] The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested\n ---> Running in 62ab82102e1b\n ---> Removed intermediate container 62ab82102e1b\n ---> fec86d321f0b\nStep 7/7 : CMD [\"node\",\"dist/worker-main.js\"]\n ---> [Warning] The requested image's platform (linux/amd64) does not match the detected host platform (linux/arm64/v8) and no specific platform was requested\n ---> Running in e2cf802f4403\n ---> Removed intermediate container e2cf802f4403\n ---> a4909e4e1aeb\nSuccessfully built a4909e4e1aeb\nSuccessfully tagged desvio-worker:dev-amd64\n{\"image\":\"sha256:a4909e4e1aeb47db7feac4ce0701002fb12e918752775b35db85a615fe4c3c6c\",\"probe\":{\"uid\":1000,\"arch\":\"x64\",\"client\":\"Docker version 29.1.2, build 890dcca\",\"worker\":\"function\",\"pngBytes\":90,\"child\":{\"uid\":65534,\"net\":[\"lo\"],\"socket\":false,\"sentinel\":null,\"caps\":\"0000000000000000\"}},\"live_calls\":false,\"scope\":\"Trusted worker packaging and actual credential-free child boundary only; no connected Temporal/database/cloud lifecycle claim\"}\nDEPRECATED: The legacy builder is deprecated and will be removed in a future release.\n            Install the buildx component to build images with BuildKit:\n            https://docs.docker.com/go/buildx/\n\nDEPRECATED: The legacy builder is deprecated and will be removed in a future release.\n            Install the buildx component to build images with BuildKit:\n            https://docs.docker.com/go/buildx/\n\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}
