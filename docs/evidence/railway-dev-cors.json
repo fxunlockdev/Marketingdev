@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-23T07:16:30.608Z",
+  "bucket_id": "9355c904-bbb8-434b-b1b9-7f7a11ff7f32",
+  "rules": [
+    {
+      "AllowedMethods": [
+        "GET",
+        "HEAD",
+        "PUT"
+      ],
+      "AllowedOrigins": [
+        "https://desvio-dev-web-dev.up.railway.app"
+      ],
+      "ID": "",
+      "AllowedHeaders": [
+        "content-type",
+        "content-length"
+      ],
+      "ExposeHeaders": [
+        "ETag"
+      ],
+      "MaxAgeSeconds": 300
+    }
+  ],
+  "scope": "Bucket CORS readback only; real browser upload still required"
+}

@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-23T07:19:24.670Z",
+  "allowed_origin": "https://desvio-dev-web-dev.up.railway.app",
+  "status": "PARTIAL",
+  "preflight_allowed": true,
+  "preflight_allowed_origin": "*",
+  "foreign_preflight_origin": "*",
+  "upload_allowed_origin": "*",
+  "foreign_origin_denied": false,
+  "signed_put": true,
+  "readback": true,
+  "anonymous_denied": true,
+  "probe_removed": true,
+  "scope": "Real S3 HTTP/CORS acceptance using production ObjectStore; browser and authenticated application flow still required"
+}

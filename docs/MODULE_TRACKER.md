@@ -1,5 +1,14 @@
 # Desvio module tracker
 
+## Dev application configuration — current checkpoint
+
+Prepared `desvio-dev-api` (21260f12-2ad2-413c-9f67-2a1c4d6f8c83) and `desvio-dev-web` (a92160c2-54ef-4523-b13b-4a9a0e2dbdd2). Reserved HTTPS address: https://desvio-dev-web-dev.up.railway.app (not yet serving the app). Generated independent authentication/mail encryption keys, configured three separate database roles and private storage; secret values were sent via stdin and read back in memory. API health check is `/health`. The web backend origin uses Railway's private-domain reference, which cannot resolve until initial API deployment initializes private networking. No API/web deployment has been submitted.
+
+**External dependency:** real SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASSWORD and verified SMTP_FROM are absent from dev API. Owner has been asked to add them securely in Railway. Do not bypass email verification or substitute a fake SMTP service to claim deployment acceptance. Continue independent module implementation while awaiting this configuration.
+
+Actual storage checks passed signed PUT, byte readback and anonymous denial, and removed the probe. CORS is **PARTIAL**: the bucket readback retains the exact web origin, but real preflight and PUT responses return `*`, including a foreign-origin preflight. Do not claim origin restriction is enforced. Object access still requires signing; browser/authenticated application acceptance and this transport discrepancy remain open. Evidence: `railway-dev-app-configuration.json`, `railway-dev-cors.json`, `railway-dev-cors-acceptance.json`. Product architecture and live-provider gates are unchanged.
+
+
 ## Private dev worker deployment — current checkpoint
 
 Offline 5 and contract 83 checks pass at frozen source `5048e773545009f2c08334482299b802dbd9dec7a47cc27986935b32f7a39067`. Existing full security/browser reports remain historical; no live-provider verification is implied.
