@@ -88,3 +88,7 @@ verify-canvas-photos:
 .PHONY: verify-canvas-calendar
 verify-canvas-calendar:
 	$(PYTHON) -m scripts.verify canvas-calendar
+
+.PHONY: verify-review-reopen
+verify-review-reopen:
+	$(PYTHON) -m scripts.verify review-reopen

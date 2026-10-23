@@ -204,3 +204,14 @@ test('original analytics skills produce evidence-bound proposals; human review s
  await admin.query("UPDATE app.insight_grants SET budget_micros=1 WHERE provider='openai' AND brand_id=$1",[brand.id]);const denied=await service.submit(alice.id,brand.id,{},randomUUID()),before=calls;assert.equal(await worker.run(scope(denied)),'rejected');assert.equal(calls,before);
  await admin.query("UPDATE app.insight_grants SET budget_micros=10000000 WHERE provider='openai' AND brand_id=$1",[brand.id]);lost=true;const unknown=await service.submit(alice.id,brand.id,{},randomUUID());assert.equal(await worker.run(scope(unknown)),'unknown');const afterLost=calls;assert.equal(await worker.run(scope(unknown)),'finished');assert.equal(calls,afterLost);await assert.rejects(service.submit(alice.id,brand.id,{},randomUUID()),/reconciliation/);
 });
+
+test('reopening review or canceling a planned post cannot claim to stop a queued or accepted publication',async()=>{
+ const f=await approvedPost(),j=await queuePost(f);
+ const body={revision:f.slot.revision,creative_version_id:f.v.id,creative_sha256:f.v.sha256};
+ for(const decision of ['reopen','cancelled'])await assert.rejects(plans.review(alice.id,brand.id,f.slot.id,{...body,decision}),/active or unresolved publication/);
+ assert.equal(await handler.run(scope(j)),'accepted');
+ for(const decision of ['reopen','cancelled'])await assert.rejects(plans.review(alice.id,brand.id,f.slot.id,{...body,decision}),/active or unresolved publication/);
+ assert.equal((await record(j)).phase,'accepted');
+ const local=await approvedPost(),pending=await queuePost(local);await publisher.cancel(alice.id,brand.id,pending.id);await handler.run(scope(pending));
+ const reopened=await plans.review(alice.id,brand.id,local.slot.id,{revision:local.slot.revision,creative_version_id:local.v.id,creative_sha256:local.v.sha256,decision:'reopen'});assert.equal(reopened.state,'pending_review');
+});

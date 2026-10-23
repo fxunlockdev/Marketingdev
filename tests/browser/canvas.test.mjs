@@ -752,6 +752,12 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByRole('button',{name:'Confirm bulk approval',exact:true}).click();await expect(page.getByText('1 post approved. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
  assert.equal((await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[postSlot.id])).rows[0].state,'approved');
  await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Reopen review',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeVisible();
+ await page.reload();await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();
+ await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Approve post',exact:true}).click();
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='review_reopened'",[postSlot.id])).rows[0].n,1);
  await page.getByRole('button',{name:'Prepare final image',exact:true}).click();
  await expect(page.getByRole('img',{name:'Saved final image for approval'})).toBeVisible({timeout:30000});
  await expect(page.getByLabel('I reviewed this saved image and its text.')).toBeEnabled();await page.getByLabel('I reviewed this saved image and its text.').check();
@@ -776,7 +782,7 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  await page.getByRole('button',{name:'Attach latest Canvas version',exact:true}).click();await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();
  await expect(page.locator('.slot-caption')).toHaveText('TEST FIXTURE: Manual revision from review');
  const after=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.notEqual(after.creative_version_id,before.creative_version_id);
- assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='approved'",[before.id])).rows[0].n,1);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='approved'",[before.id])).rows[0].n,2);
  const other=(await admin.query("SELECT id FROM app.brands WHERE organization_id=$1 AND name='OTHER BUSINESS'",[org])).rows[0].id;
  await page.goto(`${base}/b/${other}/content-plan`);await page.getByLabel('Calendar date').fill('2026-11-01');await expect(page.getByText('Space for your next ideas',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Post details',exact:true})).toHaveCount(0);
  const denied=await page.request.get(`${base}/api/v1/businesses/${other}/content-slots/${before.id}`);assert.equal(denied.status(),404);assert.deepEqual(errors,[]);

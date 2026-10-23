@@ -79,6 +79,13 @@ test('selected reviewers decide exact posts but cannot edit, generate, publish o
  await assert.rejects(reviewTx(db=>db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",[randomUUID(),org.id,brand.id,reviewer.id])),e=>e.code==='42501');
  await assert.rejects(reviewTx(db=>db.query("UPDATE app.brands SET name='tampered' WHERE id=$1",[brand.id])),e=>e.code==='42501');
  const approved=await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:reviewBody(s,'approved')});assert.equal(approved.status,201,JSON.stringify(approved.body));assert.equal(approved.body.approved_by,reviewer.id);
+ const undoBody=reviewBody(approved.body,'reopen');
+ assert.equal((await api(path(`reviews/${s.id}`),{user:editor,method:'POST',body:undoBody})).status,403);
+ assert.equal((await api(path(`reviews/${s.id}`),{user:analyst,method:'POST',body:undoBody})).status,403);
+ const reopened=await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:undoBody});assert.equal(reopened.status,201,JSON.stringify(reopened.body));assert.equal(reopened.body.state,'pending_review');assert.equal(reopened.body.approved_by,null);
+ assert.equal((await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:undoBody})).status,409);
+ const history=await plans.history(reviewer.id,brand.id,s.id);assert.ok(history.events.some(e=>e.action==='review_reopened'));
+
  assert.equal((await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:reviewBody(s,'approved')})).status,409);
  let [other]=await create();other=await plans.review(editor.id,brand.id,other.id,reviewBody(other,'pending_review'));
  const feedback=await api(path(`reviews/${other.id}`),{user:reviewer,method:'POST',body:{...reviewBody(other,'changes_requested'),feedback:'Use clearer wording'}});assert.equal(feedback.status,201);assert.equal(feedback.body.state,'changes_requested');

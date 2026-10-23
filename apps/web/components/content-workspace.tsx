@@ -826,7 +826,7 @@ function SlotPanel({
         }),
       decision === "approved"
         ? "Approved this saved version. It has not been published."
-        : "Review decision saved.",
+        : decision === "reopen" ? "Review reopened. Approval was removed; this post needs review again." : "Review decision saved.",
     );
   }
   const candidates = draft && s ? localCandidates(draft.local, s.timezone) : [];
@@ -1167,13 +1167,14 @@ function SlotPanel({
                       </p>
                     </>
                   )}
+                  {canReview&&['approved','rejected','changes_requested'].includes(s.state)&&<button disabled={busy||dirty} onClick={()=>review('reopen')}>Reopen review</button>}
                   {canWrite && s.state !== "cancelled" && (
                     <button
                       disabled={busy || dirty}
                       onClick={() => {
                         if (
                           window.confirm(
-                            "Cancel this planned post? Its saved creative and history will be kept.",
+                            "Cancel this planned post? Its saved creative and history will be kept. Active publishing requests must be managed in Publishing first.",
                           )
                         )
                           review("cancelled");

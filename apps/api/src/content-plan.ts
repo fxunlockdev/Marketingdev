@@ -194,24 +194,25 @@ export class ContentPlan {
  }
  review(user:string,id:string,slotId:string,body:unknown) {
   const v=object(body,['revision','creative_version_id','creative_sha256','video_version_id','video_sha256','decision','feedback']);
-  return this.scope(user,id,true,(db,b)=>this.decide(db,b,user,id,uuid(slotId),v),['approved','changes_requested','rejected'].includes(String(v.decision)));
+  return this.scope(user,id,true,(db,b)=>this.decide(db,b,user,id,uuid(slotId),v),['approved','changes_requested','rejected','reopen'].includes(String(v.decision)));
  }
  async decide(db:PoolClient,b:Business,user:string,id:string,slotId:string,v:Record<string,unknown>) {
   const rev=revision(v.revision),decision=String(v.decision),feedback=text(v.feedback??'',2000,true);
-  if(!['pending_review','approved','changes_requested','rejected','cancelled'].includes(decision))throw new BadRequestException('Choose a review action');
+  if(!['pending_review','approved','changes_requested','rejected','cancelled','reopen'].includes(decision))throw new BadRequestException('Choose a review action');
   if(['changes_requested','rejected'].includes(decision)&&!feedback)throw new BadRequestException('Include feedback for the creator');
   const s=(await db.query('SELECT * FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,slotId])).rows[0];
   if(!s)throw new NotFoundException('Content slot not found');
   if(s.revision!==rev||s.creative_version_id!==(v.creative_version_id??null)||s.creative_sha256!==(v.creative_sha256??null)||s.video_version_id!==(v.video_version_id??null)||s.video_sha256!==(v.video_sha256??null))throw new ConflictException('Review the current post and creative version');
-  if(['approved','rejected','changes_requested'].includes(decision)&&!(await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed)throw new ForbiddenException('Only a business owner or admin can decide reviews');
-  const allowed=decision==='cancelled'?s.state!=='cancelled':decision==='pending_review'?['draft_ready','changes_requested'].includes(s.state):s.state==='pending_review';
+  if(['approved','rejected','changes_requested','reopen'].includes(decision)&&!(await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed)throw new ForbiddenException('Only a business owner or admin can decide reviews');
+  if(['reopen','cancelled'].includes(decision)&&(await db.query("SELECT 1 FROM app.publication_requests WHERE slot_id=$1 AND phase NOT IN ('rejected','canceled')",[slotId])).rowCount)throw new ConflictException('This post has an active or unresolved publication. Manage it in Publishing before changing its review or canceling the plan.');
+  const allowed=decision==='reopen'?['approved','rejected','changes_requested'].includes(s.state):decision==='cancelled'?s.state!=='cancelled':decision==='pending_review'?['draft_ready','changes_requested'].includes(s.state):s.state==='pending_review';
   if(!allowed)throw new ConflictException('This post is not eligible for that review action');
-  if(decision!=='cancelled'){
+  if(!['cancelled','reopen'].includes(decision)){
    if(s.format==='video'){await this.video(db,b.organization_id,id,s.video_version_id,s.channel);}
    else await this.creative(db,b.organization_id,id,s.creative_version_id,s.format);
   }
-  const result=(await db.query('UPDATE app.content_slots SET state=$2,revision=revision+1,approved_by=$3,approved_at=$4,updated_at=now() WHERE id=$1 RETURNING *',[slotId,decision,decision==='approved'?user:null,decision==='approved'?new Date():null])).rows[0];
-  await this.event(db,user,result,decision,feedback);
+  const result=(await db.query('UPDATE app.content_slots SET state=$2,revision=revision+1,approved_by=$3,approved_at=$4,updated_at=now() WHERE id=$1 RETURNING *',[slotId,decision==='reopen'?'pending_review':decision,decision==='approved'?user:null,decision==='approved'?new Date():null])).rows[0];
+  await this.event(db,user,result,decision==='reopen'?'review_reopened':decision,feedback);
   return result;
  }
  bulkSubmit(user:string,id:string,body:unknown) {

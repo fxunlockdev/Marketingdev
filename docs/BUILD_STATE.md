@@ -1,5 +1,11 @@
 # Desvio build state
 
+## Active checkpoint — Review reopening and publication boundaries
+
+Verified source `6963322e343d5af7ddab99ddde926df38e8b52ffe6de4467b4df59bcc0ea3649` passes offline 4, contracts 83, all 33 browser journeys and full security (26 account + 154 application cases, six guards and dependency audits). Reopening retains both approval decisions and the intervening reversal, survives reload and requires renewed final approval. Active/unresolved publication guards pass. Release remains BLOCKED on deployed product E2E, provider-worker isolation and trusted live evidence; no live calls or application deployment ran.
+
+Migration 038 and ContentPlan now support exact-version reopening by owner/admin/reviewer with retained decision history. Reviewer field restrictions remain enforced; editors and analysts cannot undo a review. Local plan cancellation and reopening reject active/unresolved publication requests. The pinned Postiz remote delete/status APIs swallow workflow termination/start errors; no safe remote cancellation or rescheduling completion is claimed. Planning services (14) and publishing services (13) passed. The first focused browser run proved reopening, reload and renewed approval but hit an older history assertion expecting one approval instead of the two intentionally retained decisions. That assertion is corrected; all 33 browser cases and full security now pass at the source above. Next: close the operator setup gap (typed provider/model/budget/social grants without manual SQL), deployed application/worker setup and remaining publication lifecycle capability. Railway still lists only Redis, Postiz, Postgres and Temporal; Desvio has no application service. Do not treat MOCK upstreams as live.
+
 ## Active checkpoint — Canvas correction and Content Plan export
 
 Canvas reference uploads exposed an adjacent React key collision when starting a new conversation: the planner and reference library shared the business ID as key. Distinct component keys now prevent duplicate/orphaned planners; a browser assertion requires exactly one planner. The temporary select-control experiment was reverted after identifying the actual cause. Product photos upload, normalize, receive explicit crop reuse approval and feed actual image inputs; paid upstream responses remain MOCK.
@@ -493,3 +499,7 @@ Verification passed within the scopes above; PR-01 is a stacked draft at https:/
 Continue work without asking product questions or provider keys prematurely. Keep the active goal honest and do all independent offline implementation before external live-test handoff.
 
 V5 next task: complete SSRF-safe website crawling and persisted semantic/goal recommendations from actual source evidence, then finalize the three-step review-first onboarding (including OCR/visual analysis and conflict handling). Continue into genuine skill-driven Canvas generation/revisions and the rest of the end-to-end flow. The current manual fallback is not the requested final onboarding experience. Production sandbox execution, selected-business role administration and live verification remain release blockers.
+
+## Next implementation checkpoint
+
+Add typed operator provider/model/budget and publishing allowlist setup so staging configuration requires no hand-written SQL. Include UI-control evidence mappings for PL-09 exports, RV-14 reopening and CV-05 direct reference uploads before the next source freeze; those catalog rows currently understate the implemented controls. Update stale deployment/reference scope descriptions in the verifier at that same boundary. Then use the audited official Railway SDK candidate and dedicated dev service contracts to deploy the existing app/isolated worker architecture. Worker host controls are documented in RAILWAY_WORKER_HOSTING_AUDIT.md; they are not yet implemented/deployed. All test processes from this checkpoint have finished.

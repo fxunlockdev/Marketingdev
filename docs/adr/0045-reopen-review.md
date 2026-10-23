@@ -1,0 +1,7 @@
+# 0045 — Reopen a saved review decision before publication
+
+A business owner, admin or selected-business reviewer may reopen an approved, rejected or changes-requested calendar post. The endpoint checks the exact current slot revision and media hashes, returns it to pending review, clears approval identity/time and appends `review_reopened` history. It does not restore an old version or remove prior decisions. Final-media approvals remain bound to their old context revision and must be renewed before publishing. Editors cannot undo a reviewer decision; read-only and foreign-business users cannot mutate it. Reviewer SQL remains limited to review fields through migration 038.
+
+Reopening and planned-post cancellation reject any active or unresolved publication request, including queued submissions. Customers first cancel an eligible unsubmitted request in Publishing and wait for its durable cancellation. Accepted/unknown external submissions remain held: local plan changes must not claim to cancel an external post. The pinned Postiz deletion/status paths swallow workflow-operation failures, so remote cancellation and rescheduling require further upstream lifecycle work; see POSTIZ_API_MATRIX.md.
+
+Backend tests cover scoped reviewer reopening, stale replay, denied editor/analyst mutations, retained history and active-publication guards. Browser acceptance reopens an approval, reloads, approves again, then prepares and approves the final image. Provider transports are MOCK; live remote cancellation is not implemented or claimed.
