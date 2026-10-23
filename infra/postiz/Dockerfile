@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ make python
     && npm install --global pnpm@10.6.1
 WORKDIR /app
 # Context is produced only by the exact-commit export script, never the working tree.
-COPY . /app
+COPY upstream /app
 ENV NODE_OPTIONS="--max-old-space-size=4096" NEXT_TELEMETRY_DISABLED=1
 RUN pnpm install --frozen-lockfile --ignore-scripts \
     && pnpm rebuild bcrypt \
@@ -17,7 +17,9 @@ RUN pnpm run build:backend && pnpm run build:orchestrator
 RUN apt-get update && apt-get install -y --no-install-recommends nginx util-linux \
     && rm -rf /var/lib/apt/lists/*
 COPY desvio-runtime /opt/desvio-postiz
-RUN chmod 755 /opt/desvio-postiz/entrypoint.sh && mkdir -p /uploads && chown node:node /uploads
+COPY DESVIO_BUILD_SOURCE.json /app/DESVIO_BUILD_SOURCE.json
+RUN chmod 755 /opt/desvio-postiz/entrypoint.sh && mkdir -p /uploads && chown node:node /uploads \
+    && setpriv --reuid=node --regid=node --init-groups nginx -t -c /opt/desvio-postiz/nginx.conf
 ENV NODE_ENV=production
 ENV PORT=5000 UPLOAD_DIRECTORY=/uploads STORAGE_PROVIDER=local
 WORKDIR /app

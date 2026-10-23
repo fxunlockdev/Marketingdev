@@ -1,13 +1,19 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {workerReadiness} from './readiness.mjs';
 const canonical=x=>x===null||typeof x!=='object'?JSON.stringify(x):Array.isArray(x)?'['+x.map(canonical).join(',')+']':'{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+canonical(x[k])).join(',')+'}';
+export const API_ACTIVATION_FLAGS=['VIDEO_ENABLED','POSTIZ_ENABLED','POSTIZ_PROVISIONING_ENABLED','POSTIZ_PUBLISHING_ENABLED'];
+export const API_ACTIVATION_KEYS=[...API_ACTIVATION_FLAGS,'VIDEO_RUNTIME_IMAGE','RENDER_RUNTIME_IMAGE'];
+export const apiSettingDefault=key=>API_ACTIVATION_FLAGS.includes(key)?'false':'';
+const disabled=values=>({...values,...Object.fromEntries(API_ACTIVATION_FLAGS.map(k=>[k,'false']))});
 const fail=code=>{throw Error(code);};
 export function activationPlan({spec,observed,api}){
  const readiness=workerReadiness(spec,observed);
  if(!observed.worker?.running||!observed.worker.id)fail('ACTIVATION_RUNNING_WORKER_REQUIRED');
  if(!api.deploymentId||api.status!=='SUCCESS')fail('ACTIVATION_HEALTHY_API_REQUIRED');
- const after={VIDEO_ENABLED:spec.values.VIDEO_ENABLED,VIDEO_RUNTIME_IMAGE:spec.values.VIDEO_RUNTIME_IMAGE,RENDER_RUNTIME_IMAGE:spec.values.RENDER_RUNTIME_IMAGE};
- const before=Object.fromEntries(Object.keys(after).map(k=>[k,api.variables[k]??(k==='VIDEO_ENABLED'?'false':'')]));
+ const social=spec.values.POSTIZ_ENABLED??'false',publishing=spec.values.POSTIZ_PUBLISHING_ENABLED??'false';
+ if(!['true','false'].includes(social)||!['true','false'].includes(publishing)||publishing==='true'&&social!=='true')fail('ACTIVATION_SOCIAL_FLAGS_INVALID');
+ const after={VIDEO_ENABLED:spec.values.VIDEO_ENABLED,POSTIZ_ENABLED:social,POSTIZ_PROVISIONING_ENABLED:social,POSTIZ_PUBLISHING_ENABLED:publishing,VIDEO_RUNTIME_IMAGE:spec.values.VIDEO_RUNTIME_IMAGE,RENDER_RUNTIME_IMAGE:spec.values.RENDER_RUNTIME_IMAGE};
+ const before=Object.fromEntries(Object.keys(after).map(k=>[k,api.variables[k]??apiSettingDefault(k)]));
  const plan={version:1,worker:{before:{id:observed.worker.id,image:observed.worker.image,configuration:observed.worker.configuration},image:spec.image,configuration:spec.configurationHash,replace:readiness.status==='replacement_required'},api:{before,after,deploymentId:api.deploymentId,update:canonical(before)!==canonical(after)}};
  return {...plan,preview_sha256:createHash('sha256').update(canonical(plan)).digest('hex')};
 }
@@ -26,8 +32,8 @@ export async function activate(plan,approval,io){
   // Recheck under the operator lock after the potentially slow idle query.
   if(activationPlan(await io.snapshot()).preview_sha256!==approval)fail('ACTIVATION_PREVIEW_STALE');
   await io.journal({stage:'starting',token,backup,plan});
-  if(plan.api.before.VIDEO_ENABLED==='true'){
-   apiTouched=true;await io.setAPI({...plan.api.before,VIDEO_ENABLED:'false'});
+  if(API_ACTIVATION_FLAGS.some(k=>plan.api.before[k]==='true')){
+   apiTouched=true;await io.setAPI(disabled(plan.api.before));
   }
   if(plan.worker.replace){
    workerTouched=true;await io.swapWorker(plan.worker,backup,token);
@@ -40,7 +46,7 @@ export async function activate(plan,approval,io){
  }catch(error){
   if(workerTouched||apiTouched){
    try{
-    if(apiTouched)await io.setAPI({...plan.api.before,VIDEO_ENABLED:'false'});
+    if(apiTouched)await io.setAPI(disabled(plan.api.before));
     if(workerTouched){await io.restoreWorker(plan.worker,backup,token);await io.verifyWorker(true);}
     if(apiTouched){await io.setAPI(plan.api.before);await io.verifyAPI(plan.api.before);}
     await io.journal({stage:'rolled_back',token,backup,plan});

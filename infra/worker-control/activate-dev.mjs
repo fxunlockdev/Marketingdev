@@ -4,7 +4,7 @@ import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {setTimeout} from 'node:timers/promises';
 import {loadDevWorker,inspectDevWorker,startDevWorker} from './start-dev.mjs';
-import {activationPlan,activate} from './activation.mjs';
+import {activationPlan,activate,API_ACTIVATION_KEYS,apiSettingDefault} from './activation.mjs';
 const service='21260f12-2ad2-413c-9f67-2a1c4d6f8c83';
 const quote=s=>"'"+s.replaceAll("'","'\\''")+"'";
 const env={...process.env,RAILWAY_CALLER:'skill:use-railway@1.7.0',RAILWAY_AGENT_SESSION:'desvio-coordinated-activation'};
@@ -54,9 +54,9 @@ export function activationIO(){
   async setAPI(values){
    guardDeployment();
    const prior=variables();
-   const keys=['VIDEO_ENABLED','VIDEO_RUNTIME_IMAGE','RENDER_RUNTIME_IMAGE'];
+   const keys=API_ACTIVATION_KEYS;
    if(keys.some(k=>!Object.hasOwn(values,k)))throw Error('ACTIVATION_API_CONFIGURATION_INVALID');
-   if(keys.every(k=>(prior[k]??(k==='VIDEO_ENABLED'?'false':''))===values[k]))return;
+   if(keys.every(k=>(prior[k]??apiSettingDefault(k))===values[k]))return;
    call(['variable','set',...keys.map(k=>k+'='+values[k]),...scope(),'--skip-deploys','--json']);
    const result=JSON.parse(call(['redeploy',...scope(),'--yes','--json']));
    const id=result.deploymentId??result.id;
@@ -74,7 +74,7 @@ export function activationIO(){
   },
   async verifyAPI(values){
    const current=guardDeployment(),actual=variables();
-   if(current.status!=='SUCCESS'||current.stopped||Object.keys(values).some(k=>(actual[k]??(k==='VIDEO_ENABLED'?'false':''))!==values[k]))throw Error('ACTIVATION_API_VERIFICATION_FAILED');
+   if(current.status!=='SUCCESS'||current.stopped||Object.keys(values).some(k=>(actual[k]??apiSettingDefault(k))!==values[k]))throw Error('ACTIVATION_API_VERIFICATION_FAILED');
   },
  };
  return io;

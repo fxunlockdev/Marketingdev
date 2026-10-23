@@ -11,7 +11,8 @@ export function postizBuildContext(checkout){
  if(git('rev-parse','HEAD')!==POSTIZ_SOURCE||git('status','--porcelain'))throw Error('POSTIZ_EXACT_CLEAN_CHECKOUT_REQUIRED');
  const directory=mkdtempSync(join(tmpdir(),'desvio-postiz-source-'));
  const archive=execFileSync('git',['-C',checkout,'archive','--format=tar',POSTIZ_SOURCE],{maxBuffer:100*1024*1024,stdio:['ignore','pipe','pipe']});
- execFileSync('tar',['-xf','-','-C',directory],{input:archive,stdio:['pipe','ignore','pipe']});
+ mkdirSync(join(directory,'upstream'));
+ execFileSync('tar',['-xf','-','-C',join(directory,'upstream')],{input:archive,stdio:['pipe','ignore','pipe']});
  copyFileSync(join(root,'infra/postiz/Dockerfile'),join(directory,'Dockerfile'));
  mkdirSync(join(directory,'desvio-runtime'));
  const runtime={};

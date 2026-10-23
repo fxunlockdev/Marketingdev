@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Postiz startup repair and coordinated social flags — in progress
+
+Deployment `9f9179c8-4b1b-4b7f-929b-8fe8dd8e3b1b` built successfully and its upstream Prisma schema push succeeded, but application startup failed because non-root nginx tried to create `/var/lib/nginx/fastcgi`. The gateway now places fastcgi/uwsgi/scgi temporary paths under `/tmp`, alongside its existing proxy/body paths. The Docker build now runs nginx configuration acceptance as user `node`, so this failure is detected before deployment. The export separates immutable upstream source from runtime overlays to avoid reinstalling/recompiling upstream when only deployment configuration changes.
+
+Corrected deployment **14da6475-7421-42b2-87cd-9d1cad1fccda** is submitted; observe that exact deployment, do not restart it on a polling timeout. Upload result: `work/postiz-railway-deploy-fixed.json`; latest source context: `work/postiz-runtime-context.json`. The obsolete native scratch build sandbox is confirmed destroyed after its log was preserved to `work/postiz-native-build-final.log`; it is not the running worker host. No image/runtime health acceptance is claimed yet.
+
+The coordinated activation plan now includes Postiz connection/provisioning/publishing flags. All active API feature flags are disabled before a worker replacement and restored during rollback; publication remains separately explicit and cannot be enabled with social disabled. Eight activation contracts pass, including the new social flag order/opt-in case. Actual social activation is still pending real Postiz health, private key synchronization and worker configuration. `infra/worker-control/check-postiz.mjs` is prepared to check the private backend/orchestrator gateway, frontend absence and unauthenticated/media denial; do not claim it passed before running against the healthy deployment. Owner will configure model keys/business/test budget themselves; continue implementation without asking again.
+
 ## Restricted provisioning worker — deployed and registered
 
 `provisioner-spec.mjs` rejects model/storage/admin credentials, mutable image tags, incorrect database roles, shared asset queues and reused keys. `start-dev-provisioner.mjs` starts only the exact existing trusted image with a separate credential set, read-only filesystem, dropped capabilities, memory/process limits and no Docker socket. Existing mismatched containers are refused, not overwritten. Secrets travel over stdin and are excluded from evidence.
