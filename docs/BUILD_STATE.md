@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Current deployment follow-up — 23 October
+
+The reported API failure notification corresponds to deployment `b34f9064-9610-4e85-a278-42c69bbee7a4` (image built, startup health check failed while Resend was unconfigured). Railway read-back confirms replacement `9ce5ba60-f1a1-4116-9911-bd0261f12ebb` SUCCESS. Public dev HTTP and actual owner Chromium sign-in/session/business access were reverified at 12:17 UTC. Earlier startup-pending entries below are historical.
+
+Owner will add keys and perform paid acceptance at the end; do not request keys or run paid tests now. New configuration-only Railway service `desvio-dev-worker-settings` holds future OPENAI_API_KEY, optional GEMINI_API_KEY, and HIGGSFIELD_CREDENTIALS. `infra/worker-control/start-dev.mjs` now reads only those allowlisted credentials; two tests reject infrastructure overrides, automatic enable flags and malformed values. Keys require worker reconfiguration/restart; video/publication feature settings and business-scoped grants remain separately required.
+
+Current trusted worker amd64 image passed actual credential-free child isolation; updated skill runtime rebuilt. Image archive transfer/rollout is underway, not yet claimed deployed. Next: verify exact host images, controlled idle worker replacement with rollback, Temporal registration and genuine private-storage job acceptance. Carousel publication remains incomplete.
+
 ## Deployed owner password login — verified
 
 API deployment `9ce5ba60-f1a1-4116-9911-bd0261f12ebb` and web deployment `2ac61a33-7ac1-4c39-9eb9-906c0ee58fb7` are SUCCESS. API private networking is ACTIVE at `desvio-dev-api.railway.internal`; the web origin is https://desvio-dev-web-dev.up.railway.app. Resend is not required for this owner-authorized nonproduction access mode.

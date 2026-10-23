@@ -1,8 +1,11 @@
 import {execFileSync} from 'node:child_process';import {readFileSync,writeFileSync,existsSync} from 'node:fs';import {randomUUID} from 'node:crypto';
 const host=JSON.parse(readFileSync('work/railway-worker-host.json')),project='5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12',environment='6a760b10-9ed8-4f01-9c4a-77a25919755a';
+const suffix=process.env.DESVIO_PROBE_SUFFIX??'';
+if(suffix&&!/^[a-z0-9-]{1,40}$/.test(suffix))throw Error('Invalid probe suffix');
+const scoped=p=>suffix?p.replace(/\.json$/, '-'+suffix+'.json'):p;
 const cleanup=process.argv.includes('--cleanup'),recovery=process.argv.includes('--recovery');
-const evidencePath=recovery?'docs/evidence/railway-worker-recovery.json':'docs/evidence/railway-worker-job.json',cleanupPath=recovery?'docs/evidence/railway-worker-recovery-cleanup.json':'docs/evidence/railway-worker-job-cleanup.json';
-const statePath=recovery?'work/railway-job-recovery-probe.json':'work/railway-job-probe.json',q=s=>"'"+s.replaceAll("'","'\\''")+"'";
+const evidencePath=scoped(recovery?'docs/evidence/railway-worker-recovery.json':'docs/evidence/railway-worker-job.json'),cleanupPath=scoped(recovery?'docs/evidence/railway-worker-recovery-cleanup.json':'docs/evidence/railway-worker-job-cleanup.json');
+const statePath=scoped(recovery?'work/railway-job-recovery-probe.json':'work/railway-job-probe.json'),q=s=>"'"+s.replaceAll("'","'\\''")+"'";
 const env={...process.env,RAILWAY_CALLER:'skill:use-railway@1.7.0',RAILWAY_AGENT_SESSION:'desvio-dev-job-20261023'};
 const call=(args,input,timeout=30000)=>execFileSync('railway',args,{input,encoding:'utf8',timeout,env,stdio:['pipe','pipe','pipe']});
 try{

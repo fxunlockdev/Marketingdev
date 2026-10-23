@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-10-23T06:45:28.486195+00:00",
+  "checked_at": "2026-10-23T12:17:03.920467+00:00",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:a4909e4e1aeb47db7feac4ce0701002fb12e918752775b35db85a615fe4c3c6c",
+      "image_id": "sha256:af1425942e5f24a8a7c836fd142666ffbaaac81e0901f9c2dd632b1fe29654d4",
       "architecture": "amd64",
       "user": "node"
     },
@@ -15,7 +15,7 @@
     },
     {
       "role": "skills",
-      "image_id": "sha256:b25c95ed832e27d66a7a6ed20262e496607b0a9959378a70411604f42b954e9a",
+      "image_id": "sha256:e00d2d1b83e6d8b68d33556a98068ca361cbd1f1265be546ef5f96185a80fc31",
       "architecture": "amd64",
       "user": "65534:65534"
     },

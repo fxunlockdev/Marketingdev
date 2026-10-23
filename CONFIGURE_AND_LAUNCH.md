@@ -57,3 +57,7 @@ For the selected Resend provider, set `MAIL_PROVIDER=resend`, `RESEND_API_KEY` a
 ### Temporary private dev access without email
 
 With owner authorization, staging can explicitly set `MAIL_PROVIDER=disabled`. Only already verified/operator-provisioned password accounts can sign in; public signup and email delivery are unavailable. The mail worker does not consume pending messages. This is not a production mode, default password or global email-verification bypass. Provision only the owner's requested address, keep any temporary password in a private local file, and change it through normal Profile controls. Switch to Resend and verify real delivery before enabling customer signup/invitations.
+
+### Dev provider credential location
+
+In Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12`, environment **dev**, open **desvio-dev-worker-settings → Variables**. Add `OPENAI_API_KEY`, optionally `GEMINI_API_KEY`, and `HIGGSFIELD_CREDENTIALS` (`API_KEY:API_SECRET`). This is a settings-only service; credentials are read by the private worker deployment script, never the web service. Adding a variable does not automatically restart the sandbox worker. Apply via a controlled worker rollout; `start-dev.mjs` refuses an existing worker with different configuration. Video enablement/output origins/encryption and expiring business provider grants are separate prerequisites. Live calls and social publishing remain off until explicitly authorized. Owner has deferred adding credentials and will perform live tests later.
