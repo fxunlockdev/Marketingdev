@@ -326,3 +326,73 @@ test('carousel is one immutable ordered composition; scoped reviewers approve ex
  await assert.rejects(service.review(alice.id,brand.id,edited.id,{revision:1,decision:'in_review',sha256:next.sha256,confirmed:true,feedback:''}),/Refresh/);
  assert.equal((await api(path('carousels')+'/'+result.project_id,{user:bob})).status,404);
 });
+
+test('carousel generation reserves ordered children once, isolates tenants and cancels without provider calls',async()=>{
+ const {CarouselGeneration}=await import('../../dist/carousel-generation.js');
+ const {CarouselJobs}=await import('../../dist/carousel-jobs.js');
+ const {CreativeJobs}=await import('../../dist/creative-jobs.js');
+ const {CreativeProvider}=await import('../../dist/creative-provider.js');
+ await admin.query("UPDATE app.jobs SET created_at=now()-interval '2 days' WHERE brand_id=$1",[brand.id]);
+ const service=new CarouselGeneration(canvas,renderer.image);
+ const body={prompt:'TEST FIXTURE: coordinated three-slide story',slide_count:3,channel:'linkedin',size:'1024x1024',text_provider:'openai'},key=randomUUID();
+ await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true",[org.id,brand.id]);
+ await assert.rejects(service.submit(viewer.id,brand.id,body,randomUUID()));
+ await assert.rejects(service.submit(bob.id,brand.id,body,randomUUID()));
+ const j=await service.submit(alice.id,brand.id,body,key);
+ assert.equal((await service.submit(alice.id,brand.id,body,key)).id,j.id);
+ await assert.rejects(service.submit(alice.id,brand.id,{...body,slide_count:4},key));
+ const read=await service.read(alice.id,brand.id),children=read.slides.filter(s=>s.parent_job_id===j.id);
+ assert.deepEqual(children.map(s=>s.position),[0,1,2]);
+ assert.ok(children.every(s=>s.generation_status==='queued'&&s.export_status==='queued'));
+ assert.equal((await service.read(alice.id,sibling.id)).runs.length,0);
+ const ids=(await admin.query('SELECT generation_job_id,export_job_id FROM app.carousel_children WHERE parent_job_id=$1',[j.id])).rows.flatMap(r=>[r.generation_job_id,r.export_job_id]);
+ assert.equal((await admin.query('SELECT * FROM app.job_dispatch WHERE job_id=ANY($1::uuid[])',[ids])).rowCount,0);
+ assert.equal((await admin.query('SELECT * FROM app.job_dispatch WHERE job_id=$1',[j.id])).rowCount,1);
+ await service.cancel(alice.id,brand.id,j.id);
+ const creative=new CreativeJobs(jobs,{carouselPlan(){throw Error('Canceled requests must never call a model');}},new CreativeProvider());
+ const coordinator=new CarouselJobs(jobs,creative,handler);
+ assert.equal((await coordinator.plan(scope(j))).state,'canceled');
+ assert.ok((await admin.query('SELECT status FROM app.jobs WHERE id=ANY($1::uuid[])',[ids])).rows.every(r=>r.status==='canceled'));
+ assert.equal((await admin.query('SELECT * FROM app.creative_calls WHERE job_id=ANY($1::uuid[])',[[j.id,...ids]])).rowCount,0);
+ await assert.rejects(workerPool.query('INSERT INTO app.carousel_reviews DEFAULT VALUES'),e=>e.code==='42501');
+});
+
+test('durable carousel uses one actual isolated plan, sequential MOCK images and real exports; replay does not charge twice',async()=>{
+ const [{CarouselGeneration},{CarouselJobs},{CreativeJobs},{CreativeProvider},{SkillRuntime},{prepareSkillImage},{default:OpenAI},{carouselPlan}]=await Promise.all([
+ import('../../dist/carousel-generation.js'),import('../../dist/carousel-jobs.js'),import('../../dist/creative-jobs.js'),import('../../dist/creative-provider.js'),import('../../dist/skill-runtime.js'),import('../../scripts/skill-test-image.mjs'),import('openai'),import('../fixtures/carousel-planning.mjs')]);
+ let planning=0,images=0,uncertainAt=0;
+ const provider=new CreativeProvider(undefined,new OpenAI({apiKey:'LOCAL MOCK',maxRetries:0,fetch:async(url,init)=>{
+  if(new URL(url).pathname==='/v1/responses'){
+   planning++;const wire=JSON.parse(init.body),message=wire.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')),input=JSON.parse(message.content.slice(message.content.indexOf('\n')+1)),plan=carouselPlan(input.slide_count);
+   for(const slide of plan.slides){slide.fact_ids=[input.brand.facts[0].id];slide.headline=`Slide ${slide.position}`;slide.body='';slide.cta='';}
+   return Response.json({object:'response',id:'mock-carousel',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(plan),annotations:[]}]}],usage:{input_tokens:100,output_tokens:100,total_tokens:200}});
+  }
+  assert.equal(new URL(url).pathname,'/v1/images/generations');images++;if(images===uncertainAt)throw new TypeError('TEST FIXTURE connection lost after possible submission');
+  return Response.json({created:1,data:[{b64_json:png.toString('base64')}],usage:{input_tokens:50,output_tokens:100,total_tokens:150}});
+ }}));
+ const creative=new CreativeJobs(jobs,new SkillRuntime(prepareSkillImage()),provider),coordinator=new CarouselJobs(jobs,creative,handler),service=new CarouselGeneration(canvas,renderer.image);
+ const j=await service.submit(alice.id,brand.id,{prompt:'TEST FIXTURE: a connected two-slide story',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID());
+ const native=await NativeConnection.connect({address:config.jobs.address}),connection=await Connection.connect({address:config.jobs.address}),taskQueue='carousel-'+randomUUID();
+ const beat=fn=>async(...args)=>{const ctx=Context.current(),timer=setInterval(()=>ctx.heartbeat(),1000);try{return await fn(...args);}finally{clearInterval(timer);}};
+ const temporal=await Worker.create({connection:native,namespace:config.jobs.namespace,taskQueue,workflowsPath:fileURLToPath(new URL('../../dist/asset-workflow.js',import.meta.url)),activities:{planCarousel:beat(s=>coordinator.plan(s)),prepareCarouselExport:beat((s,p)=>coordinator.prepareExport(s,p)),checkCarouselExport:beat((s,p)=>coordinator.checkExport(s,p)),completeCarousel:beat(s=>coordinator.complete(s)),failCarousel:beat(s=>coordinator.fail(s)),generateCreative:beat(s=>creative.run(s)),failCreative:s=>creative.fail(s),exportCreative:beat(s=>handler.run(s)),failExport:s=>handler.fail(s)}});
+ try{const client=new Client({connection,namespace:config.jobs.namespace});const result=await temporal.runUntil(()=>client.workflow.execute('generateCarouselWorkflow',{workflowId:'carousel-'+j.id,taskQueue,args:[scope(j)]}));assert.equal(result,'succeeded',JSON.stringify((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[j.id])).rows));}finally{await native.close();await connection.close();}
+ assert.equal(planning,1);assert.equal(images,2);
+ const read=await service.read(alice.id,brand.id),run=read.runs.find(r=>r.id===j.id);assert.ok(run.output_version_id);
+ const saved=(await admin.query('SELECT * FROM app.carousel_versions WHERE id=$1',[run.output_version_id])).rows[0];assert.equal(saved.status,'draft');assert.equal(saved.reviewed_by,null);
+ assert.equal((await admin.query('SELECT * FROM app.carousel_pages WHERE carousel_version_id=$1',[saved.id])).rowCount,2);
+ assert.equal((await coordinator.plan(scope(j))).state,'succeeded');assert.equal(await coordinator.complete(scope(j)),'succeeded');assert.equal(planning,1);assert.equal(images,2);
+ uncertainAt=4;
+ const partial=await service.submit(alice.id,brand.id,{prompt:'TEST FIXTURE: preserve an uncertain partial result',slide_count:3,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID());
+ const ready=await coordinator.plan(scope(partial));assert.equal(ready.state,'ready');
+ const first=ready.children[0],second=ready.children[1];
+ assert.equal(await creative.run({...scope(partial),jobId:first.generation_job_id}),'succeeded');
+ const exp=await coordinator.prepareExport(scope(partial),0);assert.equal(exp.state,'ready');assert.equal(await handler.run(exp.export_scope),'succeeded');
+ assert.equal(await creative.run({...scope(partial),jobId:second.generation_job_id}),'unknown');
+ assert.equal((await coordinator.prepareExport(scope(partial),1)).state,'unknown');
+ assert.equal((await coordinator.plan(scope(partial))).state,'unknown');assert.equal(images,4);assert.equal(planning,2);
+ const partialRead=await service.read(alice.id,brand.id),slides=partialRead.slides.filter(s=>s.parent_job_id===partial.id);
+ assert.deepEqual(slides.map(s=>s.generation_status),['succeeded','unknown','canceled']);assert.ok(slides[0].output_version_id);assert.ok(slides[0].export_id);assert.equal(partialRead.runs.find(r=>r.id===partial.id).output_version_id,null);
+ await assert.rejects(service.cancel(alice.id,brand.id,partial.id),/Active carousel generation not found/);assert.equal(await coordinator.fail(scope(partial)),'unknown');assert.equal(images,4);
+ await assert.rejects(service.submit(alice.id,brand.id,{prompt:'Must not bypass the unknown hold',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID()),/reconciliation/);
+
+});

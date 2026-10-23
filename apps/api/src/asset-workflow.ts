@@ -69,3 +69,19 @@ type InsightActivities={generateInsights(scope:JobScope):Promise<string>;failIns
 const insights=proxyActivities<InsightActivities>({startToCloseTimeout:'6 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
 const insightFinalization=proxyActivities<InsightActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
 export async function generateInsightsWorkflow(scope:JobScope){try{return await insights.generateInsights(scope);}catch{return await insightFinalization.failInsights(scope);}}
+
+type CarouselActivities={planCarousel(scope:JobScope):Promise<{state:string;children?:{position:number;generation_job_id:string;export_job_id:string}[]}>;prepareCarouselExport(scope:JobScope,position:number):Promise<{state:string;export_scope?:JobScope}>;checkCarouselExport(scope:JobScope,position:number):Promise<string>;completeCarousel(scope:JobScope):Promise<string>;failCarousel(scope:JobScope):Promise<string>};
+const carousel=proxyActivities<CarouselActivities>({startToCloseTimeout:'6 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
+const carouselFinalization=proxyActivities<CarouselActivities>({startToCloseTimeout:'60 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function generateCarouselWorkflow(scope:JobScope){
+ try{
+  const plan=await carousel.planCarousel(scope);if(plan.state!=='ready')return plan.state;
+  for(const child of plan.children!){
+   await generateCreativeWorkflow({...scope,jobId:child.generation_job_id});
+   const next=await carousel.prepareCarouselExport(scope,child.position);if(next.state!=='ready')return next.state;
+   await exportCreativeWorkflow(next.export_scope!);
+   const state=await carousel.checkCarouselExport(scope,child.position);if(state!=='ready')return state;
+  }
+  return await carousel.completeCarousel(scope);
+ }catch{return await carouselFinalization.failCarousel(scope);}
+}

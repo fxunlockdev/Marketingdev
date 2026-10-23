@@ -234,7 +234,7 @@ export class Canvas {
       if (
         (
           await db.query(
-            "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND status IN ('queued','running','retrying','unknown') LIMIT 1",
+            "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('creative.generate','carousel.generate') AND status IN ('queued','running','retrying','unknown') LIMIT 1",
             [b.organization_id, id],
           )
         ).rowCount

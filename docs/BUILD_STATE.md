@@ -1,5 +1,14 @@
 # Desvio build state
 
+## Whole-carousel generation — backend locally verified
+
+At unchanged source `ac58968061b65a9dbccadf64776f5094258b7eb6183c650baef3cc17fef40b9a`, all 12 export/video/carousel integration tests pass. Machine evidence: `docs/evidence/carousel-generation.json`. Actual PostgreSQL RLS, Temporal, isolated original skills, private storage and canonical rendering ran with MOCK model/provider transports. Coverage includes one shared plan, ordered child generation/export, draft-only promotion, replay without duplicate calls, cancellation before model calls, uncertain second-image submission, preserved first-slide output and denial of further requests while reconciliation is needed. An uncertain outcome remains unknown; it cannot be cleared by cancellation.
+
+Migration 044 and `carousel-generation.ts` / `carousel-jobs.ts` connect the existing creative/export activities without app credentials in the worker. Preliminary tests caught and fixed a worker-only cancellation privilege issue and a recursive export policy. No privileges were broadened to fix cancellation. Export insertion binds the exact child output; ExportJobs still validates its immutable source hash. All 88 standalone contract checks also passed before the final focused changes; standard offline five and contracts 83 also pass for this final source.
+
+Next: connect the Canvas generation UI and its browser acceptance, then calendar/review-inbox attachment, bundle export and carousel publication. The existing composer/editor/review UI is implemented, but the new whole-carousel generation endpoint is not yet wired to it. Full product completion and live quality are not claimed. Migration 044 remains local; Railway is through 042. No paid/live provider calls ran. Billing excluded.
+
+
 ## Coordinated carousel planning — locally verified runtime
 
 A dedicated carousel task now uses the existing isolated original skills and produces one shared story/visual direction/caption with 2–10 ordered slide briefs and alt text. Strict validation binds each slide to approved evidence; the same OpenAI/Gemini text adapters are used. Copywriting digests were verified from the original archive. At unchanged source `a8b0a7babaf0da93ea5d2cac7b6ef9de6fea97bf702c95318da2e0da2996a763`, three new contract checks and nine actual isolated runtime checks pass, including OpenAI/Gemini SDK transports with MOCK responses and static/calendar/video branch regression. Offline five and contracts 83 also pass. Evidence: `docs/evidence/carousel-planning.json`. The hosted skill image has not been replaced; deployed acceptance remains pending.

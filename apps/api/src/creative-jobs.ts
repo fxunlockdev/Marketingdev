@@ -1,3 +1,4 @@
+import {validateCarouselResult,carouselSlideBrief} from './carousel-planning.js';
 import {assertLearningCurrent} from './learning-context.js';
 import {GeminiPlanner} from "./gemini-planner.js";
 import {ApiError as GeminiAPIError} from "@google/genai";
@@ -36,12 +37,12 @@ export class CreativeJobs {
     const sql=provider==="gemini"?"SELECT * FROM app.gemini_creative_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()":"SELECT * FROM app.creative_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()";
     return (await db.query(sql,[j.organization_id,j.brand_id])).rows[0];
   }
-  async planCall(scope:JobScope,message:PlannerRequest,request:any){
+  async planCall(scope:JobScope,message:PlannerRequest,request:any,maxOutputTokens:4000|16000=4000){
     const provider=this.planner(request.text_provider),model=request.selected_text_model;
     if(!model)throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
     if(!provider.configured)throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
-    const wire=provider.plannerRequest(message,model,4000);
-    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>wire.maxInputTokens*Number(g.input_micros_per_token)+wire.maxOutputTokens*Number(g.output_micros_per_token),()=>provider.plan(message,model,4000),request.text_provider);
+    const wire=provider.plannerRequest(message,model,maxOutputTokens);
+    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>wire.maxInputTokens*Number(g.input_micros_per_token)+wire.maxOutputTokens*Number(g.output_micros_per_token),()=>provider.plan(message,model,maxOutputTokens),request.text_provider);
   }
   finish(db: any, j: any, status: string, code: string | null = null) {
     return db
@@ -63,11 +64,12 @@ export class CreativeJobs {
     const prepared = await this.jobs.transaction(scope, async (db, j) => {
       if (!(await this.jobs.permitted(db, j)))
         throw new CreativeError("CREATIVE_ACCESS_REVOKED");
-      const memorySQL=j.kind==='creative.video'?'SELECT memory_context FROM app.video_requests WHERE job_id=$1':'SELECT memory_context FROM app.creative_requests WHERE job_id=$1';
+      const memorySQL=j.kind==='carousel.generate'?'SELECT memory_context FROM app.carousel_requests WHERE job_id=$1':j.kind==='creative.video'?'SELECT memory_context FROM app.video_requests WHERE job_id=$1':'SELECT memory_context FROM app.creative_requests WHERE job_id=$1';
       await assertLearningCurrent(db,(await db.query(memorySQL,[j.id])).rows[0]?.memory_context);
+      const carousel=(await db.query('SELECT r.canceled FROM app.carousel_children c JOIN app.carousel_requests r ON r.job_id=c.parent_job_id WHERE c.generation_job_id=$1',[j.id])).rows[0];if(carousel?.canceled)throw new CreativeError('CREATIVE_ACCESS_REVOKED');
       if(step==='image'){if(providerName!=='openai')throw new CreativeError('CREATIVE_CONFIG_CHANGED');}
       else {
-        const sql=j.kind==='creative.video'?'SELECT text_provider,selected_text_model FROM app.video_requests WHERE job_id=$1':'SELECT text_provider,selected_text_model FROM app.creative_requests WHERE job_id=$1';
+        const sql=j.kind==='carousel.generate'?'SELECT text_provider,selected_text_model FROM app.carousel_requests WHERE job_id=$1':j.kind==='creative.video'?'SELECT text_provider,selected_text_model FROM app.video_requests WHERE job_id=$1':'SELECT text_provider,selected_text_model FROM app.creative_requests WHERE job_id=$1';
         const bound=(await db.query(sql,[j.id])).rows[0];
         if(!bound||bound.text_provider!==providerName||bound.selected_text_model!==model)throw new CreativeError('CREATIVE_CONFIG_CHANGED');
       }
@@ -277,7 +279,14 @@ export class CreativeJobs {
         referenceImages.push(canonical);
         referenceManifest.push({id:r.id,visual_id:r.visual_id,kind:r.kind,label:r.label,crop:r.crop??null,source_sha256:r.sha256,input_sha256:digest(canonical)});
       }
+      const carousel=await this.jobs.transaction(scope,async(db,j)=>(await db.query('SELECT r.job_id,r.input,r.input_sha256,r.plan,r.canceled,c.position FROM app.carousel_children c JOIN app.carousel_requests r ON r.job_id=c.parent_job_id WHERE c.generation_job_id=$1',[j.id])).rows[0]);
       let plan = request.plan;
+      if(carousel){
+        if(carousel.canceled)throw new CreativeError('CREATIVE_ACCESS_REVOKED');
+        if(!carousel.plan||hash(canonicalJSON(carousel.input))!==carousel.input_sha256||carousel.input.brand.id!==input.brand.id||carousel.input.brand.sha256!==input.brand.sha256)throw new CreativeError('CAROUSEL_PLAN_UNAVAILABLE');
+        const shared=validateCarouselResult(carousel.plan,carousel.input),derived={type:'result',version:shared.version,brief:carouselSlideBrief(shared.plan,carousel.position),skills:shared.skills,reads:shared.reads,model_calls:shared.model_calls,helpers_executed:false};
+        if(plan&&canonicalJSON(plan)!==canonicalJSON(derived))throw new CreativeError('CAROUSEL_PLAN_CHANGED');plan=derived;
+      }
       if (!plan) {
         plan = await this.runtime.plan(input,message=>this.planCall(scope,message,request));
         await this.jobs.transaction(scope, async (db, j) => {
@@ -289,7 +298,7 @@ export class CreativeJobs {
           );
         });
       }
-      plan = validateSkillResult(plan, input);
+      if(!carousel)plan = validateSkillResult(plan, input);
       let reference: Buffer | undefined;
       if (parent) {
         reference = await this.jobs.store.read(parent.object_key);
@@ -419,6 +428,7 @@ export class CreativeJobs {
           ).rows[0].n,
         );
         const manifest = {
+          ...(carousel?{carousel:{job_id:carousel.job_id,position:carousel.position,plan_sha256:hash(canonicalJSON(carousel.plan))}}:{}),
           ...(referenceManifest.length?{references:referenceManifest}:{}),
           skills: plan.skills,
           reads: plan.reads,
