@@ -46,7 +46,7 @@ async function fixture(overrides={}){
 async function queue(v=current){return exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},randomUUID());}
 async function render(v){const j=await queue(v);assert.equal(await exportHandler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
 before(async()=>{
- config.socialEnabled=true;config.publishingEnabled=true;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses);exports=new CreativeExports(canvas,renderer.image);
+ config.socialEnabled=true;config.publishingEnabled=true;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses,renderer.image);exports=new CreativeExports(canvas,renderer.image);
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Render fixtures'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
  for(const [u,role] of [[editor,'editor'],[viewer,'viewer']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',[org.id,u.id,role]);
  for(const [field,value] of [['brand_name','Render fixtures'],['offering','Creative workflow tools'],['audience','Business owners']])await brain.manual(alice.id,org.id,brand.id,{field,value},randomUUID());
@@ -58,7 +58,7 @@ after(async()=>{store.close();await app?.close();await Promise.all([admin.end(),
 // Actual local immutable rendered exports, approval API, private S3 and jobs.
 // All remote Postiz responses below are explicitly MOCK, never external posting.
 const encryptionKey=randomBytes(32).toString('hex'),credential='MOCK_'+randomBytes(24).toString('hex');
-let provider,providerBase,publisher,handler,channelId,mode='',uploads=0,submissions=0,postRows=[],lastUpload,afterUpload,remoteState='QUEUE';
+let provider,providerBase,publisher,handler,channelId,mode='',uploads=0,submissions=0,postRows=[],lastPostMedia,lastUpload,afterUpload,remoteState='QUEUE';
 const reply=(res,value,status=200)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));};
 async function setupProvider(){
  const binding={organization_id:org.id,brand_id:brand.id,remote_organization_id:'publication-mock-org',revision:1};
@@ -71,7 +71,7 @@ async function setupProvider(){
   if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false}]);
   if(req.url.startsWith('/api/public/v1/analytics/post/'))return reply(res,mode==='analyticsFail'?{}:mode==='analyticsEmpty'?[]:[{label:'Impressions',data:[{date:'2026-10-23',total:120}],percentageChange:0}],mode==='analyticsFail'?503:200);
   if(req.url==='/api/public/v1/upload'){uploads++;const start=raw.indexOf(Buffer.from('Content-Type: image/png\r\n\r\n'))+'Content-Type: image/png\r\n\r\n'.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);assert.equal((await sharp(lastUpload).metadata()).format,'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+'.png'});}
-  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:'linkedin'},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
+  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();lastPostMedia=body.posts[0].value[0].image;postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:'linkedin'},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
   if(req.url.startsWith('/api/public/v1/posts?')){if(mode==='listFail')return reply(res,{},503);return reply(res,{posts:mode==='listMissing'?[]:mode==='listMismatch'?postRows.map(p=>({...p,integration:{...p.integration,id:'foreign-channel'}})):postRows});}reply(res,{},404);
  });await new Promise(r=>provider.listen(0,'127.0.0.1',r));providerBase='http://127.0.0.1:'+provider.address().port;
  publisher=new Publication(new SocialConnections(businesses,true),exports,true);handler=new PublicationJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test'},encryptionKey},renderer.image,true);
@@ -229,4 +229,47 @@ test('reopening review or canceling a planned post cannot claim to stop a queued
  assert.equal((await record(j)).phase,'accepted');
  const local=await approvedPost(),pending=await queuePost(local);await publisher.cancel(alice.id,brand.id,pending.id);await handler.run(scope(pending));
  const reopened=await plans.review(alice.id,brand.id,local.slot.id,{revision:local.slot.revision,creative_version_id:local.v.id,creative_sha256:local.v.sha256,decision:'reopen'});assert.equal(reopened.state,'pending_review');
+});
+
+async function approvedCarousel(){
+ const {Carousels}=await import('../../dist/carousels.js'),service=new Carousels(canvas,renderer.image);
+ const a=await fixture(),b=await fixture(),ea=await render(a),eb=await render(b);
+ const c=await service.save(alice.id,brand.id,{project_id:null,parent_id:null,title:'Publish ordered carousel',caption:'MOCK shared carousel caption',channel:'linkedin',pages:[{creative_version_id:a.id,export_id:ea.id,alt_text:'First slide'},{creative_version_id:b.id,export_id:eb.id,alt_text:'Second slide'}]},randomUUID());
+ let v=(await service.read(alice.id,brand.id,c.project_id)).versions[0];await service.review(alice.id,brand.id,c.id,{revision:v.review_revision,sha256:v.sha256,decision:'in_review',feedback:'',confirmed:true});await service.review(alice.id,brand.id,c.id,{revision:v.review_revision+1,sha256:v.sha256,decision:'approved',feedback:'',confirmed:true});
+ const date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'Carousel publishing',objective:'TEST',starts_on:start,timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:date,brief:'TEST'}]},randomUUID());
+ let slot=await plans.addCarousel(alice.id,brand.id,p.id,{carousel_version_id:c.id,planned_at:date,channel:'linkedin',brief:'TEST'},randomUUID());slot=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[slot.id])).rows[0];
+ for(const decision of ['pending_review','approved'])slot=await plans.review(alice.id,brand.id,slot.id,{revision:slot.revision,carousel_version_id:c.id,carousel_sha256:v.sha256,decision});
+ return {a,b,ea,eb,c,slot,body:{slot_id:slot.id,revision:slot.revision,carousel_version_id:c.id,channel_id:channelId,confirmed:true}};
+}
+test('carousel publication uploads ordered private slides once and reconciles one post; tenant and replay checks apply',async()=>{
+ const f=await approvedCarousel(),beforeUploads=uploads,beforePosts=submissions,key=randomUUID();
+ await assert.rejects(publisher.submit(bob.id,brand.id,f.body,key));await assert.rejects(publisher.submit(alice.id,sibling.id,f.body,key));assert.throws(()=>publisher.submit(alice.id,brand.id,{...f.body,export_id:f.ea.id},key),/exactly one/);
+ const j=await publisher.submit(alice.id,brand.id,f.body,key);assert.deepEqual(await publisher.submit(alice.id,brand.id,f.body,key),j);
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);
+ const slides=(await admin.query('SELECT * FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows;
+ assert.deepEqual(slides.map(s=>s.export_id),[f.ea.id,f.eb.id]);assert.ok(slides.every(s=>s.phase==='uploaded'));assert.deepEqual(lastPostMedia,slides.map(s=>s.remote_media));assert.equal((await record(j)).carousel_version_id,f.c.id);
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);assert.equal((await handler.reconcile(scope(j))).state,'queued');
+ assert.equal((await workerPool.query('SELECT * FROM app.publication_slides')).rowCount,0);
+});
+test('ambiguous later carousel upload retains earlier media and never retries or submits',async()=>{
+ const f=await approvedCarousel(),j=await queuePost(f),beforeUploads=uploads,beforePosts=submissions;
+ afterUpload=()=>{if(uploads===beforeUploads+2)mode='uploadLost';};
+ assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await record(j)).phase,'unknown');
+ const slides=(await admin.query('SELECT phase,remote_media FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows;
+ assert.deepEqual(slides.map(s=>s.phase),['uploaded','uploading']);assert.ok(slides[0].remote_media);assert.equal(slides[1].remote_media,null);
+ mode='';afterUpload=undefined;await handler.run(scope(j));assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts);
+});
+test('changed carousel approval after enqueue prevents any external upload',async()=>{
+ const f=await approvedCarousel(),j=await queuePost(f),beforeUploads=uploads,beforePosts=submissions;
+ await admin.query("UPDATE app.carousel_versions SET status='changes_requested',review_revision=review_revision+1 WHERE id=$1",[f.c.id]);
+ assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await record(j)).error_code,'PUBLICATION_APPROVAL_CHANGED');assert.equal(uploads,beforeUploads);assert.equal(submissions,beforePosts);
+});
+test('carousel resumes confirmed uploads after a pre-send read failure without uploading the first slide twice',async()=>{
+ const {PostizError}=await import('../../dist/postiz-client.js');
+ const f=await approvedCarousel(),j=await queuePost(f),beforeUploads=uploads,beforePosts=submissions,original=handler.client.bind(handler);let calls=0;
+ handler.client=(...args)=>{const c=original(...args),upload=c.uploadPNG.bind(c);c.uploadPNG=async(...input)=>{if(++calls===2)throw new PostizError('POSTIZ_NETWORK_ERROR','not_sent');return upload(...input);};return c;};
+ try{await assert.rejects(handler.run(scope(j)),/SOCIAL_READ_UNAVAILABLE/);}finally{handler.client=original;}
+ assert.equal(uploads,beforeUploads+1);assert.equal((await record(j)).phase,'queued');
+ assert.deepEqual((await admin.query('SELECT phase FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows.map(s=>s.phase),['uploaded','queued']);
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);
 });

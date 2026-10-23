@@ -1,3 +1,4 @@
+import {carouselPublicationProof} from './carousel-publication-proof.js';
 import {videoPublicationProof} from './video-publication-proof.js';
 import {randomUUID} from 'node:crypto';
 import {ConflictException} from '@nestjs/common';
@@ -22,8 +23,8 @@ export class PublicationJobs {
   if(!await this.#social.permitted(db,j))throw new PostizError('PUBLICATION_ACCESS_REVOKED');
   if(!(await db.query('SELECT 1 FROM app.publication_grants WHERE channel_id=$1 AND expires_at>now()',[r.channel_id])).rowCount)throw new PostizError('PUBLICATION_GRANT_EXPIRED');
   const a=await this.account(db,r),c=(await db.query("SELECT remote_id FROM app.social_channels WHERE id=$1 AND provider='linkedin' AND observed_state='available' AND account_revision=$2",[r.channel_id,a.revision])).rows[0];if(c?.remote_id!==r.remote_channel_id)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
-  const e=r.video_version_id?await videoPublicationProof(db,r.slot_id,this.videoImage):await this.#proof.publicationProof(db,r.slot_id),s=(await db.query(`SELECT s.revision,s.planned_at,s.channel,v.caption FROM app.content_slots s JOIN app.${r.video_version_id?'video_versions':'creative_versions'} v ON v.id=s.${r.video_version_id?'video_version_id':'creative_version_id'} WHERE s.id=$1`,[r.slot_id])).rows[0];
-  if(!s||s.revision!==r.slot_revision||s.channel!=='linkedin'||e.id!==(r.video_version_id??r.export_id)||e.sha256!==(r.video_sha256??r.image_sha256)||s.caption!==r.caption||new Date(s.planned_at).getTime()!==new Date(r.scheduled_at).getTime())throw new PostizError('PUBLICATION_APPROVAL_CHANGED');
+  const e=r.carousel_version_id?await carouselPublicationProof(db,r.slot_id,this.image):r.video_version_id?await videoPublicationProof(db,r.slot_id,this.videoImage):await this.#proof.publicationProof(db,r.slot_id),s=(await db.query(`SELECT s.revision,s.planned_at,s.channel,v.caption FROM app.content_slots s JOIN app.${r.carousel_version_id?'carousel_versions':r.video_version_id?'video_versions':'creative_versions'} v ON v.id=s.${r.carousel_version_id?'carousel_version_id':r.video_version_id?'video_version_id':'creative_version_id'} WHERE s.id=$1`,[r.slot_id])).rows[0];
+  if(!s||s.revision!==r.slot_revision||s.channel!=='linkedin'||e.id!==(r.carousel_version_id??r.video_version_id??r.export_id)||e.sha256!==(r.carousel_sha256??r.video_sha256??r.image_sha256)||s.caption!==r.caption||new Date(s.planned_at).getTime()!==new Date(r.scheduled_at).getTime())throw new PostizError('PUBLICATION_APPROVAL_CHANGED');
   if(new Date(r.scheduled_at).getTime()<=Date.now())throw new PostizError('PUBLICATION_TIME_PASSED');return {a,e};
  }
  async run(scope:JobScope):Promise<string>{
@@ -33,10 +34,11 @@ export class PublicationJobs {
     if(['uploading','submitting','unknown'].includes(r.phase)){await this.record(db,j,'unknown','failed','PUBLICATION_OUTCOME_UNKNOWN');return null;}
     await publicationLocks(db,j.brand_id);await this.validate(db,j,r);await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);return r;
    });if(!r)return 'finished';if(r.phase==='accepted')return 'accepted';
-   if(r.phase==='queued'){
+   if(r.phase==='queued'&&r.carousel_version_id){await this.uploadCarousel(scope);}
+   if(r.phase==='queued'&&!r.carousel_version_id){
     // Fetch/hash the immutable export before claiming a remote mutation.
     const e=await this.#jobs.transaction(scope,async(db,j)=>{await publicationLocks(db,j.brand_id);const current=await this.request(db,j);return (await this.validate(db,j,current)).e;});
-    const bytes=await this.#jobs.store.read(e.object_key,r.video_version_id?64*1024*1024:20*1024*1024);if(bytes.length!==e.bytes||digest(bytes)!==(r.video_sha256??r.image_sha256))throw new PostizError('PUBLICATION_IMAGE_INVALID');
+    const bytes=await this.#jobs.store.read(e.object_key,r.video_version_id?64*1024*1024:20*1024*1024);if(bytes.length!==e.bytes||digest(bytes)!==(r.carousel_sha256??r.video_sha256??r.image_sha256))throw new PostizError('PUBLICATION_IMAGE_INVALID');
     await this.claim(scope,'queued','uploading');
     await this.#jobs.transaction(scope,async(db,j)=>{await db.query("SET LOCAL idle_in_transaction_session_timeout='90s'");await publicationLocks(db,j.brand_id);const current=await this.request(db,j);if(current.phase!=='uploading')throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');const {a}=await this.validate(db,j,current);
      const media=await (current.video_version_id?this.client(scope,a).uploadMP4(bytes,current.video_sha256):this.client(scope,a).uploadPNG(bytes,current.image_sha256));await db.query("UPDATE app.publication_requests SET remote_media=$2,phase='uploaded' WHERE job_id=$1",[j.id,JSON.stringify(media)]);
@@ -44,7 +46,9 @@ export class PublicationJobs {
    }
    await this.claim(scope,'uploaded','submitting');
    await this.#jobs.transaction(scope,async(db,j)=>{await db.query("SET LOCAL idle_in_transaction_session_timeout='90s'");await publicationLocks(db,j.brand_id);const current=await this.request(db,j);if(current.phase!=='submitting')throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');const {a}=await this.validate(db,j,current);
-    const remote=await this.client(scope,a).submitLinkedIn({integrationId:current.remote_channel_id,caption:current.caption,media:current.remote_media,mediaType:current.video_version_id?'video':'image',scheduledAt:new Date(current.scheduled_at).toISOString()});
+    let media=current.remote_media;
+    if(current.carousel_version_id){const slides=await this.slides(db,current);if(slides.some((s:any)=>s.phase!=='uploaded'))throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');media=slides.map((s:any)=>s.remote_media);}
+    const remote=await this.client(scope,a).submitLinkedIn({integrationId:current.remote_channel_id,caption:current.caption,media,mediaType:current.carousel_version_id?'carousel':current.video_version_id?'video':'image',scheduledAt:new Date(current.scheduled_at).toISOString()});
     await db.query("UPDATE app.publication_requests SET remote_post_id=$2,phase='accepted' WHERE job_id=$1",[j.id,remote.postId]);await this.#social.finish(db,j,'succeeded');
    });return 'accepted';
   }catch(e){
@@ -52,10 +56,29 @@ export class PublicationJobs {
    const error=e instanceof PostizError?e:new PostizError('PUBLICATION_APPROVAL_CHANGED');let retry=false;
    await this.#jobs.transaction(scope,async(db,j)=>{const r=await this.request(db,j);if(!r||terminal.has(j.status))return;
     if(error.outcome==='unknown'||error.code==='PUBLICATION_OUTCOME_UNKNOWN')return this.record(db,j,'unknown','failed','PUBLICATION_OUTCOME_UNKNOWN');
-    if(error.outcome==='not_sent'&&transient(error)){retry=true;return this.record(db,j,r.phase==='uploading'?'queued':r.phase==='submitting'?'uploaded':r.phase,'retrying',error.code);}
+    if(error.outcome==='not_sent'&&transient(error)){if(r.carousel_version_id&&r.phase==='uploading')await db.query("UPDATE app.publication_slides SET phase='queued' WHERE publication_id=$1 AND phase='uploading'",[j.id]);retry=true;return this.record(db,j,r.phase==='uploading'?'queued':r.phase==='submitting'?'uploaded':r.phase,'retrying',error.code);}
     return this.record(db,j,error.code==='PUBLICATION_ACCESS_REVOKED'?'canceled':'rejected',error.code==='PUBLICATION_ACCESS_REVOKED'?'canceled':'rejected',error.code);
    });if(retry)throw new SocialReadRetry(error.retryAfterSeconds??30);return 'rejected';
   }
+ }
+ async slides(db:any,r:any){
+  const rows=(await db.query('SELECT * FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[r.job_id])).rows;
+  const proof=await carouselPublicationProof(db,r.slot_id,this.image);
+  if(rows.length!==proof.files.length||rows.some((s:any,i:number)=>s.position!==i||s.export_id!==proof.files[i].id||s.sha256!==proof.files[i].sha256))throw new PostizError('PUBLICATION_APPROVAL_CHANGED');
+  return rows;
+ }
+ async uploadCarousel(scope:JobScope){
+  for(let position=0;position<10;position++){
+   const next=await this.#jobs.transaction(scope,async(db,j)=>{await publicationLocks(db,j.brand_id);const r=await this.request(db,j);const {e}=await this.validate(db,j,r);const rows=await this.slides(db,r);
+    if(rows.some((s:any)=>s.phase==='uploading'))throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');
+    const pending=rows.find((s:any)=>s.phase==='queued');if(!pending){await db.query("UPDATE app.publication_requests SET phase='uploaded' WHERE job_id=$1",[j.id]);return null;}
+    return {row:pending,file:e.files[pending.position]};
+   });if(!next)return;
+   const bytes=await this.#jobs.store.read(next.file.object_key,20*1024*1024);if(bytes.length!==Number(next.file.bytes)||digest(bytes)!==next.row.sha256)throw new PostizError('PUBLICATION_IMAGE_INVALID');
+   await this.#jobs.transaction(scope,async(db,j)=>{await publicationLocks(db,j.brand_id);const r=await this.request(db,j);await this.validate(db,j,r);const rows=await this.slides(db,r);if(r.phase!=='queued'||rows[next.row.position]?.phase!=='queued')throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');await db.query("UPDATE app.publication_slides SET phase='uploading' WHERE publication_id=$1 AND position=$2",[j.id,next.row.position]);await db.query("UPDATE app.publication_requests SET phase='uploading' WHERE job_id=$1",[j.id]);});
+   await this.#jobs.transaction(scope,async(db,j)=>{await db.query("SET LOCAL idle_in_transaction_session_timeout='90s'");await publicationLocks(db,j.brand_id);const r=await this.request(db,j);const {a}=await this.validate(db,j,r);if(r.phase!=='uploading')throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');const media=await this.client(scope,a).uploadPNG(bytes,next.row.sha256);await db.query("UPDATE app.publication_slides SET phase='uploaded',remote_media=$3 WHERE publication_id=$1 AND position=$2",[j.id,next.row.position,JSON.stringify(media)]);await db.query("UPDATE app.publication_requests SET phase='queued' WHERE job_id=$1",[j.id]);});
+  }
+  await this.#jobs.transaction(scope,async(db,j)=>{await publicationLocks(db,j.brand_id);const r=await this.request(db,j);await this.validate(db,j,r);if((await this.slides(db,r)).some((s:any)=>s.phase!=='uploaded'))throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');await db.query("UPDATE app.publication_requests SET phase='uploaded' WHERE job_id=$1",[j.id]);});
  }
  async claim(scope:JobScope,from:string,to:string){return this.#jobs.transaction(scope,async(db,j)=>{await publicationLocks(db,j.brand_id);const r=await this.request(db,j);if(r.phase!==from||terminal.has(j.status))throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');await this.validate(db,j,r);await db.query('UPDATE app.publication_requests SET phase=$2 WHERE job_id=$1',[j.id,to]);});}
  async reconcile(scope:JobScope):Promise<{state:string;scheduledAt?:string}>{

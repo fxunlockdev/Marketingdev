@@ -1,5 +1,11 @@
 # Desvio build state
 
+## Durable carousel publication backend — local acceptance passed
+
+Migration 046 adds immutable carousel publication binding and tenant/job-scoped per-slide upload records. Publication submit freezes the approved composition; the worker revalidates exact global/calendar approval before each mutation, checks canonical bytes, commits each successful upload, and submits one ordered multi-image post. Ambiguous upload/submission outcomes stop replay; a confirmed pre-send read failure resumes without reuploading earlier slides. Existing single-image flow remains covered.
+
+All 17 publication integration cases passed with real local database/RLS/storage/rendering and MOCK Postiz HTTP. Evidence: `carousel-publication-backend.json`. Test setup was corrected to supply the renderer to ContentPlan and use synchronous assertion for immediate validation errors. No paid generation or social publication. Migration 046 is local only; dev is still through 045. Next: carousel-ready API/ordered preview/consent UI, analytics format classification, browser acceptance, then coordinated migration/API/web/worker rollout.
+
 ## Carousel publication: ordered transport and approval proof
 
 Pinned Postiz source confirms native ordered multi-image LinkedIn publication; the PDF-conversion flag stays false. `postiz-client.ts` accepts 2–10 validated distinct PNG media records as one post, rejecting mixed/foreign inputs before network activity. MOCK HTTP tests verify order, single submission, tenant identity and unknown-outcome handling. `carousel-publication-proof.ts` requires current global review plus matching calendar review/hash, current renderer, ordered source versions and private exports. All 13 real local export/database cases passed, including foreign-business denial, renderer mismatch, reset calendar approval and changed source slide rejection. Initial invocation used stale compiled output and failed before cases; rebuilding resolved it.
