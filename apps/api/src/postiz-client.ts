@@ -86,12 +86,12 @@ export class PostizClient {
   await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'video/mp4'}),`desvio-${expectedSHA}.mp4`);
   return this.media(await this.request('public/v1/upload','POST',form),'mp4');
  }
- async submitLinkedIn(input:{integrationId:string;caption:string;media:{id:string;path:string};mediaType?:'image'|'video';scheduledAt:string}){
-  let id:string,date:string,media:{id:string;path:string};
-  try{id=remoteId(input.integrationId);date=iso(input.scheduledAt);if(input.mediaType!==undefined&&! ['image','video'].includes(input.mediaType))throw new Error();media=this.media(input.media,input.mediaType==='video'?'mp4':'png');if(typeof input.caption!=='string'||input.caption.length>3000)throw new Error();}catch{throw new PostizError('POSTIZ_POST_INVALID');}
+ async submitLinkedIn(input:{integrationId:string;caption:string;media:{id:string;path:string}|{id:string;path:string}[];mediaType?:'image'|'video'|'carousel';scheduledAt:string}){
+  let id:string,date:string,media:{id:string;path:string}[];
+  try{id=remoteId(input.integrationId);date=iso(input.scheduledAt);if(input.mediaType!==undefined&&! ['image','video','carousel'].includes(input.mediaType))throw new Error();if(input.mediaType==='carousel'){if(!Array.isArray(input.media)||input.media.length<2||input.media.length>10)throw new Error();media=input.media.map(m=>this.media(m));if(new Set(media.map(m=>m.id)).size!==media.length||new Set(media.map(m=>m.path)).size!==media.length)throw new Error();}else{if(Array.isArray(input.media))throw new Error();media=[this.media(input.media,input.mediaType==='video'?'mp4':'png')];}if(typeof input.caption!=='string'||input.caption.length>3000)throw new Error();}catch{throw new PostizError('POSTIZ_POST_INVALID');}
   const integrations=await this.listIntegrations(),target=integrations.find(i=>i.id===id);
   if(!target||target.provider!=='linkedin'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
-  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:[media]}],settings:{__type:'linkedin',post_as_images_carousel:false}}]};
+  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:media}],settings:{__type:'linkedin',post_as_images_carousel:false}}]};
   const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
   return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
  }

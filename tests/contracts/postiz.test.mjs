@@ -94,3 +94,17 @@ test('post analytics verifies identity, preserves unknown data and rejects malfo
  requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).postAnalytics('post-a'),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
  await assert.rejects(client().postAnalytics('../other'),e=>e.code==='POSTIZ_RESPONSE_INVALID');await assert.rejects(client().postAnalytics('post-a',91),e=>e.code==='POSTIZ_DATE_RANGE_INVALID');
 });
+
+test('ordered carousel submits exactly one native LinkedIn multi-image post',async()=>{
+ const media=[{id:'slide-2',path:base+'/uploads/second.png'},{id:'slide-1',path:base+'/uploads/first.png'}];
+ const input={integrationId:'channel-a',caption:'Approved ordered carousel',media,mediaType:'carousel',scheduledAt:'2026-11-01T10:00:00Z'};
+ requests=[];handler=(req,res,body)=>{if(req.url.endsWith('/integrations'))return json(res,[integration]);assert.equal(req.url,'/api/public/v1/posts');const v=JSON.parse(body);assert.equal(v.posts.length,1);assert.deepEqual(v.posts[0].value,[{content:input.caption,image:media}]);assert.equal(v.posts[0].settings.post_as_images_carousel,false);return json(res,[{postId:'carousel-a',integration:'channel-a'}]);};
+ assert.deepEqual(await client().submitLinkedIn(input),{postId:'carousel-a',integrationId:'channel-a',status:'accepted'});
+ assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ for(const patch of [{media:[]},{media:[media[0]]},{media:Array.from({length:11},(_,i)=>({id:'slide-'+i,path:base+'/uploads/'+i+'.png'}))},{media:[media[0],media[0]]},{media:[media[0],{...media[1],id:media[0].id}]},{media:[media[0],{...media[1],path:media[0].path}]},{media:[media[0],{...media[1],path:'https://foreign.test/a.png'}]},{media:[media[0],{...media[1],path:base+'/uploads/video.mp4'}]},{mediaType:'video'},{mediaType:undefined}]){
+  requests=[];await assert.rejects(client().submitLinkedIn({...input,...patch}),e=>e.code==='POSTIZ_POST_INVALID'&&e.outcome==='not_sent');assert.equal(requests.length,0);
+ }
+ requests=[];handler=(req,res)=>{if(req.url.endsWith('/integrations'))return json(res,[integration]);req.socket.destroy();};
+ await assert.rejects(client().submitLinkedIn(input),e=>e.outcome==='unknown');assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).submitLinkedIn(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.filter(r=>r.method==='POST').length,0);
+});

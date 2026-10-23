@@ -1,5 +1,11 @@
 # Desvio build state
 
+## Carousel publication: ordered transport and approval proof
+
+Pinned Postiz source confirms native ordered multi-image LinkedIn publication; the PDF-conversion flag stays false. `postiz-client.ts` accepts 2–10 validated distinct PNG media records as one post, rejecting mixed/foreign inputs before network activity. MOCK HTTP tests verify order, single submission, tenant identity and unknown-outcome handling. `carousel-publication-proof.ts` requires current global review plus matching calendar review/hash, current renderer, ordered source versions and private exports. All 13 real local export/database cases passed, including foreign-business denial, renderer mismatch, reset calendar approval and changed source slide rejection. Initial invocation used stale compiled output and failed before cases; rebuilding resolved it.
+
+Evidence: `carousel-publication-proof.json`, contracts report. This does not enable carousel publication yet. Next: migration for immutable carousel publication binding and per-slide upload ledger; worker recovery that never repeats ambiguous uploads/submissions; publication API/UI preview and approval binding; complete publication/browser acceptance. Existing deployed image/video publishing remains disabled pending credentials/grants and consent.
+
 ## Current deployment follow-up — 23 October
 
 The reported API failure notification corresponds to deployment `b34f9064-9610-4e85-a278-42c69bbee7a4` (image built, startup health check failed while Resend was unconfigured). Railway read-back confirms replacement `9ce5ba60-f1a1-4116-9911-bd0261f12ebb` SUCCESS. Public dev HTTP and actual owner Chromium sign-in/session/business access were reverified at 12:17 UTC. Earlier startup-pending entries below are historical.
