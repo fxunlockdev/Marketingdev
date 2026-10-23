@@ -1,3 +1,4 @@
+import {videoPublicationProof} from './video-publication-proof.js';
 import {randomUUID} from 'node:crypto';
 import {ConflictException} from '@nestjs/common';
 import {AssetJobs,type JobScope} from './jobs.js';
@@ -11,7 +12,7 @@ const terminal=new Set(['succeeded','failed','rejected','canceled']);
 const transient=(e:PostizError)=>['POSTIZ_TIMEOUT','POSTIZ_NETWORK_ERROR','POSTIZ_UNAVAILABLE','POSTIZ_RATE_LIMITED'].includes(e.code);
 export class PublicationJobs {
  #jobs:AssetJobs;#config?:SocialWorkerConfig;#vault?:PostizVault;#social:SocialJobs;#proof:CreativeExports;
- constructor(jobs:AssetJobs,config:SocialWorkerConfig|undefined,readonly image:string|undefined,readonly enabled=false){this.#jobs=jobs;this.#config=config;this.#social=new SocialJobs(jobs);this.#proof=new CreativeExports(null as any,image);if(config)this.#vault=new PostizVault(config.encryptionKey);}
+ constructor(jobs:AssetJobs,config:SocialWorkerConfig|undefined,readonly image:string|undefined,readonly enabled=false,readonly videoImage?:string){this.#jobs=jobs;this.#config=config;this.#social=new SocialJobs(jobs);this.#proof=new CreativeExports(null as any,image);if(config)this.#vault=new PostizVault(config.encryptionKey);}
  async record(db:any,j:any,phase:string,status:string,code:string|null=null){await db.query('UPDATE app.publication_requests SET phase=$2 WHERE job_id=$1',[j.id,phase]);return this.#social.finish(db,j,status,code);}
  async request(db:any,j:any){if(!['social.publish','social.reconcile'].includes(j.kind))throw new Error('JOB_KIND_DENIED');return (await db.query('SELECT * FROM app.publication_requests')).rows[0];}
  client(scope:JobScope,a:any){if(!this.#config||!this.#vault)throw new PostizError('POSTIZ_NOT_CONFIGURED');return new PostizClient(this.#config.client,{organizationId:scope.organizationId,brandId:scope.brandId,remoteOrganizationId:a.remote_organization_id,apiKey:this.#vault.open(a,a.encrypted_credential)});}
@@ -21,8 +22,8 @@ export class PublicationJobs {
   if(!await this.#social.permitted(db,j))throw new PostizError('PUBLICATION_ACCESS_REVOKED');
   if(!(await db.query('SELECT 1 FROM app.publication_grants WHERE channel_id=$1 AND expires_at>now()',[r.channel_id])).rowCount)throw new PostizError('PUBLICATION_GRANT_EXPIRED');
   const a=await this.account(db,r),c=(await db.query("SELECT remote_id FROM app.social_channels WHERE id=$1 AND provider='linkedin' AND observed_state='available' AND account_revision=$2",[r.channel_id,a.revision])).rows[0];if(c?.remote_id!==r.remote_channel_id)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
-  const e=await this.#proof.publicationProof(db,r.slot_id),s=(await db.query('SELECT s.revision,s.planned_at,s.channel,v.caption FROM app.content_slots s JOIN app.creative_versions v ON v.id=s.creative_version_id WHERE s.id=$1',[r.slot_id])).rows[0];
-  if(!s||s.revision!==r.slot_revision||s.channel!=='linkedin'||e.id!==r.export_id||e.sha256!==r.image_sha256||s.caption!==r.caption||new Date(s.planned_at).getTime()!==new Date(r.scheduled_at).getTime())throw new PostizError('PUBLICATION_APPROVAL_CHANGED');
+  const e=r.video_version_id?await videoPublicationProof(db,r.slot_id,this.videoImage):await this.#proof.publicationProof(db,r.slot_id),s=(await db.query(`SELECT s.revision,s.planned_at,s.channel,v.caption FROM app.content_slots s JOIN app.${r.video_version_id?'video_versions':'creative_versions'} v ON v.id=s.${r.video_version_id?'video_version_id':'creative_version_id'} WHERE s.id=$1`,[r.slot_id])).rows[0];
+  if(!s||s.revision!==r.slot_revision||s.channel!=='linkedin'||e.id!==(r.video_version_id??r.export_id)||e.sha256!==(r.video_sha256??r.image_sha256)||s.caption!==r.caption||new Date(s.planned_at).getTime()!==new Date(r.scheduled_at).getTime())throw new PostizError('PUBLICATION_APPROVAL_CHANGED');
   if(new Date(r.scheduled_at).getTime()<=Date.now())throw new PostizError('PUBLICATION_TIME_PASSED');return {a,e};
  }
  async run(scope:JobScope):Promise<string>{
@@ -35,15 +36,15 @@ export class PublicationJobs {
    if(r.phase==='queued'){
     // Fetch/hash the immutable export before claiming a remote mutation.
     const e=await this.#jobs.transaction(scope,async(db,j)=>{await publicationLocks(db,j.brand_id);const current=await this.request(db,j);return (await this.validate(db,j,current)).e;});
-    const bytes=await this.#jobs.store.read(e.object_key);if(bytes.length!==e.bytes||digest(bytes)!==r.image_sha256)throw new PostizError('PUBLICATION_IMAGE_INVALID');
+    const bytes=await this.#jobs.store.read(e.object_key,r.video_version_id?64*1024*1024:20*1024*1024);if(bytes.length!==e.bytes||digest(bytes)!==(r.video_sha256??r.image_sha256))throw new PostizError('PUBLICATION_IMAGE_INVALID');
     await this.claim(scope,'queued','uploading');
     await this.#jobs.transaction(scope,async(db,j)=>{await db.query("SET LOCAL idle_in_transaction_session_timeout='90s'");await publicationLocks(db,j.brand_id);const current=await this.request(db,j);if(current.phase!=='uploading')throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');const {a}=await this.validate(db,j,current);
-     const media=await this.client(scope,a).uploadPNG(bytes,current.image_sha256);await db.query("UPDATE app.publication_requests SET remote_media=$2,phase='uploaded' WHERE job_id=$1",[j.id,JSON.stringify(media)]);
+     const media=await (current.video_version_id?this.client(scope,a).uploadMP4(bytes,current.video_sha256):this.client(scope,a).uploadPNG(bytes,current.image_sha256));await db.query("UPDATE app.publication_requests SET remote_media=$2,phase='uploaded' WHERE job_id=$1",[j.id,JSON.stringify(media)]);
     });
    }
    await this.claim(scope,'uploaded','submitting');
    await this.#jobs.transaction(scope,async(db,j)=>{await db.query("SET LOCAL idle_in_transaction_session_timeout='90s'");await publicationLocks(db,j.brand_id);const current=await this.request(db,j);if(current.phase!=='submitting')throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');const {a}=await this.validate(db,j,current);
-    const remote=await this.client(scope,a).submitLinkedIn({integrationId:current.remote_channel_id,caption:current.caption,media:current.remote_media,scheduledAt:new Date(current.scheduled_at).toISOString()});
+    const remote=await this.client(scope,a).submitLinkedIn({integrationId:current.remote_channel_id,caption:current.caption,media:current.remote_media,mediaType:current.video_version_id?'video':'image',scheduledAt:new Date(current.scheduled_at).toISOString()});
     await db.query("UPDATE app.publication_requests SET remote_post_id=$2,phase='accepted' WHERE job_id=$1",[j.id,remote.postId]);await this.#social.finish(db,j,'succeeded');
    });return 'accepted';
   }catch(e){

@@ -72,3 +72,14 @@ test('redirects, oversized JSON, broken schemas and timeout fail closed',async()
 test('unsafe endpoint and callback configurations are rejected before any network call',()=>{
  for(const patch of [{baseURL:'http://evil.test/api'},{baseURL:'https://user:password@example.test/api'},{baseURL:'https://example.test/api?secret=x'},{baseURL:'https://example.test/not-api'},{callbackOrigin:'https://desvio.test/path'},{mediaOrigins:['javascript:alert(1)']}])assert.throws(()=>new PostizClient({...config(),...patch},binding()),/POSTIZ_CONFIG_INVALID/);
 });
+
+
+test('canonical MP4 upload uses the pinned multipart contract and video-specific scheduling without accepting image paths',async()=>{
+ const mp4=Buffer.alloc(32);mp4.writeUInt32BE(32);mp4.write('ftypisom',4);const sha=createHash('sha256').update(mp4).digest('hex');let uploaded=0,scheduled=0;
+ handler=(req,res,body)=>{if(req.url==='/api/public/v1/upload'){uploaded++;assert.ok(body.includes(Buffer.from('video/mp4')));assert.ok(body.includes(Buffer.from(`desvio-${sha}.mp4`)));assert.ok(body.includes(Buffer.from('false')));return json(res,{id:'video-a',path:base+'/media/canonical.mp4'});}if(req.url==='/api/public/v1/integrations')return json(res,[integration]);if(req.url==='/api/public/v1/posts'){scheduled++;const value=JSON.parse(body);assert.deepEqual(value.posts[0].value[0].image,[{id:'video-a',path:base+'/media/canonical.mp4'}]);assert.equal(value.posts[0].settings.post_as_images_carousel,false);return json(res,[{postId:'video-post',integration:'channel-a'}]);}return json(res,{},404);};
+ const c=client(),media=await c.uploadMP4(mp4,sha);assert.equal(uploaded,1);
+ await assert.rejects(c.submitLinkedIn({integrationId:'channel-a',caption:'MOCK video',media,scheduledAt:'2026-12-01T00:00:00Z'}),e=>e.code==='POSTIZ_POST_INVALID');
+ assert.equal((await c.submitLinkedIn({integrationId:'channel-a',caption:'MOCK video',media,mediaType:'video',scheduledAt:'2026-12-01T00:00:00Z'})).status,'accepted');assert.equal(scheduled,1);
+ await assert.rejects(c.uploadMP4(png,hash),e=>e.code==='POSTIZ_MEDIA_INVALID');await assert.rejects(c.uploadMP4(mp4,'0'.repeat(64)),e=>e.code==='POSTIZ_MEDIA_INVALID');assert.equal(uploaded,1);
+ handler=(req,res)=>json(res,{id:'wrong-kind',path:base+'/media/wrong.png'});await assert.rejects(c.uploadMP4(mp4,sha),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');
+});

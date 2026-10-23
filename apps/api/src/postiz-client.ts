@@ -72,16 +72,22 @@ export class PostizClient {
   await this.verify();const value=await this.request('integrations/social-connect/linkedin','POST',JSON.stringify({state,code,timezone}),'application/json');
   return this.checked(value,v=>{const r=record(v);if(r.organizationId!==this.#remoteOrg||r.providerIdentifier!=='linkedin'||r.inBetweenSteps===true||r.isBetweenSteps===true||r.pages&&(!Array.isArray(r.pages)||r.pages.length))return fail();return {id:remoteId(r.id),internalId:remoteId(r.internalId),name:str(r.name,300)};},true);
  }
- private media(value:any){return this.checked(value,v=>{const r=record(v),url=new URL(str(r.path,2048));if(!this.#origins.has(url.origin)||url.username||url.password||url.hash||!url.pathname.toLowerCase().endsWith('.png'))return fail();return {id:remoteId(r.id),path:url.href};},true);}
+ private media(value:any,extension='png'){return this.checked(value,v=>{const r=record(v),url=new URL(str(r.path,2048));if(!this.#origins.has(url.origin)||url.username||url.password||url.hash||!url.pathname.toLowerCase().endsWith('.'+extension))return fail();return {id:remoteId(r.id),path:url.href};},true);}
  async uploadPNG(bytes:Buffer,expectedSHA:string){
   if(bytes.length<24||bytes.length>20*1024*1024||! /^[a-f0-9]{64}$/.test(expectedSHA)||sha(bytes)!==expectedSHA)throw new PostizError('POSTIZ_MEDIA_INVALID');
   try{const m=await sharp(bytes,{limitInputPixels:1536*1536}).metadata();if(m.format!=='png'||!m.width||!m.height||![[1024,1024],[1536,1024],[1024,1536]].some(([w,h])=>m.width===w&&m.height===h))throw new Error();}catch{throw new PostizError('POSTIZ_MEDIA_INVALID');}
   await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'image/png'}),`desvio-${expectedSHA}.png`);
   return this.media(await this.request('public/v1/upload','POST',form));
  }
- async submitLinkedIn(input:{integrationId:string;caption:string;media:{id:string;path:string};scheduledAt:string}){
+ // Caller supplies the hash-bound canonical output of the isolated video renderer.
+ async uploadMP4(bytes:Buffer,expectedSHA:string){
+  if(!Buffer.isBuffer(bytes)||bytes.length<24||bytes.length>64*1024*1024||bytes.subarray(4,8).toString()!=='ftyp'||!/^[a-f0-9]{64}$/.test(expectedSHA)||sha(bytes)!==expectedSHA)throw new PostizError('POSTIZ_MEDIA_INVALID');
+  await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'video/mp4'}),`desvio-${expectedSHA}.mp4`);
+  return this.media(await this.request('public/v1/upload','POST',form),'mp4');
+ }
+ async submitLinkedIn(input:{integrationId:string;caption:string;media:{id:string;path:string};mediaType?:'image'|'video';scheduledAt:string}){
   let id:string,date:string,media:{id:string;path:string};
-  try{id=remoteId(input.integrationId);date=iso(input.scheduledAt);media=this.media(input.media);if(typeof input.caption!=='string'||input.caption.length>3000)throw new Error();}catch{throw new PostizError('POSTIZ_POST_INVALID');}
+  try{id=remoteId(input.integrationId);date=iso(input.scheduledAt);if(input.mediaType!==undefined&&! ['image','video'].includes(input.mediaType))throw new Error();media=this.media(input.media,input.mediaType==='video'?'mp4':'png');if(typeof input.caption!=='string'||input.caption.length>3000)throw new Error();}catch{throw new PostizError('POSTIZ_POST_INVALID');}
   const integrations=await this.listIntegrations(),target=integrations.find(i=>i.id===id);
   if(!target||target.provider!=='linkedin'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
   const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:[media]}],settings:{__type:'linkedin',post_as_images_carousel:false}}]};

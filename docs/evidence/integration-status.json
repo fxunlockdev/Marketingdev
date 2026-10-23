@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "1dee4c834e6fa4bb3e014efaecee0837056c359d",
-  "checked_at": "2026-10-22T17:15:40.411732+00:00",
+  "code_commit": "0613a432911a61752e7d3e5ec80cf20925dc194b",
+  "checked_at": "2026-10-22T17:39:06.244276+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -220,7 +220,7 @@
       "blocked_reason": "Pinned SDK and documented image-to-video/edit bodies, fixed-origin HTTP submission/status/cancel, persisted-intent fingerprint boundary, duplicate key semantics and bounded credentials-free output download tested against MOCK transports. Downloaded bytes remain untrusted. The durable provider substage has separate evidence; complete approved-reference/skill-driven video workflow, media decoder/private canonical output, Canvas video controls, account model eligibility, actual provider output and paid/live verification remain incomplete."
     },
     "canvas_video_workflow": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/video-canvas.json"
@@ -291,7 +291,7 @@
       "blocked_reason": "Actual isolated original marketing-plan/social/product-marketing skills, Temporal, immutable approved context, MOCK OpenAI/Gemini official SDKs, immutable provider/model choice, provider-specific budget holds, signed Gemini tool context and bounded mixed-format generation, PostgreSQL persistence/RLS, budget holds and failure recovery tested. Deployed runtime, paid strategy/creative quality, semantic claim validation, broader channels and full product acceptance remain incomplete."
     },
     "gemini_text_planning": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -301,7 +301,7 @@
       "blocked_reason": "Pinned official Google Gen AI SDK, signed read_file context through actual original skills, immutable OpenAI/Gemini choice, separate provider funding, unknown-outcome holds and Canvas model-selection browser flow use MOCK Gemini responses. Gemini for direct creative/video-script requests, authorized live quality/cost proof and deployed worker acceptance remain open."
     },
     "recurring_content_planning": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",

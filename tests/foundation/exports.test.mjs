@@ -266,4 +266,15 @@ test('approved export to original video skills, durable provider stage, actual m
 
 
 
+ // Extend the same real generation/render/approval journey to a consented MOCK LinkedIn publication.
+ const publishRequest=await service.submit(alice.id,brand.id,thread,{...body,slot_id:undefined,slot_revision:undefined,channel:'linkedin'},randomUUID());
+ assert.equal(await pipeline.step(scope(publishRequest)),'awaiting_approval');const publishDraft=await service.draft(alice.id,brand.id,publishRequest.id);
+ await service.saveDraft(alice.id,brand.id,publishRequest.id,{brief:{...publishDraft.brief,video_prompt:'TEST FIXTURE user edited motion'},revision:1,approve:true});
+ assert.equal(await pipeline.step(scope(publishRequest)),'accepted');assert.equal(await pipeline.step(scope(publishRequest)),'completed');assert.equal(await pipeline.step(scope(publishRequest)),'succeeded');
+ const publishVersion=(await admin.query('SELECT * FROM app.video_versions WHERE job_id=$1',[publishRequest.id])).rows[0];
+ await service.review(alice.id,brand.id,publishVersion.id,{decision:'in_review',feedback:'Review for publishing',revision:1,sha256:publishVersion.sha256});
+ await service.review(alice.id,brand.id,publishVersion.id,{decision:'approved',feedback:'Approve exact video',revision:2,sha256:publishVersion.sha256,confirmed:true});
+ const {proveVideoPublication}=await import('../fixtures/prove-video-publication.mjs');
+ await proveVideoPublication({admin,jobs,store,businesses,exports,plans,org,brand,alice,bob,editor,video:publishVersion,image,staticImage:renderer.image});
+
 });

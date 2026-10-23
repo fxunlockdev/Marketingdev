@@ -23,9 +23,9 @@ export function CanvasPlanner({business,threadId,onSubmitted,disabled=false,init
  {!business.has_approved_brand||prefs?.step!==3?<p><a href={`/b/${business.id}/onboarding`}>Confirm your brand and goals before planning.</a></p>:<form onSubmit={e=>{e.preventDefault();void submit();}}><fieldset disabled={disabled||busy||business.role==='viewer'||!!selected&&!plan}>
  <Field label="Planning model">{id=><select id={id} value={provider} onChange={e=>setProvider(e.target.value)}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
  <Field label="What should we plan?">{id=><textarea id={id} placeholder="Plan a week of helpful posts introducing our services…" value={brief} required={natural} maxLength={2000} onChange={e=>setBrief(e.target.value)}/>}</Field>
- {plan&&<label><input type="checkbox" checked={useContext} onChange={e=>setUseContext(e.target.checked)}/> Use selected saved plan as context</label>}
+ {plan&&<label className="publication-consent"><input type="checkbox" checked={useContext} onChange={e=>setUseContext(e.target.checked)}/> Use selected saved plan as context</label>}
  {plan&&useContext&&<p>Using “{plan.title}” and its current edits. This creates a new draft plan; the saved plan stays unchanged.</p>}
- <label><input type="checkbox" checked={!natural} onChange={e=>{setNatural(!e.target.checked);setCycles(1);setConsent(false);}}/> Set days and post counts myself</label>
+ <label className="publication-consent"><input type="checkbox" checked={!natural} onChange={e=>{setNatural(!e.target.checked);setCycles(1);setConsent(false);}}/> Set days and post counts myself</label>
  {natural?<p>Describe the days, posts and videos you want. AI will suggest a mix when unspecified, within 90 days and 90 posts. This creates draft ideas, not generated images or videos.</p>:<>
  <div className="button-row">{[1,7,30].map(n=><button type="button" key={n} aria-pressed={days===n} onClick={()=>{setDays(n);setCount(n);setCycles(1);setConsent(false);}}>{n===1?'Daily':n===7?'Weekly':'30 days'}</button>)}</div>
  <Field label="Planning days">{id=><input id={id} type="number" min={1} max={90} required value={days} onChange={e=>{setDays(Number(e.target.value));setCount(Number(e.target.value));setCycles(1);setConsent(false);}}/>}</Field>
@@ -37,7 +37,7 @@ export function CanvasPlanner({business,threadId,onSubmitted,disabled=false,init
  <Field label="Repeat this plan">{id=><select id={id} value={cycles} onChange={e=>{setCycles(Number(e.target.value));setConsent(false);}}>{[1,2,3,4,6,12].filter(n=>n*days<=366).map(n=><option key={n} value={n}>{n===1?'One plan':`${n} planning cycles`}</option>)}</select>}</Field>
  {cycles>1&&<><p>Creates the first plan now, then another every {days} days at the start of its first day in {prefs.timezone}. Each cycle uses your latest approved brand facts and goals. The loop ends after {cycles} cycles; stop it at any time. Already submitted calls may finish and count toward the budget. It creates drafts only.</p>
  <Field label="Total loop planning budget (USD)">{id=><input id={id} type="number" min="0.01" max="1000" step="0.01" required value={budget} onChange={e=>setBudget(e.target.value)}/>}</Field>
- <label><input type="checkbox" checked={consent} required onChange={e=>setConsent(e.target.checked)}/> Allow recurring AI planning charges up to this total budget, within my business allowance. Video generation and publishing still require approval.</label></>}
+ <label className="publication-consent"><input type="checkbox" checked={consent} required onChange={e=>setConsent(e.target.checked)}/> Allow recurring AI planning charges up to this total budget, within my business allowance. Video generation and publishing still require approval.</label></>}
  </>}
  <p>{prefs.timezone} · {prefs.channels.join(', ')}</p><button type="submit" className="primary">{busy?'Saving request…':'Plan my content'}</button>
  </fieldset></form>}

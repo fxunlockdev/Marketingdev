@@ -2,6 +2,13 @@
 
 Updated 2026-10-23 (Asia/Kuala_Lumpur). Active objective updated by owner: complete Desvio end to end except Billing, retaining the original architecture and all other V5 modules. The requested remaining-usage/time target is not evidence of readiness. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Current session — approved video publishing
+
+- Migration 031, `video-publication-proof.ts`, `publication.ts`, `publication-jobs.ts` and the pinned Postiz adapter extend existing LinkedIn publishing to canonical MP4. Both the latest saved-video approval and exact current calendar approval are required; private bytes and manifest identity are revalidated before upload. Ambiguous remote writes remain held.
+- Publishing now previews and hash-checks the exact private clip, waits for playback readiness, and requires explicit account/time consent. Static images retain their existing path. Canvas planning checkbox layout is corrected. API/web typechecks, offline (4), contracts (80), publishing browser journeys (6), and security (24 account + 145 application cases, six guards and dependency audits) pass at source `1ed29981703c78c75e3b7eb05f3e8770b81c659739307b1101738d6beb8487ed`. The security suite includes the actual video rendering-to-publication journey with MOCK providers. The mobile video confirmation screenshot was inspected. Initial fixture errors were corrected. Release remains blocked for broader historical/deployed/live evidence and unfinished product scope.
+- Source contract audit and limits are in ADR 0034. `VIDEO_RUNTIME_IMAGE` must be the same canonical renderer pin on API and worker. No paid provider, real social publication, or deployment ran. This does not complete analytics, remaining modules or live acceptance.
+- Next: implement the business-specific Team management experience, then remaining Canvas provider/action routing, analytics/memory, profile and deployed/live acceptance. The owner’s pre-generation approval applies only to videos; final publishing approval applies to both formats.
+
 ## Current session — natural planning and selected-plan follow-ups
 
 - Natural Canvas requests now resolve bounded day/post/video counts through the existing original-skill OpenAI/Gemini planning path. `planning-contracts.ts` validates resolved settings and every resulting slot; `planning-jobs.ts` persists the actual resolved horizon/count provenance.
