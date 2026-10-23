@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Carousel release rollout — in progress
+
+AI insight evidence now labels carousels correctly; all 17 backend cases passed again, including the exact observation query used for analysis. Dev migration 046 is verified by checksum replay and six runtime-role logins. Bootstrap deployment `486d6ea2-e855-4171-9d1a-fe0fc31dc320` is REMOVED and all seven temporary credential variables were read back absent. Evidence: `railway-dev-migration046.json`.
+
+API deployment `01289a92-8e98-4093-899b-3384dd9f094b` and web `16d7df8f-87fa-4d17-bdc7-791bcf86e98f` are confirmed SUCCESS. Current worker `sha256:1d91dc8906c70727e43fb19a858e3486b1754839f0a1fede9a825a159db25774` is deployed after idle check, with prior container retained for rollback. Exact image/scanner checks, Temporal workflow/activity registration and restricted role logins passed. Real signed upload → durable scan → canonical/normalized private readback passed with replay/foreign-tenant denial; exact synthetic fixture cleanup completed. Owner login/session/business UI passed on the public dev domain. Evidence: `railway-worker-rollout.json`, `railway-worker-job-carousel046.json`, matching cleanup and `railway-dev-owner-browser.json`.
+
+Five offline checks and 84 contracts pass. Release gate remains BLOCKED: full security/browser evidence is stale, comprehensive product/deployed provider acceptance is incomplete and live calls are owner-deferred. Next: finish operator provider configuration/allowance usability, audit actual remaining module gaps, and refresh required full security acceptance; no claim that keys alone currently enable every video/social path.
+
 ## Carousel publishing UI — browser acceptance passed
 
 Ready-to-publish now includes only current approved carousel compositions, returning ordered slide IDs/hashes/alt text without private storage keys. The confirmation panel loads and hash-checks every slide, requires all images to display before consent, and binds submission to the carousel version. Corrupt preview reload, tenant access, explicit account/time/consent and observed publication are tested through the actual browser/API/worker using MOCK Postiz. Analytics filters/labels distinguish carousels. All nine publishing browser journeys passed, including existing image/video paths; mobile screenshot inspected and accessibility/overflow checks passed. API and web builds pass. Evidence: `carousel-publishing-browser.json`.
