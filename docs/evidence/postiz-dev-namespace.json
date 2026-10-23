@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-23T14:57:00.497Z",
+  "namespace": "desvio-postiz-dev",
+  "created": false,
+  "attributes": {
+    "organizationId": 1,
+    "postId": 1
+  },
+  "scope": "Actual dedicated dev namespace and pinned-source search-attribute types. Does not prove Postiz pollers or workflows."
+}

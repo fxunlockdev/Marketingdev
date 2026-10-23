@@ -1,5 +1,21 @@
 # Desvio build state
 
+## Restricted provisioning worker — deployed and registered
+
+`provisioner-spec.mjs` rejects model/storage/admin credentials, mutable image tags, incorrect database roles, shared asset queues and reused keys. `start-dev-provisioner.mjs` starts only the exact existing trusted image with a separate credential set, read-only filesystem, dropped capabilities, memory/process limits and no Docker socket. Existing mismatched containers are refused, not overwritten. Secrets travel over stdin and are excluded from evidence.
+
+Actual dev container `50e3e43864253d54922db6e563795697508d7c00fa14f2a6fd3abdd99a86cc5e` is running on the existing private worker host. `check-provisioner.mjs` verifies both provisioning queue pollers, database role `desvio_provisioner` and absence of unrelated credentials. Evidence: `railway-provisioner-start.json`, `railway-provisioner-registration.json`. Sixteen focused configuration/activation contracts pass; full `make verify-operator` also passes (18 contracts and eight real local database cases), log `work/provisioner-operator-tests.log`.
+
+Railway Postiz deployment `9f9179c8-4b1b-4b7f-929b-8fe8dd8e3b1b` has built image manifest `sha256:503402c016b999209c92ee5d843f64b8394a4c1c0f063ee653b804046006f269`, config `sha256:d0fbb1bea6aaa2eaa77f83e6a88f5c1d0098ea77c1d3888fc6c312ffd93f9c0a`, and is still uploading; do not redeploy while this exact deployment is active. Local upload result: `work/postiz-railway-deploy.json`. Separate native sandbox build also passed backend/orchestrator compilation and is assembling the runtime; preserve its durable session until inspected/cleaned up.
+
+Latest actual worker check still finds no model credentials, video/publishing disabled and no businesses. Owner explicitly says they will add keys/create business/test themselves; do not repeatedly request them or execute paid calls. Continue plumbing independently: Postiz health/schema/runtime acceptance, real two-tenant enterprise API checks, media delivery deployment, coordinated social activation, and operator setup usability. Missing credentials are not a reason to stop those tasks or claim full completion.
+
+## Private Postiz application staging — configured, not deployed
+
+Created dev-only application service `12fba8b8-e4f0-45c4-900f-fa4cb05f5c83` (`desvio-dev-postiz`) with upload volume `e590480f-53a0-4002-a9d9-9f833c047f2f`. Variables reference only dedicated dev PostgreSQL/Redis and namespace `desvio-postiz-dev`; no model/social credentials or public domain. Explicit supervisor start, `/health`, three failure restarts and a bounded upstream Prisma schema-push pre-deploy command are configured. The source image is not yet built/deployed. Do not claim service readiness from configuration alone.
+
+Namespace creation and pinned-source `organizationId`/`postId` Text search attributes are read back verified in `postiz-dev-namespace.json`. The first immediate setup read failed; the idempotent follow-up observed existing namespace/attributes and passed. The native backend compile has succeeded; orchestrator compilation is currently running in build container `4d72f698c1b2` under the existing durable build session. Next: finish actual image acceptance and upload exact exported context to this service, observe exact deployment health, then provisioner and tenant/API/media acceptance. The user now wants to add provider keys and test; adding keys alone still does not activate the worker, allowances or video, and does not authorize paid tests.
+
 ## Dev Postiz dependencies — deployed and privately verified
 
 Dedicated dev-only services are now separate from production Postiz data. Database `81f8ec79-d5e2-4938-b50e-da1f500413ec` (`desvio-dev-postiz-db`), volume `8576533e-a39c-4ce6-b056-0c5486e34ea4`, deployment `a2a9dd4c-76ec-42ac-a389-8df9099bba69` SUCCESS, pinned PostgreSQL image `postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73`. Redis `cadf4da1-bc0b-4436-bcc4-bfad480daff4` (`desvio-dev-postiz-redis`), volume `af2aa990-2e8d-4554-917e-8e7d5c9c26fd`, deployment `008c829f-6e79-4cf1-aee9-9e15520bceca` SUCCESS, pinned amd64 Redis 7.2 image `redis@sha256:7cd025cf5b832cc4780477f5bb22df4c90fc6c0e0aab775593c5147b7aed3fc1`. Redis has append-only persistence and a generated password. Neither has a public domain/proxy.
