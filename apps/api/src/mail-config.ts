@@ -1,6 +1,7 @@
 export function mailConfig(env:NodeJS.ProcessEnv,mode:string){
  const required=(key:string)=>{if(!env[key])throw new Error(`${key} is required`);return env[key]!;};
  const provider=env.MAIL_PROVIDER??'smtp';
+ if(provider==='disabled'){if(!['test','development','staging'].includes(mode))throw new Error('Disabled email is restricted to nonproduction');return undefined;}
  if(!['smtp','resend'].includes(provider))throw new Error('MAIL_PROVIDER must be smtp or resend');
  // Resend officially supports implicit TLS SMTP with the API key as password.
  // Fixed transport settings prevent unrelated SMTP variables redirecting this key.

@@ -13,3 +13,13 @@ test('local SMTP remains available while staging rejects missing credentials and
  assert.equal(mailConfig(env,'test').port,1025);assert.throws(()=>mailConfig(env,'staging'),/Authenticated/);
  for(const patch of [{SMTP_PORT:'0'},{SMTP_PORT:'65536'},{SMTP_PORT:'abc'},{SMTP_SECURE:'yes'}])assert.throws(()=>mailConfig({...env,...patch},'test'));
 });
+
+test('explicit no-email dev mode keeps verified password authentication and never processes mail',async()=>{
+ const {MailQueue,MailWorker}=await import('../../dist/mail.js');const {authOptions}=await import('../../dist/auth.js');
+ assert.equal(mailConfig({MAIL_PROVIDER:'disabled'},'staging'),undefined);assert.throws(()=>mailConfig({MAIL_PROVIDER:'disabled'},'production'),/nonproduction/);
+ const db={query:async()=>{throw Error('Unexpected database access');}},config={mode:'staging',origin:'https://dev.example.test',authSecret:'x'.repeat(32),smtp:undefined};
+ const queue=new MailQueue(config.origin,'ab'.repeat(32),false),worker=new MailWorker(db,queue,config);
+ assert.equal(await worker.runOnce(),null);worker.close();
+ await assert.rejects(queue.enqueue(db,'verify',{to:'owner@example.test',url:config.origin+'/verify'},new Date()),/disabled/);
+ const options=authOptions(db,config,queue);assert.equal(options.emailAndPassword.enabled,true);assert.equal(options.emailAndPassword.requireEmailVerification,true);assert.equal(options.emailAndPassword.disableSignUp,true);
+});

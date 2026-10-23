@@ -538,3 +538,20 @@ test('authenticator enrollment, pending sign-in, one-use recovery and disabling 
  assert.equal((await challenge()).body.twoFactorRedirect,undefined);
  const appPool=new Pool({connectionString:config.appDatabaseUrl});try{await assert.rejects(appPool.query('SELECT * FROM auth."twoFactor"'),e=>e.code==='42501');}finally{await appPool.end();}
 });
+
+test('dev without email accepts an existing verified password account but denies public signup and unverified login',async()=>{
+ const label='dev-'+randomUUID(),user=await signup(label);
+ const pendingEmail='pending-'+randomUUID()+'@example.test';
+ assert.equal((await request('/api/auth/sign-up/email',{method:'POST',body:{name:'Pending',email:pendingEmail,password:'a-strong-test-password-2026'}})).status,200);
+ const isolated=await createApplication({...config,smtp:undefined});
+ try{
+  await isolated.app.listen(0,'127.0.0.1');const address=await isolated.app.getUrl();
+  const post=(path,body)=>fetch(address+path,{method:'POST',headers:{origin:config.origin,'content-type':'application/json'},body:JSON.stringify(body)});
+  const signupResponse=await post('/api/auth/sign-up/email',{name:'Denied',email:'disabled-'+randomUUID()+'@example.test',password:'a-strong-test-password-2026'});assert.equal(signupResponse.status,400);
+  const unverified=await post('/api/auth/sign-in/email',{email:pendingEmail,password:'a-strong-test-password-2026'});assert.equal(unverified.status,403);
+  const login=await post('/api/auth/sign-in/email',{email:user.email,password:'a-strong-test-password-2026'});assert.equal(login.status,200);const cookie=login.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');assert.ok(cookie);
+  const session=await fetch(address+'/api/v1/workspaces',{headers:{cookie}});assert.equal(session.status,200);
+  assert.equal((await fetch(address+'/api/v1/workspaces')).status,401);
+  assert.equal(await isolated.mailWorker.runOnce(),null);
+ }finally{await isolated.close();}
+});

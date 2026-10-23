@@ -15,7 +15,7 @@ export function authOptions(pool: Pool, config: Config, mail?: MailQueue) {
     appName: 'Desvio', baseURL: config.origin, basePath: '/api/auth',
     secret: config.authSecret, database: {dialect:new PostgresDialect({pool}),type:'postgres' as const,transaction:true},
     trustedOrigins: [config.origin],
-    emailAndPassword: { enabled: true, minPasswordLength: 12, maxPasswordLength: 128,
+    emailAndPassword: { enabled: true, disableSignUp: !config.smtp, minPasswordLength: 12, maxPasswordLength: 128,
       requireEmailVerification: true,autoSignIn:false,revokeSessionsOnPasswordReset:true,resetPasswordTokenExpiresIn:1800,
       sendResetPassword: async({user,url}:{user:{email:string};url:string})=>enqueue('reset',user.email,url) },
     emailVerification:{sendOnSignUp:true,sendOnSignIn:false,autoSignInAfterVerification:false,expiresIn:1800,

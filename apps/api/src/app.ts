@@ -293,7 +293,7 @@ export async function createApplication(config: Config) {
     await database.assertRuntimeRole();
     const { rows: [role] } = await authPool.query('SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user');
     if (role.name !== 'desvio_auth' || role.rolsuper || role.rolbypassrls) throw new Error('Unsafe authentication database role');
-    const mail=new MailQueue(config.origin,config.mailEncryptionKey),mailWorker=new MailWorker(mailPool,mail,config);
+    const mail=new MailQueue(config.origin,config.mailEncryptionKey,!!config.smtp),mailWorker=new MailWorker(mailPool,mail,config);
     await mailWorker.assertRole();
     const auth = createAuth(authPool, config,mail), workspaces = new Workspaces(database),team=new Team(database,mail,config.origin);
     const server = express();

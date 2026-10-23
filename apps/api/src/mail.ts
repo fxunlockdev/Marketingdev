@@ -18,8 +18,9 @@ const aad = (id: string,kind: Kind,org?: string | null) => Buffer.from(`desvio-m
 
 export class MailQueue {
   private readonly key: Buffer;
-  constructor(readonly origin: string,key: string) { this.key=keyFromHex(key); }
+  constructor(readonly origin: string,key: string,readonly enabled=true) { this.key=keyFromHex(key); }
   async enqueue(db: Queryable,kind: Kind,payload: Payload,expiresAt: Date,org?: string,actor?: string) {
+    if(!this.enabled)throw new Error('Email delivery is disabled');
     mailbox(payload.to);
     if(new URL(payload.url).origin!==this.origin) throw new Error('Email links must use the configured app origin');
     const id=randomUUID(),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',this.key,iv);
@@ -47,9 +48,10 @@ export class MailQueue {
 }
 
 export class MailWorker {
-  private readonly transport;
+  private readonly transport?: ReturnType<typeof nodemailer.createTransport>;
   constructor(readonly db: Pool,readonly queue: MailQueue,readonly config: Config) {
     const smtp=config.smtp;
+    if(!smtp){if(!['test','development','staging'].includes(config.mode))throw new Error('Email configuration required');return;}
     mailbox(smtp.from);
     const local=['test','development'].includes(config.mode) && ['127.0.0.1','localhost','::1'].includes(smtp.host);
     if(!local && (!smtp.user || !smtp.password)) throw new Error('Authenticated SMTP required');
@@ -63,6 +65,7 @@ export class MailWorker {
     if(role.name!=='desvio_mail' || role.rolsuper || role.rolbypassrls) throw new Error('Unsafe email worker database role');
   }
   async runOnce(): Promise<{id:string;status:string}|null> {
+    const smtp=this.config.smtp;if(!smtp||!this.transport)return null;
     // A killed worker may have submitted DATA. Never automatically send those rows again.
     await this.db.query(`UPDATE delivery.outbox SET status='unknown',error_code='WORKER_LOST',lease_id=NULL,leased_until=NULL
       WHERE status='processing' AND leased_until<now()`);
@@ -78,9 +81,9 @@ export class MailWorker {
     const heading=row.kind==='invite'?`You have been invited to ${payload.workspace ?? 'a client workspace'}.`:
       row.kind==='verify'?'Verify your email to continue with Desvio.':'Use this link to choose a new password.';
     try {
-      const result=await this.transport.sendMail({from:{name:'Desvio',address:this.config.smtp.from},to:payload.to,subject,
+      const result=await this.transport.sendMail({from:{name:'Desvio',address:smtp.from},to:payload.to,subject,
         text:`${heading}\n\n${payload.url}\n\nThis link expires. If you did not request this message, you can ignore it.`,
-        textEncoding:'base64',messageId:`<${row.id}@${this.config.smtp.from.split('@')[1]}>`});
+        textEncoding:'base64',messageId:`<${row.id}@${smtp.from.split('@')[1]}>`});
       if(result.accepted.length!==1 || result.rejected.length) {
         await this.finish(row.id,lease,'failed','RECIPIENT_REJECTED');return{id:row.id,status:'failed'};
       }
@@ -103,5 +106,5 @@ export class MailWorker {
       WHERE id=$1 AND lease_id=$2 AND status='processing'`,[id,lease,status,code,Math.min(3600,30*2**attempts)]);
     if(result.rowCount!==1) throw new Error('Email worker lease no longer active');
   }
-  close() {this.transport.close();}
+  close() {this.transport?.close();}
 }

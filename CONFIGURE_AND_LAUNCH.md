@@ -53,3 +53,7 @@ Publication defaults off. Both API and worker require `POSTIZ_PUBLISHING_ENABLED
 ## Resend email configuration
 
 For the selected Resend provider, set `MAIL_PROVIDER=resend`, `RESEND_API_KEY` and `RESEND_FROM` (one address on your verified sender domain) on the API service only. No SMTP fields are required in this mode. The transport is fixed to Resend implicit TLS, as documented at https://resend.com/docs/send-with-smtp. Keep credentials out of the web/skill containers. Existing generic SMTP remains available for local tests or deployments selecting `MAIL_PROVIDER=smtp`. Acceptance by the transport is not proof of inbox delivery: verify sign-up, password reset and invitation delivery in dev before launch.
+
+### Temporary private dev access without email
+
+With owner authorization, staging can explicitly set `MAIL_PROVIDER=disabled`. Only already verified/operator-provisioned password accounts can sign in; public signup and email delivery are unavailable. The mail worker does not consume pending messages. This is not a production mode, default password or global email-verification bypass. Provision only the owner's requested address, keep any temporary password in a private local file, and change it through normal Profile controls. Switch to Resend and verify real delivery before enabling customer signup/invitations.

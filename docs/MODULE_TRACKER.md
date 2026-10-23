@@ -1,5 +1,12 @@
 # Desvio module tracker
 
+## Temporary dev password access — owner requested
+
+Owner requested email/password access without waiting for Resend. `MAIL_PROVIDER=disabled` is now explicit nonproduction-only configuration; it creates no mail transport and consumes no queued mail. Existing verified password accounts and normal tenant/session enforcement remain enabled. Public signup is disabled; unverified users cannot sign in. Disabled delivery rejects enqueue attempts rather than claiming mail was sent. Resend can be enabled later without changing the authentication architecture.
+
+Acceptance passes three configuration contracts and all 29 real account/email cases at unchanged source `bbd6e4792f6127d7067a4471ce8bafb27fdf86f1e3f878ee1ef06dc8860855e5`, including actual HTTP verified-password sign-in, anonymous denial, unverified-account denial and disabled public signup against the email-disabled app. Railway dev API is configured for this mode and a new source-only API deployment has been requested. Owner email is pending via async question; no owner account/password has been created yet. Next: finish API/web rollout, provision only that requested dev account using normal credential hashing and securely deliver a temporary password; retain ordinary password-change and role controls. No universal/default password or public verification bypass.
+
+
 ## Dev database through 045 — verified; app startup pending
 
 Deployment `458eba7a-4986-473e-b2f1-1e39deea69f3` completed checksum-verified migration replay through 045 and all six runtime-role login checks. It is REMOVED; all seven temporary migration/runtime credential variables were deleted and read back absent. Runtime passwords were reused. Machine evidence: `docs/evidence/railway-dev-migration045.json`.

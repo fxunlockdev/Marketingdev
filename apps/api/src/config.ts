@@ -11,7 +11,7 @@ export type Config = {
   appDatabaseUrl: string;
   mailDatabaseUrl: string;
   mailEncryptionKey: string;
-  smtp: {host:string;port:number;secure:boolean;user?:string;password?:string;from:string};
+  smtp?: {host:string;port:number;secure:boolean;user?:string;password?:string;from:string};
   storage: StorageConfig;
   renderImage?:string;
   videoRenderImage?:string;
