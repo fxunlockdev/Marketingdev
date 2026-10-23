@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Coordinated activation and real API renderer-pin repair
+
+`activation.mjs` and `activate-dev.mjs` implement exact preview/apply, a remote operator lock, idle-job preflight, repeated drift checks, unique worker rollback preservation, worker registration checks, API flag/pin synchronization and exact redeployment verification. Unknown recovery retains the lock and safe journal. `start-dev.mjs` now exposes the existing loader/inspection/start operations for reuse without executing on import. No paid credentials, business grants or social flags are auto-enabled.
+
+The real preview found missing API renderer pins even though the worker had them. Applied only that configuration change: worker replacement was false; VIDEO_ENABLED stayed false. API deployment `66d29c9e-a1a5-41eb-84b8-948834fdaf5a` is confirmed SUCCESS and running. Evidence: `railway-provider-activation.json`, `railway-provider-activation-api.json`; worker registration was checked during activation. The actual public dev owner sign-in/session/business screen passed again after this deployment. No provider call occurred.
+
+`make verify-operator` passes 15 contracts plus eight real local database cases. Failure-injection tests cover stale settings, busy queues, worker startup/ambiguous swap failure, API failure, rollback and retained lock on uncertain recovery. Real acceptance of the new command covers API configuration/redeployment only; provider-enabled worker replacement and full live acceptance remain open. Next: finish recovery/activation usability and core Postiz deployment/configuration, preserving user-deferred keys and paid testing.
+
 ## Explicit video configuration and worker readiness
 
 `providerRuntimeSettings` now accepts the video flag/key/output-origin bundle only when explicitly enabled and complete; merely adding model credentials leaves video disabled. It reuses the real downloader URL validation and additionally rejects wildcard/duplicate origins. Infrastructure and social flags cannot be overridden by the settings service. The new wildcard-origin test initially caught permissive URL parsing; explicit rejection fixed the failing case.

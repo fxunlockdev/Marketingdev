@@ -1,9 +1,9 @@
 {
   "suite": "operator",
   "scope": "Actual disposable PostgreSQL, all six AI grant kinds and exact social allowlist configuration, preview/apply/replay, stale expiry, schema checksums, runtime-role denial and credential-free listing. Fixture accounts only; no live provider calls or cloud configuration.",
-  "checked_at": "2026-10-23T13:30:30.045330+00:00",
-  "source_sha256": "050d98aff1e026ad5e24211af04acf4b1dbe8628ebf7fd385876149e4e40a23c",
-  "source_sha256_start": "050d98aff1e026ad5e24211af04acf4b1dbe8628ebf7fd385876149e4e40a23c",
+  "checked_at": "2026-10-23T13:38:52.400632+00:00",
+  "source_sha256": "53d92673df7594a5016fde84ad474110ed437fd1183f64318c8f9763055edf7f",
+  "source_sha256_start": "53d92673df7594a5016fde84ad474110ed437fd1183f64318c8f9763055edf7f",
   "source_unchanged": true,
   "results": [
     {
@@ -21,10 +21,11 @@
         "--test",
         "tests/contracts/provider-setup.test.mjs",
         "tests/contracts/worker-readiness.test.mjs",
+        "tests/contracts/activation.test.mjs",
         "infra/worker-control/provider-settings.test.mjs"
       ],
       "exit_code": 0,
-      "output": "\u2714 copies only provider credentials, never infrastructure or enable flags (0.669416ms)\n\u2714 video activation requires complete explicit settings and never forwards unrelated controls (4.073833ms)\n\u2714 video setup rejects malformed keys, implicit flags and unsafe or ambiguous download origins (0.211042ms)\n\u2714 empty settings leave unpaid deployment usable; malformed secrets fail without disclosure (0.084875ms)\n\u2714 Railway setup requires exact dev scope, pinned image and explicit preview approval (0.888709ms)\n\u2714 payload rejects malformed targets and gathers actual migration sources without connection commands (4.898667ms)\n\u2714 readiness distinguishes matching, absent, stopped and changed workers without leaking credentials (0.929083ms)\n\u2714 readiness rejects wrong image platform, missing pins and unrelated containers (0.218625ms)\n\u2139 tests 8\n\u2139 suites 0\n\u2139 pass 8\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 108.608209\n"
+      "output": "\u2714 copies only provider credentials, never infrastructure or enable flags (0.679292ms)\n\u2714 video activation requires complete explicit settings and never forwards unrelated controls (4.496458ms)\n\u2714 video setup rejects malformed keys, implicit flags and unsafe or ambiguous download origins (0.248792ms)\n\u2714 empty settings leave unpaid deployment usable; malformed secrets fail without disclosure (0.095583ms)\n\u2714 preview contains only exact pins, flags and fingerprints and rejects unready targets (1.374708ms)\n\u2714 matching configuration verifies worker without restarting or redeploying (2.180042ms)\n\u2714 activation disables video before replacing worker and only enables API after worker verification (0.227459ms)\n\u2714 wrong approval, stale snapshots and busy queues cannot mutate services (0.911833ms)\n\u2714 drift during idle preflight is rejected before service mutations (0.585625ms)\n\u2714 failed and ambiguous worker swaps restore exact previous worker and API before releasing lock (0.51575ms)\n\u2714 API verification failure rolls back both services and recovery ambiguity retains lock (0.382792ms)\n\u2714 Railway setup requires exact dev scope, pinned image and explicit preview approval (1.1285ms)\n\u2714 payload rejects malformed targets and gathers actual migration sources without connection commands (6.269208ms)\n\u2714 readiness distinguishes matching, absent, stopped and changed workers without leaking credentials (0.96625ms)\n\u2714 readiness rejects wrong image platform, missing pins and unrelated containers (0.266708ms)\n\u2139 tests 15\n\u2139 suites 0\n\u2139 pass 15\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 127.061708\n"
     },
     {
       "command": [
@@ -33,7 +34,7 @@
         "--operator"
       ],
       "exit_code": 0,
-      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\n\u2714 one-shot Railway runner lists, previews and applies disabled grants without leaking administrator credentials (359.232458ms)\n\u2714 strict manifest rejects secrets, prototype capabilities, duplicate grants, unsafe budgets and invalid dates (0.436209ms)\n\u2714 preview makes no changes; approval applies once and audit is immutable to runtime roles (47.065459ms)\n\u2714 expiry-only drift invalidates a preview and exact database/business boundaries are required (23.800083ms)\n\u2714 all six AI grant kinds persist atomically, with explicit model and cost bounds (30.543625ms)\n\u2714 unbound publishing accounts cannot receive permission and partial batches are not applied (8.893375ms)\n\u2714 exact verified social binding can be enabled and revoked; listing omits credentials (41.737791ms)\n\u2714 missing migration checksum prevents configuration without altering grants (4.996834ms)\n\u2139 tests 8\n\u2139 suites 0\n\u2139 pass 8\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 587.371666\n"
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\n\u2714 one-shot Railway runner lists, previews and applies disabled grants without leaking administrator credentials (398.219ms)\n\u2714 strict manifest rejects secrets, prototype capabilities, duplicate grants, unsafe budgets and invalid dates (0.50575ms)\n\u2714 preview makes no changes; approval applies once and audit is immutable to runtime roles (51.47075ms)\n\u2714 expiry-only drift invalidates a preview and exact database/business boundaries are required (25.642625ms)\n\u2714 all six AI grant kinds persist atomically, with explicit model and cost bounds (49.755292ms)\n\u2714 unbound publishing accounts cannot receive permission and partial batches are not applied (10.142625ms)\n\u2714 exact verified social binding can be enabled and revoked; listing omits credentials (71.086667ms)\n\u2714 missing migration checksum prevents configuration without altering grants (5.7565ms)\n\u2139 tests 8\n\u2139 suites 0\n\u2139 pass 8\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 676.832125\n"
     }
   ],
   "passed": true,

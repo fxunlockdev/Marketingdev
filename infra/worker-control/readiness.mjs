@@ -23,5 +23,5 @@ worker=None
 if ids:
  info=json.loads(subprocess.check_output(['docker','inspect','desvio-trusted-worker'],stderr=subprocess.DEVNULL))[0]
  labels=info['Config'].get('Labels') or {}
- worker={'image':info['Image'],'configuration':labels.get('desvio.configuration'),'purpose':labels.get('desvio.purpose'),'running':info['State']['Running']}
+ worker={'id':info['Id'],'image':info['Image'],'configuration':labels.get('desvio.configuration'),'purpose':labels.get('desvio.purpose'),'running':info['State']['Running']}
 print(json.dumps({'images':images,'worker':worker}))`;
