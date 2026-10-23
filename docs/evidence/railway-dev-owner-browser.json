@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-10-23T12:02:45.876Z",
+  "passed": true,
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "email_sha256": "a570b3ae53a6d29232f7de610cbebb9c59f72b03146a5f51e595ace77b69c138",
+  "password_signin": true,
+  "authenticated_session": true,
+  "businesses_endpoint": true,
+  "first_business_ui": true,
+  "scope": "Actual deployed owner browser login and first-business screen; generation/social publishing not tested."
+}

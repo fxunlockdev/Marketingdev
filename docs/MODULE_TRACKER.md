@@ -1,5 +1,14 @@
 # Desvio module tracker
 
+## Deployed owner password login — verified
+
+API deployment `9ce5ba60-f1a1-4116-9911-bd0261f12ebb` and web deployment `2ac61a33-7ac1-4c39-9eb9-906c0ee58fb7` are SUCCESS. API private networking is ACTIVE at `desvio-dev-api.railway.internal`; the web origin is https://desvio-dev-web-dev.up.railway.app. Resend is not required for this owner-authorized nonproduction access mode.
+
+The owner-requested account was provisioned through the dedicated auth role with the pinned Better Auth password hash; no existing account was overwritten, and no global/default password or public email-verification bypass exists. Its temporary password is stored only in ignored mode-0600 local files. Private API login/session/business access passed. Actual Chromium through the public dev domain also passed password sign-in, session identity, business-list API and first-business UI. Screenshot captured and inspected. Evidence: `railway-dev-owner-login.json`, `railway-dev-owner-browser.json`. Initial provisioning rolled back on PostgreSQL parameter type inference (42P08); separate correctly typed account/user parameters fixed it before successful provisioning.
+
+This makes owner login and the initial business UI available; it does not prove live model generation or social publishing. Next: current trusted-worker/skill rollout, real model credentials and capped acceptance, and carousel publication. Billing excluded; email signup/reset/invitations intentionally await Resend. User can change the temporary password through Profile. Preserve existing owner data and do not rerun fixture cleanup against this real account.
+
+
 ## Temporary dev password access — owner requested
 
 Owner requested email/password access without waiting for Resend. `MAIL_PROVIDER=disabled` is now explicit nonproduction-only configuration; it creates no mail transport and consumes no queued mail. Existing verified password accounts and normal tenant/session enforcement remain enabled. Public signup is disabled; unverified users cannot sign in. Disabled delivery rejects enqueue attempts rather than claiming mail was sent. Resend can be enabled later without changing the authentication architecture.
