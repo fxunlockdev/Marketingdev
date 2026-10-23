@@ -41,3 +41,5 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 ### 2026-10-24 deployment plumbing evidence
 
 Private Postiz application deployment is SUCCESS; backend/orchestrator health and two actual enterprise identities passed. Desvio adapter rejects crossed organization bindings. Dedicated provisioner queue/database-role checks pass. Public web media route is deployed and actual Postiz upload → Desvio hash/HEAD/range delivery passed. Coordinated social/provisioning activation passed, including worker registration and exact healthy API redeployment. Owner browser sign-in passed. Publishing/video remain disabled. No OAuth account, model spending or live generation/publication acceptance is implied.
+
+- `railway-provisioning-job.json`: actual scoped business submission → durable outbox/Temporal → isolated provisioner → real Postiz identity → encrypted binding passed, including replay and foreign-scope denial. This is service-level deployed acceptance, not a browser OAuth/publication claim.

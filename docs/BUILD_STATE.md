@@ -1,5 +1,9 @@
 # Desvio build state
 
+## Actual durable provisioning acceptance — 2026-10-24
+
+`check-provisioning-job.mjs` now exercises a synthetic business through real scoped Desvio service methods, outbox, Temporal, isolated provisioner, actual private Postiz enterprise API and encrypted account binding. The dev job succeeded; identity verification, idempotent submission, foreign-business denial and credential-free customer result passed. No browser/session, OAuth consent, model or publication acceptance is implied. Probe state is retained for reconciliation; the runner refuses to create another over it. Exact completed-workflow/fixture cleanup is separate and leaves the remote synthetic Postiz organization and normal Temporal history intact. Evidence: `railway-provisioning-job.json` and cleanup report. This closes the gap between direct enterprise transport checks and actual durable provisioning; customer OAuth and paid generation remain unverified.
+
 ## Guided operator setup — 2026-10-24
 
 `npm run setup:dev` now guides saved-settings activation and individual business allowance setup without hand-written JSON. Exact tenant selection, eligible model IDs, explicit verified token prices, lifetime USD cap, expiry and per-request reservations flow into the existing strict manifest/preview/apply implementation. No invented rates, paid calls, social authorization or runtime administrator credentials. Explicit confirmation is required after the exact preview; private manifests preserve change IDs for reconciliation. Six focused tests cover decimal conversion, confirmation/cancellation, selected tenant/model/rates, invalid business/over-cap inputs and video model choices. The operator web UI and real provider acceptance remain unfinished; this CLI is not their substitute. Previous turn made concrete progress: actual Postiz deployment/enterprise/media verification and coordinated worker/API activation.

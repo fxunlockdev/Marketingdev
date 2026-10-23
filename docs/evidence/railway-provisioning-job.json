@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-10-23T16:11:02.016Z",
+  "passed": true,
+  "run_id": "952846fa-e88b-43b4-8c90-ec73ef811793",
+  "organization_id": "1df0dd16-d7b0-4359-a14a-bd4b47b36776",
+  "brand_id": "c8cb042c-1f14-439a-8e6e-85c3085a200f",
+  "job_id": "9d3fffc0-2702-417b-8192-ffab23d7adc6",
+  "job_status": "succeeded",
+  "submission_replay": true,
+  "foreign_scope_denied": true,
+  "encrypted_binding": true,
+  "identity_verified": true,
+  "no_social_accounts": true,
+  "no_credentials_in_customer_result": true,
+  "fixture_retained": false,
+  "scope": "Actual dev scoped service submission, outbox/Temporal/provisioner, real Postiz enterprise identity and encrypted account binding; synthetic identities retained. No browser/session, OAuth, social post or paid model acceptance.",
+  "cleanup_evidence": "docs/evidence/railway-provisioning-job-cleanup.json"
+}
