@@ -1,3 +1,4 @@
+import {approvedLearning} from './learning-context.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
 import {
@@ -301,7 +302,7 @@ export class Canvas {
         [job, b.organization_id, id, user],
       );
       await db.query(
-        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)",
+        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model,memory_context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)",
         [
           job,
           b.organization_id,
@@ -316,7 +317,7 @@ export class Canvas {
           v.size,
           k,
           sha,
-          textProvider,selectedTextModel,
+          textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),
         ],
       );
       for(const [position,referenceId] of referenceIds.entries())await db.query('INSERT INTO app.creative_references(organization_id,brand_id,job_id,reference_id,position) VALUES($1,$2,$3,$4,$5)',[b.organization_id,id,job,referenceId,position]);

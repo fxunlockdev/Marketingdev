@@ -1,3 +1,4 @@
+import {assertLearningCurrent} from './learning-context.js';
 import {randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
 import {VideoReferences} from './video-references.js';
@@ -16,7 +17,7 @@ export class VideoJobs {
  constructor(readonly jobs:AssetJobs,readonly references:VideoReferences,readonly creative:CreativeJobs,readonly provider:VideoProviderJobs,readonly download:VideoDownload,readonly renderer:VideoRenderer){}
  private transaction<T>(scope:JobScope,action:(db:any,j:any)=>Promise<T>){return this.jobs.transaction(scope,async(db,j)=>{if(j.kind!=='creative.video')throw new VideoStateError('VIDEO_JOB_KIND_DENIED');return action(db,j);});}
  private async finish(scope:JobScope,status:string,code:string|null){await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]);});await this.references.revoke(scope);return status;}
- private async providerStep(scope:JobScope){const phase=await this.provider.step(scope,async(db,j)=>{await this.references.verifySubmission(db,j);await this.checkSlot(db,j);});if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
+ private async providerStep(scope:JobScope){const phase=await this.provider.step(scope,async(db,j)=>{await this.references.verifySubmission(db,j);await assertLearningCurrent(db,(await db.query('SELECT memory_context FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0]?.memory_context);await this.checkSlot(db,j);});if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
  private async checkSlot(db:any,j:any){
   const r=(await db.query('SELECT slot_id,slot_revision FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
   if(!r?.slot_id)return;
@@ -58,7 +59,7 @@ export class VideoJobs {
      if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new VideoStateError('VIDEO_BRAND_INTEGRITY_FAILED');
      const grant=await this.creative.plannerGrant(db,j,request.text_provider);
      if(!grant)throw new VideoStateError('VIDEO_TEXT_APPROVAL_REQUIRED');
-     const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:request.prompt,channel:request.channel,duration_seconds:request.duration_seconds,reference:{kind:'image',sha256:proof.sha256,width:proof.width,height:proof.height,duration_seconds:null,caption:''}};
+     const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,learning:request.memory_context,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:request.prompt,channel:request.channel,duration_seconds:request.duration_seconds,reference:{kind:'image',sha256:proof.sha256,width:proof.width,height:proof.height,duration_seconds:null,caption:''}};
      return {input,grant};
     });
     let plan=request.plan;
@@ -70,6 +71,7 @@ export class VideoJobs {
     if(!request.approved_brief||request.approved_revision!==request.draft_revision)return 'awaiting_approval';
     plan={...plan,brief:request.approved_brief};
     validateVideoPlanningResult(plan,context.input);
+    await this.transaction(scope,async(db)=>assertLearningCurrent(db,request.memory_context));
     const lease=await this.references.prepare(scope);
     await this.references.verify(scope);
     await this.provider.prepare(scope,{kind:'image',model:HIGGSFIELD_MODELS.image,idempotencyKey:scope.jobId,referenceURL:lease.url,prompt:plan.brief.video_prompt+'\nScript:\n'+plan.brief.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n'),durationSeconds:request.duration_seconds,sound:'off'},async(db,j)=>{
@@ -104,7 +106,7 @@ export class VideoJobs {
     if(!await this.jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${j.brand_id}`]);
     const freshProof=await this.references.verifyTransaction(db,j);
-    const id=randomUUID(),manifest={...output.manifest,text_provider:request.text_provider,text_model:request.selected_text_model,brain_id:request.brain_id,plan:{...request.plan,brief:request.approved_brief},prompt_approval:{actor:request.approved_by,revision:request.approved_revision},reference:{export_id:freshProof.id,sha256:freshProof.sha256,approval_id:freshProof.approval_id}};
+    const id=randomUUID(),manifest={...output.manifest,learning:request.memory_context,text_provider:request.text_provider,text_model:request.selected_text_model,brain_id:request.brain_id,plan:{...request.plan,brief:request.approved_brief},prompt_approval:{actor:request.approved_by,revision:request.approved_revision},reference:{export_id:freshProof.id,sha256:freshProof.sha256,approval_id:freshProof.approval_id}};
     await db.query('INSERT INTO app.video_versions(id,organization_id,brand_id,project_id,job_id,object_key,sha256,bytes,poster_key,poster_sha256,poster_bytes,caption,overlays,manifest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',[id,j.organization_id,j.brand_id,request.project_id,j.id,key,output.manifest.video_sha256,output.video.length,posterKey,output.manifest.poster_sha256,output.poster.length,request.approved_brief.caption,JSON.stringify(request.approved_brief.overlays),JSON.stringify(manifest)]);
     await db.query('UPDATE app.video_projects SET latest_version_id=$2 WHERE id=$1',[request.project_id,id]);
     await db.query('UPDATE app.video_requests SET output_version_id=$2 WHERE job_id=$1',[j.id,id]);

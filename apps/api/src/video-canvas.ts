@@ -1,3 +1,4 @@
+import {approvedLearning} from './learning-context.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {validateVideoBrief,type VideoPlanningInput} from './video-planning.js';
 import {BadRequestException,ConflictException,ForbiddenException,NotFoundException} from '@nestjs/common';
@@ -42,7 +43,7 @@ export class VideoCanvas {
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.video')",[job,b.organization_id,brand,user]);
    await this.references.bind(user,brand,job,v.reference,{db,b});
    if(!v.parent_version_id)await db.query('INSERT INTO app.video_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[project,b.organization_id,brand,threadId,prompt.slice(0,140),user]);
-   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision,text_provider,selected_text_model) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint,slotId,v.slot_revision??null,textProvider,selectedTextModel]);
+   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision,text_provider,selected_text_model,memory_context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint,slotId,v.slot_revision??null,textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db))]);
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.video')",[job,b.organization_id,brand]);
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'video.requested',$4)",[b.organization_id,brand,user,job]);
    return {id:job,status:'queued'};

@@ -63,3 +63,9 @@ export async function publishSocialWorkflow(scope:JobScope){
  }
  return 'accepted_unconfirmed';
 }
+
+
+type InsightActivities={generateInsights(scope:JobScope):Promise<string>;failInsights(scope:JobScope):Promise<string>};
+const insights=proxyActivities<InsightActivities>({startToCloseTimeout:'6 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
+const insightFinalization=proxyActivities<InsightActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function generateInsightsWorkflow(scope:JobScope){try{return await insights.generateInsights(scope);}catch{return await insightFinalization.failInsights(scope);}}

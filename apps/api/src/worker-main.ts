@@ -1,3 +1,4 @@
+import {InsightJobs} from './insight-jobs.js';
 import {GeminiPlanner} from './gemini-planner.js';
 import {VideoJobs} from './video-jobs.js';
 import {VideoReferences} from './video-references.js';
@@ -40,6 +41,7 @@ const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new WebsiteParser(config.documentImage),new BrandAnalyzer(process.env.OPENAI_API_KEY),undefined,new VisualCrawler(config.documentImage));
 const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
+const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled,config.videoRenderImage);
 const social=new SocialJobs(jobs,config.social);
 const socialOAuth=new SocialOAuthJobs(jobs,config.social,config.oauthEncryptionKey);
@@ -52,6 +54,8 @@ const worker=await Worker.create({connection,namespace:config.jobs.namespace,tas
   maxConcurrentActivityTaskExecutions:2,activities:{
     stepVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.nonRetryable('Video generation is not configured','VideoUnavailable');const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await video.step(scope);}catch{throw ApplicationFailure.retryable('Video processing temporarily unavailable','VideoUnavailable');}finally{clearInterval(heartbeat);}},
     failVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.retryable('Video recovery awaits configured worker','VideoUnavailable');return video.exhausted(scope);},
+    generateInsights:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await insights.run(scope);}catch{throw ApplicationFailure.retryable('Analysis temporarily unavailable','InsightsUnavailable');}finally{clearInterval(heartbeat);}},
+    failInsights:async(scope:JobScope)=>insights.fail(scope),
     publishSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.run(scope);}catch(e){throw ApplicationFailure.create({message:'Publication processing unavailable',type:'PublicationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     reconcileSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.reconcile(scope);}catch(e){throw ApplicationFailure.create({message:'Publication check unavailable',type:'PublicationCheckUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     failPublication:async(scope:JobScope)=>publication.fail(scope),

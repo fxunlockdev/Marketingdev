@@ -1,3 +1,4 @@
+import {validateInsightResult,type InsightInput} from './insight-contracts.js';
 import {validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
 import {validateVideoInput,validateVideoPlanningResult,type VideoPlanningInput,type VideoPlanningResult} from './video-planning.js';
 import { spawn, execFile } from "node:child_process";
@@ -26,7 +27,8 @@ export class SkillRuntime {
     validateVideoInput(input);
     return this.run(input,model,value=>validateVideoPlanningResult(value,input));
   }
-  private async run<T>(input:CreativeInput|PlanningInput|VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,validate:(value:any)=>T):Promise<T> {
+  insights(input:InsightInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<any>{return this.run(input,model,value=>validateInsightResult(value,input));}
+  private async run<T>(input:CreativeInput|PlanningInput|VideoPlanningInput|InsightInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,validate:(value:any)=>T):Promise<T> {
     if (!this.configured)
       throw new CreativeError("SKILL_RUNTIME_NOT_CONFIGURED");
     const encoded = JSON.stringify(input);

@@ -1,3 +1,4 @@
+import type {LearningContext} from './learning-context.js';
 import { CREATIVE_SKILLS } from "./creative-skill-pins.js";
 export class CreativeError extends Error {
   constructor(readonly code: string) {
@@ -19,6 +20,7 @@ export type CreativeInput = {
     id: string;
     sha256: string;
     facts: { id: string; field: string; value: string }[];
+    learning?:LearningContext;
   };
   prompt: string;
   format: "static" | "ad";

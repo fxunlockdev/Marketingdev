@@ -1300,3 +1300,9 @@ summary:focus-visible {
 .reference-library .reference-choice { display: flex; align-items: flex-start; gap: 10px; font-weight: 500; }
 .reference-library .reference-choice input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin: 3px 0 0; padding: 0; }
 .reference-library section { border-top: 1px solid var(--line, #dfcbb7); margin-top: 20px; padding-top: 16px; }
+
+.performance-lessons fieldset { border: 0; padding: 0; margin: 18px 0; min-width: 0; }
+.performance-lessons .learning-consent { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0; font-size: 14px; line-height: 1.6; }
+.performance-lessons .learning-consent input { width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 2px 0 0; flex: 0 0 18px; }
+.performance-lessons .creative-review { overflow-wrap: anywhere; }
+.performance-lessons details { margin: 16px 0; }

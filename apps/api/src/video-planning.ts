@@ -1,3 +1,4 @@
+import {validLearning} from './learning-context.js';
 import {CreativeError,type CreativeInput,type SkillResult} from './creative-contracts.js';
 import {CREATIVE_SKILLS} from './creative-skill-pins.js';
 export const VIDEO_SKILLS={
@@ -17,7 +18,7 @@ const time=(v:any)=>Number.isSafeInteger(v)&&v>=0;
 export function validateVideoInput(v:any):asserts v is VideoPlanningInput {
  const fail=()=>{throw new CreativeError('VIDEO_PLAN_INPUT_INVALID');};
  if(!fields(v,['task','brand','prompt','channel','duration_seconds','reference'])||v.task!=='video'||!plain(v.prompt,4000)||!['linkedin','instagram'].includes(v.channel)||!Number.isInteger(v.duration_seconds)||v.duration_seconds<3||v.duration_seconds>15)fail();
- if(!fields(v.brand,['id','sha256','facts'])||!plain(v.brand.id,100)||!sha(v.brand.sha256)||!Array.isArray(v.brand.facts)||!v.brand.facts.length||v.brand.facts.length>200||v.brand.facts.some((f:any)=>!fields(f,['id','field','value'])||!plain(f.id,100)||!plain(f.field,100)||!plain(f.value,4000))||new Set(v.brand.facts.map((f:any)=>f.id)).size!==v.brand.facts.length)fail();
+ if(!fields(v.brand,['id','sha256','facts',...(v.brand?.learning===undefined?[]:['learning'])])||(v.brand.learning!==undefined&&!validLearning(v.brand.learning))||!plain(v.brand.id,100)||!sha(v.brand.sha256)||!Array.isArray(v.brand.facts)||!v.brand.facts.length||v.brand.facts.length>200||v.brand.facts.some((f:any)=>!fields(f,['id','field','value'])||!plain(f.id,100)||!plain(f.field,100)||!plain(f.value,4000))||new Set(v.brand.facts.map((f:any)=>f.id)).size!==v.brand.facts.length)fail();
  const r=v.reference;
  if(!fields(r,['kind','sha256','width','height','duration_seconds','caption'])||!['image','video'].includes(r.kind)||!sha(r.sha256)||![r.width,r.height].every(n=>Number.isInteger(n)&&n>=64&&n<=4096)||!plain(r.caption,3000,true)||(r.kind==='image'?r.duration_seconds!==null:typeof r.duration_seconds!=='number'||!Number.isFinite(r.duration_seconds)||r.duration_seconds<1||r.duration_seconds>30))fail();
  if(Buffer.byteLength(JSON.stringify(v))>350000)fail();

@@ -1,4 +1,5 @@
 "use client";
+import {PerformanceLessons} from './performance-lessons';
 import {Profile} from "./profile";
 import {BusinessTeam} from "./business-team";
 import {VisualReview} from "./visual-review";
@@ -1409,12 +1410,13 @@ function Memory({ business }: { business: Business }) {
             Review brand facts
           </a>
           <p className="availability-note">
-            Approved visual directions appear above. Performance lessons and experiments are still being implemented.
+            Approved visual directions appear above. Review performance hypotheses separately below; they never replace these facts.
           </p>
         </section>
       ) : (
         !error && <Loading />
       )}
+      <PerformanceLessons key={business.id} businessId={business.id}/>
     </>
   );
 }

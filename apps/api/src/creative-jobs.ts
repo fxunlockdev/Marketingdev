@@ -1,3 +1,4 @@
+import {assertLearningCurrent} from './learning-context.js';
 import {GeminiPlanner} from "./gemini-planner.js";
 import {ApiError as GeminiAPIError} from "@google/genai";
 import type {PlannerRequest} from "./creative-contracts.js";
@@ -62,6 +63,8 @@ export class CreativeJobs {
     const prepared = await this.jobs.transaction(scope, async (db, j) => {
       if (!(await this.jobs.permitted(db, j)))
         throw new CreativeError("CREATIVE_ACCESS_REVOKED");
+      const memorySQL=j.kind==='creative.video'?'SELECT memory_context FROM app.video_requests WHERE job_id=$1':'SELECT memory_context FROM app.creative_requests WHERE job_id=$1';
+      await assertLearningCurrent(db,(await db.query(memorySQL,[j.id])).rows[0]?.memory_context);
       if(step==='image'){if(providerName!=='openai')throw new CreativeError('CREATIVE_CONFIG_CHANGED');}
       else {
         const sql=j.kind==='creative.video'?'SELECT text_provider,selected_text_model FROM app.video_requests WHERE job_id=$1':'SELECT text_provider,selected_text_model FROM app.creative_requests WHERE job_id=$1';
@@ -228,6 +231,7 @@ export class CreativeJobs {
         );
         const input: CreativeInput = {
           brand: {
+            learning:request.memory_context,
             id: brain.id,
             sha256: brain.sha256,
             facts: brain.snapshot.facts.map((f: any) => ({
@@ -424,6 +428,7 @@ export class CreativeJobs {
           fact_ids: plan.brief.fact_ids,
           text_provider:request.text_provider,
           text_model: request.selected_text_model,
+          learning:request.memory_context,
           image_model: grant.image_model,
           reserved_cost_micros: reserved,
         };

@@ -1,3 +1,4 @@
+import {approvedLearning} from './learning-context.js';
 import {addDays,dayStart} from './local-calendar.js';
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
@@ -37,7 +38,7 @@ export class Planning {
    if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
    const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
    if(!prefs||prefs.step!==3||!prefs.channels.length)throw new ConflictException('Finish your brand goals and choose content channels before planning');
-   const input:PlanningInput={task:'content_plan',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(v.video_count!==undefined?{video_count:Number(videos)}:{})};
+   const input:PlanningInput={task:'content_plan',brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(v.video_count!==undefined?{video_count:Number(videos)}:{})};
    if(v.planning_mode==='natural')input.planning_mode='natural';
    if(referenceId){
     const plan=(await db.query('SELECT id,title,duration_days,starts_on::text,timezone FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,referenceId])).rows[0];

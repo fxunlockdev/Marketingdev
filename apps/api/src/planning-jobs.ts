@@ -1,3 +1,4 @@
+import {approvedLearning,assertLearningCurrent} from './learning-context.js';
 import {ApiError as GeminiAPIError} from '@google/genai';
 import {GeminiPlanner} from './gemini-planner.js';
 import OpenAI from 'openai';
@@ -18,8 +19,9 @@ export class PlanningJobs {
   const prepared=await this.jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='plan.generate')throw new Error('JOB_KIND_DENIED');
    if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
-   const bound=(await db.query('SELECT provider,selected_model,loop_id,scheduled_at FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];
+   const bound=(await db.query('SELECT provider,selected_model,loop_id,scheduled_at,input,execution_input FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];
    if(!bound||bound.provider!==providerName||bound.selected_model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
+   await assertLearningCurrent(db,(bound.execution_input??bound.input).brand.learning);
    if(new Date(bound.scheduled_at).getTime()>Date.now())throw new CreativeError('PLAN_NOT_DUE');
    const loop=bound.loop_id?(await db.query('SELECT * FROM app.planning_loops WHERE id=$1',[bound.loop_id])).rows[0]:null;
    if(bound.loop_id&&(!loop||loop.stopped_at))throw new CreativeError('PLAN_ACCESS_REVOKED');
@@ -70,7 +72,7 @@ export class PlanningJobs {
       const latest=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[j.organization_id,j.brand_id])).rows[0];
       const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0];
       if(!latest||hash(canonicalJSON(latest.snapshot))!==latest.sha256||!prefs||prefs.step!==3||!prefs.channels.length)throw new CreativeError('PLAN_BRAND_INTEGRITY_FAILED');
-      const input={...request.input,brand:{id:latest.id,sha256:latest.sha256,facts:latest.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{...request.input.preferences,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,revision:prefs.revision}};
+      const input={...request.input,brand:{id:latest.id,sha256:latest.sha256,learning:await approvedLearning(db),facts:latest.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{...request.input.preferences,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,revision:prefs.revision}};
       if(Buffer.byteLength(JSON.stringify(input))>390000)throw new CreativeError('SKILL_INPUT_LIMIT');
       request.execution_input=input;request.execution_sha256=hash(canonicalJSON(input));request.execution_brain_id=latest.id;
       await db.query('UPDATE app.planning_requests SET execution_input=$2,execution_sha256=$3,execution_brain_id=$4 WHERE job_id=$1',[j.id,JSON.stringify(input),request.execution_sha256,latest.id]);
@@ -109,7 +111,7 @@ export class PlanningJobs {
     if(prior)return this.finish(db,j,'succeeded');
     if((await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0].n>=36)throw new CreativeError('PLAN_LIMIT_REACHED');
     const planId=randomUUID(),reserved=(await db.query('SELECT sum(reserved_micros)::text AS n FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0].n;
-    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
+    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,learning:input.brand.learning??[],resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
     await db.query(`INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,origin,created_by,request_key,request_hash,job_id,brain_id,strategy,skill_manifest,duration_days)
       VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify(result.plan),JSON.stringify(manifest),resolved.duration_days??30]);
     for(const [index,s] of result.plan.slots.entries()){

@@ -1,4 +1,5 @@
 "use client";
+import {PerformanceLessons} from './performance-lessons';
 import {PostAnalytics} from './post-analytics';
 import {useCallback,useEffect,useId,useRef,useState} from 'react';
 import {api} from './api';
@@ -62,6 +63,7 @@ export function PublishingScreen({business}:{business:Business}){
     {data.publications.filter(r=>filter==='all'||status(r).key===filter).length?<ul className="publication-list">{data.publications.filter(r=>filter==='all'||status(r).key===filter).map(r=>{const s=status(r);return <li key={r.id}><div className="publication-record-heading"><div><strong>{r.account_name} · LinkedIn</strong><p>{formatDate(r.scheduled_at,zone)} · {zone}</p></div><span className={'publication-status '+s.key}>{s.label}</span></div><p className="publication-caption">{r.caption}</p><p>{s.detail}</p>{r.last_checked_at&&<p className="hint">Last observed {formatDate(r.last_checked_at,zone)}</p>}<div className="publication-record-actions">{data.can_manage&&['queued','uploaded'].includes(r.phase)&&!['failed','rejected','canceled','succeeded'].includes(r.status)&&<button disabled={busy||r.cancel_requested||!!loadError} onClick={()=>void act(r,'cancel')}>{r.cancel_requested?'Cancellation requested':'Cancel request'}</button>}{data.can_manage&&r.phase==='accepted'&&<button disabled={busy||!!loadError} onClick={()=>void act(r,'reconcile')}>Check post status</button>}{s.key==='published'&&r.release_url&&<a href={r.release_url} target="_blank" rel="noopener noreferrer">View published post ↗</a>}</div><History root={root} record={r} zone={zone}/></li>;})}</ul>:<p className="connection-empty">No publishing requests match this view.</p>}
    </section>
    <PostAnalytics key={business.id} businessId={business.id}/>
+   <PerformanceLessons key={business.id+':lessons'} businessId={business.id}/>
   </>}
  </>;
 }
