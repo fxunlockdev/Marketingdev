@@ -1,5 +1,9 @@
 # Desvio build state
 
+## Allowance change review — 2026-10-24
+
+Audited current onboarding/creative/planning/insight/video grant fields against their runtime reservation checks. Allowance previews now return prior configuration beside the proposed manifest, without account credentials, and explicitly explain lifetime caps do not reset used reservations. Guided setup displays this existing preview automatically. `make verify-operator` passes 28 contracts and nine database cases including prior visual-cap readback. No dev allowance was changed and no provider was called. Model eligibility/prices/authorized allowances and live journey acceptance remain external configuration requirements; operator web UI and other documented module gaps remain open.
+
 ## Visual onboarding allowance plumbing repair — 2026-10-24
 
 Found a concrete setup defect: onboarding analysis requires a positive `analysis_grants.max_tokens_per_image` when screenshots/document images exist, but the operator tool could not set that field. Added the optional bounded integer field and an explicit guided prompt; it flows through the existing preview, audited atomic apply and token-cost reservation. Omitting it preserves legacy manifest hashes and existing values; explicit zero disables visual analysis. No defaults invent image-token ceilings or spending. `make verify-operator` passes 28 contracts plus nine real PostgreSQL cases, including persisted visual caps, invalid values, omission preservation and explicit reset. No runtime/image/migration deployment is needed: the one-shot Railway runner sends this updated administrator source from the checkout. Owner allowance/live analysis remains unconfigured/unverified.

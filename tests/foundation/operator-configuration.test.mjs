@@ -96,7 +96,7 @@ test('missing migration checksum prevents configuration without altering grants'
 
 test('visual onboarding token cap persists explicitly, rejects unsafe caps, and preserves omitted legacy fields',async()=>{
  const m=manifest();m.grants[0].max_tokens_per_image=12345;
- const p=await configureProviders(admin,m,options);assert.equal(p.manifest.grants[0].max_tokens_per_image,12345);
+ const p=await configureProviders(admin,m,options);assert.equal(p.manifest.grants[0].max_tokens_per_image,12345);assert.equal(p.previous.length,1);assert.equal(p.previous[0].kind,'onboarding');assert.equal(p.previous[0].existing.max_tokens_per_image,0);assert.ok(!JSON.stringify(p.previous).includes('encrypted_credential'));
  await configureProviders(admin,m,{...options,approval:p.preview_sha256});
  const cap=async()=>Number((await admin.query('SELECT max_tokens_per_image FROM app.analysis_grants WHERE brand_id=$1',[brand])).rows[0].max_tokens_per_image);
  assert.equal(await cap(),12345);

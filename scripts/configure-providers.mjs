@@ -95,7 +95,7 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
    snapshots.push({kind:g.kind,key:d.key?g[d.key]:null,existing,account});
   }
   const previewHash=digest({manifest,snapshots});
-  if(!approval){await db.query('ROLLBACK');return {status:'preview',preview_sha256:previewHash,business,manifest,scope:'Grant configuration only; no provider keys, model eligibility, deployment or live verification is implied.'};}
+  if(!approval){await db.query('ROLLBACK');return {status:'preview',preview_sha256:previewHash,business,manifest,previous:snapshots.map(({kind,key,existing})=>({kind,key,existing})),scope:'Lifetime caps include existing reservations; this does not reset usage. Grant configuration only; no provider keys, model eligibility, deployment or live verification is implied.'};}
   if(approval!==previewHash)deny('CONFIGURATION_PREVIEW_STALE');
   for(const g of manifest.grants){
    const d=definitions[g.kind],data={organization_id:manifest.organization_id,brand_id:manifest.business_id};
