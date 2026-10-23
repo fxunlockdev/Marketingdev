@@ -1,5 +1,14 @@
 # Desvio module tracker
 
+## Private dev worker deployment — current checkpoint
+
+Offline 5 and contract 83 checks pass at frozen source `5048e773545009f2c08334482299b802dbd9dec7a47cc27986935b32f7a39067`. Existing full security/browser reports remain historical; no live-provider verification is implied.
+
+The five exact amd64 runtime images have been transferred to the private Railway host and imported successfully. Archive SHA-256 and all remote image identities, architectures and runtime users pass actual checks. The host reaches the dedicated dev database and Temporal service over private DNS. ClamAV accepts a clean sample, rejects the standard antivirus test string, and has fresh signatures. Evidence: `railway-worker-transfer.json`, `railway-private-connectivity.json`, `railway-worker-host-checks.json`.
+
+The trusted worker is running with separate worker/dispatcher database roles. Actual role logins and both Temporal workflow/activity pollers pass (`railway-worker-registration.json`). This is registration evidence, not durable job acceptance. Remaining deployment checks include real durable jobs/recovery, application/browser wiring and tenant acceptance. Model generation and social publishing remain disabled; no paid provider calls or social posts ran. Billing remains excluded.
+
+
 ## amd64 creative runtimes verified
 
 Source `0a7294f7aad6c7309e546120dceed92a34670745897c523532490f89936f0659` passes all six original-skill cases and nine real PostgreSQL/private-storage/Temporal export, final-approval and video-lineage cases with amd64 skill/static/video runtimes. Provider transports remain MOCK. Static renderer keeps its original pinned Node 22 image family; explicit architecture-specific child digests were verified from that original registry index. Five local amd64 runtime image IDs are recorded in `docs/evidence/worker-image-inventory.json`; none has yet been transferred to a hosted worker. Next is private host transfer/lifecycle, Temporal/scanner configuration and connected app deployment.

@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-23T07:06:25.934Z",
+  "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "sha256": "a9b6f3f2a684f6fe67d3a06916000c83d23bdcb00f318a78e15791f00ba5e680",
+  "bytes": 1716181075,
+  "verified": true,
+  "temporary_private_object_removed": true,
+  "scope": "Exact Docker archive bytes transferred and hashed on private host; image import and worker readiness not yet proven"
+}
