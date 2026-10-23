@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Deployment alert follow-up and full acceptance refresh
+
+Railway read-back again confirms API `01289a92-8e98-4093-899b-3384dd9f094b` SUCCESS. The screenshot alert is the superseded `b34f9064-9610-4e85-a278-42c69bbee7a4`: its image built, but startup health checks failed while Resend was unconfigured. The existing explicit dev password-only configuration resolves that startup issue; no new deployment was necessary.
+
+Full security refresh passes at unchanged source: 29 account tests, 169 foundation cases, six Python boundary tests, API build and both production dependency audits. `scripts/storage-test-services.mjs` now allows a bounded longer full-signature scanner startup under emulation and records container state/logs before exact cleanup on failure. The first attempt failed scanner readiness, not a product assertion; the subsequent complete suite passed. Offline and 84 contract checks also pass. All 37 full browser journeys pass at the same unchanged source. Public dev owner login/session/business access also passed again at 13:11 UTC. Release gate now reports the remaining product/deployed-provider/live acceptance gap; it no longer reports stale security/browser evidence.
+
+Module-by-module implementation and precise remaining gates are tracked in [MODULE_TRACKER.md](MODULE_TRACKER.md). Next: operator provider activation for the usable core, then remaining core social setup. Preserve current acceptance evidence; rerun affected checks after source changes. Owner defers keys and paid testing; no paid requests or posts are authorized.
+
 ## Carousel release rollout — in progress
 
 AI insight evidence now labels carousels correctly; all 17 backend cases passed again, including the exact observation query used for analysis. Dev migration 046 is verified by checksum replay and six runtime-role logins. Bootstrap deployment `486d6ea2-e855-4171-9d1a-fe0fc31dc320` is REMOVED and all seven temporary credential variables were read back absent. Evidence: `railway-dev-migration046.json`.
