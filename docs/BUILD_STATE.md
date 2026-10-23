@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Real hosted private-upload job — verified component flow
+
+The actual dev application service methods reserved and uploaded a synthetic PNG to private Railway storage. The running dispatcher and Temporal worker processed `asset.validate` successfully in one attempt, using real scanning and canonical storage. Reservation/submission replay stayed idempotent; unsigned object access and foreign-user service reads/downloads were denied. Canonical PNG and normalized preview checksum readback passed. This uses administrative test identities rather than browser authentication; it does not establish sign-in/email, full customer flow, worker restart recovery or live model/social readiness.
+
+Evidence: `railway-worker-job.json`. The workflow reached COMPLETED; all three probe objects and its exact database fixtures were removed (`railway-worker-job-cleanup.json`). Temporal history remains under normal retention. Administrative credentials went only through stdin to a separate short-lived acceptance container, never into the persistent worker. The runner refuses to launch a second probe over an existing outcome and records IDs for reconciliation.
+
+Offline five and contracts 83 pass at source `8af986169667689e5d6461aa480c7e0dccd6ec9b73447dbc9d87b89610074f38`. Scripts: `infra/worker-control/check-job.mjs`, `job-probe.mjs`, `job-probe-cleanup.mjs`. Next: hosted recovery acceptance and remaining customer modules; full API/web deployment still needs real SMTP. Billing remains excluded.
+
 ## Dev schema and hosted crawl acceptance
 
 Dedicated Railway dev deployment `b0d325c0-a618-4654-adfe-c262c360cdcc` applied migration 040 with checksum-verified replay and verified all six existing runtime-role logins. Runtime passwords were reused, not rotated. Completion output is recorded in `railway-dev-migration040.json`; the one-shot deployment is REMOVED and its administrator reference plus runtime password variables were deleted. Worker/dispatcher logins and both Temporal pollers still pass after migration.

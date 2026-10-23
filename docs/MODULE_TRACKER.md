@@ -1,5 +1,13 @@
 # Desvio module tracker
 
+## Real hosted private-upload job — verified component flow
+
+The actual dev application service methods reserved and uploaded a synthetic PNG to private Railway storage. The running dispatcher and Temporal worker processed `asset.validate` successfully in one attempt, using real scanning and canonical storage. Reservation/submission replay stayed idempotent; unsigned object access and foreign-user service reads/downloads were denied. Canonical PNG and normalized preview checksum readback passed. This uses administrative test identities rather than browser authentication; it does not establish sign-in/email, full customer flow, worker restart recovery or live model/social readiness.
+
+Evidence: `railway-worker-job.json`. The workflow reached COMPLETED; all three probe objects and its exact database fixtures were removed (`railway-worker-job-cleanup.json`). Temporal history remains under normal retention. Administrative credentials went only through stdin to a separate short-lived acceptance container, never into the persistent worker. The runner refuses to launch a second probe over an existing outcome and records IDs for reconciliation.
+
+Offline five and contracts 83 pass at source `8af986169667689e5d6461aa480c7e0dccd6ec9b73447dbc9d87b89610074f38`. Scripts: `infra/worker-control/check-job.mjs`, `job-probe.mjs`, `job-probe-cleanup.mjs`. Next: hosted recovery acceptance and remaining customer modules; full API/web deployment still needs real SMTP. Billing remains excluded.
+
 ## Dev schema and hosted crawl acceptance
 
 Dedicated Railway dev deployment `b0d325c0-a618-4654-adfe-c262c360cdcc` applied migration 040 with checksum-verified replay and verified all six existing runtime-role logins. Runtime passwords were reused, not rotated. Completion output is recorded in `railway-dev-migration040.json`; the one-shot deployment is REMOVED and its administrator reference plus runtime password variables were deleted. Worker/dispatcher logins and both Temporal pollers still pass after migration.
@@ -157,7 +165,7 @@ Historical checkpoints below are superseded by the current checkpoint above: b1d
 |---|---|
 | Better Auth / Postgres / business isolation | Real local sessions, recovery, forced RLS and concurrent quota tests. Railway dev roles and migrations through 040 verified; deployed application acceptance pending. |
 | Private S3 media / malware validation | Real local signed storage, validation, access denial and replay tests. Production bucket/IAM/CORS/retention not ready. |
-| Temporal / workers | Real local dispatch, retry/cancel and worker recovery; creative paid calls reserve once and hold uncertain results. Private cloud worker and pollers verified; durable deployed job/recovery and customer acceptance pending. |
+| Temporal / workers | Real local dispatch, retry/cancel and worker recovery; creative paid calls reserve once and hold uncertain results. Private cloud worker, pollers and actual durable private-upload validation/readback verified; hosted restart recovery and customer acceptance pending. |
 | Crawl4AI / Docling | Real bounded local executables. Rich website screenshots/design sources captured; documents now include native text, textless-page English OCR and stored page visuals with MOCK-tested model interpretation. Actual hosted isolated website extraction/render smoke passes; durable job and broader quality coverage remain open. |
 | Deep Agents + 52 original skills | Audited original archive; allowlisted skills actually execute inside isolated per-job containers for image/video/content planning. No customer-facing agent UI or unrestricted skill helpers. Local x86_64 runtime tests and actual cloud image identity checks pass; deployed skill execution and live provider acceptance remain pending. |
 | OpenAI | Official brand/vision, 30-day planning and image create/edit adapters and MOCK contracts; no LIVE_VERIFIED results. Server keys, selected eligible models, funded cap and explicit test authorization needed before paid validation. |
