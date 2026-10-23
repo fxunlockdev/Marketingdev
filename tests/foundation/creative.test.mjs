@@ -719,3 +719,39 @@ test('approved private brand references reach MOCK image edits with immutable pr
   await assert.rejects(db.query('UPDATE app.brand_references SET label=$2 WHERE id=$1',[reapproved.id,'Tampered']),/permission denied/);
  },brand.id).catch(e=>{if(!/aborted/.test(e.message))throw e;});
 });
+
+
+test('queued generation loses authorization when its editor becomes Reviewer or Analyst',async()=>{
+ for(const role of ['reviewer','analyst']){
+  const j=await submit('Queued before role change'),before=planCalls+imageCalls;
+  await admin.query("UPDATE app.memberships SET role='editor',business_scope='selected' WHERE organization_id=$1 AND user_id=$2",[org.id,alice]);
+  await admin.query('INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,$4) ON CONFLICT(organization_id,brand_id,user_id) DO UPDATE SET role=$4,active=true',[org.id,brand.id,alice,role]);
+  try{assert.equal(await handler.run(scope(j)),'finished');assert.equal((await row(j)).status,'canceled');assert.equal(planCalls+imageCalls,before);}finally{await admin.query("UPDATE app.memberships SET role='owner',business_scope='all' WHERE organization_id=$1 AND user_id=$2",[org.id,alice]);await admin.query('DELETE FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3',[org.id,brand.id,alice]);}
+ }
+});
+
+
+test('Gemini creative planning uses its own allowance and preserves OpenAI image generation',async()=>{
+ const {GoogleGenAI}=await import('@google/genai'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');
+ await grant(100000000);let calls=0;
+ const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
+  calls++;const wire=JSON.parse(init.body);
+  const raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text;
+  const input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
+  return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(brief(input.brand.facts.find(f=>f.field==='offering').id))}]},finishReason:'STOP'}]});
+ }}}));
+ await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org.id,brand.id]);
+ const body={...request('Create with Gemini direction'),text_provider:'gemini'},key=randomUUID();
+ const j=await canvas.submit(alice,brand.id,thread.id,body,key),before=planCalls,images=imageCalls;
+ await assert.rejects(canvas.submit(alice,brand.id,thread.id,{...body,text_provider:'openai'},key),/another creative request/);
+ const mixed=new CreativeJobs(jobs,skills,provider,gemini);
+ assert.equal(await mixed.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.equal(calls,1);assert.equal(planCalls,before);assert.equal(imageCalls,images+1);
+ const ledger=(await admin.query('SELECT provider,step FROM app.creative_calls WHERE job_id=$1 ORDER BY step',[j.id])).rows;
+ assert.deepEqual(ledger,[{provider:'openai',step:'image'},{provider:'gemini',step:'plan:1'}]);
+ const manifest=(await admin.query('SELECT skill_manifest FROM app.creative_versions WHERE job_id=$1',[j.id])).rows[0].skill_manifest;
+ assert.equal(manifest.text_provider,'gemini');assert.equal(manifest.text_model,'gemini-fixture');
+ assert.equal(await mixed.run(scope(j)),'finished');assert.equal(calls,1);
+ await admin.query('UPDATE app.gemini_creative_grants SET budget_micros=1 WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
+ const denied=await canvas.submit(alice,brand.id,thread.id,body,randomUUID());
+ assert.equal(await mixed.run(scope(denied)),'rejected');assert.equal((await row(denied)).error_code,'CREATIVE_BUDGET_EXHAUSTED');assert.equal(calls,1);assert.equal(imageCalls,images+1);
+});

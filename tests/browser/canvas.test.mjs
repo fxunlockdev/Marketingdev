@@ -250,16 +250,21 @@ before(async () => {
       },
     }),
   );
-  const handler = new CreativeJobs(
-    jobs,
-    new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),
-    provider,
-  );
   const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
    assert.equal(new URL(url).pathname,'/v1beta/models/gemini-fixture:generateContent');const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
+   if(input.task==='video')return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]})}]},finishReason:'STOP'}]});
+   if(input.task!=='content_plan'){
+    planned++;const brief={headline:planned===1?'TEST FIXTURE: A little everyday care':'TEST FIXTURE: Fresh perspective',body:'Refillable botanical soap',cta:'Explore the collection',caption:'TEST FIXTURE: Botanical soap, made for your everyday ritual.',image_prompt:'TEST FIXTURE: Still life with room for text',palette:['#e6d5bb','#201e1d'],fact_ids:[input.brand.facts.find(f=>f.field==='offering').id],warnings:['TEST FIXTURE — no live generation']};
+    return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(brief)}]},finishReason:'STOP'}]});
+   }
    const settings=input.planning_mode==='natural'?{duration_days:7,post_count:7,video_count:2}:null;
    return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input))}]},finishReason:'STOP'}]});
   }}}));
+  const handler = new CreativeJobs(
+    jobs,
+    new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),
+    provider,gemini,
+  );
   const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider,gemini);
   const exporter=new ExportJobs(jobs,new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE));
   const videoImage=prepareVideoImage(),videoKey='ab'.repeat(32);
@@ -410,6 +415,7 @@ after(async () => {
   await Promise.all([admin.end(), workerPool.end(), dispatchPool.end()]);
 });
 test("Canvas browser creates a real queued job, renders a private creative and saves editable Fabric layers (MOCK OpenAI)", async () => {
+  await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER MOCK')",[org,brand]);
   const visualId=randomUUID(),sourceId=randomUUID(),captureJob=randomUUID();
   referenceBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
   const key=`evidence/${org}/${brand}/browser-reference/${digest(referenceBytes)}`;
@@ -419,6 +425,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   await admin.query("INSERT INTO app.website_visuals(id,organization_id,brand_id,source_id,job_id,viewport,parser_version,object_key,sha256,bytes,width,height,observations,coverage) VALUES($1,$2,$3,$4,$5,'desktop','explicit-browser-fixture',$6,$7,$8,1440,900,'{}','{}')",[visualId,org,brand,sourceId,captureJob,key,digest(referenceBytes),referenceBytes.length]);
   const approval=await page.request.post(`${base}/api/v1/businesses/${brand}/canvas/references`,{headers:{origin:base},data:{kind:'website',visual_id:visualId,label:'Botanical brand reference',consent:true}});assert.equal(approval.status(),201);
   await page.goto(`${base}/b/${brand}/canvas`);
+  await page.getByLabel('Creative planning model',{exact:true}).selectOption('gemini');
   await page.getByText('Brand image references',{exact:true}).click();
   await page.getByRole('checkbox',{name:'Botanical brand reference',exact:true}).check();
   await page
@@ -547,6 +554,7 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   await expect(page.getByLabel('Video idea',{exact:true})).toHaveValue(/TEST planned script/);
   await page.getByLabel('Video idea',{exact:true}).fill('TEST animate this brand image');
   await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
+  await page.getByLabel('Video script model',{exact:true}).selectOption('gemini');
   await page.getByRole('button',{name:'Draft video script',exact:true}).click();
   await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,0);
   await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt');

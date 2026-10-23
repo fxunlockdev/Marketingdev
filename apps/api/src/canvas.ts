@@ -1,3 +1,4 @@
+import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
 import {
   BadRequestException,
@@ -141,7 +142,7 @@ export class Canvas {
         ).rows,
         runs: (
           await db.query(
-            "SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.project_id,r.parent_version_id,r.output_version_id,r.channel,r.size,r.format FROM app.jobs j JOIN app.creative_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC LIMIT 100",
+            "SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.project_id,r.parent_version_id,r.output_version_id,r.channel,r.size,r.format,r.text_provider,r.selected_text_model FROM app.jobs j JOIN app.creative_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC LIMIT 100",
             [b.organization_id, id, threadId],
           )
         ).rows,
@@ -171,9 +172,11 @@ export class Canvas {
         "size",
         "parent_version_id",
         "reference_ids",
+        "text_provider",
       ]),
       prompt = plain(v.prompt, 4000),
-      k = key(requestKey);
+      k = key(requestKey),
+      textProvider=creativeTextProvider(v.text_provider);
     if (
       !["static", "ad"].includes(String(v.format)) ||
       !["linkedin", "instagram"].includes(String(v.channel)) ||
@@ -197,6 +200,7 @@ export class Canvas {
           channel: v.channel,
           size: v.size,
           parent,
+          ...(textProvider==='gemini'?{text_provider:textProvider}:{}),
           ...(referenceIds.length?{reference_ids:referenceIds}:{}),
         }),
       );
@@ -290,13 +294,14 @@ export class Canvas {
         );
       }
       if(referenceIds.length&&(await db.query('SELECT id FROM app.brand_references WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[]) AND revoked_at IS NULL',[b.organization_id,id,referenceIds])).rowCount!==referenceIds.length)throw new ConflictException('A reference is unavailable or no longer approved');
+      const selectedTextModel=await creativeTextModel(db,b.organization_id,id,textProvider);
       const job = randomUUID();
       await db.query(
         "INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",
         [job, b.organization_id, id, user],
       );
       await db.query(
-        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)",
         [
           job,
           b.organization_id,
@@ -311,6 +316,7 @@ export class Canvas {
           v.size,
           k,
           sha,
+          textProvider,selectedTextModel,
         ],
       );
       for(const [position,referenceId] of referenceIds.entries())await db.query('INSERT INTO app.creative_references(organization_id,brand_id,job_id,reference_id,position) VALUES($1,$2,$3,$4,$5)',[b.organization_id,id,job,referenceId,position]);

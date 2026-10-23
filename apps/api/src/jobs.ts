@@ -26,8 +26,8 @@ export class AssetJobs {
   async permitted(db:PoolClient,job:any){
     if(job.cancel_requested)return false;
     const {rows:[member]}=await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[job.organization_id,job.requested_by]);
-    if(!member||member.role==='viewer')return false;
-    if(member.business_scope==='selected'){const grant=(await db.query('SELECT role FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3 AND active',[job.organization_id,job.brand_id,job.requested_by])).rows[0];return !!grant&&grant.role!=='viewer';}
+    if(!member||!['owner','admin','editor'].includes(member.role))return false;
+    if(member.business_scope==='selected'){const grant=(await db.query('SELECT role FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3 AND active',[job.organization_id,job.brand_id,job.requested_by])).rows[0];return !!grant&&['admin','editor'].includes(grant.role);}
     return true;
   }
   async finish(db:PoolClient,job:any,status:string,code:string|null=null,scanner:string|null=null,etag:string|null=null){

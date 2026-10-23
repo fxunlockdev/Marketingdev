@@ -1,3 +1,6 @@
+import {GeminiPlanner} from "./gemini-planner.js";
+import {ApiError as GeminiAPIError} from "@google/genai";
+import type {PlannerRequest} from "./creative-contracts.js";
 import sharp from 'sharp';
 import {referenceColumns,referenceJoins} from './brand-references.js';
 import { randomUUID } from "node:crypto";
@@ -25,7 +28,20 @@ export class CreativeJobs {
     readonly jobs: AssetJobs,
     readonly runtime: SkillRuntime,
     readonly provider: CreativeProvider,
+    readonly gemini:GeminiPlanner=new GeminiPlanner(),
   ) {}
+  planner(provider:string){if(provider!=="openai"&&provider!=="gemini")throw new CreativeError("CREATIVE_CONFIG_CHANGED");return provider==="gemini"?this.gemini:this.provider;}
+  async plannerGrant(db:any,j:any,provider:string){
+    const sql=provider==="gemini"?"SELECT * FROM app.gemini_creative_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()":"SELECT * FROM app.creative_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()";
+    return (await db.query(sql,[j.organization_id,j.brand_id])).rows[0];
+  }
+  async planCall(scope:JobScope,message:PlannerRequest,request:any){
+    const provider=this.planner(request.text_provider),model=request.selected_text_model;
+    if(!model)throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
+    if(!provider.configured)throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
+    const wire=provider.plannerRequest(message,model,4000);
+    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>wire.maxInputTokens*Number(g.input_micros_per_token)+wire.maxOutputTokens*Number(g.output_micros_per_token),()=>provider.plan(message,model,4000),request.text_provider);
+  }
   finish(db: any, j: any, status: string, code: string | null = null) {
     return db
       .query(
@@ -41,10 +57,17 @@ export class CreativeJobs {
     inputHash: string,
     cost: (grant: any) => number,
     action: () => Promise<any>,
+    providerName="openai",
   ) {
     const prepared = await this.jobs.transaction(scope, async (db, j) => {
       if (!(await this.jobs.permitted(db, j)))
         throw new CreativeError("CREATIVE_ACCESS_REVOKED");
+      if(step==='image'){if(providerName!=='openai')throw new CreativeError('CREATIVE_CONFIG_CHANGED');}
+      else {
+        const sql=j.kind==='creative.video'?'SELECT text_provider,selected_text_model FROM app.video_requests WHERE job_id=$1':'SELECT text_provider,selected_text_model FROM app.creative_requests WHERE job_id=$1';
+        const bound=(await db.query(sql,[j.id])).rows[0];
+        if(!bound||bound.text_provider!==providerName||bound.selected_text_model!==model)throw new CreativeError('CREATIVE_CONFIG_CHANGED');
+      }
       const previous = (
         await db.query(
           "SELECT * FROM app.creative_calls WHERE job_id=$1 AND step=$2",
@@ -52,7 +75,7 @@ export class CreativeJobs {
         )
       ).rows[0];
       if (previous) {
-        if (previous.model !== model || previous.input_sha256 !== inputHash)
+        if (previous.provider!==providerName || previous.model !== model || previous.input_sha256 !== inputHash)
           return { blocked: "CREATIVE_REPLAY_MISMATCH" };
         if (previous.status === "succeeded") return { cached: previous.result };
         if (previous.status === "submitted")
@@ -68,12 +91,7 @@ export class CreativeJobs {
         };
       }
       if((await db.query('SELECT 1 FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id WHERE c.job_id=$1 AND r.revoked_at IS NOT NULL',[j.id])).rowCount)throw new CreativeError('CREATIVE_REFERENCE_REVOKED');
-      const grant = (
-        await db.query(
-          "SELECT * FROM app.creative_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()",
-          [j.organization_id, j.brand_id],
-        )
-      ).rows[0];
+      const grant=await this.plannerGrant(db,j,providerName);
       if (!grant) throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
       if (model !== (step === "image" ? grant.image_model : grant.text_model))
         throw new CreativeError("CREATIVE_CONFIG_CHANGED");
@@ -81,8 +99,8 @@ export class CreativeJobs {
         used = Number(
           (
             await db.query(
-              "SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE organization_id=$1 AND brand_id=$2",
-              [j.organization_id, j.brand_id],
+              "SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3",
+              [j.organization_id, j.brand_id,providerName],
             )
           ).rows[0].n,
         );
@@ -93,8 +111,8 @@ export class CreativeJobs {
       )
         throw new CreativeError("CREATIVE_BUDGET_EXHAUSTED");
       await db.query(
-        "INSERT INTO app.creative_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted')",
-        [j.id, step, j.organization_id, j.brand_id, model, inputHash, reserved],
+        "INSERT INTO app.creative_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8)",
+        [j.id, step, j.organization_id, j.brand_id, model, inputHash, reserved,providerName],
       );
       return { submit: true };
     });
@@ -106,7 +124,7 @@ export class CreativeJobs {
     } catch (error) {
       const known =
         error instanceof CreativeError ||
-        (error instanceof OpenAI.APIError &&
+        ((error instanceof OpenAI.APIError || error instanceof GeminiAPIError) &&
           [400, 401, 403, 404, 422, 429].includes(error.status ?? 0));
       await this.jobs.transaction(scope, async (db, j) => {
         await db.query(
@@ -257,19 +275,7 @@ export class CreativeJobs {
       }
       let plan = request.plan;
       if (!plan) {
-        plan = await this.runtime.plan(input, async (message) => {
-          const wire = this.provider.plannerRequest(message, grant.text_model);
-          return this.call(
-            scope,
-            `plan:${message.step}`,
-            grant.text_model,
-            wire.sha256,
-            (g) =>
-              wire.maxInputTokens * Number(g.input_micros_per_token) +
-              wire.maxOutputTokens * Number(g.output_micros_per_token),
-            () => this.provider.plan(message, grant.text_model),
-          );
-        });
+        plan = await this.runtime.plan(input,message=>this.planCall(scope,message,request));
         await this.jobs.transaction(scope, async (db, j) => {
           if (!(await this.jobs.permitted(db, j)))
             throw new CreativeError("CREATIVE_ACCESS_REVOKED");
@@ -416,7 +422,8 @@ export class CreativeJobs {
           model_calls: plan.model_calls,
           warnings: plan.brief.warnings,
           fact_ids: plan.brief.fact_ids,
-          text_model: grant.text_model,
+          text_provider:request.text_provider,
+          text_model: request.selected_text_model,
           image_model: grant.image_model,
           reserved_cost_micros: reserved,
         };

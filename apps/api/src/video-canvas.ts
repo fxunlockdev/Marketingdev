@@ -1,3 +1,4 @@
+import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {validateVideoBrief,type VideoPlanningInput} from './video-planning.js';
 import {BadRequestException,ConflictException,ForbiddenException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
@@ -9,12 +10,13 @@ export class VideoCanvas {
  constructor(readonly canvas:Canvas,readonly references:VideoReferenceBindings,readonly enabled=false){}
  submit(user:string,brand:string,threadId:string,body:unknown,requestKey:unknown){
   if(!this.enabled||!this.references.image)throw new ConflictException('Video generation is not configured');
-  threadId=uuid(threadId);const v=object(body,['prompt','channel','duration_seconds','reference','parent_version_id','slot_id','slot_revision']);
+  threadId=uuid(threadId);const v=object(body,['prompt','channel','duration_seconds','reference','parent_version_id','slot_id','slot_revision','text_provider']);
   if(typeof requestKey!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(requestKey)||typeof v.prompt!=='string'||!v.prompt.trim()||v.prompt.length>4000||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(v.prompt)||!['instagram','linkedin'].includes(String(v.channel))||!Number.isInteger(v.duration_seconds)||Number(v.duration_seconds)<3||Number(v.duration_seconds)>15)throw new BadRequestException('Choose a video brief, channel and duration from 3 to 15 seconds');
   if((v.slot_id===undefined)!==(v.slot_revision===undefined)||v.slot_id!==undefined&&(!Number.isSafeInteger(v.slot_revision)||Number(v.slot_revision)<1))throw new BadRequestException('Include the saved calendar post revision');
   const slotId=v.slot_id===undefined?null:uuid(String(v.slot_id));
-  const prompt=v.prompt.trim();
-  const fingerprint=hash(canonicalJSON({threadId,...v}));
+  const prompt=v.prompt.trim(),textProvider=creativeTextProvider(v.text_provider);
+  const {text_provider:ignoredProvider,...fingerprintBody}=v;
+  const fingerprint=hash(canonicalJSON({threadId,...fingerprintBody,...(textProvider==='gemini'?{text_provider:textProvider}:{})}));
   return this.canvas.scope(user,brand,true,async(db,b)=>{
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`members:${b.organization_id}`]);
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${brand.toLowerCase()}`]);
@@ -35,11 +37,12 @@ export class VideoCanvas {
    if(!brain)throw new ConflictException('Confirm your brand profile before creating a video');
    let project=randomUUID();
    if(v.parent_version_id){const parent=(await db.query('SELECT v.id,v.project_id,p.latest_version_id,p.thread_id FROM app.video_versions v JOIN app.video_projects p ON p.id=v.project_id WHERE v.id=$1',[uuid(String(v.parent_version_id))])).rows[0];if(!parent||parent.latest_version_id!==parent.id||parent.thread_id!==threadId)throw new ConflictException('Revise the latest video in its original conversation');project=parent.project_id;}
+   const selectedTextModel=await creativeTextModel(db,b.organization_id,brand,textProvider);
    const job=randomUUID();
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.video')",[job,b.organization_id,brand,user]);
    await this.references.bind(user,brand,job,v.reference,{db,b});
    if(!v.parent_version_id)await db.query('INSERT INTO app.video_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[project,b.organization_id,brand,threadId,prompt.slice(0,140),user]);
-   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint,slotId,v.slot_revision??null]);
+   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision,text_provider,selected_text_model) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint,slotId,v.slot_revision??null,textProvider,selectedTextModel]);
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.video')",[job,b.organization_id,brand]);
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'video.requested',$4)",[b.organization_id,brand,user,job]);
    return {id:job,status:'queued'};
@@ -53,9 +56,9 @@ export class VideoCanvas {
  async regenerate(user:string,brand:string,id:string,body:unknown,key:unknown){id=uuid(id);const v=object(body,['feedback']);
   if(typeof v.feedback!=='string'||!v.feedback.trim()||v.feedback.length>2000)throw new BadRequestException('Describe the changes for this video');
   const prior=await this.canvas.scope(user,brand,true,async db=>{
-   const r=(await db.query('SELECT p.thread_id,r.channel,r.duration_seconds,r.approved_brief,x.export_id,x.approval_id,x.source_sha256,x.export_sha256 FROM app.video_versions v JOIN app.video_projects p ON p.id=v.project_id JOIN app.video_requests r ON r.job_id=v.job_id JOIN app.video_references x ON x.job_id=v.job_id WHERE v.id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Video not found');return r;
+   const r=(await db.query('SELECT p.thread_id,r.channel,r.duration_seconds,r.approved_brief,r.text_provider,x.export_id,x.approval_id,x.source_sha256,x.export_sha256 FROM app.video_versions v JOIN app.video_projects p ON p.id=v.project_id JOIN app.video_requests r ON r.job_id=v.job_id JOIN app.video_references x ON x.job_id=v.job_id WHERE v.id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Video not found');return r;
   });
-  return this.submit(user,brand,prior.thread_id,{parent_version_id:id,prompt:`Revise the saved video. Previous direction: ${prior.approved_brief.video_prompt.slice(0,1800)}\nRequested changes: ${v.feedback}`,channel:prior.channel,duration_seconds:prior.duration_seconds,reference:{export_id:prior.export_id,approval_id:prior.approval_id,source_sha256:prior.source_sha256,export_sha256:prior.export_sha256,confirmed:true}},key);
+  return this.submit(user,brand,prior.thread_id,{parent_version_id:id,prompt:`Revise the saved video. Previous direction: ${prior.approved_brief.video_prompt.slice(0,1800)}\nRequested changes: ${v.feedback}`,channel:prior.channel,duration_seconds:prior.duration_seconds,text_provider:prior.text_provider,reference:{export_id:prior.export_id,approval_id:prior.approval_id,source_sha256:prior.source_sha256,export_sha256:prior.export_sha256,confirmed:true}},key);
  }
  draft(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async db=>{
   const row=(await db.query('SELECT r.job_id,r.prompt,r.channel,r.duration_seconds,j.cancel_requested,r.draft_revision,r.approved_revision,r.edited_brief,r.plan,j.status,j.error_code FROM app.video_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.job_id=$1',[id])).rows[0];

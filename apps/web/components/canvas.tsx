@@ -109,6 +109,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     [prompt, setPrompt] = useState(""),
     [referenceIds,setReferenceIds]=useState<string[]>([]),
     [channel, setChannel] = useState("instagram"),
+    [textProvider,setTextProvider]=useState("openai"),
     [format, setFormat] = useState("static"),
     [size, setSize] = useState("1024x1024"),
     [busy, setBusy] = useState(false),
@@ -219,6 +220,7 @@ export function CanvasScreen({ business }: { business: Business }) {
         root + `/canvas/threads/${id}/messages`,
         {
           prompt,
+          text_provider:textProvider,
           channel: edit?.run.channel ?? channel,
           format: edit?.run.format ?? format,
           size: edit
@@ -378,6 +380,8 @@ export function CanvasScreen({ business }: { business: Business }) {
                   />
                 )}
               </Field>
+              <Field label="Creative planning model">{id=><select id={id} value={textProvider} onChange={e=>{setTextProvider(e.target.value);submitKey.current=crypto.randomUUID();}}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
+              <p className="muted">Your selected model writes the creative brief. OpenAI generates and edits the image.</p>
               {!edit && (
                 <div className="studio-options">
                   <Field label="Channel">

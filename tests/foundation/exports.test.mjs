@@ -159,10 +159,11 @@ test('approved export to original video skills, durable provider stage, actual m
  const linkedRange={start:'2027-01-01T00:00:00Z',end:'2027-02-01T00:00:00Z',plan_id:linkedPlan.id},linkedSlot=(await plans.list(alice.id,brand.id,linkedRange)).slots[0];
  const body={prompt:'Animate our approved creative',slot_id:linkedSlot.id,slot_revision:linkedSlot.revision,channel:'instagram',duration_seconds:3,reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
  await assert.rejects(service.submit(viewer.id,brand.id,thread,body,randomUUID()));await assert.rejects(service.submit(bob.id,brand.id,thread,body,randomUUID()));
+ await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour',budget_micros=10000000",[org.id,brand.id]);
  const requestKey=randomUUID(),j=await service.submit(alice.id,brand.id,thread,body,requestKey);
  assert.equal((await service.submit(alice.id,brand.id,thread,body,requestKey)).id,j.id);
  await assert.rejects(service.submit(alice.id,brand.id,thread,{...body,prompt:'Different'},requestKey),/different video/);
- await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour',budget_micros=10000000",[org.id,brand.id]);
+
  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL TEST',true)",[org.id,brand.id]);
  let plansCalled=0,submits=0,statuses=0,downloads=0,leasedURL;
  const text=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
@@ -277,5 +278,23 @@ test('approved export to original video skills, durable provider stage, actual m
  await service.review(alice.id,brand.id,publishVersion.id,{decision:'approved',feedback:'Approve exact video',revision:2,sha256:publishVersion.sha256,confirmed:true});
  const {proveVideoPublication}=await import('../fixtures/prove-video-publication.mjs');
  await proveVideoPublication({admin,jobs,store,businesses,exports,plans,org,brand,alice,bob,editor,video:publishVersion,image,staticImage:renderer.image});
+ const {GoogleGenAI}=await import('@google/genai'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');let geminiCalls=0;
+ const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
+  geminiCalls++;const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
+  const brief={title:'Gemini test video',caption:'TEST FIXTURE video caption',video_prompt:'TEST FIXTURE subtle motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:3000,action:'Subtle motion',camera:'Static'}],overlays:[]};
+  return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(brief)}]},finishReason:'STOP'}]});
+ }}}));
+ await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org.id,brand.id]);
+ const {slot_id:ignoredSlot,slot_revision:ignoredRevision,...unlinked}=body;
+ const gj=await service.submit(alice.id,brand.id,thread,{...unlinked,text_provider:'gemini'},randomUUID()),beforeText=plansCalled,beforeGeminiPaid=submits;
+ const gp=new VideoJobs(jobs,refs,new CreativeJobs(jobs,new SkillRuntime(skillImage),text,gemini),provider,downloader,new VideoRenderer(image));
+ assert.equal(await gp.step(scope(gj)),'awaiting_approval');assert.equal(geminiCalls,1);assert.equal(plansCalled,beforeText);assert.equal(submits,beforeGeminiPaid);
+ assert.equal(await gp.step(scope(gj)),'awaiting_approval');assert.equal(geminiCalls,1);
+ const gd=await service.draft(alice.id,brand.id,gj.id);
+ await service.saveDraft(alice.id,brand.id,gj.id,{brief:{...gd.brief,video_prompt:'TEST FIXTURE user edited motion'},revision:1,approve:true});
+ assert.equal(await gp.step(scope(gj)),'accepted');assert.equal(submits,beforeGeminiPaid+1);
+ assert.equal(await gp.step(scope(gj)),'completed');assert.equal(await gp.step(scope(gj)),'succeeded');
+ const gv=(await admin.query('SELECT manifest FROM app.video_versions WHERE job_id=$1',[gj.id])).rows[0];assert.equal(gv.manifest.text_provider,'gemini');assert.equal(gv.manifest.text_model,'gemini-fixture');
+
 
 });

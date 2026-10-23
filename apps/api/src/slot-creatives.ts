@@ -1,3 +1,4 @@
+import {creativeTextProvider} from "./creative-planning.js";
 import {
   BadRequestException,
   ConflictException,
@@ -20,7 +21,7 @@ export class SlotCreatives {
     key: unknown,
   ) {
     slotId = uuid(slotId);
-    const v = object(body, ["revision", "feedback", "size", "reset_approval"]);
+    const v = object(body, ["revision", "feedback", "size", "reset_approval", "text_provider"]);
     if (
       !Number.isSafeInteger(v.revision) ||
       Number(v.revision) < 1 ||
@@ -31,6 +32,7 @@ export class SlotCreatives {
       throw new BadRequestException(
         "Include the saved revision and request key",
       );
+    const textProvider=creativeTextProvider(v.text_provider);
     const feedback = v.feedback ?? "";
     if (
       typeof feedback !== "string" ||
@@ -51,6 +53,7 @@ export class SlotCreatives {
         feedback,
         size: v.size ?? null,
         reset_approval: v.reset_approval ?? false,
+        ...(textProvider==='gemini'?{text_provider:textProvider}:{}),
       }),
     );
     return this.plans.scope(user, id, true, async (db, b) => {
@@ -149,6 +152,7 @@ export class SlotCreatives {
           channel: s.channel,
           size,
           parent_version_id: s.creative_version_id,
+          text_provider:textProvider,
         },
         `slot-job:${sha}`,
         { db, b },

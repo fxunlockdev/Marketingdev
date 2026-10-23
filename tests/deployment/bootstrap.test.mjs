@@ -42,7 +42,7 @@ test('a database error during fresh setup rolls back roles and schema together',
 });
 test('fresh setup atomically creates least-privilege service logins, all migrations and protected credential metadata',async()=>{
  const result=await bootstrapDatabase(pool,passwords,'postgres');assert.equal(result.replayed,false);
- assert.equal((await pool.query('SELECT count(*)::int AS n FROM desvio_migrations.applied')).rows[0].n,34);
+ assert.equal((await pool.query('SELECT count(*)::int AS n FROM desvio_migrations.applied')).rows[0].n,35);
  for(const role of Object.keys(runtimeRoles))await withRole(role,async db=>{
   const r=(await db.query('SELECT current_user AS name,rolsuper,rolbypassrls,rolcreaterole,rolcreatedb,rolinherit FROM pg_roles WHERE rolname=current_user')).rows[0];assert.equal(r.name,role);assert.deepEqual([r.rolsuper,r.rolbypassrls,r.rolcreaterole,r.rolcreatedb,r.rolinherit],[false,false,false,false,false]);
   await assert.rejects(db.query('SELECT * FROM desvio_migrations.runtime_credentials'),/permission denied/);

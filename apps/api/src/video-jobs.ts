@@ -49,24 +49,21 @@ export class VideoJobs {
     }
     return this.finish(scope,'canceled',e instanceof VideoStateError?e.code:'VIDEO_ACCESS_REVOKED');
    }
-   if(!this.renderer.configured||!this.creative.runtime.configured||!this.creative.provider.configured)throw new VideoStateError('VIDEO_RUNTIME_NOT_CONFIGURED');
+   if(!this.renderer.configured||!this.creative.runtime.configured||!this.creative.planner(state.request.text_provider).configured)throw new VideoStateError('VIDEO_RUNTIME_NOT_CONFIGURED');
    const request=state.request;
    if(!state.phase){
     await this.transaction(scope,(db,j)=>this.checkSlot(db,j));
     const context=await this.transaction(scope,async(db,j)=>{
      const brain=(await db.query('SELECT * FROM app.brand_brain_versions WHERE id=$1',[request.brain_id])).rows[0];
      if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new VideoStateError('VIDEO_BRAND_INTEGRITY_FAILED');
-     const grant=(await db.query('SELECT * FROM app.creative_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id])).rows[0];
+     const grant=await this.creative.plannerGrant(db,j,request.text_provider);
      if(!grant)throw new VideoStateError('VIDEO_TEXT_APPROVAL_REQUIRED');
      const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:request.prompt,channel:request.channel,duration_seconds:request.duration_seconds,reference:{kind:'image',sha256:proof.sha256,width:proof.width,height:proof.height,duration_seconds:null,caption:''}};
      return {input,grant};
     });
     let plan=request.plan;
     if(!plan){
-     plan=await this.creative.runtime.videoPlan(context.input,async message=>{
-      const wire=this.creative.provider.plannerRequest(message,context.grant.text_model);
-      return this.creative.call(scope,`plan:${message.step}`,context.grant.text_model,wire.sha256,g=>wire.maxInputTokens*Number(g.input_micros_per_token)+wire.maxOutputTokens*Number(g.output_micros_per_token),()=>this.creative.provider.plan(message,context.grant.text_model));
-     });
+     plan=await this.creative.runtime.videoPlan(context.input,message=>this.creative.planCall(scope,message,request));
      validateVideoPlanningResult(plan,context.input);
      await this.transaction(scope,async(db,j)=>{if(!await this.jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');await db.query('UPDATE app.video_requests SET plan=$2 WHERE job_id=$1',[j.id,JSON.stringify(plan)]);});
     }
@@ -107,7 +104,7 @@ export class VideoJobs {
     if(!await this.jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${j.brand_id}`]);
     const freshProof=await this.references.verifyTransaction(db,j);
-    const id=randomUUID(),manifest={...output.manifest,brain_id:request.brain_id,plan:{...request.plan,brief:request.approved_brief},prompt_approval:{actor:request.approved_by,revision:request.approved_revision},reference:{export_id:freshProof.id,sha256:freshProof.sha256,approval_id:freshProof.approval_id}};
+    const id=randomUUID(),manifest={...output.manifest,text_provider:request.text_provider,text_model:request.selected_text_model,brain_id:request.brain_id,plan:{...request.plan,brief:request.approved_brief},prompt_approval:{actor:request.approved_by,revision:request.approved_revision},reference:{export_id:freshProof.id,sha256:freshProof.sha256,approval_id:freshProof.approval_id}};
     await db.query('INSERT INTO app.video_versions(id,organization_id,brand_id,project_id,job_id,object_key,sha256,bytes,poster_key,poster_sha256,poster_bytes,caption,overlays,manifest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',[id,j.organization_id,j.brand_id,request.project_id,j.id,key,output.manifest.video_sha256,output.video.length,posterKey,output.manifest.poster_sha256,output.poster.length,request.approved_brief.caption,JSON.stringify(request.approved_brief.overlays),JSON.stringify(manifest)]);
     await db.query('UPDATE app.video_projects SET latest_version_id=$2 WHERE id=$1',[request.project_id,id]);
     await db.query('UPDATE app.video_requests SET output_version_id=$2 WHERE job_id=$1',[j.id,id]);

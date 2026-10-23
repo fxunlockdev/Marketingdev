@@ -1,0 +1,12 @@
+# Analytics contract audit — next module
+
+Audited local Postiz pin `651876e24317c2d8e717262cf98267ec6f699180`; this is source inspection, not a live provider test.
+
+- Public controller `apps/backend/src/public-api/routes/v1/public.integrations.controller.ts:662` exposes integration analytics with `date` interpreted as a positive day count (default 7), not an ISO date. Post analytics is `/public/v1/analytics/post/:postId?date=<days>` at line 672. Use saved Postiz post IDs, not external network release IDs.
+- `posts.service.ts:311` scopes lookup by organization and post ID. It returns `[]` for missing posts, unsupported providers, refresh failures or caught upstream errors; `{missing:true}` is distinct. Empty data cannot be converted into zero performance or a healthy connection badge.
+- `integration.service.ts:461` looks up the integration under the organization. Desvio must additionally bind the ID to the selected business and its private Postiz credentials before any request; API callers must not choose arbitrary remote IDs.
+- `social.integrations.interface.ts:70` declares labels, dated data totals as strings, and percentageChange. Actual LinkedIn Page implementation returns numeric totals and casts the response. Validation must accept finite nonnegative numeric values or strictly parsed numeric strings, bound payload sizes and reject malformed/duplicate series.
+- `linkedin.page.provider.ts:445` returns **lifetime** post statistics, ignores the requested range for those totals, and assigns today's date when upstream timeRange is absent. Do not present these points as daily performance or sum repeated snapshots. `percentageChange` is hard-coded zero here and must not be displayed as measured growth.
+- LinkedIn personal provider has no postAnalytics implementation in this pin. Page/account capability must be represented explicitly. Upstream errors and absent optional metrics remain unknown, never invented zeros or AI explanations.
+
+Implementation acceptance: durable tenant-scoped snapshots with collection time and measurement semantics; request permissions and idempotency; known/unknown/error distinction; comparisons only across compatible channel/format/time semantics; AI explanations cite observed evidence and remain recommendations. Memory learning requires an explicit human decision and cannot overwrite approved Brand Brain claims. No analytics feature or live status is claimed by this audit.
