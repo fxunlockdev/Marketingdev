@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Pool} from 'pg';
 import {configurationManifest,configureProviders,inspectConfiguration} from '../../scripts/configure-providers.mjs';
+import {spawn} from 'node:child_process';
+import {setupPayload,setupRunner} from '../../infra/worker-control/configure-providers.mjs';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL});
 const org=randomUUID(),brand=randomUUID(),user=randomUUID();
 const options={mode:'test',expectedDatabase:'postgres'};
@@ -14,6 +16,25 @@ before(async()=>{
  await admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[brand,org,'Operator business']);
 });
 after(()=>admin.end());
+test('one-shot Railway runner lists, previews and applies disabled grants without leaking administrator credentials',async()=>{
+ const run=async(manifest,approval)=>{
+  const input=await setupPayload(process.env.DESVIO_TEST_ADMIN_URL,manifest,approval);
+  return new Promise((resolve,reject)=>{
+   const child=spawn(process.execPath,['--input-type=module','-e',setupRunner],{stdio:['pipe','pipe','pipe']});let output='',errors='';
+   child.stdout.on('data',x=>output+=x);child.stderr.on('data',x=>errors+=x);child.on('error',reject);
+   child.on('exit',code=>{assert.ok(!output.includes(input.connectionString));assert.ok(!errors.includes(input.connectionString));code===0?resolve(JSON.parse(output)):reject(Error(errors));});
+   child.stdin.end(JSON.stringify(input));
+  });
+ };
+  const listed=await run(null);assert.ok(listed.businesses.some(b=>b.business_id===brand));
+  const m=manifest(),preview=await run(m);assert.equal(preview.status,'preview');
+  assert.equal((await admin.query('SELECT * FROM app.analysis_grants WHERE brand_id=$1',[brand])).rowCount,0);
+  assert.equal((await run(m,preview.preview_sha256)).status,'applied');
+  assert.equal((await run(m,preview.preview_sha256)).status,'already_applied');
+  assert.equal((await admin.query('SELECT enabled FROM app.analysis_grants WHERE brand_id=$1',[brand])).rows[0].enabled,false);
+  // Restore this fixture so later pre-existing tests retain their empty initial state.
+  await admin.query('DELETE FROM app.analysis_grants WHERE brand_id=$1',[brand]);
+});
 test('strict manifest rejects secrets, prototype capabilities, duplicate grants, unsafe budgets and invalid dates',()=>{
  for(const mutate of [m=>m.api_key='secret',m=>m.grants[0].kind='__proto__',m=>m.grants.push({...m.grants[0]}),m=>m.grants[0].budget_micros=NaN,m=>m.grants[0].expires_at='2026-02-30T00:00:00Z',m=>m.grants[0].enabled='true']){
   const m=manifest();mutate(m);assert.throws(()=>configurationManifest(m),e=>e.code?.startsWith('CONFIGURATION_'));

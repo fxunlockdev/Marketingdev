@@ -1,6 +1,6 @@
 # Desvio module tracker
 
-Updated 23 October 2026. Billing is excluded by owner request. “Implemented” below describes code and local acceptance, not LIVE_VERIFIED or production readiness. Provider calls in local tests use explicit mocks. Owner will add credentials and perform live tests later.
+Updated 23 October 2026. Railway allowance configuration now has a tested list/preview/apply command; the setup UI and complete provider activation still remain. Billing is excluded by owner request. “Implemented” below describes code and local acceptance, not LIVE_VERIFIED or production readiness. Provider calls in local tests use explicit mocks. Owner will add credentials and perform live tests later.
 
 Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
 
@@ -33,7 +33,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 
 ## Immediate sequence
 
-1. Complete: full browser (37 journeys), security (29 account + 169 foundation + six boundary cases), offline and contracts pass at the same current source. Release remains blocked on comprehensive product/deployed-provider/live acceptance.
-2. Finish the operator workflow for applying model/spending allowances and provider/video settings without custom integration code. Keys are added to Railway dev → desvio-dev-worker-settings, but a key alone does not yet apply allowances or restart the private worker.
+1. Complete: full browser (37 journeys), security (29 account + 169 foundation + six boundary cases), offline and contracts pass at the prior recorded source. The newer operator-only change has focused acceptance. Release remains blocked on comprehensive product/deployed-provider/live acceptance.
+2. Implemented: Railway list/preview/apply for model/spending allowances, with four contracts and eight real local database cases passing plus actual read-only dev acceptance. Continue provider/video settings, controlled worker activation and operator UI. Keys are added to Railway dev → desvio-dev-worker-settings; a key alone does not apply allowances or restart the worker.
 3. Complete core connection/publishing activation, refresh release evidence, and deploy changes. Additional channels and advanced analytics follow the usable core release.
 4. Owner adds credentials and authorized test accounts/budgets, then live generation/editing/publishing acceptance can establish LIVE_VERIFIED status. No paid tests or posts will run merely because a key exists.

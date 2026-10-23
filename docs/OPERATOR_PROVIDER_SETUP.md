@@ -1,5 +1,15 @@
 # Staging provider permissions
 
+## Railway dev command
+
+From the repository, use `node infra/worker-control/configure-providers.mjs --list` to discover exact business/channel IDs. The command is pinned to the existing Desvio dev project/environment and reads the current private sandbox and trusted image inventory. It retrieves the database credential internally through the authenticated Railway CLI, sends it only over stdin to a temporary restricted container, and never installs it on the worker or API. No provider calls occur. An empty business list means the owner must first add a business in Desvio.
+
+Prepare the manifest below using authorized model IDs, rates and spending limits. Preview with `node infra/worker-control/configure-providers.mjs /private/path/grants.json`, then apply only that reviewed preview using `node infra/worker-control/configure-providers.mjs /private/path/grants.json --apply PREVIEW_SHA256`. The same existing migration-check, tenant, atomicity, audit and stale-preview safeguards run inside the temporary container. On a transport failure, reconcile by rerunning the same manifest/change ID: a committed change reports `already_applied`; do not create a new change ID to blindly retry.
+
+This eliminates manually copying the administrator database connection. It does not deploy provider settings, enable video/API flags, verify pricing or create a social connection. The credentials-only worker settings and controlled worker rollout remain separate. Never enable grants before the owner's spending authorization. The operator setup UI remains unfinished.
+
+## Direct administrator command
+
 Use the one-shot administrator tool after database bootstrap. Never put the migration credential in API, web, worker or customer environments. Provider keys belong in server secret configuration, not this manifest or command arguments. This tool makes no provider calls and does not verify model eligibility or pricing.
 
 Set `APP_MODE=staging`, `DESVIO_DATABASE_NAME` to the exact database name and `MIGRATION_DATABASE_URL` through the administrator's secret environment. Run `node scripts/configure-providers.mjs --list` to list business and channel IDs without credentials. Only test/development/staging modes are accepted, and every applied migration checksum must match the checkout.

@@ -24,7 +24,7 @@ SUITES = {
     "creative-amd64": [["npm", "run", "build"], ["env", "DESVIO_RUNTIME_ARCH=amd64", "node", "--test", "tests/runtime/video-skills.test.mjs"], ["env", "DESVIO_RUNTIME_ARCH=amd64", "node", "scripts/foundation-test.mjs", "--exports"]],
     "worker-host": [["npm", "run", "build"], ["node", "--test", "tests/contracts/worker-host.test.mjs"], [sys.executable, "scripts/container-context-test.py"], ["node", "scripts/worker-image-test.mjs"]],
     "native-amd64": [["env", "DESVIO_RUNTIME_ARCH=amd64", "node", "scripts/video-media-test.mjs"], ["env", "DESVIO_RUNTIME_ARCH=amd64", "node", "scripts/document-visual-test.mjs"]],
-    "operator": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--operator"]],
+    "operator": [["npm", "run", "build"], ["node", "--test", "tests/contracts/provider-setup.test.mjs", "infra/worker-control/provider-settings.test.mjs"], ["node", "scripts/foundation-test.mjs", "--operator"]],
     "review-reopen": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--planning"], ["node", "scripts/foundation-test.mjs", "--publishing"], ["node", "scripts/foundation-test.mjs", "--canvas-web"]],
     "canvas-calendar": [["npm", "run", "build"], ["node", "--test", "tests/contracts/calendar-export.test.mjs"], ["node", "scripts/foundation-test.mjs", "--planning"], ["node", "scripts/foundation-test.mjs", "--customer-web"], ["node", "scripts/foundation-test.mjs", "--canvas-web"]],
     "canvas-photos": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--customer-web"], ["node", "scripts/foundation-test.mjs", "--canvas-web"]],

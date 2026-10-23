@@ -1,5 +1,13 @@
 # Desvio build state
 
+## Railway provider allowance setup — implemented and verified
+
+`infra/worker-control/configure-providers.mjs` now wraps the existing audited administrator tool: exact dev project/environment and pinned worker image, list/preview/exact-hash apply, temporary restricted container, stdin-only administrator credential, current migration checksums, and no mutation to worker/API secrets. It never calls paid providers or creates social connections. Setup results produce `docs/evidence/railway-provider-setup.json` without credentials or customer names. Real dev read-only listing passed; zero businesses/channels existed at that observation. No dev grants were changed.
+
+`make verify-operator` passes four configuration contracts and eight real local PostgreSQL cases, including the actual one-shot runner listing, previewing, applying a disabled fixture grant and replaying the same change. Tests cover role denial, stale approval, wrong schema/business, atomicity and no credential disclosure. Evidence: `operator.json`; setup instructions: `docs/OPERATOR_PROVIDER_SETUP.md`. The initial new test had a syntax error, corrected before the complete passing rerun.
+
+The previous full security/browser acceptance remains evidence for its recorded source; this turn changes only the operator wrapper, its tests and verifier registration, so those broad suites were not needlessly repeated. Next: explicit provider/video configuration and controlled worker activation, then the remaining core social setup and operator UI. Owner still defers keys/live tests; no spending grant or provider call was authorized.
+
 ## Deployment alert follow-up and full acceptance refresh
 
 Railway read-back again confirms API `01289a92-8e98-4093-899b-3384dd9f094b` SUCCESS. The screenshot alert is the superseded `b34f9064-9610-4e85-a278-42c69bbee7a4`: its image built, but startup health checks failed while Resend was unconfigured. The existing explicit dev password-only configuration resolves that startup issue; no new deployment was necessary.
