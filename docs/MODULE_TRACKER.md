@@ -1,5 +1,12 @@
 # Desvio module tracker
 
+## Resend configuration for usable dev access
+
+`MAIL_PROVIDER=resend` now maps `RESEND_API_KEY` and `RESEND_FROM` to Resend's documented fixed TLS SMTP transport. Existing encrypted queue, lease/uncertain-send handling and account flows are reused. Unrelated SMTP variables cannot redirect the Resend credential. Evidence `resend-configuration.json`: both new configuration tests and all 28 real local account/email tests pass at unchanged source `fed74a67001d512d404d0219829dbd7b0e00fcccc4c62462a81e7970ba005df8`. This is not external email acceptance. Owner was asked only for the Resend key and verified sender in Railway, never secrets in chat.
+
+Railway dev API now has MAIL_PROVIDER=resend. Web Dockerfile/health settings were applied. First web deployment `a6dd76d2-951c-4390-ad95-8cf9749f3db2` was started from a source-only temporary directory. Its existing API_ORIGIN resolves to `http://:3100`: Railway private networking has not initialized for the undeployed API. Private endpoint update was refused until API deployment. API upload is underway to initialize the real service; missing Resend values may prevent startup. No usable deployed app is claimed yet. Correct private routing, migrations 043–045, current worker images and authenticated acceptance remain required.
+
+
 ## Usable dev release priority — 23 October 2026
 
 Owner explicitly prioritized using the core platform while later improvements ship as patches. Immediate release path: deployed authentication and brand onboarding → real image/video generation and editing → exact-version review → authorized social publishing. Billing remains excluded. Advanced analytics, additional social channels, automated performance attribution and account conveniences are follow-up patches, not prerequisites for the first usable dev release. Do not weaken tenant isolation, private media access, video prompt cost approval or final publication approval.

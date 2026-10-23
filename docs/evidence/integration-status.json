@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "843f66f8f9db035af691bd92edd5bc809f452e52",
-  "checked_at": "2026-10-23T11:16:57.278855+00:00",
+  "code_commit": "733d610850f35f8c5368e82c0ad0c706507d71f3",
+  "checked_at": "2026-10-23T11:32:54.887107+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/resend-configuration.json",
         "docs/evidence/carousel-download.json",
         "docs/evidence/carousel-calendar-ui.json",
         "docs/evidence/carousel-calendar.json",
@@ -107,6 +108,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/resend-configuration.json",
         "docs/evidence/carousel-download.json",
         "docs/evidence/carousel-calendar-ui.json",
         "docs/evidence/carousel-calendar.json",
@@ -148,6 +150,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/resend-configuration.json",
         "docs/evidence/carousel-download.json",
         "docs/evidence/carousel-calendar-ui.json",
         "docs/evidence/carousel-calendar.json",

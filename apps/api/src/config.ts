@@ -1,3 +1,4 @@
+import {mailConfig} from './mail-config.js';
 import type {SocialWorkerConfig} from './social-jobs.js';
 export type StorageConfig={endpoint:string;region:string;bucket:string;accessKeyId:string;secretAccessKey:string};
 export type ScannerConfig={host:string;port:number};
@@ -39,12 +40,7 @@ export function configFromEnv(env = process.env): Config {
   if(mode==='production') throw new Error('Production launch blocked pending the complete release gate');
   const mailEncryptionKey=required('MAIL_ENCRYPTION_KEY');
   if(!/^[a-f0-9]{64}$/i.test(mailEncryptionKey)) throw new Error('MAIL_ENCRYPTION_KEY must be 32 random bytes as hex');
-  const smtp={host:required('SMTP_HOST'),port:Number(required('SMTP_PORT')),secure:env.SMTP_SECURE==='true',
-    user:env.SMTP_USER,password:env.SMTP_PASSWORD,from:required('SMTP_FROM')};
-  if(!Number.isInteger(smtp.port) || smtp.port<1 || smtp.port>65535) throw new Error('Invalid SMTP port');
-  if(env.SMTP_SECURE!==undefined && !['true','false'].includes(env.SMTP_SECURE)) throw new Error('SMTP_SECURE must be true or false');
-  if(!/^[^\s<>@]+@[^\s<>@]+\.[^\s<>@]+$/.test(smtp.from)) throw new Error('SMTP_FROM must be a single email address');
-  if(mode==='staging' && (!smtp.user || !smtp.password)) throw new Error('Authenticated SMTP required for staging');
+  const smtp=mailConfig(env,mode!);
   const storage=storageFromEnv(env);
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
   if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
