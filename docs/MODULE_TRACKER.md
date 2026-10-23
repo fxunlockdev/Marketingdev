@@ -1,5 +1,12 @@
 # Desvio module tracker
 
+## Dev database through 042 — verified
+
+Railway dev deployment `5ad6949d-a398-47af-9c19-de4f6f03e89b` reached SUCCESS and applied the tested MFA/experiment-report migrations with checksum replay and all six existing runtime-role login checks. It was then removed; MCP confirmed REMOVED and all seven temporary administrator/runtime-secret variables were deleted and read back absent. Runtime passwords were reused. Evidence: `docs/evidence/railway-dev-migration042.json`.
+
+SMTP variables are still absent in the prepared dev API service. API/web deployment and authenticated cloud acceptance therefore remain open. No model/social calls ran. Full security passes at unchanged source `bbba26c93c01fc5e8d37e760266e0012985c52ec25466c8b40e0938ba8eded72`: 28 account + 161 application cases, six guards and both dependency audits. All 34 full browser journeys pass with zero skips at the same unchanged source; offline five and contracts 83 also pass. Current local acceptance therefore covers the connected cross-module UI, not merely the focused Memory/MFA flows. Hosted workflow/activity pollers and worker/dispatcher logins still pass after migration (the registration report checks only those components; earlier job/recovery reports remain separate). Billing remains excluded.
+
+
 ## Memory experiment reports — locally verified
 
 Migration 042 and the existing insight service now store immutable, human-reported experiment methods, dates, conclusions and limitations against an exact approved-for-testing hypothesis revision. Business owners/admins can append; other authorized business members can read. Retries are idempotent and results do not change Brand Brain or generation context. The UI includes consent, saved history and a correction-by-new-record explanation.
