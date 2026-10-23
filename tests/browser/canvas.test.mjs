@@ -1,3 +1,5 @@
+import {CarouselJobs} from '../../dist/carousel-jobs.js';
+import {carouselPlan} from '../fixtures/carousel-planning.mjs';
 import {MalwareScanner} from '../../dist/file-validation.js';
 import {GoogleGenAI} from '@google/genai';
 import {GeminiPlanner} from '../../dist/gemini-planner.js';
@@ -199,6 +201,7 @@ before(async () => {
             input.brand.facts.every((f) => !f.value.includes("OTHER BUSINESS")),
           );
           if(input.task==='video')return modelResponse({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]});
+          if(input.task==='carousel'){const plan=carouselPlan(input.slide_count);for(const slide of plan.slides){slide.fact_ids=[input.brand.facts[0].id];slide.headline=`Story ${slide.position}`;slide.body='';slide.cta='';}return modelResponse(plan);}
           if(input.task==='content_plan')return modelResponse(generatedPlan(input));
           planned++;
           const brief = {
@@ -268,6 +271,8 @@ before(async () => {
   );
   const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider,gemini);
   const exporter=new ExportJobs(jobs,new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE));
+  const carousel=new CarouselJobs(jobs,handler,exporter);
+  const carouselBeat=fn=>async(...args)=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await fn(...args);}finally{clearInterval(timer);}};
   const videoImage=prepareVideoImage(),videoKey='ab'.repeat(32);
   const clip=Buffer.from(execFileSync('docker',['run','--rm','--network','none','--read-only','--cap-drop=ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--entrypoint','python',videoImage,'-c',"import sys,base64; sys.path.insert(0,'/runtime'); import runtime as r; r.command('ffmpeg',['-v','error','-f','lavfi','-i','color=blue:size=320x180:duration=3:rate=24','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','/tmp/test.mp4']); print(base64.b64encode(open('/tmp/test.mp4','rb').read()).decode())"],{encoding:'utf8',timeout:30000}).trim(),'base64');
   const videoProvider={prepare:intent=>({model:intent.model,idempotencyKey:intent.idempotencyKey,sha256:hash(canonicalJSON(intent))}),submit:async intent=>{videoSubmits++;assert.ok(intent.prompt.startsWith('TEST user edited video prompt'));assert.ok(intent.prompt.includes('TEST revised storyline'));assert.equal((await fetch(intent.referenceURL)).status,200);return {requestId:randomUUID()};},status:async()=>({state:'completed',videoURL:'https://video.example.org/fixture.mp4',errorCode:null}),cancel:async()=>{}};
@@ -282,6 +287,7 @@ before(async () => {
       new URL("../../dist/asset-workflow.js", import.meta.url),
     ),
     activities: {
+      planCarousel:carouselBeat(s=>carousel.plan(s)),prepareCarouselExport:carouselBeat((s,p)=>carousel.prepareExport(s,p)),checkCarouselExport:carouselBeat((s,p)=>carousel.checkExport(s,p)),completeCarousel:carouselBeat(s=>carousel.complete(s)),failCarousel:carouselBeat(s=>carousel.fail(s)),
       validate:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await jobs.validate(scope);}finally{clearInterval(timer);}},
       fail:scope=>jobs.fail(scope),
       stepVideo:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await video.step(scope);}finally{clearInterval(timer);}},
@@ -908,5 +914,21 @@ test('Canvas composes generated slides as one carousel, reviews exact pixels, re
  const id=await panel.getByLabel('Saved carousel',{exact:true}).inputValue();await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await panel.getByLabel('Saved carousel',{exact:true}).selectOption(id);await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
  await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-carousel-mobile.png',fullPage:true});
  const sibling=(await admin.query('SELECT id FROM app.brands WHERE organization_id=$1 AND id<>$2 LIMIT 1',[org,brand])).rows[0];assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/carousels/${id}`)).status(),404);
+ assert.deepEqual(errors,[]);
+});
+
+
+test('Canvas generates an entire carousel, reopens it for editing and reviews saved slides after reload',async()=>{
+ await page.setViewportSize({width:1280,height:900});await page.goto(`${base}/b/${brand}/canvas`);
+ const panel=page.getByRole('region',{name:'Carousels',exact:true});await panel.getByText('Carousels · compose and review slides',{exact:true}).click();
+ const generation=panel.getByRole('region',{name:'Generate a carousel',exact:true});
+ await generation.getByLabel('Carousel idea',{exact:true}).fill('TEST a coordinated refill story');await generation.getByLabel('Number of carousel slides',{exact:true}).fill('2');
+ await generation.getByRole('button',{name:'Generate carousel',exact:true}).click();
+ await expect(generation.getByRole('button',{name:'Review generated carousel',exact:true})).toBeVisible({timeout:60000});
+ await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();
+ const review=panel.getByRole('region',{name:'Review carousel',exact:true});await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img')).toHaveCount(2);
+ const consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-generated-carousel-mobile.png',fullPage:true});
  assert.deepEqual(errors,[]);
 });
