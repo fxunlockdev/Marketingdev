@@ -1,5 +1,12 @@
 # Desvio build state
 
+## Current work — operator model and budget setup
+
+Migration 039 and `scripts/configure-providers.mjs` provide administrator-only configuration for onboarding, OpenAI/Gemini creatives, planning, insights, video and exact LinkedIn publishing allowlists. The tool lists business/channel IDs without credentials, validates the target database and every migration checksum, previews changes before explicit hash-bound application, serializes against business job funding, retains an audit, and never resets spend ledgers. Seven disposable PostgreSQL cases pass, including expiry-only stale previews, runtime-role denial, exact social identity/revision checks and revocation. No real provider permissions or keys were configured. Full security now passes: 26 account + 161 application cases, six security guards and dependency audits. Offline 4, contracts 83 and focused operator 7 also pass at source `f72d8612b3e825f0f5d3fc5f27ecb3027c888b1de65043b13fca43f544a6145a`. No customer UI changed in this checkpoint; prior browser results remain historical, and release remains blocked on fresh browser/deployed/live acceptance. See `OPERATOR_PROVIDER_SETUP.md` and machine-generated `docs/evidence/operator.json`.
+
+Next work: trusted worker hosting and dev application deployment, preserving existing Temporal jobs and credential-free isolated child runtimes. No deployed app, live model success or social posting is claimed. Billing remains excluded by the owner.
+
+
 ## Active checkpoint — Review reopening and publication boundaries
 
 Verified source `6963322e343d5af7ddab99ddde926df38e8b52ffe6de4467b4df59bcc0ea3649` passes offline 4, contracts 83, all 33 browser journeys and full security (26 account + 154 application cases, six guards and dependency audits). Reopening retains both approval decisions and the intervening reversal, survives reload and requires renewed final approval. Active/unresolved publication guards pass. Release remains BLOCKED on deployed product E2E, provider-worker isolation and trusted live evidence; no live calls or application deployment ran.

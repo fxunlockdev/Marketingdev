@@ -25,6 +25,7 @@ READY = {
 }
 
 CANVAS = {
+    'CV-05': ('BrandReferences', 'Private asset upload and approved reference selection', 'app.assets + approved crop sources', 'scanned normalized photo upload, crop approval and private pixels in MOCK SDK edit request'),
     'CV-01': ('CanvasScreen', 'POST /api/v1/businesses/:id/canvas/threads/:thread/messages', 'app.canvas_messages + creative_requests + jobs', 'saved prompt, actual scoped skills/Temporal; MOCK OpenAI'),
     'CV-06': ('CanvasScreen', 'generateCreativeWorkflow / official OpenAI images.generate', 'app.creative_calls + creative_media + creative_versions', 'MOCK upstream image creation; real SDK/S3/Temporal/RLS; no live quality claim'),
     'CV-07': ('CreativeProject', 'generateCreativeWorkflow / official OpenAI images.edit', 'app.creative_versions + creative_media', 'MOCK image edit receives prior private pixels; creates new unapproved child version'),
@@ -38,6 +39,8 @@ CANVAS = {
 }
 
 PLANNING = {
+    'PL-09': 'Authenticated filtered CSV/iCalendar export with formula neutralization and stable event IDs; no scheduling implication',
+    'RV-14': 'Exact-version reviewer reopening with retained history; active or unresolved publication blocks reversal',
     'PL-08': 'Editor-scoped atomic submission of 1–30 exact saved drafts to review; stale/foreign items roll back the batch; no approval or publication',
     'PL-01': 'Saved month/7-day/list views with stable pagination and business timezone',
     'PL-02': 'Previous/next period and arbitrary real dates, never a fixed seed date',
@@ -73,7 +76,7 @@ def update_matrix(root: Path, ready: bool, creative_ready: bool = False):
                 implementation_evidence=f'Fresh local browser/security evidence required; {scope}. No LIVE_VERIFIED or LAUNCH_READY.')
         if row['id'] in CANVAS:
             component,api,db,scope=CANVAS[row['id']]
-            component_file='creative-export' if component=='CreativeExportPanel' else 'creative-editor' if component=='CreativeEditor' else 'canvas'
+            component_file='brand-references' if component=='BrandReferences' else 'creative-export' if component=='CreativeExportPanel' else 'creative-editor' if component=='CreativeEditor' else 'canvas'
             row.update(status='ADAPTER_READY' if creative_ready else 'NOT_IMPLEMENTED',component_path=f'apps/web/components/{component_file}.tsx#{component}',api_or_worker=api,persistent_object=db,
                 automated_test='tests/browser/canvas.test.mjs; tests/foundation/creative.test.mjs; tests/foundation/exports.test.mjs; tests/contracts/creative.test.mjs',
                 implementation_evidence=f'Fresh source-bound local evidence required; {scope}. No LIVE_VERIFIED or LAUNCH_READY.')

@@ -92,3 +92,7 @@ verify-canvas-calendar:
 .PHONY: verify-review-reopen
 verify-review-reopen:
 	$(PYTHON) -m scripts.verify review-reopen
+
+.PHONY: verify-operator
+verify-operator:
+	$(PYTHON) -m scripts.verify operator
