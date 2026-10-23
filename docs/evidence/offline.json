@@ -1,9 +1,9 @@
 {
   "suite": "offline",
   "scope": "TypeScript build and M0 skill archive/middleware probes",
-  "checked_at": "2026-10-23T11:02:45.979608+00:00",
-  "source_sha256": "ba34713b36eec078750ade0a2ce322098ac191d8560b6669cbbac59522b59ecf",
-  "source_sha256_start": "ba34713b36eec078750ade0a2ce322098ac191d8560b6669cbbac59522b59ecf",
+  "checked_at": "2026-10-23T11:12:09.825903+00:00",
+  "source_sha256": "3835350032d15572ac4e4de52509da7d5c5a9062dd0c83332c60d532e8e2b310",
+  "source_sha256_start": "3835350032d15572ac4e4de52509da7d5c5a9062dd0c83332c60d532e8e2b310",
   "source_unchanged": true,
   "results": [
     {
@@ -26,7 +26,7 @@
         "-v"
       ],
       "exit_code": 0,
-      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\ntest_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved (test_video_bundle.VideoBundleGuard.test_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved) ... ok\ntest_supported_architectures_have_exact_pins_and_same_ffmpeg_contract (test_video_bundle.VideoBundleGuard.test_supported_architectures_have_exact_pins_and_same_ffmpeg_contract) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 1.204s\n\nOK\n"
+      "output": "test_original_archive_and_all_skill_hashes (test_skills.SkillsAuditTests.test_original_archive_and_all_skill_hashes) ... ok\ntest_real_middleware_discovers_curated_subset (test_skills.SkillsAuditTests.test_real_middleware_discovers_curated_subset) ... ok\ntest_supporting_references_are_mounted (test_skills.SkillsAuditTests.test_supporting_references_are_mounted) ... ok\ntest_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved (test_video_bundle.VideoBundleGuard.test_changed_package_is_rejected_before_extraction_and_existing_output_is_preserved) ... ok\ntest_supported_architectures_have_exact_pins_and_same_ffmpeg_contract (test_video_bundle.VideoBundleGuard.test_supported_architectures_have_exact_pins_and_same_ffmpeg_contract) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 1.449s\n\nOK\n"
     }
   ],
   "passed": true,

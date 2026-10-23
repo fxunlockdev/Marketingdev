@@ -1,3 +1,5 @@
+import {Readable} from 'node:stream';
+import {StreamableFile} from '@nestjs/common';
 import {CarouselGeneration} from './carousel-generation.js';
 import {Carousels} from './carousels.js';
 import {Insights} from './insights.js';
@@ -74,6 +76,10 @@ class CarouselGenerationController {
 class CarouselsController {
  constructor(@Inject(Carousels) private readonly service:Carousels){}
  @Get() list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Get('versions/:version/download') async download(@Req() r:AuthRequest,@Param('id') id:string,@Param('version') version:string){
+  const bundle=await this.service.download(r.actorId,id,version);
+  return new StreamableFile(Readable.from(bundle.stream()),{type:'application/zip',disposition:'attachment; filename="desvio-carousel.zip"',length:bundle.length});
+ }
  @Get(':project') read(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string){return this.service.read(r.actorId,id,project);}
  @Post() save(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.save(r.actorId,id,body,key);}
  @Post(':version/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('version') version:string,@Body() body:unknown){return this.service.review(r.actorId,id,version,body);}

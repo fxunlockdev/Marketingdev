@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {mkdir,writeFile} from 'node:fs/promises';
 import {Pool} from 'pg';
 import sharp from 'sharp';
+import {readZip} from '../fixtures/read-zip.mjs';
 import {Worker,NativeConnection} from '@temporalio/worker';
 import {Client,Connection} from '@temporalio/client';
 import {Context} from '@temporalio/activity';
@@ -310,6 +311,13 @@ test('carousel is one immutable ordered composition; scoped reviewers approve ex
  assert.deepEqual(await service.save(alice.id,brand.id,input,key),result);await assert.rejects(service.save(alice.id,brand.id,{...input,caption:'Changed shared caption'},key),/another carousel/);
  assert.equal((await service.list(alice.id,sibling.id)).carousels.length,0);await assert.rejects(service.read(bob.id,brand.id,result.project_id));
  let data=await service.read(viewer.id,brand.id,result.project_id),v=data.versions[0];assert.equal(v.current,true);assert.deepEqual(v.pages.map(p=>p.creative_version_id),[a.id,b.id]);assert.equal(v.status,'draft');
+ const downloadPath=path(`carousels/versions/${v.id}/download`);
+ for(const target of [path(`carousels/versions/${v.id}/download`,sibling),downloadPath]){const denied=await fetch(base+target,{headers:{cookie:target===downloadPath?bob.cookie:alice.cookie}});assert.equal(denied.status,404);}
+ const download=await fetch(base+downloadPath,{headers:{cookie:viewer.cookie}});assert.equal(download.status,200);assert.equal(download.headers.get('content-type'),'application/zip');assert.equal(download.headers.get('cache-control'),'no-store');
+ const bundle=Buffer.from(await download.arrayBuffer());assert.equal(bundle.length,Number(download.headers.get('content-length')));const archive=await readZip(bundle);
+ assert.deepEqual(archive.map(e=>e.name),['slide-01.png','slide-02.png','caption.txt','manifest.json']);assert.equal(digest(archive[0].bytes),ea.sha256);assert.equal(digest(archive[1].bytes),eb.sha256);assert.equal(archive[2].bytes.toString(),input.caption+'\n');
+ const manifest=JSON.parse(archive[3].bytes.toString());assert.equal(manifest.status_at_download,'draft');assert.equal(manifest.current_at_download,true);assert.deepEqual(manifest.slides.map(p=>p.alt_text),input.pages.map(p=>p.alt_text));assert.equal(JSON.stringify(manifest).includes('object_key'),false);
+ const broken=new Carousels({scope:canvas.scope.bind(canvas),store:{read:async()=>Buffer.from('corrupted')}},renderer.image);const badBundle=await broken.download(alice.id,brand.id,v.id);await assert.rejects(async()=>{for await(const chunk of badBundle.stream()){}},/integrity/);
  const decision=(revision,decision)=>({revision,decision,sha256:v.sha256,confirmed:true,feedback:decision==='changes_requested'?'Please improve the second slide.':''});
  await assert.rejects(service.review(alice.id,brand.id,v.id,decision(1,'approved')),/Submit/);
  await service.review(editor.id,brand.id,v.id,decision(1,'in_review'));await assert.rejects(service.review(editor.id,brand.id,v.id,decision(2,'approved')));

@@ -1,5 +1,14 @@
 # Desvio build state
 
+## Usable dev release priority — 23 October 2026
+
+Owner explicitly prioritized using the core platform while later improvements ship as patches. Immediate release path: deployed authentication and brand onboarding → real image/video generation and editing → exact-version review → authorized social publishing. Billing remains excluded. Advanced analytics, additional social channels, automated performance attribution and account conveniences are follow-up patches, not prerequisites for the first usable dev release. Do not weaken tenant isolation, private media access, video prompt cost approval or final publication approval.
+
+Carousel ZIP downloads now pass source-bound acceptance at `3835350032d15572ac4e4de52509da7d5c5a9062dd0c83332c60d532e8e2b310`: two archive contracts, 13 backend integration cases and all ten Canvas browser journeys, zero skipped. Downloads contain ordered saved PNGs, caption and alt-text/hash manifest, enforce tenant access and object integrity, and never generate or publish. Evidence: `docs/evidence/carousel-download.json`. Offline and provider contracts pass separately. Model transports remain MOCK; no live claim.
+
+Next: remove deployment/configuration friction using the owner's Resend choice, deploy the current core app/worker/schema to dev, and complete the carousel publication proof/upload path. Real model generation needs owner-provided scoped credentials, cost cap and live-test authorization. Real social publication additionally needs an authorized test account/app permissions. Full product goal remains active; other modules remain tracked below.
+
+
 ## Carousel Calendar and Review Inbox — local acceptance passed
 
 Migration 045 binds complete ordered carousel versions/fingerprints to calendar slots and immutable events. New/existing-plan attachment, local-time scheduling, exact-version review, feedback, approval reset, channel matching and source-slide invalidation are connected. Calendar approval requires the complete saved carousel’s final review. The UI previews every private saved slide in Calendar/Review Inbox and links back to the exact Canvas carousel or slide. This changes the plan, not remote publication.

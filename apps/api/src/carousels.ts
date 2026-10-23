@@ -1,4 +1,6 @@
 import {BadRequestException,ConflictException,ForbiddenException,NotFoundException} from '@nestjs/common';
+import {zipDownload} from './zip-download.js';
+import {digest} from './object-store.js';
 import {randomUUID} from 'node:crypto';
 import {Canvas} from './canvas.js';
 import {canonicalJSON,hash} from './brand-brain.js';
@@ -26,6 +28,36 @@ export class Carousels {
   for(const v of versions){v.pages=await this.pages(db,v.id);v.current=v.id===project.latest_version_id&&this.current(v.pages)&&carouselFingerprint(v,v.pages)===v.sha256;}
   return {project,versions,reviews:(await db.query('SELECT r.version_id,r.decision,r.feedback,r.revision,r.created_at FROM app.carousel_reviews r JOIN app.carousel_versions v ON v.id=r.version_id WHERE v.project_id=$1 ORDER BY r.created_at,r.id',[id])).rows};
  });}
+ async download(user:string,brand:string,id:string){
+  id=uuid(id);
+  const snapshot=await this.canvas.scope(user,brand,false,async db=>{
+   const v=(await db.query('SELECT v.*,p.latest_version_id FROM app.carousel_versions v JOIN app.carousel_projects p ON p.id=v.project_id WHERE v.id=$1',[id])).rows[0];
+   if(!v)throw new NotFoundException('Carousel version not found');
+   const pages=await this.pages(db,id);
+   if(pages.length<2||pages.length>10||carouselFingerprint(v,pages)!==v.sha256)throw new ConflictException('Carousel integrity check failed');
+   const files=[];
+   for(const [i,p] of pages.entries()){
+    const e=(await db.query('SELECT object_key,bytes,sha256 FROM app.creative_exports WHERE id=$1',[p.export_id])).rows[0];
+    if(!e||e.sha256!==p.sha256)throw new ConflictException('Saved slide is unavailable');
+    files.push({...e,bytes:Number(e.bytes),name:`slide-${String(i+1).padStart(2,'0')}.png`,alt_text:p.alt_text,creative_version_id:p.creative_version_id,export_id:p.export_id});
+   }
+   return {v,files,current:v.latest_version_id===id&&this.current(pages)};
+  });
+  const {v,files,current}=snapshot;
+  const manifest=Buffer.from(JSON.stringify({version:1,carousel_version_id:id,sha256:v.sha256,title:v.title,caption:v.caption,channel:v.channel,status_at_download:v.status,current_at_download:current,slides:files.map(({object_key,...f})=>f)},null,2)+'\n');
+  const caption=Buffer.from(v.caption+'\n');
+  return zipDownload([
+   ...files.map(f=>({name:f.name,bytes:f.bytes,read:async()=>{
+    // Recheck membership before each private storage read, without holding a DB transaction during I/O.
+    await this.canvas.scope(user,brand,false,async db=>{if(!(await db.query('SELECT id FROM app.carousel_versions WHERE id=$1',[id])).rowCount)throw new NotFoundException('Carousel version not found');});
+    const bytes=await this.canvas.store.read(f.object_key);
+    if(bytes.length!==f.bytes||digest(bytes)!==f.sha256)throw new ConflictException('Saved slide integrity check failed');
+    return bytes;
+   }})),
+   {name:'caption.txt',bytes:caption.length,read:async()=>caption},
+   {name:'manifest.json',bytes:manifest.length,read:async()=>manifest}
+  ]);
+ }
  save(user:string,brand:string,body:unknown,key:unknown){
   const v=object(body,['project_id','parent_id','title','caption','channel','pages']),projectId=v.project_id==null?null:uuid(String(v.project_id)),parent=v.parent_id==null?null:uuid(String(v.parent_id));
   if(!!projectId!==!!parent||!plain(v.title,140)||!plain(v.caption,3000)||!['linkedin','instagram'].includes(String(v.channel))||!Array.isArray(v.pages)||v.pages.length<2||v.pages.length>10||typeof key!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('Choose 2–10 saved slides, a title, caption and channel');
