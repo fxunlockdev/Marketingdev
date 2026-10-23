@@ -55,7 +55,7 @@ async function fixture(overrides={},captionLabel='Saved creative'){
 async function queue(v=current){return exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},randomUUID());}
 async function render(v){const j=await queue(v);assert.equal(await exportHandler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
 before(async()=>{
- config.videoRenderImage=prepareVideoImage();config.socialEnabled=true;config.publishingEnabled=true;base='http://127.0.0.1:'+await port();config.origin=base;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');await startWeb(await app.app.getUrl());ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses);exports=new CreativeExports(canvas,renderer.image);
+ config.videoRenderImage=prepareVideoImage();config.socialEnabled=true;config.publishingEnabled=true;base='http://127.0.0.1:'+await port();config.origin=base;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');await startWeb(await app.app.getUrl());ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses,renderer.image);exports=new CreativeExports(canvas,renderer.image);
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Northstar Coffee'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
  for(const [u,role] of [[editor,'editor'],[viewer,'viewer']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',[org.id,u.id,role]);
  for(const [field,value] of [['brand_name','Northstar Coffee'],['offering','Creative workflow tools'],['audience','Business owners']])await brain.manual(alice.id,org.id,brand.id,{field,value},randomUUID());
@@ -193,4 +193,28 @@ test('AI analysis becomes a reviewed business-memory hypothesis and retirement r
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/performance-memory-mobile.png',fullPage:true});
  await page.goto(base+`/b/${brand.id}/overview`);await expect(ideas.getByText('No saved performance recommendations yet.',{exact:false})).toBeVisible();await expect(ideas.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toHaveCount(0);
  await reader.goto(base+`/b/${sibling.id}/overview`);await expect(reader.getByRole('region',{name:'Recent post results',exact:true}).getByText('No confirmed published posts yet.',{exact:false})).toBeVisible();
+});
+
+async function approvedCarousel(){
+ const {Carousels}=await import('../../dist/carousels.js'),service=new Carousels(canvas,renderer.image);
+ const a=await fixture(),b=await fixture(),ea=await render(a),eb=await render(b);
+ const c=await service.save(alice.id,brand.id,{project_id:null,parent_id:null,title:'Publish ordered carousel',caption:'MOCK shared carousel caption',channel:'linkedin',pages:[{creative_version_id:a.id,export_id:ea.id,alt_text:'First slide'},{creative_version_id:b.id,export_id:eb.id,alt_text:'Second slide'}]},randomUUID());
+ let v=(await service.read(alice.id,brand.id,c.project_id)).versions[0];await service.review(alice.id,brand.id,c.id,{revision:v.review_revision,sha256:v.sha256,decision:'in_review',feedback:'',confirmed:true});await service.review(alice.id,brand.id,c.id,{revision:v.review_revision+1,sha256:v.sha256,decision:'approved',feedback:'',confirmed:true});
+ const date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'Carousel publishing',objective:'TEST',starts_on:start,timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:date,brief:'TEST'}]},randomUUID());
+ let slot=await plans.addCarousel(alice.id,brand.id,p.id,{carousel_version_id:c.id,planned_at:date,channel:'linkedin',brief:'TEST'},randomUUID());slot=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[slot.id])).rows[0];
+ for(const decision of ['pending_review','approved'])slot=await plans.review(alice.id,brand.id,slot.id,{revision:slot.revision,carousel_version_id:c.id,carousel_sha256:v.sha256,decision});
+ return {v:{caption:'MOCK shared carousel caption'},a,b,ea,eb,c,slot,body:{slot_id:slot.id,revision:slot.revision,carousel_version_id:c.id,channel_id:channelId,confirmed:true}};
+}
+
+test('carousel preview checks every saved slide before consent, publishes once and labels carousel metrics',async()=>{
+ const f=await approvedCarousel(),count=submissions,uploadCount=uploads;remoteState='PUBLISHED';
+ const mediaPattern=config.storage.endpoint+'/**';await page.route(mediaPattern,route=>route.fulfill({contentType:'image/png',body:'CORRUPT SLIDE'}));
+ await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByText('Slide 1 failed its integrity check.',{exact:true})).toBeVisible();await expect(page.getByLabel(/I authorize this exact carousel/)).toBeDisabled();assert.equal(submissions,count);
+ await page.unroute(mediaPattern);await page.getByRole('button',{name:'Reload approved carousel'}).click();
+ const slides=page.getByRole('list',{name:'Approved carousel slides'});await expect(slides.getByRole('img')).toHaveCount(2);await expect(slides.getByRole('img').nth(0)).toHaveAttribute('alt','First slide');await expect(slides.getByRole('img').nth(1)).toHaveAttribute('alt','Second slide');
+ await page.getByLabel('Publish to',{exact:true}).selectOption(channelId);await expect(page.getByLabel(/I authorize this exact carousel/)).toBeEnabled();await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
+ assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-carousel-confirm.png'});
+ await page.getByLabel(/I authorize this exact carousel/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.equal(uploads,uploadCount+2);
+ await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
+ const panel=page.getByRole('region',{name:'Post performance',exact:true});await panel.getByLabel('Performance format',{exact:true}).selectOption('carousel');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);await expect(panel.getByRole('heading',{name:/Carousel/})).toBeVisible();
 });

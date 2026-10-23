@@ -1306,3 +1306,7 @@ summary:focus-visible {
 .performance-lessons .learning-consent input, .mfa-settings .learning-consent input,.carousel-composer .learning-consent input { width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 2px 0 0; flex: 0 0 18px; }
 .performance-lessons .creative-review { overflow-wrap: anywhere; }
 .performance-lessons details { margin: 16px 0; }
+
+.publication-carousel { list-style: none; padding: 0; margin: 0; display: grid; gap: 20px; }
+.publication-carousel li { min-width: 0; }
+.publication-carousel img { display: block; width: 100%; height: auto; border-radius: 12px; }

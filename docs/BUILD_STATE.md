@@ -1,5 +1,11 @@
 # Desvio build state
 
+## Carousel publishing UI — browser acceptance passed
+
+Ready-to-publish now includes only current approved carousel compositions, returning ordered slide IDs/hashes/alt text without private storage keys. The confirmation panel loads and hash-checks every slide, requires all images to display before consent, and binds submission to the carousel version. Corrupt preview reload, tenant access, explicit account/time/consent and observed publication are tested through the actual browser/API/worker using MOCK Postiz. Analytics filters/labels distinguish carousels. All nine publishing browser journeys passed, including existing image/video paths; mobile screenshot inspected and accessibility/overflow checks passed. API and web builds pass. Evidence: `carousel-publishing-browser.json`.
+
+Next: correct the remaining AI-insight evidence query that still labels carousel observations as static; then migration 046 and coordinated API/web/current worker rollout. No credentials or paid tests requested; owner will test live later. No live publication or full release readiness claimed.
+
 ## Durable carousel publication backend — local acceptance passed
 
 Migration 046 adds immutable carousel publication binding and tenant/job-scoped per-slide upload records. Publication submit freezes the approved composition; the worker revalidates exact global/calendar approval before each mutation, checks canonical bytes, commits each successful upload, and submits one ordered multi-image post. Ambiguous upload/submission outcomes stop replay; a confirmed pre-send read failure resumes without reuploading earlier slides. Existing single-image flow remains covered.
