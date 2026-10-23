@@ -242,13 +242,14 @@ async function approvedCarousel(){
  return {a,b,ea,eb,c,slot,body:{slot_id:slot.id,revision:slot.revision,carousel_version_id:c.id,channel_id:channelId,confirmed:true}};
 }
 test('carousel publication uploads ordered private slides once and reconciles one post; tenant and replay checks apply',async()=>{
- const f=await approvedCarousel(),beforeUploads=uploads,beforePosts=submissions,key=randomUUID();
+ const f=await approvedCarousel(),beforeUploads=uploads,beforePosts=submissions,key=randomUUID();remoteState='PUBLISHED';
  await assert.rejects(publisher.submit(bob.id,brand.id,f.body,key));await assert.rejects(publisher.submit(alice.id,sibling.id,f.body,key));assert.throws(()=>publisher.submit(alice.id,brand.id,{...f.body,export_id:f.ea.id},key),/exactly one/);
  const j=await publisher.submit(alice.id,brand.id,f.body,key);assert.deepEqual(await publisher.submit(alice.id,brand.id,f.body,key),j);
  assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);
  const slides=(await admin.query('SELECT * FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows;
  assert.deepEqual(slides.map(s=>s.export_id),[f.ea.id,f.eb.id]);assert.ok(slides.every(s=>s.phase==='uploaded'));assert.deepEqual(lastPostMedia,slides.map(s=>s.remote_media));assert.equal((await record(j)).carousel_version_id,f.c.id);
- assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);assert.equal((await handler.reconcile(scope(j))).state,'queued');
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);assert.equal((await handler.reconcile(scope(j))).state,'published');
+ const {insightObservationsSQL}=await import('../../dist/insights.js');const observations=await plans.scope(alice.id,brand.id,false,async db=>(await db.query(insightObservationsSQL)).rows);assert.equal(observations.find(o=>o.publication_id===j.id)?.format,'carousel');
  assert.equal((await workerPool.query('SELECT * FROM app.publication_slides')).rowCount,0);
 });
 test('ambiguous later carousel upload retains earlier media and never retries or submits',async()=>{
