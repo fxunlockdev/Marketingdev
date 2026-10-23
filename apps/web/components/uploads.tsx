@@ -176,7 +176,7 @@ export function BrandFiles({
         </div>
         <span className="status neutral">Private to this client</span>
       </div>
-      {org.role !== "viewer" && (
+      {["owner","admin","editor"].includes(org.role) && (
         <form className="upload-panel" onSubmit={upload} aria-busy={busy}>
           <span className="upload-icon" aria-hidden="true">
             ↥
@@ -257,12 +257,12 @@ export function BrandFiles({
                     Download
                   </button>
                 )}
-                {org.role !== "viewer" && asset.state === "awaiting_upload" && (
+                {["owner","admin","editor"].includes(org.role) && asset.state === "awaiting_upload" && (
                   <button onClick={() => void action(asset, "abandon")}>
                     Dismiss upload
                   </button>
                 )}
-                {org.role !== "viewer" &&
+                {["owner","admin","editor"].includes(org.role) &&
                   asset.job_id &&
                   ["queued", "validating"].includes(asset.state) && (
                     <button

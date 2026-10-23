@@ -1,0 +1,38 @@
+{
+  "checked_at": "2026-10-23T02:40:29.346564+00:00",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "sandbox": {
+    "id": "055ec3f9-fb61-4167-a0fb-79fc206e8bed",
+    "status": "CREATING",
+    "region": "us-west2",
+    "environmentId": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+    "createdAt": "2026-10-23T02:35:57.802Z",
+    "idleTimeoutMinutes": 15
+  },
+  "host_probe": "Warning: Railway sandboxes are experimental and APIs may change or break during testing.\nx86_64\nuid=0(root) gid=0(root) groups=0(root)\n/usr/local/bin/docker\nPRETTY_NAME=\"Ubuntu 26.04.1 LTS\"\nNAME=\"Ubuntu\"\nVERSION_ID=\"26.04\"\nVERSION=\"26.04.1 LTS (Resolute Raccoon)\"\nVERSION_CODENAME=resolute\nID=ubuntu\nID_LIKE=debian\nHOME_URL=\"https://www.ubuntu.com/\"\nSUPPORT_URL=\"https://help.ubuntu.com/\"\nBUG_REPORT_URL=\"https://bugs.launchpad.net/ubuntu/\"\nPRIVACY_POLICY_URL=\"https://www.ubuntu.com/legal/terms-and-policies/privacy-policy\"\nUBUNTU_CODENAME=resolute\nLOGO=ubuntu-logo\n",
+  "docker_probe": "Warning: Railway sandboxes are experimental and APIs may change or break during testing.\n[\"name=seccomp,profile=builtin\",\"name=cgroupns\"]\n29.1.2\n",
+  "container_result": {
+    "arch": "x64",
+    "uid": 65532,
+    "networks": [
+      "lo"
+    ],
+    "capabilities": "CapEff:\t0000000000000000"
+  },
+  "container_image": "node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb",
+  "container_options": [
+    "--network none",
+    "--user 65532:65532",
+    "--read-only",
+    "--cap-drop ALL",
+    "--security-opt no-new-privileges",
+    "--memory 256m",
+    "--cpus 1",
+    "--pids-limit 64",
+    "--tmpfs /tmp:rw,noexec,nosuid,size=16m"
+  ],
+  "cleanup_output": "Warning: Railway sandboxes are experimental and APIs may change or break during testing.\n\u2713 Destroyed sandbox 055ec3f9-fb61-4167-a0fb-79fc206e8bed\n",
+  "scope": "Basic isolated container compatibility only. No app, worker, parser, skills, renderer or provider integration deployed. No secrets supplied. Actual x86_64 runtime builds and durable worker lifecycle remain unverified.",
+  "live_provider_calls": false
+}

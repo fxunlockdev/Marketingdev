@@ -57,6 +57,32 @@ before(async()=>{
 });
 after(async()=>{await runtime?.close();await admin.end();});
 
+test('selected reviewers decide exact posts but cannot edit, generate, publish or cross business scope; analysts are read-only',async()=>{
+ const reviewer=await signup(),analyst=await signup();
+ for(const [u,role] of [[reviewer,'reviewer'],[analyst,'analyst']]){
+  await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org.id,u.id]);
+  await admin.query('INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,$4)',[org.id,brand.id,u.id,role]);
+ }
+ let [s]=await create();s=await plans.review(editor.id,brand.id,s.id,reviewBody(s,'pending_review'));
+ for(const user of [reviewer,analyst]){
+  assert.equal((await api(path(`content-plan?${query()}`),{user})).status,200);
+  assert.equal((await api(path(`content-plan?${query()}`,sibling),{user})).status,404);
+  assert.equal((await api(path(`content-slots/${s.id}`),{user,method:'PATCH',body:{revision:s.revision,brief:'Unauthorized rewrite'}})).status,403);
+  await assert.rejects(canvas.createThread(user.id,brand.id,{title:'No paid work'},randomUUID()));
+  await runtime.database.transaction(user.id,org.id,false,async db=>{assert.equal((await db.query('SELECT app.social_manager($1,$2) AS allowed',[org.id,brand.id])).rows[0].allowed,false);},brand.id);
+ }
+ assert.equal((await api(path(`reviews/${s.id}`),{user:analyst,method:'POST',body:reviewBody(s,'approved')})).status,403);
+ // Even a review-marked transaction cannot mutate content, create jobs or alter a business.
+ const reviewTx=action=>runtime.database.transaction(reviewer.id,org.id,true,action,brand.id,true);
+ await assert.rejects(reviewTx(db=>db.query("UPDATE app.content_slots SET brief='tampered',state='approved',revision=revision+1,approved_by=$2,approved_at=now() WHERE id=$1",[s.id,reviewer.id])),e=>e.code==='42501');
+ await assert.rejects(reviewTx(db=>db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",[randomUUID(),org.id,brand.id,reviewer.id])),e=>e.code==='42501');
+ await assert.rejects(reviewTx(db=>db.query("UPDATE app.brands SET name='tampered' WHERE id=$1",[brand.id])),e=>e.code==='42501');
+ const approved=await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:reviewBody(s,'approved')});assert.equal(approved.status,201,JSON.stringify(approved.body));assert.equal(approved.body.approved_by,reviewer.id);
+ assert.equal((await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:reviewBody(s,'approved')})).status,409);
+ let [other]=await create();other=await plans.review(editor.id,brand.id,other.id,reviewBody(other,'pending_review'));
+ const feedback=await api(path(`reviews/${other.id}`),{user:reviewer,method:'POST',body:{...reviewBody(other,'changes_requested'),feedback:'Use clearer wording'}});assert.equal(feedback.status,201);assert.equal(feedback.body.state,'changes_requested');
+});
+
 test('30 real persisted slots across two channels; concurrent request replay creates one plan and no publishing job',async()=>{
  const slots=Array.from({length:30},(_,i)=>({...slot(i%2?'instagram':'linkedin'),planned_at:`2026-11-${String(i+1).padStart(2,'0')}T08:00:00Z`})),body=payload(slots),key=randomUUID();
  const results=await Promise.all(Array.from({length:3},()=>api(path('content-plans'),{method:'POST',key,body})));

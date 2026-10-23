@@ -872,7 +872,30 @@ test('business Team invites through real email, accepts selected access, changes
  await alice.getByRole('button',{name:'Refresh team',exact:true}).click();await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption('editor');await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByText('Business role saved.',{exact:true})).toBeVisible();
  await alice.reload();await expect(alice.getByRole('region',{name:'People with access'}).getByText('editor',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-desktop.png',fullPage:true});
  await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-mobile.png',fullPage:true});
+ for(const role of ['reviewer','analyst']){await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption(role);await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByRole('region',{name:'People with access'}).getByText(role,{exact:true})).toBeVisible();}
  await bob.goto(base+`/b/${firstBusiness}/team`);await expect(bob.getByRole('heading',{name:'Team',exact:true})).toBeVisible();await expect(bob.getByRole('button',{name:'Send invitation'})).toHaveCount(0);
  await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByRole('button',{name:'Remove access',exact:true}).click();await alice.getByRole('button',{name:'Confirm removal',exact:true}).click();await expect(alice.getByText('Access to this business removed.',{exact:false})).toBeVisible();
  await bob.reload();await expect(bob.getByRole('heading',{name:'Business unavailable'})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(1);await expect(bob.locator('.v5-business-card')).toContainText('Juniper Goods');await alice.setViewportSize({width:1440,height:1100});
+});
+
+test('Profile saves identity, revokes a separate session and changes the real password with other-session logout',async()=>{
+ await admin.query('DELETE FROM auth."rateLimit"');
+ const other=await browser.newContext();
+ try{
+  const login=()=>other.request.post(base+'/api/auth/sign-in/email',{headers:{origin:base},data:{email,password:password+'-new'}});
+  assert.equal((await login()).status(),200);
+  await alice.goto(base+'/profile');await expect(alice.getByRole('heading',{name:'Profile',exact:true})).toBeVisible();
+  await alice.getByLabel('Your name',{exact:true}).fill('Sam Desvio');await alice.getByRole('button',{name:'Save name',exact:true}).click();await expect(alice.getByText('Your name is saved.',{exact:true})).toBeVisible();
+  await alice.reload();await expect(alice.getByLabel('Your name',{exact:true})).toHaveValue('Sam Desvio');
+  await expect(alice.getByRole('heading',{name:'Active sessions',exact:true})).toBeVisible();
+  // Revoke all other authenticated browser sessions, preserving the current one.
+  await alice.getByRole('button',{name:'Sign out all other sessions',exact:true}).click();await alice.getByRole('button',{name:'Confirm sign-out of other sessions',exact:true}).click();await expect(alice.getByText('Other sessions signed out.',{exact:true})).toBeVisible();
+  assert.equal(await(await other.request.get(base+'/api/auth/get-session')).json(),null);
+  assert.equal((await login()).status(),200);
+  await alice.getByLabel('Current password',{exact:true}).fill(password+'-new');await alice.getByLabel('New password',{exact:true}).fill(password+'-profile');await alice.getByLabel('Confirm new password',{exact:true}).fill(password+'-profile');
+  await alice.getByRole('button',{name:'Change password',exact:true}).click();await expect(alice.getByText('Password changed. Other sessions have been signed out.',{exact:true})).toBeVisible();
+  assert.equal(await(await other.request.get(base+'/api/auth/get-session')).json(),null);await expect(alice.getByLabel('Current password',{exact:true})).toHaveValue('');
+  assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+  await alice.screenshot({path:'work/browser/profile-desktop.png',fullPage:true});await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await alice.screenshot({path:'work/browser/profile-mobile.png',fullPage:true});
+ }finally{await other.close();}
 });

@@ -808,7 +808,38 @@ test('Canvas natural follow-up uses the edited selected plan and opens a new wee
  const request=(await admin.query("SELECT input,output_plan_id FROM app.planning_requests WHERE brand_id=$1 AND input->>'planning_mode'='natural'",[brand])).rows[0];
  assert.equal(request.input.reference_plan.id,original.id);assert.ok(request.input.reference_plan.slots.some(s=>s.video_draft?.prompt==='TEST edited calendar video prompt'));assert.ok(request.output_plan_id);
  assert.deepEqual((await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at,id',[original.id])).rows,before);
+ // A slow initial conversation fetch must not replace an already-open planner.
+ await page.route('**/canvas/threads',async route=>{await delay(600);await route.continue();});
  await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(7);
+ await page.unroute('**/canvas/threads');
  await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Make this a weekly plan');
  await page.screenshot({path:'work/browser/canvas-natural-followup.png',fullPage:true});assert.deepEqual(errors,[]);
+});
+
+test('Reviewer can give calendar feedback without editing or generation; Analyst sees read-only controls',async()=>{
+ const plans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
+ const v=(await admin.query('SELECT v.* FROM app.creative_versions v JOIN app.creative_projects p ON p.latest_version_id=v.id WHERE v.brand_id=$1 ORDER BY v.created_at DESC LIMIT 1',[brand])).rows[0];
+ const p=await plans.create(actor,brand,{title:'TEST reviewer access',objective:'Review boundaries',starts_on:'2027-03-01',timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:'2027-03-01T10:00:00Z',brief:'Reviewer approval fixture',creative_version_id:v.id}]},crypto.randomUUID());
+ let s=(await plans.list(actor,brand,{start:'2027-03-01T00:00:00Z',end:'2027-04-01T00:00:00Z',plan_id:p.id})).slots[0];
+ s=await plans.review(actor,brand,s.id,{revision:s.revision,creative_version_id:v.id,creative_sha256:v.sha256,decision:'pending_review'});
+ const context=await browser.newContext({viewport:{width:1440,height:1000}}),reviewPage=await context.newPage(),email='reviewer-'+randomUUID()+'@example.test';
+ const signup=await context.request.post(base+'/api/auth/sign-up/email',{headers:{origin:base},data:{name:'Review teammate',email,password:'reviewer-browser-password'}});assert.equal(signup.status(),200);const reviewerId=(await signup.json()).user.id;
+ await admin.query('UPDATE auth."user" SET "emailVerified"=true WHERE id=$1',[reviewerId]);
+ assert.equal((await context.request.post(base+'/api/auth/sign-in/email',{headers:{origin:base},data:{email,password:'reviewer-browser-password'}})).status(),200);
+ await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org,reviewerId]);
+ await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'reviewer')",[org,brand,reviewerId]);
+ try{
+  await reviewPage.goto(`${base}/b/${brand}/content-plan?start=2027-03-01&slot=${s.id}`);
+  await expect(reviewPage.getByLabel('Creative brief',{exact:true})).toBeDisabled();
+  await expect(reviewPage.getByRole('button',{name:'Revise creative',exact:true})).toHaveCount(0);
+  await expect(reviewPage.getByLabel('Feedback or creative direction')).toBeEnabled();
+  await reviewPage.getByLabel('Feedback or creative direction').fill('Reviewer: simplify the message.');
+  await reviewPage.getByRole('button',{name:'Request changes',exact:true}).click();
+  await expect(reviewPage.getByLabel('Feedback or creative direction')).toHaveValue('');
+  assert.equal((await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[s.id])).rows[0].state,'changes_requested');
+  await admin.query("UPDATE app.business_memberships SET role='analyst' WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3",[org,brand,reviewerId]);
+  await reviewPage.reload();await expect(reviewPage.getByLabel('Feedback or creative direction')).toBeDisabled();await expect(reviewPage.getByRole('button',{name:'Approve post',exact:true})).toHaveCount(0);
+  await reviewPage.goto(`${base}/b/${brand}/canvas`);await expect(reviewPage.getByRole('button',{name:'+ New conversation',exact:true})).toBeDisabled();
+  assert.deepEqual((await new AxeBuilder({page:reviewPage}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+ }finally{await context.close();}
 });

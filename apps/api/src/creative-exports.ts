@@ -62,7 +62,7 @@ export class CreativeExports {
    }
    if(prior?.context_revision===approvedRevision)return {id:prior.id};
    const approval=randomUUID();await db.query('INSERT INTO app.creative_export_approvals(id,organization_id,brand_id,export_id,actor_id,context_type,context_id,context_revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[approval,b.organization_id,id,exportId,user,v.context_type,context,approvedRevision]);return {id:approval};
-  });
+  },true);
  }
  // Publication must recheck this proof in its own locked transaction immediately
  // before submitting approved bytes. Historical approvals alone are insufficient.

@@ -96,7 +96,7 @@ export class VideoCanvas {
    await db.query('UPDATE app.video_versions SET status=$2,review_revision=review_revision+1,reviewed_by=$3,reviewed_at=$4 WHERE id=$1',[id,v.decision,v.decision==='in_review'?null:user,v.decision==='in_review'?null:new Date()]);
    await db.query('INSERT INTO app.video_reviews(id,organization_id,brand_id,version_id,actor_id,decision,feedback,sha256,revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[randomUUID(),b.organization_id,brand,id,user,v.decision,v.feedback,v.sha256,Number(v.revision)+1]);
    return {id,status:v.decision,revision:Number(v.revision)+1};
-  });
+  },v.decision!=='in_review');
  }
 
 }

@@ -36,6 +36,7 @@ export class Canvas {
     id: string,
     write: boolean,
     action: (db: any, b: any) => Promise<T>,
+    reviewOnly=false,
   ) {
     const b = await this.businesses.resolve(user, id);
     return this.businesses.database.transaction(
@@ -43,7 +44,7 @@ export class Canvas {
       b.organization_id,
       write,
       (db) => action(db, b),
-      id,
+      id,reviewOnly,
     );
   }
   references(user:string,id:string){
@@ -506,7 +507,7 @@ export class Canvas {
         revision: Number(v.revision) + 1,
       };
     };
-    return scoped?action(scoped.db,scoped.b):this.scope(user,id,true,action);
+    return scoped?action(scoped.db,scoped.b):this.scope(user,id,true,action,v.decision!=='in_review');
   }
   media(user: string, id: string, mediaId: string) {
     mediaId = uuid(mediaId);

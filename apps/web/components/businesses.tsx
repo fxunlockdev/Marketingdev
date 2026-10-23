@@ -1,4 +1,5 @@
 "use client";
+import {Profile} from "./profile";
 import {BusinessTeam} from "./business-team";
 import {VisualReview} from "./visual-review";
 import { useEffect, useRef, useState, type FormEvent } from "react";
@@ -264,7 +265,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
               name={session.user.name}
             />
           ) : section === "profile" ? (
-            <Profile user={session.user} />
+            <Profile session={session} onChanged={setSession} />
           ) : section === "billing" ? (
             <Billing entitlement={entitlement} />
           ) : !business ? (
@@ -731,32 +732,6 @@ function Billing({ entitlement }: { entitlement: any }) {
     </>
   );
 }
-function Profile({ user }: { user: any }) {
-  return (
-    <>
-      <PageTitle eyebrow="Your account" title="Profile">
-        <p>Your identity and account access.</p>
-      </PageTitle>
-      <section className="v5-panel narrow">
-        <dl>
-          <dt>Name</dt>
-          <dd>{user.name}</dd>
-          <dt>Email</dt>
-          <dd>{user.email}</dd>
-          <dt>Email status</dt>
-          <dd>{user.emailVerified ? "Verified" : "Verification needed"}</dd>
-        </dl>
-        <a className="button" href="/forgot-password">
-          Reset password
-        </a>
-        <p className="hint">
-          Password recovery uses the account email flow. Additional profile
-          settings, MFA and device management are not available in this build.
-        </p>
-      </section>
-    </>
-  );
-}
 export function BrandOnboarding({ business }: { business: Business }) {
   const [state, setState] = useState<any>(),
     [brain, setBrain] = useState<any>(),
@@ -835,7 +810,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
         )}
       </>
     );
-  const writable = business.role !== "viewer",
+  const writable = ['owner','admin','editor'].includes(business.role),
     change = (key: string, value: any) => {
       setState({ ...state, [key]: value });
       setDirty(true);
@@ -1068,7 +1043,7 @@ function BrandReview({
     manualKey = useRef(""),
     lastBody = useRef("");
   const path = scopePath(business),
-    writable = business.role !== "viewer";
+    writable = ['owner','admin','editor'].includes(business.role);
   useUnsavedChanges(!!value && !busy);
   async function load() {
     try {

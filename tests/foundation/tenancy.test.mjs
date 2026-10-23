@@ -416,5 +416,36 @@ test('business invitations grant only selected clients, preserve independent rol
  assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:second}})).status,201);
  assert.equal((await request(teamPath,{cookie:seat.cookie})).status,404);assert.equal((await request(`/api/v1/businesses/${a.id}/team`,{cookie:seat.cookie})).status,200);
  assert.ok((await request(teamPath,{cookie:owner.cookie})).body.activity.some(e=>e.action==='business.member_removed'));
+ for(const role of ['reviewer','analyst']){
+  const scopedToken=await send([a.id],role);assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:scopedToken}})).status,201);
+  const roles=(await request('/api/v1/businesses',{cookie:seat.cookie})).body.businesses;assert.equal(roles.find(x=>x.id===a.id).role,role);
+  await assert.rejects(direct.transaction(seat.id,org.id,true,async()=>{},a.id));
+  assert.equal((await request(endpoint,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{email:seat.email,role}})).status,400);
+ }
  const third=await send([c.id],'viewer');const pending=(await request(endpoint,{cookie:owner.cookie})).body.invitations.find(i=>i.status==='pending');await request(endpoint+'/'+pending.id+'/revoke',{cookie:owner.cookie,method:'POST',body:{}});assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:third}})).status,404);
+});
+
+test('profile name, password changes and session controls remain bound to the authenticated user',async()=>{
+ const user=await signup('profile-controls'),other=await signup('profile-other');
+ for(const body of [{name:''},{name:'x'.repeat(121)},{name:'New name',role:'owner'},{email:'changed@example.test'}])assert.equal((await request('/api/auth/update-user',{method:'POST',cookie:user.cookie,body})).status,400);
+ const login=()=>request('/api/auth/sign-in/email',{method:'POST',body:{email:user.email,password:'a-strong-test-password-2026'}});
+ const second=await login();assert.equal(second.status,200);
+ assert.equal((await request('/api/auth/update-user',{method:'POST',cookie:user.cookie,body:{name:'Updated profile'}})).status,200);
+ assert.equal((await request('/api/auth/get-session',{cookie:user.cookie})).body.user.name,'Updated profile');
+ assert.notEqual((await request('/api/auth/get-session',{cookie:other.cookie})).body.user.name,'Updated profile');
+ const sessions=await request('/api/auth/list-sessions',{cookie:user.cookie});assert.equal(sessions.status,200);assert.ok(sessions.body.length>=2);assert.ok(sessions.body.every(s=>s.userId===user.id));
+ const foreign=(await request('/api/auth/list-sessions',{cookie:other.cookie})).body[0];
+ await request('/api/auth/revoke-session',{cookie:user.cookie,method:'POST',body:{token:foreign.token}});assert.ok((await request('/api/auth/get-session',{cookie:other.cookie})).body?.user);
+ assert.equal((await request('/api/auth/revoke-other-sessions',{cookie:user.cookie,method:'POST',body:{}})).status,200);
+ assert.equal((await request('/api/auth/get-session',{cookie:second.cookie})).body,null);
+ const wrong=await request('/api/auth/change-password',{cookie:user.cookie,method:'POST',body:{currentPassword:'incorrect-password',newPassword:'new-profile-password-2026',revokeOtherSessions:true}});assert.equal(wrong.status,400);
+ // Separate the password-rotation phase from the already-tested login rate window.
+ await admin.query('DELETE FROM auth."rateLimit"');
+ const third=await login();assert.equal(third.status,200);
+ const changed=await request('/api/auth/change-password',{cookie:user.cookie,method:'POST',body:{currentPassword:'a-strong-test-password-2026',newPassword:'new-profile-password-2026',revokeOtherSessions:true}});assert.equal(changed.status,200);assert.ok(changed.cookie);
+ assert.equal((await request('/api/auth/get-session',{cookie:third.cookie})).body,null);
+ assert.equal((await login()).status,401);
+ const replacement=await request('/api/auth/sign-in/email',{method:'POST',body:{email:user.email,password:'new-profile-password-2026'}});assert.equal(replacement.status,200);
+ assert.equal((await request('/api/auth/update-user',{method:'POST',cookie:replacement.cookie,origin:'https://other.example',body:{name:'forged'}})).status,403);
+ assert.equal((await request('/api/auth/list-sessions')).status,401);
 });

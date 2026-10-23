@@ -2,6 +2,44 @@
 
 Updated 2026-10-23 (Asia/Kuala_Lumpur). Active objective updated by owner: complete Desvio end to end except Billing, retaining the original architecture and all other V5 modules. The requested remaining-usage/time target is not evidence of readiness. Canvas, calendar/channel-review, Connections, approved-image publishing and business Overview workflows are implemented locally within documented scope. No live generation, social publication or dev app deployment is claimed. Current test evidence and blockers are recorded below; historical checkpoints do not imply current production readiness.
 
+## Latest verified checkpoint — scoped review, Profile and Canvas reload
+
+Source `b006987aee74ba3cfbfabd07395793eff1c069522ff906d6923ffc2e7ab42308` passes `make verify-offline` (4), `make verify-contracts` (80), `make verify-security` (26 account + 146 application cases, six guards and root/media audits), `make verify-browser` (31), and `make verify-deployment` (nine deployment checks plus the 26 account cases). Source fingerprints match across all five machine reports. Release gate ran and remains BLOCKED specifically for product deployed E2E, deployed provider-worker tenant isolation and a trusted live-evidence runner. No `verify-live`, paid generation or real social publication ran.
+
+Shipped code in this checkpoint: migration 033 and API transaction scopes for selected-business Reviewer/Analyst roles; field-restricted final creative/video/calendar review; explicit UI write/review separation including uploads; real Profile name/password/session controls through pinned Better Auth; and initial Canvas conversation readiness before planning/creation. Exact PNG/MP4 approvals and publishing tests remain passing. Browser tests cover real separate teammates, persisted feedback, role changes, profile identity/password rotation/session invalidation and accessibility. Mobile Profile UI was inspected. Earlier failed tests and corrected causes are retained below, not reclassified as passes.
+
+Railway dev creation and a basic isolated-container compatibility probe succeeded. The probe sandbox was destroyed; dev remains empty. This is not app deployment. Owner credentials/funding/allowlists and Meta app work remain separate from the unfinished cloud setup.
+
+**Next concrete task:** finish direct OpenAI/Gemini selection for image/video-script planning within Canvas, with immutable per-request provider/model and separate accounting (never fallback into another provider's budget). Reuse the existing Gemini SDK broker/original skill runtime; keep images on OpenAI and paid video on Higgsfield, with video-only prompt approval. Then genuine Postiz analytics and approved Memory learning, remaining scoped-admin/Profile lifecycle scope, and cloud application/worker deployment. Billing remains excluded. Do not repeat green suites without a new source change or unresolved failure.
+
+## Railway isolated-container compatibility probe
+
+Created an empty 15-minute-idle sandbox in dev, with no credentials/customer data/private networking. It provides Ubuntu 26.04.1 x86_64 and Docker 29.1.2. The repository-pinned Node OCI image ran successfully with UID 65532, network none, read-only root, all capabilities dropped, no-new-privileges, CPU/memory/PID limits and a bounded tmpfs. Output reported only loopback and zero effective capabilities. The temporary sandbox was destroyed after the probe; the dev environment remains. Evidence: `docs/evidence/railway-sandbox-compatibility.json`.
+
+This is a promising execution host for the existing isolated-worker design, not app deployment or production acceptance. Existing local ARM64 parser/skills/render/video artifacts need actual x86_64 builds and tests; durable sandbox/worker lifecycle, private services, credentials and deployment remain unfinished. No provider call, app domain or public Docker socket was created.
+
+## Combined verification correction — Canvas initial-load race
+
+The second combined browser run passed 30/31 cases, including the separate Reviewer/Analyst and Profile journeys. An existing weekly follow-up reload case exposed an initial-load race: the planner could be opened while the initial thread request was pending, then remounted closed when the thread arrived. `CanvasScreen` now waits for initial conversation selection before exposing planning or enabling creation. The regression deliberately delays that initial thread request. Final security and browser verification are running at the corrected source; no green suite is asserted until their machine reports pass. Profile mobile screenshot was visually inspected.
+
+## Railway dev environment created
+
+Railway now accepts environment creation. Explicit project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12` has a new **dev** environment, `6a760b10-9ed8-4f01-9c4a-77a25919755a`. Read-back reports no services in dev. Production was not modified, cloned or redeployed. Machine-captured tool responses are in `docs/evidence/railway-dev-environment.json`. The historical environment-creation pause is no longer the current blocker. Application services/domain, isolated worker execution, dev data/storage/SMTP/Temporal configuration and actual deployment remain unfinished; no application deployment or live acceptance is claimed.
+
+## Current session — profile controls and combined regression
+
+- Profile now uses the installed Better Auth 1.7.12 contracts for display name, password changes and active-session revocation. Server validates name-only updates; password rotation requires the current password and signs out other sessions. Customer UI provides real forms, session listing/confirmation and fresh-sign-in recovery guidance. No new identity system or provider interface.
+- Focused account suite passes 26 cases, including new profile security and Reviewer/Analyst invitation acceptance. The test fixture explicitly resets the tested auth rate window between session and password phases; production rate limits are unchanged. Combined browser/security checks are pending below.
+- Previous full browser run passed 29/30 journeys, including actual local MP4 generation/review/publishing with MOCK transports. The new reviewer test failed because its fixture incorrectly demoted the personal-account owner; it now uses a separate authenticated teammate. The shared upload panel now hides editing for Reviewer/Analyst. An initial service test caught worker evaluation of an app-only review helper; the trigger now exits for worker roles before that expression. These corrections need the combined regression evidence; do not claim an all-green checkpoint yet.
+- Profile still lacks MFA, notifications and account lifecycle controls. Next after verification: remaining Canvas provider/action routing, analytics/memory, scoped-admin delegation and cloud/live acceptance. Billing remains excluded.
+
+## Current session — Reviewer and Analyst access (verification in progress)
+
+- Migration 033 adds selected-business Reviewer and Analyst invitations/grants. General business writes remain denied to both. Only review transactions may let Reviewers update creative/video/calendar review fields or append review records; a database trigger prevents content, media, schedule or ownership changes through that path. Publishing, video prompt/spend consent and job creation remain restricted.
+- API review scopes and UI capability checks separate editing from final review. Analyst currently provides read-only access to business information; analytics generation remains unfinished. Team role controls include both roles.
+- Focused planning suite passes 12 cases including actual Reviewer approval/feedback, Analyst denial, sibling-business denial, and direct database rejection of content tampering/jobs/business updates even in review context. Offline 4 and contract 80 checks pass. Actual renderer/export/video and expanded browser/security verification are running; no deployed/live completion is claimed.
+- Next: finish role verification, then profile/session controls and remaining Canvas/analytics/memory/deployment acceptance. Scoped-admin delegation remains unfinished. Billing remains excluded.
+
 ## Deployment read-back — 23 October
 
 Railway MCP authentication works again. Explicit project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12`, environment `0ca68498-6559-4b95-9788-34a5ff703dc0` is named **production**. Platform status reports SUCCESS for Postgres, Redis, desvio-temporal and desvio-postiz, each with one active deployment dated 21 October. The project service inventory contains only those four services; no Desvio API/web/worker service is deployed. These reads do not prove runtime health, corrective Postiz configuration rollout, a writable deployment plane or dev app readiness. No infrastructure mutation or secrets read occurred.

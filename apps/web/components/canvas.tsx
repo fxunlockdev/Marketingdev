@@ -101,6 +101,7 @@ function problem(code: string | null) {
 export function CanvasScreen({ business }: { business: Business }) {
   const root = `/api/v1/businesses/${business.id}`,
     [threads, setThreads] = useState<Thread[]>(),
+    [initialized,setInitialized]=useState(false),
     [threadId, setThreadId] = useState(""),
     [conversation, setConversation] = useState<Conversation>(),
     [projectId, setProjectId] = useState(""),
@@ -116,7 +117,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     [edit, setEdit] = useState<{ version: Version; run: Run } | null>(null);
   const submitKey = useRef(crypto.randomUUID()),
     threadKey = useRef(crypto.randomUUID()),
-    write = business.role !== "viewer";
+    write = ['owner','admin','editor'].includes(business.role);
   useUnsavedChanges(dirty || !!prompt || busy || referenceIds.length>0);
   const refreshThreads = useCallback(async () => {
     const list = await api(root + "/canvas/threads");
@@ -134,6 +135,7 @@ export function CanvasScreen({ business }: { business: Business }) {
               ? requested!
               : (list[0]?.id ?? ""),
           );
+          setInitialized(true);
         }
       })
       .catch((e) => active && setError(e));
@@ -260,7 +262,7 @@ export function CanvasScreen({ business }: { business: Business }) {
       <CanvasVideoContext businessId={business.id}/>
       <div className="studio-layout">
         <aside className="studio-conversations" aria-label="Conversations">
-          <button disabled={!write || busy} onClick={() => choose("")}>
+          <button disabled={!initialized || !write || busy} onClick={() => choose("")}>
             + New conversation
           </button>
           {!threads ? (
@@ -336,10 +338,10 @@ export function CanvasScreen({ business }: { business: Business }) {
             </div>
           )}
           {!!conversation?.planning_runs.length&&<section aria-label="Conversation plans">{conversation.planning_runs.map(r=><p key={r.id}>{r.output_plan_id?<a href={`/b/${business.id}/content-plan?start=${r.starts_on}`}>Open calendar · {r.starts_on}</a>:r.cancel_requested?'Planning canceled':r.status==='queued'&&Date.parse(r.scheduled_at)>Date.now()?`Planning scheduled for ${r.starts_on}`:r.status==='unknown'?'Planning needs reconciliation before another request.':`Planning ${r.status}`}</p>)}</section>}
-          <CanvasPlanner key={business.id+threadId} business={business} threadId={threadId} onDirty={setPlanningDirty} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>
+          {initialized&&<CanvasPlanner key={business.id+threadId} business={business} threadId={threadId} onDirty={setPlanningDirty} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>}
           <form className="studio-composer" onSubmit={send}>
             <fieldset
-              disabled={!write || busy || held || !business.has_approved_brand}
+              disabled={!initialized || !write || busy || held || !business.has_approved_brand}
             >
               <legend>{edit ? "Revise this image" : "Create an image"}</legend>
               <BrandReferences businessId={business.id} writable={write} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!write||busy||held||!business.has_approved_brand}/>
@@ -546,8 +548,8 @@ export function CreativeProject({
       JSON.stringify({ design, caption }) !==
         JSON.stringify({ design: version.design, caption: version.caption }),
     latest = version?.id === data?.project.latest_version_id,
-    write = business.role !== "viewer",
-    reviewer = ["owner", "admin"].includes(business.role);
+    write = ['owner','admin','editor'].includes(business.role),
+    reviewer = ["owner", "admin", "reviewer"].includes(business.role);
   dirtyRef.current = dirty;
   useUnsavedChanges(dirty || !!feedback || busy);
   const onDirtyRef = useRef(onDirty);
@@ -766,7 +768,7 @@ export function CreativeProject({
           Edits create a new draft. Approval stays with the exact version
           reviewed.
         </p>
-        {write && latest && !dirty && (
+        {(write || reviewer) && latest && !dirty && (
           <>
             <Field label="Review feedback">
               {(id) => (
@@ -780,7 +782,7 @@ export function CreativeProject({
               )}
             </Field>
             <div className="actions">
-              {["draft", "changes_requested"].includes(version.status) && (
+              {write && ["draft", "changes_requested"].includes(version.status) && (
                 <button disabled={busy} onClick={() => review("in_review")}>
                   Send for review
                 </button>

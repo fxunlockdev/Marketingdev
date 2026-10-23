@@ -282,6 +282,10 @@ export async function createApplication(config: Config) {
     });
     server.all('/api/auth/{*path}', toNodeHandler(async request=>{
       const unavailable=()=>globalThis.Response.json({error:'Account service is temporarily unavailable. Please try again.',traceId:request.headers.get('x-desvio-trace-id')},{status:503});
+      if(request.method==='POST'&&new URL(request.url).pathname==='/api/auth/update-user'){
+        let body:any;try{body=await request.clone().json();}catch{return globalThis.Response.json({error:'Enter your name'},{status:400});}
+        if(!body||Array.isArray(body)||Object.keys(body).some(k=>k!=='name')||typeof body.name!=='string'||body.name!==body.name.trim()||!body.name||body.name.length>120||/[\u0000-\u001f\u007f]/.test(body.name))return globalThis.Response.json({error:'Enter a name of 1–120 characters'},{status:400});
+      }
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));

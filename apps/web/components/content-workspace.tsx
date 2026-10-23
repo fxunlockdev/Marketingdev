@@ -111,8 +111,8 @@ export function ContentWorkspace({
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
   useEffect(()=>{const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
-  const canWrite = business.role !== "viewer",
-    canReview = ["owner", "admin"].includes(business.role);
+  const canWrite = ['owner','admin','editor'].includes(business.role),
+    canReview = ["owner", "admin", "reviewer"].includes(business.role);
   useUnsavedChanges(!!brief || busy);
   useEffect(() => {
     let active = true;
@@ -772,8 +772,8 @@ function SlotPanel({
     }, 3000);
     return () => clearInterval(timer);
   }, [active, load]);
-  const canWrite = business.role !== "viewer",
-    canReview = ["owner", "admin"].includes(business.role),
+  const canWrite = ['owner','admin','editor'].includes(business.role),
+    canReview = ["owner", "admin", "reviewer"].includes(business.role),
     locked = busy || !canWrite;
   async function act(
     action: () => Promise<unknown>,
@@ -1058,7 +1058,7 @@ function SlotPanel({
                       id={id}
                       maxLength={2000}
                       value={feedback}
-                      disabled={locked}
+                      disabled={busy || (!canWrite && !canReview)}
                       onChange={(e) => setFeedback(e.target.value)}
                     />
                   )}

@@ -9,7 +9,7 @@ import { object,uuid } from './workspaces.js';
 
 const digest=(value:string)=>createHash('sha256').update(value).digest('hex');
 function invitationRole(value:unknown): string {
-  if(typeof value!=='string' || !['admin','editor','viewer'].includes(value)) throw new BadRequestException('Choose admin, editor or viewer');
+  if(typeof value!=='string' || !['admin','editor','reviewer','analyst','viewer'].includes(value)) throw new BadRequestException('Choose a supported business role');
   return value;
 }
 function key(value:unknown):string {
@@ -50,6 +50,7 @@ export class Team {
     let email:string;try{email=mailbox(value.email);}catch{throw new BadRequestException('Enter a valid email address');}
     let businessIds:string[]|null=null;
     if(value.business_ids!==undefined){if(!Array.isArray(value.business_ids)||value.business_ids.length<1||value.business_ids.length>1000)throw new BadRequestException('Select one or more businesses');businessIds=value.business_ids.map(v=>uuid(String(v))).sort();if(new Set(businessIds).size!==businessIds.length)throw new BadRequestException('Select each business once');}
+    if(!businessIds&&['reviewer','analyst'].includes(role))throw new BadRequestException('This role requires selected businesses');
     const requestHash=digest(JSON.stringify({email,role,...(businessIds?{business_ids:businessIds}:{})}));
     return this.database.transaction(user,org,true,async db=>{
       // Same lock as role changes and acceptance: permissions cannot change mid-invitation.

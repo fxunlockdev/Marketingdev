@@ -21,7 +21,7 @@ import {ObjectStore,digest} from '../../dist/object-store.js';
 import {AssetJobs} from '../../dist/jobs.js';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),workerPool=new Pool({connectionString:config.jobs.workerDatabaseUrl});
 const store=new ObjectStore(config.storage),renderer=new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE),jobs=new AssetJobs(workerPool,store,null),handler=new ExportJobs(jobs,renderer);
-let app,base,ws,businesses,brain,canvas,plans,exports,alice,bob,editor,viewer,org,brand,sibling,brainId,current,project,canonical;
+let app,base,ws,businesses,brain,canvas,plans,exports,alice,bob,editor,viewer,reviewer,org,brand,sibling,brainId,current,project,canonical;
 const png=await sharp({create:{width:1024,height:1024,channels:3,background:'#eee7db'}}).png().toBuffer();
 const scope=j=>({organizationId:org.id,brandId:brand.id,jobId:j.id});
 async function api(path,{user=alice,body,method='GET',key}={}){const r=await fetch(base+path,{method,headers:{...(user?{cookie:user.cookie}:{}),origin:config.origin,'content-type':'application/json',...(key?{'idempotency-key':key}:{})},body:body===undefined?undefined:JSON.stringify(body)});return {status:r.status,body:await r.json(),cookie:r.headers.getSetCookie().map(s=>s.split(';')[0]).join('; ')};}
@@ -43,6 +43,7 @@ async function render(v){const j=await queue(v);assert.equal(await handler.run(s
 before(async()=>{
  app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses);exports=new CreativeExports(canvas,renderer.image);
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Render fixtures'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
+ reviewer=await signup();await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org.id,reviewer.id]);await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'reviewer')",[org.id,brand.id,reviewer.id]);
  for(const [u,role] of [[editor,'editor'],[viewer,'viewer']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',[org.id,u.id,role]);
  for(const [field,value] of [['brand_name','Render fixtures'],['offering','Creative workflow tools'],['audience','Business owners']])await brain.manual(alice.id,org.id,brand.id,{field,value},randomUUID());
  let state=await brain.read(alice.id,org.id,brand.id);for(const f of state.findings)await brain.review(alice.id,org.id,brand.id,f.id,{decision:'correct',revision:f.revision});state=await brain.read(alice.id,org.id,brand.id);await brain.approve(alice.id,org.id,brand.id,{revision:state.revision});brainId=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1',[brand.id])).rows[0].id;current=await fixture();project=current.project_id;
@@ -102,16 +103,16 @@ test('one final-image approval atomically approves a pending review; failure rol
  const body={sha256:e.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:2,confirmed:true};
  await admin.query("CREATE FUNCTION app.test_approval_failure() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'TEST approval commit failure'; END$$");
  await admin.query('CREATE TRIGGER test_approval_failure BEFORE INSERT ON app.creative_export_approvals FOR EACH ROW EXECUTE FUNCTION app.test_approval_failure()');
- try{await assert.rejects(exports.approve(alice.id,brand.id,e.id,body),/TEST approval commit failure/);}finally{await admin.query('DROP TRIGGER test_approval_failure ON app.creative_export_approvals');await admin.query('DROP FUNCTION app.test_approval_failure()');}
+ try{await assert.rejects(exports.approve(reviewer.id,brand.id,e.id,body),/TEST approval commit failure/);}finally{await admin.query('DROP TRIGGER test_approval_failure ON app.creative_export_approvals');await admin.query('DROP FUNCTION app.test_approval_failure()');}
  assert.deepEqual((await admin.query('SELECT status,review_revision FROM app.creative_versions WHERE id=$1',[v.id])).rows[0],{status:'in_review',review_revision:2});
  assert.equal((await exports.list(alice.id,brand.id,v.id)).approvals.length,0);
- const approved=await exports.approve(alice.id,brand.id,e.id,body);assert.equal((await exports.approve(alice.id,brand.id,e.id,body)).id,approved.id);
+ const approved=await exports.approve(reviewer.id,brand.id,e.id,body);assert.equal((await exports.approve(reviewer.id,brand.id,e.id,body)).id,approved.id);
  assert.deepEqual((await admin.query('SELECT status,review_revision FROM app.creative_versions WHERE id=$1',[v.id])).rows[0],{status:'approved',review_revision:3});
  const p=await plans.create(alice.id,brand.id,{title:'TEST FIXTURE atomic review',objective:'Awareness',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:'2026-11-01T10:00:00Z',brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
  let s=(await plans.list(alice.id,brand.id,{start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:p.id})).slots[0];
  s=await plans.review(alice.id,brand.id,s.id,{revision:s.revision,creative_version_id:v.id,creative_sha256:v.sha256,decision:'pending_review'});
  const sb={...body,context_type:'slot',context_id:s.id,context_revision:s.revision};
- const sa=await exports.approve(alice.id,brand.id,e.id,sb);assert.equal((await exports.approve(alice.id,brand.id,e.id,sb)).id,sa.id);
+ const sa=await exports.approve(reviewer.id,brand.id,e.id,sb);assert.equal((await exports.approve(reviewer.id,brand.id,e.id,sb)).id,sa.id);
  assert.equal((await plans.scope(alice.id,brand.id,false,db=>exports.publicationProof(db,s.id))).sha256,e.sha256);
  assert.equal((await admin.query('SELECT revision FROM app.content_slots WHERE id=$1',[s.id])).rows[0].revision,s.revision+1);
 });
@@ -205,8 +206,8 @@ test('approved export to original video skills, durable provider stage, actual m
  const approve={decision:'approved',feedback:'Approved exact clip',revision:2,sha256:version.sha256,confirmed:true};
  assert.equal((await api(endpoint+'/review',{user:editor,method:'POST',body:approve})).status,403);
  assert.equal((await api(endpoint+'/review',{method:'POST',body:{...approve,sha256:'0'.repeat(64)}})).status,409);
- assert.equal((await api(endpoint+'/review',{method:'POST',body:approve})).status,201);
- assert.equal((await api(endpoint+'/review',{method:'POST',body:approve})).status,409);
+ assert.equal((await api(endpoint+'/review',{user:reviewer,method:'POST',body:approve})).status,201);
+ assert.equal((await api(endpoint+'/review',{user:reviewer,method:'POST',body:approve})).status,409);
  assert.equal((await api(endpoint)).body.status,'approved');
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_reviews WHERE version_id=$1',[version.id])).rows[0].n,2);
  await assert.rejects(service.version(bob.id,brand.id,version.id));assert.equal((await service.list(alice.id,sibling.id)).projects.length,0);

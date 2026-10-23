@@ -50,7 +50,7 @@ export function BrandIntake({
     requestKind = useRef("");
   latest.current = onComplete;
   const path = `/api/v1/businesses/${business.id}/intake`,
-    writable = business.role !== "viewer",
+    writable = ['owner','admin','editor'].includes(business.role),
     watch = !state || state.jobs.some(active);
   useEffect(() => {
     let live = true,

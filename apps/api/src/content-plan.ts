@@ -41,7 +41,7 @@ export function planTime(value:unknown,startsOn:string,timezone:string,days=30):
 type Business={organization_id:string};
 export class ContentPlan {
  constructor(readonly businesses:Businesses){}
- async scope<T>(user:string,id:string,write:boolean,action:(db:PoolClient,b:Business)=>Promise<T>) {
+ async scope<T>(user:string,id:string,write:boolean,action:(db:PoolClient,b:Business)=>Promise<T>,reviewOnly=false) {
   const b=await this.businesses.resolve(user,id);
   return this.businesses.database.transaction(user,b.organization_id,write,async db=>{
    if(write){
@@ -50,7 +50,7 @@ export class ContentPlan {
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${id.toLowerCase()}`]);
    }
    return action(db,b);
-  },id);
+  },id,reviewOnly);
  }
  async creative(db:PoolClient,org:string,brand:string,versionId:unknown,format?:string) {
   const vid=uuid(String(versionId));
@@ -184,7 +184,7 @@ export class ContentPlan {
  }
  review(user:string,id:string,slotId:string,body:unknown) {
   const v=object(body,['revision','creative_version_id','creative_sha256','video_version_id','video_sha256','decision','feedback']);
-  return this.scope(user,id,true,(db,b)=>this.decide(db,b,user,id,uuid(slotId),v));
+  return this.scope(user,id,true,(db,b)=>this.decide(db,b,user,id,uuid(slotId),v),['approved','changes_requested','rejected'].includes(String(v.decision)));
  }
  async decide(db:PoolClient,b:Business,user:string,id:string,slotId:string,v:Record<string,unknown>) {
   const rev=revision(v.revision),decision=String(v.decision),feedback=text(v.feedback??'',2000,true);
@@ -213,6 +213,6 @@ export class ContentPlan {
    const slots=[];
    for(const i of items)slots.push(await this.decide(db,b,user,id,i.id,{...i,decision:'approved',feedback:''}));
    return {slots};
-  });
+  },true);
  }
 }

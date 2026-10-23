@@ -31,7 +31,7 @@ export function CreativeExportPanel({threadId,business,versionId,sourceSHA,conte
   return()=>{canceled=true;controller.abort();if(url)URL.revokeObjectURL(url);};
  },[root,saved?.id,saved?.sha256,previewRetry]);
  const approved=!!saved&&state?.approvals.some(a=>a.export_id===saved.id&&a.context_type===context.type&&a.context_id===context.id&&a.context_revision===context.revision);
- const reviewable=['in_review','pending_review','approved'].includes(context.state),writer=business.role!=='viewer',reviewer=['owner','admin'].includes(business.role);
+ const reviewable=['in_review','pending_review','approved'].includes(context.state),writer=['owner','admin','editor'].includes(business.role),reviewer=['owner','admin','reviewer'].includes(business.role);
  async function act(action:()=>Promise<unknown>){setBusy(true);setError(undefined);try{await action();await load();}catch(e){setError(e);}finally{setBusy(false);}}
  async function create(){requestKey.current??=crypto.randomUUID();await api(`${root}/creative-versions/${versionId}/exports`,{source_sha256:sourceSHA},'POST',requestKey.current);requestKey.current=null;}
  return <section className="creative-review final-image-review" aria-labelledby={labelId} aria-busy={busy}>
