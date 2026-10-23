@@ -47,3 +47,5 @@ Private Postiz application deployment is SUCCESS; backend/orchestrator health an
 - OAuth readiness is now separate from encryption/provisioning: the customer flow remains unavailable until explicit social app activation. Ten configuration tests and 27 local database/queue tests passed, including rejection without creating a job when OAuth is disabled. Remote OAuth remains unverified.
 
 - Scheduled-removal transport is implemented and passes MOCK contracts. It reports only an unconfirmed removal request. Durable remote cancellation, UI controls, race handling and actual social acceptance remain incomplete.
+
+- Fixed visual onboarding setup: `max_tokens_per_image` can now be explicitly configured through the guided/atomic operator path. Previously the tool could not enable screenshot analysis. 28 configuration and nine database tests pass; no live allowance or model call was enabled.

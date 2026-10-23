@@ -49,6 +49,11 @@ export async function setupWizard(io){
    const value=await io.ask(`${label} token price (USD per million tokens): `);
    if(!/^(0|[1-9]\d*)(\.\d{1,6})?$/.test(value))throw Error('Enter a verified positive decimal token price.');g[field]=Number(value);
   }
+  if(kind==='onboarding'){
+   const cap=await io.ask('Verified maximum tokens per analyzed image (0 disables visual analysis): ');
+   if(!/^(0|[1-9]\d{0,6})$/.test(cap)||Number(cap)>1000000)throw Error('Image token cap must be a whole number from 0 to 1000000.');
+   g.max_tokens_per_image=Number(cap);
+  }
   if(kind==='creative'){
    g.image_model=await io.ask('Exact eligible image model ID: ');g.quality=await io.ask('Image quality (low, medium or high): ');
    g.max_image_request_micros=dollars(await io.ask('Maximum reserved cost per image request (USD): '));

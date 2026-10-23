@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "7ccf90a771e21c7aaaea6529a28f1c39254b0733",
-  "checked_at": "2026-10-23T16:09:07.476989+00:00",
+  "code_commit": "443f0af4b4018b8c7bfa6cc09e120f844d536b9e",
+  "checked_at": "2026-10-23T16:25:11.443084+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",

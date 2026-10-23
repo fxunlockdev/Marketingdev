@@ -1,5 +1,9 @@
 # Desvio build state
 
+## Visual onboarding allowance plumbing repair — 2026-10-24
+
+Found a concrete setup defect: onboarding analysis requires a positive `analysis_grants.max_tokens_per_image` when screenshots/document images exist, but the operator tool could not set that field. Added the optional bounded integer field and an explicit guided prompt; it flows through the existing preview, audited atomic apply and token-cost reservation. Omitting it preserves legacy manifest hashes and existing values; explicit zero disables visual analysis. No defaults invent image-token ceilings or spending. `make verify-operator` passes 28 contracts plus nine real PostgreSQL cases, including persisted visual caps, invalid values, omission preservation and explicit reset. No runtime/image/migration deployment is needed: the one-shot Railway runner sends this updated administrator source from the checkout. Owner allowance/live analysis remains unconfigured/unverified.
+
 ## Scheduled removal transport — 2026-10-24
 
 Added the source-audited Postiz removal request transport with exact queued-target/tenant/channel/caption/schedule checks. It explicitly returns an unconfirmed publishing-stop outcome because upstream soft deletion swallows Temporal termination errors. Fifteen mocked HTTP Postiz contracts pass; no actual DELETE, cancellation UI, durable cancellation workflow or live claim. Next implementation step is durable cancellation-request/reconciliation state with permission, unknown-outcome and publish-race handling before any customer button. Existing local pre-submission cancellation remains unchanged.

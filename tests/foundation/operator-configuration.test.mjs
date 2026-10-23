@@ -93,3 +93,14 @@ test('missing migration checksum prevents configuration without altering grants'
  try{await admin.query('UPDATE desvio_migrations.applied SET sha256=$2 WHERE name=$1',[name,'0'.repeat(64)]);await assert.rejects(configureProviders(admin,manifest(),options),{code:'CONFIGURATION_SCHEMA_MISMATCH'});}
  finally{await admin.query('UPDATE desvio_migrations.applied SET sha256=$2 WHERE name=$1',[name,original]);}
 });
+
+test('visual onboarding token cap persists explicitly, rejects unsafe caps, and preserves omitted legacy fields',async()=>{
+ const m=manifest();m.grants[0].max_tokens_per_image=12345;
+ const p=await configureProviders(admin,m,options);assert.equal(p.manifest.grants[0].max_tokens_per_image,12345);
+ await configureProviders(admin,m,{...options,approval:p.preview_sha256});
+ const cap=async()=>Number((await admin.query('SELECT max_tokens_per_image FROM app.analysis_grants WHERE brand_id=$1',[brand])).rows[0].max_tokens_per_image);
+ assert.equal(await cap(),12345);
+ const legacy=manifest(),lp=await configureProviders(admin,legacy,options);assert.equal(Object.hasOwn(lp.manifest.grants[0],'max_tokens_per_image'),false);await configureProviders(admin,legacy,{...options,approval:lp.preview_sha256});assert.equal(await cap(),12345);
+ for(const value of [-1,1.5,1000001,'1000',null]){const bad=manifest();bad.grants[0].max_tokens_per_image=value;assert.throws(()=>configurationManifest(bad),{code:'CONFIGURATION_INVALID_IMAGE_TOKEN_CAP'});}
+ const disable=manifest();disable.grants[0].max_tokens_per_image=0;const dp=await configureProviders(admin,disable,options);await configureProviders(admin,disable,{...options,approval:dp.preview_sha256});assert.equal(await cap(),0);
+});

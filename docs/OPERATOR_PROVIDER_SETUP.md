@@ -24,7 +24,7 @@ Create a private JSON manifest with version 1, a fresh UUID `change_id`, exact `
 
 | Kind | Required additional fields |
 | --- | --- |
-| onboarding | model, budget_micros, input_micros_per_token, output_micros_per_token |
+| onboarding | model, budget_micros, input_micros_per_token, output_micros_per_token; max_tokens_per_image for visual evidence |
 | creative | text_model, image_model, quality (low/medium/high), budget_micros, input_micros_per_token, output_micros_per_token, max_image_request_micros |
 | gemini_creative | text_model, budget_micros, input_micros_per_token, output_micros_per_token |
 | planning / insights | provider (openai/gemini), model, budget_micros, input_micros_per_token, output_micros_per_token |
@@ -66,3 +66,7 @@ Postiz, its isolated provisioner and Desvio social/provisioning flags are deploy
 ## OAuth app readiness
 
 `POSTIZ_OAUTH_ENABLED` is an explicit API switch, separate from Postiz provisioning and encryption-key presence. It defaults to false; an encryption key alone must not advertise a usable social authorization flow. Set it true only after the audited LinkedIn app credentials (`LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`) are configured on the private Postiz service with the exact callback `https://desvio-dev-web-dev.up.railway.app/integrations/social/linkedin`, and that service has redeployed successfully. API startup rejects activation without Postiz enabled and a valid OAuth encryption key. Coordinated activation preserves this explicit switch while social is enabled and temporarily disables it during worker replacement. This does not verify app permissions or authorize publishing. Meta channels are separate unfinished integrations.
+
+### Visual onboarding allowance
+
+Screenshot/document-image analysis requires a positive `max_tokens_per_image` on the onboarding allowance, based on the selected model’s verified image-token ceiling. The guided setup now asks for this value. Zero disables visual analysis; it does not silently fall back to text when saved visual evidence exists. The exact image count multiplied by this ceiling participates in the existing reservation and business budget check. The optional manifest field accepts whole numbers from 0 through 1,000,000. Omitting it preserves an existing allowance’s value (or database default zero on first creation), so older manifest replays retain their content/hash. No price or token ceiling is guessed.

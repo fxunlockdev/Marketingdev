@@ -15,7 +15,7 @@ const number=(v,max,integer=true)=>{if(typeof v!=='number'||!Number.isFinite(v)|
 const model=v=>{if(typeof v!=='string'||! /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,99}$/.test(v))deny('CONFIGURATION_INVALID_MODEL');return v;};
 const textRates=['budget_micros','input_micros_per_token','output_micros_per_token'];
 const definitions={
- onboarding:{table:'analysis_grants',fields:['model',...textRates]},
+ onboarding:{table:'analysis_grants',fields:['model',...textRates,'max_tokens_per_image']},
  creative:{table:'creative_grants',fields:['text_model','image_model','quality',...textRates,'max_image_request_micros']},
  gemini_creative:{table:'gemini_creative_grants',fields:['text_model',...textRates]},
  planning:{table:'planning_grants',fields:['provider','model',...textRates],key:'provider'},
@@ -35,7 +35,8 @@ export function configurationManifest(input,now=Date.now()){
   if(new Date(g.expires_at).toISOString()!==g.expires_at.replace(/(?<!\.\d{3})Z$/,'.000Z'))deny('CONFIGURATION_EXPIRY_REQUIRED');
   g.expires_at=new Date(g.expires_at).toISOString();
   for(const field of d.fields){
-   if(field==='provider'){if(!['openai','gemini'].includes(g[field]))deny('CONFIGURATION_INVALID_PROVIDER');}
+   if(field==='max_tokens_per_image'){if(g[field]!==undefined&&(!Number.isInteger(g[field])||g[field]<0||g[field]>1000000))deny('CONFIGURATION_INVALID_IMAGE_TOKEN_CAP');}
+   else if(field==='provider'){if(!['openai','gemini'].includes(g[field]))deny('CONFIGURATION_INVALID_PROVIDER');}
    else if(['model','text_model','image_model'].includes(field))model(g[field]);
    else if(field==='quality'){if(!['low','medium','high'].includes(g[field]))deny('CONFIGURATION_INVALID_QUALITY');}
    else if(field==='models'){if(!Array.isArray(g.models)||!g.models.length||g.models.length>2||new Set(g.models).size!==g.models.length||g.models.some(m=>!['kling-video/v3.0/std/image-to-video','kling-video/o3/video-edit'].includes(m)))deny('CONFIGURATION_INVALID_VIDEO_MODEL');g.models=[...g.models].sort();}
@@ -98,7 +99,7 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
   if(approval!==previewHash)deny('CONFIGURATION_PREVIEW_STALE');
   for(const g of manifest.grants){
    const d=definitions[g.kind],data={organization_id:manifest.organization_id,brand_id:manifest.business_id};
-   for(const field of d.fields)if(field!=='remote_account_id')data[field]=g[field];
+   for(const field of d.fields)if(field!=='remote_account_id'&&g[field]!==undefined)data[field]=g[field];
    data.expires_at=g.kind==='publishing'&&!g.enabled?new Date(0).toISOString():g.expires_at;
    if(g.kind!=='publishing')data.enabled=g.enabled;
    data[['publishing','video'].includes(g.kind)?'operator_reference':'approved_by']=manifest.operator_reference;
