@@ -1,6 +1,6 @@
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {mkdtempSync,readFileSync,writeFileSync,copyFileSync} from 'node:fs';
+import {mkdtempSync,readFileSync,writeFileSync,copyFileSync,mkdirSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -13,8 +13,11 @@ export function postizBuildContext(checkout){
  const archive=execFileSync('git',['-C',checkout,'archive','--format=tar',POSTIZ_SOURCE],{maxBuffer:100*1024*1024,stdio:['ignore','pipe','pipe']});
  execFileSync('tar',['-xf','-','-C',directory],{input:archive,stdio:['pipe','ignore','pipe']});
  copyFileSync(join(root,'infra/postiz/Dockerfile'),join(directory,'Dockerfile'));
+ mkdirSync(join(directory,'desvio-runtime'));
+ const runtime={};
+ for(const name of ['nginx.conf','start.mjs','entrypoint.sh']){const bytes=readFileSync(join(root,'infra/postiz/runtime',name));writeFileSync(join(directory,'desvio-runtime',name),bytes);runtime[name]=createHash('sha256').update(bytes).digest('hex');}
  writeFileSync(join(directory,'.dockerignore'),'.git\n.env\n.env.*\nnode_modules\n**/node_modules\n**/.next\n**/dist\n');
- const evidence={commit:POSTIZ_SOURCE,archive_sha256:createHash('sha256').update(archive).digest('hex'),dockerfile_sha256:createHash('sha256').update(readFileSync(join(directory,'Dockerfile'))).digest('hex'),source_modified:false,scope:'Exact upstream source plus separate headless deployment Dockerfile; no runtime equivalence or license clearance claim.'};
+ const evidence={commit:POSTIZ_SOURCE,archive_sha256:createHash('sha256').update(archive).digest('hex'),dockerfile_sha256:createHash('sha256').update(readFileSync(join(directory,'Dockerfile'))).digest('hex'),runtime_overlays:runtime,upstream_application_source_modified:false,scope:'Exact upstream application source plus separate headless deployment/runtime overlays; no runtime equivalence or license clearance claim.'};
  writeFileSync(join(directory,'DESVIO_BUILD_SOURCE.json'),JSON.stringify(evidence,null,2)+'\n');
  return {directory,...evidence};
 }

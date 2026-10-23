@@ -8,14 +8,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ make python
 WORKDIR /app
 # Context is produced only by the exact-commit export script, never the working tree.
 COPY . /app
-ENV NODE_OPTIONS="--max-old-space-size=2048" NEXT_TELEMETRY_DISABLED=1
+ENV NODE_OPTIONS="--max-old-space-size=4096" NEXT_TELEMETRY_DISABLED=1
 RUN pnpm install --frozen-lockfile --ignore-scripts \
     && pnpm rebuild bcrypt \
     && pnpm exec prisma generate --schema libraries/nestjs-libraries/src/database/prisma/schema.prisma
 RUN pnpm run build:backend && pnpm run build:orchestrator
-RUN mkdir -p /uploads && chown node:node /uploads
+# Runtime overlay: private API/media gateway; the upstream frontend is never started.
+RUN apt-get update && apt-get install -y --no-install-recommends nginx util-linux \
+    && rm -rf /var/lib/apt/lists/*
+COPY desvio-runtime /opt/desvio-postiz
+RUN chmod 755 /opt/desvio-postiz/entrypoint.sh && mkdir -p /uploads && chown node:node /uploads
 ENV NODE_ENV=production
-USER node
-WORKDIR /app/apps/backend
-# Orchestrator uses the same image with its own explicit start command.
-CMD ["node", "--experimental-require-module", "dist/apps/backend/src/main.js"]
+ENV PORT=5000 UPLOAD_DIRECTORY=/uploads STORAGE_PROVIDER=local
+WORKDIR /app
+ENTRYPOINT ["/opt/desvio-postiz/entrypoint.sh"]

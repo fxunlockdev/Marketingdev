@@ -16,7 +16,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | Canvas | Brand-guided planning, static image creation/editing, editable projects, video storyline/script/prompt approval before generation, video editing/rendering, carousels and ZIP download | Provider keys, business allowances and video runtime activation; real image create/edit and video create/edit acceptance |
 | Publishing & Analytics | Approved static/video/carousel → ordered upload → one LinkedIn submission → status reconciliation; uncertainty holds; saved metrics and format filters | Actual Postiz/service activation and consented publishing; other channels; remote cancellation/rescheduling and unresolved-outcome operations |
 | Memory | Business-specific approved knowledge, evidence-linked performance hypotheses, human review, retirement and experiment reports | Actual model/performance acceptance and broader learning quality evaluation |
-| Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth workflow tested with mocks | Exact-source headless Postiz build is running (no dev Postiz deployment yet); deployed provisioner/real Postiz acceptance, actual consent, full reconnect/disconnect lifecycle and additional channels. Meta app alone is not proof those paths are complete |
+| Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth workflow tested with mocks | Exact-source headless Postiz compilation is in progress after dependency success and a heap-limit failure; approved-media proxy has five passing transport cases (no dev Postiz deployment yet); deployed provisioner/real Postiz acceptance, actual consent, full reconnect/disconnect lifecycle and additional channels. Meta app alone is not proof those paths are complete |
 | Team | Business-specific roles, invitations, escalation prevention and last-owner protection | Resend delivery for invitations; deployed multi-user acceptance |
 | Profile | Name/password changes, session controls, authenticator/recovery flows | Deployed security acceptance; Resend for reset/delivery flows |
 | Billing | Excluded | Not part of this goal's current scope |
@@ -28,7 +28,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 - `docs/evidence/railway-worker-rollout.json` and `railway-worker-job-carousel046.json`: exact deployed worker, queue/role registration, actual storage/scan job, replay and foreign-scope denial. Synthetic fixture cleanup recorded separately.
 - `docs/evidence/carousel-publication-backend.json`: 17 real local publication/security/recovery cases with MOCK Postiz.
 - `docs/evidence/carousel-publishing-browser.json`: nine local image/video/carousel publishing browser journeys with MOCK Postiz; accessibility/mobile checks.
-- `docs/evidence/contracts.json`: 84 passing provider/input contracts at the recorded source snapshot.
+- `docs/evidence/contracts.json`: 89 passing provider/input/media contracts at the recorded source snapshot.
 - `docs/evidence/security.json`: passed at unchanged source on 23 October, with 29 account cases, 169 foundation cases, six Python boundary cases and both production dependency audits. Scanner readiness now allows bounded slower emulated startup and preserves failure diagnostics. All 37 full browser journeys also pass at this same source.
 
 ## Immediate sequence

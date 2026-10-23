@@ -1,14 +1,18 @@
 # Desvio build state
 
-## Exact-source Postiz dev build — running
+## Exact-source Postiz dev build and approved-media delivery — in progress
 
-Current Railway discovery confirms Postiz, Redis and its PostgreSQL have no deployments in dev. The older production Postiz service/image remains untouched and cannot be substituted for audited source equivalence. The clean sibling checkout still matches `651876e24317c2d8e717262cf98267ec6f699180`.
+Railway read-back confirms API deployment `66d29c9e-a1a5-41eb-84b8-948834fdaf5a` SUCCESS. The screenshot's older failed deployment `b34f9064-9610-4e85-a278-42c69bbee7a4` stopped because `RESEND_API_KEY` was required; the explicit dev password-only configuration already resolves that failure. Production remains untouched.
 
-`scripts/postiz-build-context.mjs` exports only that exact Git commit and a pinned headless build recipe; no working-tree secrets or customer-facing Postiz frontend build. `infra/postiz/Dockerfile` pins the existing audited Node 22 amd64 base and pnpm 10.6.1, installs the frozen upstream lock, explicitly rebuilds bcrypt/generates Prisma, then builds backend/orchestrator. Source-export hashes are in `postiz-build-context.json`. This is a build candidate, not a deployed/verified service.
+The exact clean Postiz checkout is `651876e24317c2d8e717262cf98267ec6f699180`. The first local build installed the frozen dependencies but failed Prisma engine DNS resolution. Retrying that retained container succeeded, including native bcrypt and Prisma 6.5.0 generation. Dependency checkpoint: `sha256:8e5db2ba859c50ca988f00afc2c1e36e746ccf28cd811847533f5e16f9ba0e98` (`work/postiz-dependency-checkpoint.json`). The subsequent backend compile exhausted its 2 GB JavaScript heap. Neither is a successful application build.
 
-The actual local amd64 Docker build is active in exec session **74981**, image tag `desvio-postiz:651876e-headless`, context metadata `work/postiz-build-context.json`. Base/native tooling installation passed; frozen lockfile is accepted and dependency installation is progressing. Resume that exact session; do not start a duplicate build because observation times out. No other heavy tests or builds should run alongside it.
+The build now uses upstream's 4 GB heap setting, with a hard 3400 MB container memory cap and no swap to protect other local applications. Active exec session **85136**, log `work/postiz-build-resume.log`, tag `desvio-postiz:651876e-headless`; resume rather than starting a duplicate. The active worker sandbox has only 3 GB available and was not used for this compile. No unrelated container or Colima configuration was changed.
 
-Next: finish/repair this build, verify runtime entrypoints/native modules and source/image identity; then dev-only PostgreSQL/Redis/Temporal namespace and private Postiz backend/orchestrator, restricted Desvio provisioner, genuine A/B API isolation. Source review confirmed local uploads and OAuth callback both use FRONTEND_URL, so keep the callback in Desvio and implement a bounded approved-media route/private media gateway; do not expose the Postiz UI or invent a separate upstream media-origin setting. Real social OAuth and posting still wait on owner app/account consent. No model key request or paid call.
+`infra/postiz/runtime/` adds a private API/media nginx gateway and supervised backend/orchestrator; the entrypoint initializes the upload volume then drops to node. No upstream application source or customer-facing Postiz frontend is included in the overlay. `scripts/postiz-build-context.mjs` records exact upstream archive and overlay hashes. Runtime execution and service health remain unverified pending the build.
+
+`apps/web/lib/published-media.mjs` and `app/uploads/[...path]/route.ts` implement the required bounded proxy for Postiz publication copies, disabled until its private upstream is configured. Canonical Desvio media remains private. Transport validates date/hash paths, origin, MIME, lengths, byte ranges, redirects and actual streamed byte count, without forwarding session headers. Five focused MOCK transport cases pass; all 89 contract cases and web TypeScript pass. This route is not deployed or proven against actual Postiz yet.
+
+Next: finish the bounded build and runtime checks; then dev-only Postiz database/Redis/Temporal namespace, private runtime/provisioner and genuine two-tenant API isolation. Connect/test the approved-media route before rollout. No dev Postiz deployment exists yet. Social OAuth/publication and paid model acceptance remain owner-deferred; no key request, provider call or spending grant.
 
 ## Coordinated activation and real API renderer-pin repair
 
