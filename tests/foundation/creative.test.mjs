@@ -668,14 +668,15 @@ test('slot promotion failure rolls back version/attachment/event and retries cac
 
 test('approved private brand references reach MOCK image edits with immutable provenance, replay and revocation',async()=>{
  await grant(100000000);
- const sourceId=randomUUID(),visualId=randomUUID(),captureJob=randomUUID();
+ const assetId=randomUUID(),visualId=randomUUID(),captureJob=randomUUID();
  const jpg=await sharp({create:{width:1440,height:900,channels:3,background:'#2468ac'}}).jpeg().toBuffer();
  const objectKey=`evidence/${org.id}/${brand.id}/reference-fixture/${digest(jpg)}`;
  await store.persist(objectKey,jpg,'image/jpeg',digest(jpg));
- await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'website.extract','succeeded')",[captureJob,org.id,brand.id,alice]);
- await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,'explicit-test-fixture','{}','https://example.org/')",[sourceId,org.id,brand.id,digest(jpg)]);
- await admin.query("INSERT INTO app.website_visuals(id,organization_id,brand_id,source_id,job_id,viewport,parser_version,object_key,sha256,bytes,width,height,observations,coverage) VALUES($1,$2,$3,$4,$5,'desktop','explicit-test-fixture',$6,$7,$8,1440,900,'{}','{}')",[visualId,org.id,brand.id,sourceId,captureJob,objectKey,digest(jpg),jpg.length]);
- const approval={kind:'website',visual_id:visualId,label:'Approved blue palette reference',consent:true};
+ // Validated upload fixture; real scanner/normalization is exercised in assets.test.mjs.
+ await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'PRODUCT FIXTURE.jpg','image/jpeg',$5,$6,$7,$8,'ready')",[assetId,org.id,brand.id,alice,jpg.length,digest(jpg),objectKey+'-quarantine',objectKey]);
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind,status) VALUES($1,$2,$3,$4,$5,'asset.validate','succeeded')",[captureJob,org.id,brand.id,assetId,alice]);
+ await admin.query('INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$7,$8,1440,900)',[visualId,org.id,brand.id,assetId,captureJob,objectKey,digest(jpg),jpg.length]);
+ const approval={kind:'upload',visual_id:visualId,label:'Approved blue palette reference',consent:true,crop:{left:120,top:40,width:400,height:300}};
  await assert.rejects(canvas.approveReference(viewer,brand.id,approval));
  await assert.rejects(canvas.approveReference(bob,brand.id,approval));
  await assert.rejects(canvas.approveReference(alice,brand.id,{...approval,consent:false}));
@@ -692,7 +693,7 @@ test('approved private brand references reach MOCK image edits with immutable pr
   if(new URL(url).pathname==='/v1/images/edits'){
    const files=init.body.getAll('image[]');assert.equal(files.length,1);
    const bytes=Buffer.from(await files[0].arrayBuffer());assert.equal((await sharp(bytes).metadata()).format,'png');
-   assert.deepEqual(await sharp(bytes).raw().toBuffer(),await sharp(jpg).raw().toBuffer());
+   assert.deepEqual(await sharp(bytes).raw().toBuffer(),await sharp(jpg).extract(approval.crop).raw().toBuffer());
    assert.ok(init.body.get('prompt').includes(approval.label));assert.ok(!init.body.get('prompt').includes(objectKey));uploads++;
    return Response.json({created:1,data:[{b64_json:png.toString('base64')}]});
   }
@@ -701,7 +702,7 @@ test('approved private brand references reach MOCK image edits with immutable pr
  try{assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));}finally{transport=undefined;}
  const v=(await admin.query('SELECT skill_manifest FROM app.creative_versions WHERE job_id=$1',[j.id])).rows[0];
  assert.equal(Number((await admin.query("SELECT reserved_micros FROM app.creative_calls WHERE job_id=$1 AND step='image'",[j.id])).rows[0].reserved_micros),200000);
- assert.equal(v.skill_manifest.references[0].source_sha256,digest(jpg));assert.equal(v.skill_manifest.references[0].id,ref.id);assert.equal(uploads,1);
+ assert.deepEqual(v.skill_manifest.references[0].crop,approval.crop);assert.equal(v.skill_manifest.references[0].source_sha256,digest(jpg));assert.equal(v.skill_manifest.references[0].id,ref.id);assert.equal(uploads,1);
  assert.equal(await handler.run(scope(j)),'finished');assert.equal(uploads,1);
  const pending=await canvas.submit(alice,brand.id,thread.id,body,randomUUID()),calls=planCalls+imageCalls;
  await canvas.revokeReference(alice,brand.id,ref.id);
@@ -711,10 +712,10 @@ test('approved private brand references reach MOCK image edits with immutable pr
  const reapproved=await canvas.approveReference(alice,brand.id,approval);
  assert.notEqual(reapproved.id,ref.id);
  const damaged=await canvas.submit(alice,brand.id,thread.id,{...body,reference_ids:[reapproved.id]},randomUUID());
- await admin.query('UPDATE app.website_visuals SET sha256=$2 WHERE id=$1',[visualId,'0'.repeat(64)]);
+ await admin.query('UPDATE app.uploaded_visuals SET sha256=$2 WHERE id=$1',[visualId,'0'.repeat(64)]);
  const beforeDamage=planCalls+imageCalls;
  try{assert.equal(await handler.run(scope(damaged)),'rejected');assert.equal((await row(damaged)).error_code,'CREATIVE_REFERENCE_INVALID');assert.equal(planCalls+imageCalls,beforeDamage);}
- finally{await admin.query('UPDATE app.website_visuals SET sha256=$2 WHERE id=$1',[visualId,digest(jpg)]);}
+ finally{await admin.query('UPDATE app.uploaded_visuals SET sha256=$2 WHERE id=$1',[visualId,digest(jpg)]);}
  await database.transaction(alice,org.id,true,async db=>{
   await assert.rejects(db.query('UPDATE app.brand_references SET label=$2 WHERE id=$1',[reapproved.id,'Tampered']),/permission denied/);
  },brand.id).catch(e=>{if(!/aborted/.test(e.message))throw e;});

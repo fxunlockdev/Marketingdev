@@ -272,10 +272,10 @@ export class CreativeJobs {
         try{
           const decoder=sharp(bytes,{limitInputPixels:24_000_000}),metadata=await decoder.metadata();
           if(metadata.format!=='jpeg'||metadata.width!==r.width||metadata.height!==r.height)throw new Error('Invalid source');
-          canonical=await decoder.resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
+          canonical=await (r.crop?decoder.extract(r.crop):decoder).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
         }catch{throw new CreativeError('CREATIVE_REFERENCE_INVALID');}
         referenceImages.push(canonical);
-        referenceManifest.push({id:r.id,visual_id:r.visual_id,kind:r.kind,label:r.label,source_sha256:r.sha256,input_sha256:digest(canonical)});
+        referenceManifest.push({id:r.id,visual_id:r.visual_id,kind:r.kind,label:r.label,crop:r.crop??null,source_sha256:r.sha256,input_sha256:digest(canonical)});
       }
       let plan = request.plan;
       if (!plan) {

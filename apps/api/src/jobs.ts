@@ -1,3 +1,4 @@
+import {normalizeProductPhoto} from './uploaded-visuals.js';
 import {Pool,type PoolClient} from 'pg';
 import {randomUUID} from 'node:crypto';
 import {Client,WorkflowExecutionAlreadyStartedError,WorkflowIdReusePolicy} from '@temporalio/client';
@@ -52,9 +53,13 @@ export class AssetJobs {
       const scanner=await this.scanner.scan(bytes);await validateFormat(bytes,asset.content_type);
       // Persist immutable bytes that were actually scanned; never promote a mutable upload key.
       const etag=await this.store.persist(asset.canonical_key,bytes,asset.content_type,asset.sha256);
+      const visual=asset.content_type.startsWith('image/')?await normalizeProductPhoto(bytes):null;
+      const visualKey=visual?`uploaded-visuals/${asset.organization_id}/${asset.brand_id}/${asset.id}/${visual.sha256}`:null;
+      if(visual)await this.store.persist(visualKey!,visual.data,'image/jpeg',visual.sha256);
       const result=await this.transaction(scope,async(db,job)=>{
         if(terminal.has(job.status))return job.status;
         if(!await this.permitted(db,job))return this.finish(db,job,'canceled','ACCESS_REVOKED_OR_CANCELED');
+        if(visual)await db.query('INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(asset_id) DO NOTHING',[randomUUID(),job.organization_id,job.brand_id,asset.id,job.id,visualKey,visual.sha256,asset.sha256,visual.bytes,visual.width,visual.height]);
         return this.finish(db,job,'succeeded',null,scanner,etag);
       });
       // Cleanup is best effort; canonical success must not be undone by a cleanup outage.

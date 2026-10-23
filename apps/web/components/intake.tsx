@@ -212,18 +212,18 @@ export function BrandIntake({
           {state.visuals.map((v: any) => (
             <article key={v.id} id={"visual-" + v.id} className="v5-panel">
               <h3>
-                {v.document_page ? `Document page ${v.document_page}` : v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
-                {v.document_page ? "Uploaded guideline" : v.observations.title || "Website reference"}
+                {v.viewport === "upload" ? "Product photo" : v.document_page ? `Document page ${v.document_page}` : v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
+                {v.viewport === "upload" ? "Private upload" : v.document_page ? "Uploaded guideline" : v.observations.title || "Website reference"}
               </h3>
-              {!v.document_page && <a href={v.website_url} target="_blank" rel="noopener noreferrer">
+              {!v.document_page && v.viewport!=="upload" && <a href={v.website_url} target="_blank" rel="noopener noreferrer">
                 Open source page
               </a>}
               <p>
                 {v.width} × {v.height} pixels
                 {v.coverage.truncated ? " · height capped" : ""}.{" "}
-                {!v.document_page && <>{v.coverage.resourceFailures.length} resources could not be captured.</>}
+                {!v.document_page && v.viewport!=="upload" && <>{v.coverage.resourceFailures.length} resources could not be captured.</>}
               </p>
-              {!v.document_page && <><p>
+              {!v.document_page && v.viewport!=="upload" && <><p>
                 Observed fonts:{" "}
                 {[
                   ...new Set(
@@ -246,11 +246,12 @@ export function BrandIntake({
               </p></>}
               <PrivateVisual businessId={business.id} visualId={v.id}
                 label={`View ${v.document_page ? `document page ${v.document_page}` : `${v.viewport} capture`}`}
-                alt={v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}/>
+                alt={v.viewport === "upload" ? "Uploaded product photo" : v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}/>
             </article>
           ))}
         </details>
       )}
+      <button type="button" disabled={busy} onClick={()=>{setError(undefined);void api(path).then(setState).catch(setError);}}>Refresh image sources</button>
       {!!state?.visuals?.length && <BrandReferences businessId={business.id} writable={writable} sources={state.visuals}/>}
       {visualAnalysis && (
         <details>

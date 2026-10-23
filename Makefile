@@ -76,3 +76,7 @@ verify-planning:
 .PHONY: verify-container-images
 verify-container-images:
 	$(PYTHON) -m scripts.verify container-images
+
+.PHONY: verify-product-photos
+verify-product-photos:
+	$(PYTHON) -m scripts.verify product-photos

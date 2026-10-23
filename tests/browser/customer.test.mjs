@@ -340,6 +340,22 @@ test("real private upload survives refresh and download returns the original byt
     chunks = [];
   for await (const c of stream) chunks.push(c);
   assert.deepEqual(Buffer.concat(chunks), png);
+  await alice.getByRole('button',{name:'Refresh image sources',exact:true}).click();
+  await alice.getByText('Approve images for future creatives',{exact:true}).click();
+  const source=alice.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+  await source.getByRole('button',{name:'Inspect Uploaded product photo',exact:true}).click();await expect(source.getByRole('img',{name:'Uploaded product photo',exact:true})).toBeVisible();
+  await source.getByLabel('Use part of this image', {exact:true}).check();
+  await source.getByLabel('Crop width',{exact:true}).fill('32');await source.getByLabel('Crop height',{exact:true}).fill('32');
+  await source.getByRole('button',{name:'Preview selected crop',exact:true}).click();await expect(source.getByRole('img',{name:'Selected reference crop',exact:true})).toBeVisible();
+  await source.getByLabel('Reference name',{exact:true}).fill('Product photo crop');
+  await expect(source.getByRole('button',{name:'Approve image reference',exact:true})).toBeDisabled();
+  await source.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
+  await source.getByRole('button',{name:'Approve image reference',exact:true}).click();
+  await expect(alice.getByText('Product photo crop',{exact:true})).toBeVisible();
+  await alice.getByRole('button',{name:'Preview Product photo crop',exact:true}).click();await expect(alice.getByRole('img',{name:'Product photo crop',exact:true})).toBeVisible();
+  const references=await alice.request.get(base+brandUrl.replace(base,'').replace('/b/','/api/v1/businesses/').replace('/onboarding','')+'/canvas/references');assert.equal(references.status(),200);assert.deepEqual((await references.json()).references.find(r=>r.label==='Product photo crop').crop,{left:0,top:0,width:32,height:32});
+  await alice.screenshot({path:'work/browser/product-photo-crop.png',fullPage:true});
+
   assert.deepEqual(errors, []);
 });
 
@@ -697,7 +713,7 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   const referenceApproval=alice.getByRole('region',{name:'Approve reference: Document page 1'});
   await expect(referenceApproval.getByRole('button',{name:'Approve image reference'})).toBeDisabled();
   await referenceApproval.getByLabel('Reference name',{exact:true}).fill('My guideline reference');
-  await referenceApproval.getByRole('checkbox').check();
+  await referenceApproval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
   await referenceApproval.getByRole('button',{name:'Approve image reference'}).click();
   await expect(alice.getByRole('button',{name:'Remove approval for My guideline reference'})).toBeVisible();
   const privatePreview=`${base}/api/v1/businesses/${target.id}/visuals/${visualId}`;

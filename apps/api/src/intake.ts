@@ -27,6 +27,8 @@ export class Intake {
               SELECT v.id,v.source_id,v.viewport,v.width,v.height,v.observations,v.coverage,s.website_url,NULL::integer AS document_page,v.captured_at FROM app.website_visuals v JOIN app.brand_sources s ON s.id=v.source_id WHERE v.organization_id=$1 AND v.brand_id=$2
               UNION ALL
               SELECT v.id,v.source_id,'document',v.width,v.height,'{}'::jsonb,'{}'::jsonb,NULL::text,v.page,v.captured_at FROM app.document_visuals v WHERE v.organization_id=$1 AND v.brand_id=$2
+              UNION ALL
+              SELECT v.id,v.asset_id,'upload',v.width,v.height,'{}'::jsonb,'{}'::jsonb,NULL::text,NULL::integer,v.captured_at FROM app.uploaded_visuals v WHERE v.organization_id=$1 AND v.brand_id=$2
             ) evidence ORDER BY captured_at DESC,source_id,document_page LIMIT 70`,
             [b.organization_id, id],
           )
@@ -58,7 +60,7 @@ export class Intake {
       async (db) => {
         const v = (
           await db.query(
-            "SELECT object_key,viewport,sha256,bytes FROM app.website_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3 UNION ALL SELECT object_key,'document-page-'||page,sha256,bytes FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+            "SELECT object_key,viewport,sha256,bytes FROM app.website_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3 UNION ALL SELECT object_key,'document-page-'||page,sha256,bytes FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3 UNION ALL SELECT object_key,'uploaded-photo',sha256,bytes FROM app.uploaded_visuals WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
             [b.organization_id, id, visualId],
           )
         ).rows[0];
