@@ -1,5 +1,12 @@
 # Desvio build state
 
+## Memory experiment reports — locally verified
+
+Migration 042 and the existing insight service now store immutable, human-reported experiment methods, dates, conclusions and limitations against an exact approved-for-testing hypothesis revision. Business owners/admins can append; other authorized business members can read. Retries are idempotent and results do not change Brand Brain or generation context. The UI includes consent, saved history and a correction-by-new-record explanation.
+
+Frozen-source acceptance passed at `bbba26c93c01fc5e8d37e760266e0012985c52ec25466c8b40e0938ba8eded72`: 13 service cases, all eight publishing/analytics browser journeys, offline five and contracts 83. HTTP save, stale/invalid input denial, role/tenant isolation, immutable storage, replay, browser save/reload/read-only access and accessibility are covered. Mobile screenshot inspected. An initial test incorrectly treated synchronous validation as a promise rejection; a browser exact-text selector omitted the visible label. Both test assertions were corrected before final acceptance. See `docs/evidence/memory-experiments.json`. Full security is historical at the preceding MFA source; no current full-release claim. This is experiment report recording, not automated attribution, statistical validation or live performance verification. Migrations 041–042 remain local; Railway is through 040. Billing excluded.
+
+
 ## Profile authenticator MFA — locally verified
 
 Pinned Better Auth authenticator enrollment, recovery-code replacement/disable and pending sign-in verification are connected in Profile and sign-in. Migration 041 adds the provider’s auth-only schema; it is not applied to Railway. QR images are generated locally in the browser, with a manual-key fallback. Secrets remain out of browser persistent storage. Existing sessions retain their prior access; protection applies to future sign-ins.

@@ -64,6 +64,7 @@ class InsightsController {
  constructor(@Inject(Insights) private readonly service:Insights){}
  @Get() read(@Req() r:AuthRequest,@Param('id') id:string){return this.service.read(r.actorId,id);}
  @Post() submit(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,body,key);}
+ @Post(':lesson/experiments') experiment(@Req() r:AuthRequest,@Param('id') id:string,@Param('lesson') lesson:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.recordExperiment(r.actorId,id,lesson,body,key);}
  @Post(':lesson/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('lesson') lesson:string,@Body() body:unknown){return this.service.review(r.actorId,id,lesson,body);}
  @Post(':job/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(r.actorId,id,job);}
 }

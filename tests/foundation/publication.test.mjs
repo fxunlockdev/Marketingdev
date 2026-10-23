@@ -193,6 +193,18 @@ test('original analytics skills produce evidence-bound proposals; human review s
  assert.equal(calls,1);assert.equal(await worker.run(scope(j)),'finished');assert.equal(calls,1);
  const saved=await service.read(alice.id,brand.id),lesson=saved.lessons[0];assert.equal(lesson.state,'proposed');assert.equal(lesson.evidence.length,1);assert.equal((await service.read(alice.id,sibling.id)).lessons.length,0);assert.equal((await api(path('insights'),{user:bob})).status,404);assert.equal((await api(path('insights'),{user:viewer})).status,200);
  const decision={revision:1,decision:'testing',applicability:'Only future LinkedIn CTA experiments',confirmed:true};await assert.rejects(service.review(editor.id,brand.id,lesson.id,decision));await assert.rejects(service.review(alice.id,sibling.id,lesson.id,decision));await service.review(alice.id,brand.id,lesson.id,decision);await assert.rejects(service.review(alice.id,brand.id,lesson.id,decision),/Refresh/);
+ const experiment={revision:2,starts_on:'2026-01-01',ends_on:'2026-01-07',method:'Compare two CTA variants in equal windows.',outcome:'inconclusive',results:'Only two posts; unequal audience sizes prevent a reliable conclusion.',confirmed:true},experimentKey=randomUUID();
+ await assert.rejects(service.recordExperiment(editor.id,brand.id,lesson.id,experiment,randomUUID()));
+ await assert.rejects(service.recordExperiment(viewer.id,brand.id,lesson.id,experiment,randomUUID()));
+ await assert.rejects(service.recordExperiment(alice.id,sibling.id,lesson.id,experiment,randomUUID()));
+ await assert.rejects(service.recordExperiment(bob.id,brand.id,lesson.id,experiment,randomUUID()));
+ for(const patch of [{revision:1},{ends_on:'2099-01-01'},{starts_on:'2026-02-30'},{confirmed:false},{results:'short'},{outcome:'proven'}])await assert.rejects(async()=>service.recordExperiment(alice.id,brand.id,lesson.id,{...experiment,...patch},randomUUID()));
+ const experimentResponse=await api(path('insights')+'/'+lesson.id+'/experiments',{method:'POST',body:experiment,key:experimentKey});assert.equal(experimentResponse.status,201);const experimentId=experimentResponse.body.id;
+ assert.equal((await service.recordExperiment(alice.id,brand.id,lesson.id,experiment,experimentKey)).id,experimentId);
+ await assert.rejects(service.recordExperiment(alice.id,brand.id,lesson.id,{...experiment,results:'Different reported results for the same key.'},experimentKey),/different results/);
+ const reported=(await service.read(viewer.id,brand.id)).lessons.find(l=>l.id===lesson.id);assert.equal(reported.experiments.length,1);assert.equal(reported.experiments[0].outcome,'inconclusive');assert.equal(reported.state,'testing');assert.equal(reported.revision,2);
+ await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.memory_experiments SET outcome='supported' WHERE id=$1",[experimentId]),brand.id),e=>e.code==='42501');
+ assert.equal((await app.database.transaction(alice.id,org.id,false,db=>db.query('SELECT id FROM app.memory_experiments WHERE id=$1',[experimentId]),sibling.id)).rowCount,0);
  const overview=(await api(path('overview'))).body;assert.ok(overview.recommendations.some(r=>r.id===lesson.id&&r.state==='testing'&&r.evidence_count===1));assert.ok(overview.generation_activity.some(r=>r.kind==='insight.generate'&&r.completed>0));
  const {assertLearningCurrent}=await import('../../dist/learning-context.js');
  const memoryThread=await canvas.createThread(alice.id,brand.id,{title:'Approved learning test'},randomUUID());

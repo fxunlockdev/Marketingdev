@@ -1,9 +1,10 @@
 "use client";
 import {useCallback,useEffect,useId,useRef,useState} from 'react';
 import {api} from './api';
+import {ExperimentResults,type Experiment} from './experiment-results';
 import {Field,Notice} from './primitives';
 import {useUnsavedChanges} from './unsaved';
-type Lesson={id:string;state:string;revision:number;applicability:string;reviewed_at:string|null;content:{title:string;summary:string;hypothesis:string;next_test:string;limitations:string[]};analysis_limitations:string[];evidence:{id:string;publication_id:string;caption:string;provider:string;format:string;semantics:string;collected_at:string;series:{label:string;points:{date:string;value:number}[]}[]}[]};
+type Lesson={experiments:Experiment[];id:string;state:string;revision:number;applicability:string;reviewed_at:string|null;content:{title:string;summary:string;hypothesis:string;next_test:string;limitations:string[]};analysis_limitations:string[];evidence:{id:string;publication_id:string;caption:string;provider:string;format:string;semantics:string;collected_at:string;series:{label:string;points:{date:string;value:number}[]}[]}[]};
 type Data={can_generate:boolean;can_review:boolean;runs:{id:string;status:string;error_code:string|null;cancel_requested:boolean;provider:string}[];lessons:Lesson[]};
 const active=(state:string)=>['queued','running','retrying'].includes(state);
 export function PerformanceLessons({businessId}:{businessId:string}){
@@ -29,5 +30,6 @@ function LessonCard({lesson:l,root,businessId,canReview,onSaved}:{lesson:Lesson;
  {l.reviewed_at&&<p>Last decision {new Date(l.reviewed_at).toLocaleString()}</p>}
  <Notice error={error}/>{canReview?<fieldset disabled={busy}><Field label="Where this lesson applies">{id=><textarea id={id} value={applicability} maxLength={1000} onChange={e=>{setApplicability(e.target.value);setConfirmed(false);}}/>}</Field><label className="learning-consent"><input type="checkbox" checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/> I understand this is an unproven hypothesis, not a verified brand fact.</label><div className="publication-record-actions">{l.state!=='testing'&&<button disabled={!confirmed} onClick={()=>void review('testing')}>Approve for testing</button>}{l.state==='testing'&&applicability!==l.applicability&&<button disabled={!confirmed} onClick={()=>void review('testing')}>Save applicability</button>}{l.state==='testing'&&<button disabled={!confirmed} onClick={()=>void review('retired')}>Retire learning</button>}{l.state==='proposed'&&<button disabled={!confirmed} onClick={()=>void review('rejected')}>Reject proposal</button>}</div></fieldset>:l.applicability&&<p>Applicability: {l.applicability}</p>}
  {l.state==='testing'&&<p>New creative and planning requests can use this hypothesis within its applicability. <a href={`/b/${businessId}/canvas`}>Try in Canvas</a> · <a href={`/b/${businessId}/content-plan`}>Open content plan</a></p>}
+ <ExperimentResults records={l.experiments} canRecord={canReview&&l.state==='testing'} revision={l.revision} url={`${root}/${l.id}/experiments`} onSaved={onSaved}/>
  </article>;
 }
