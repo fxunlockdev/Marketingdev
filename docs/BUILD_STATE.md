@@ -1,3 +1,7 @@
+## Upload guidance — local copy update
+
+Added an encouraging note beside Brand files in onboarding explaining that existing logos, product photos and guidelines help tailor creatives, and can be added later. Copy-only; no upload behavior change. Brand Engine runtime integration remains in progress and GPT-only enforcement is not yet complete. Not deployed.
+
 ## Business direction and copied Higgsfield keys — local changes, not deployed
 
 Migration 054 adds optional business_stage and growth_expectation to existing tenant-scoped onboarding preferences. The existing third step asks stage and a 90-day success target; no new onboarding step or backend call. Old clients preserve saved values. Monthly and recurring planning snapshot this context alongside approved brand facts. The skill prompt treats growth targets as ambitions, never achieved results or guaranteed claims, and uses context for static briefs and video concepts. All 19 planning foundation tests and 141 contracts pass; web and API builds pass. The new test verifies saved values, legacy-client preservation, foreign-access denial, invalid input rejection and actual isolated-skill receipt of the context for a month with 26 static briefs and four editable video concepts. Evidence: business-direction.json. No claim of live AI output quality or deployment.

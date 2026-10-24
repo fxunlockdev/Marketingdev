@@ -178,7 +178,7 @@ export function BrandFiles({
       <div className="section-heading">
         <div>
           <h2>{imagesOnly?"Product photos":"Brand files"}</h2>
-          <p className="hint">{imagesOnly?"Upload, preview and approve a photo before using it in a creative.":"Guidelines, logos and visual references."}</p>
+          <p className="hint">{imagesOnly?"Upload, preview and approve a photo before using it in a creative.":"Have a logo, product photos or brand guidelines? We recommend uploading them here to help Desvio understand your brand and tailor your creatives. You can add more later."}</p>
         </div>
         <span className="status neutral">Private to this client</span>
       </div>
