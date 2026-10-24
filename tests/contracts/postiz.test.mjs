@@ -141,3 +141,16 @@ test('channel removal verifies tenant, exact acknowledgement and holds ambiguous
  handler=(req,res)=>json(res,{id:'other'});await assert.rejects(client().removeIntegration('channel-a'),e=>e.outcome==='unknown');
  handler=(req,res)=>req.socket.destroy();requests=[];await assert.rejects(client().removeIntegration('channel-a'),e=>e.outcome==='unknown');assert.equal(requests.filter(x=>x.method==='DELETE').length,1);
 });
+
+
+test('Instagram standalone permits only the audited OAuth endpoint and provider-bound callback',async()=>{
+ const good='https://www.instagram.com/oauth/authorize?'+new URLSearchParams({state:'MOCK_STATE',client_id:'MOCK_APP',response_type:'code',redirect_uri:'https://desvio.test/integrations/social/instagram-standalone'});
+ let url=good;handler=(req,res)=>{assert.equal(req.url,'/api/public/v1/social/instagram-standalone?refresh=IG_PERSON');json(res,{url});};
+ assert.equal((await client().beginAuthorization('instagram-standalone','IG_PERSON')).state,'MOCK_STATE');
+ for(const bad of [good.replace('www.instagram.com','evil.test'),good.replace('/oauth/authorize','/other'),good+'&state=SECOND',good+'&client_id=SECOND',good.replace('instagram-standalone','linkedin')]){url=bad;await assert.rejects(client().beginAuthorization('instagram-standalone','IG_PERSON'),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');}
+ requests=[];await assert.rejects(client().beginAuthorization('instagram'),e=>e.code==='POSTIZ_PROVIDER_UNSUPPORTED');assert.equal(requests.length,0);
+ let provider='instagram-standalone';handler=(req,res,body)=>{assert.equal(req.url,'/api/integrations/social-connect/instagram-standalone');assert.deepEqual(JSON.parse(body),{state:'MOCK_STATE',code:'MOCK_CODE',timezone:'-480'});json(res,{id:'ig-channel',organizationId:'org-a',providerIdentifier:provider,internalId:'IG_PERSON',name:'Instagram',token:'SECRET'});};
+ assert.deepEqual(await client().completeAuthorization('instagram-standalone','MOCK_STATE','MOCK_CODE','-480'),{id:'ig-channel',internalId:'IG_PERSON',name:'Instagram'});
+ provider='linkedin';await assert.rejects(client().completeAuthorization('instagram-standalone','MOCK_STATE','MOCK_CODE','-480'),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).beginAuthorization('instagram-standalone'),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+});

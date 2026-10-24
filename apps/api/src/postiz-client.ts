@@ -61,18 +61,28 @@ export class PostizClient {
  private integrations(value:any):PostizIntegration[]{return this.checked(value,v=>{if(!Array.isArray(v)||v.length>500)return fail();const seen=new Set<string>();return v.map(raw=>{const r=record(raw),id=remoteId(r.id);if(seen.has(id))return fail();seen.add(id);return {id,name:str(r.name,300),provider:str(r.identifier,100),disabled:bool(r.disabled),profile:optionalURL(r.profile),picture:optionalURL(r.picture)};});});}
  async removeIntegration(id:string){id=remoteId(id);await this.verify();const value=await this.request('public/v1/integrations/'+encodeURIComponent(id),'DELETE');return this.checked(value,v=>{if(remoteId(record(v).id)!==id)return fail();return {id,publishingStopped:false as const};},true);}
  async listIntegrations(){await this.verify();return this.integrations(await this.request('public/v1/integrations'));}
- // First OAuth flow is LinkedIn member. Page/account selection remains a separate
- // verified workflow; no arbitrary provider URL is accepted here.
- async beginLinkedIn(internalId?:string){const path='public/v1/social/linkedin'+(internalId===undefined?'':'?'+new URLSearchParams({refresh:remoteId(internalId)}));await this.verify();const value=await this.request(path,'GET',undefined,undefined,true);return this.checked(value,v=>{
-  const url=new URL(str(record(v).url,8000));if(url.origin!=='https://www.linkedin.com'||url.pathname!=='/oauth/v2/authorization'||url.username||url.password||url.hash)return fail();
-  const state=url.searchParams.getAll('state'),redirect=url.searchParams.getAll('redirect_uri');
-  if(state.length!==1||!/^[a-zA-Z0-9_-]{6,256}$/.test(state[0])||redirect.length!==1||redirect[0]!==`${this.#callback.origin}/integrations/social/linkedin`||url.searchParams.get('response_type')!=='code'||!url.searchParams.get('client_id'))return fail();
-  return {url:url.href,state:state[0]};
- },true);}
- async completeLinkedIn(state:string,code:string,timezone:string){
-  if(!/^[a-zA-Z0-9_-]{6,256}$/.test(state)||!code||code.length>8000||/[\x00-\x1f]/.test(code)||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840)throw new PostizError('POSTIZ_CALLBACK_INVALID');
-  await this.verify();const value=await this.request('integrations/social-connect/linkedin','POST',JSON.stringify({state,code,timezone}),'application/json');
-  return this.checked(value,v=>{const r=record(v);if(r.organizationId!==this.#remoteOrg||r.providerIdentifier!=='linkedin'||r.inBetweenSteps===true||r.isBetweenSteps===true||r.pages&&(!Array.isArray(r.pages)||r.pages.length))return fail();return {id:remoteId(r.id),internalId:remoteId(r.internalId),name:str(r.name,300)};},true);
+ // Only audited single-step providers; page selection is a separate workflow.
+ async beginLinkedIn(internalId?:string){return this.beginAuthorization('linkedin',internalId);}
+ async completeLinkedIn(state:string,code:string,timezone:string){return this.completeAuthorization('linkedin',state,code,timezone);}
+ async beginAuthorization(provider:string,internalId?:string){
+  const target=this.oauthProvider(provider);
+  const path='public/v1/social/'+provider+(internalId===undefined?'':'?'+new URLSearchParams({refresh:remoteId(internalId)}));await this.verify();const value=await this.request(path,'GET',undefined,undefined,true);return this.checked(value,v=>{
+   const url=new URL(str(record(v).url,8000));if(url.origin!==target.origin||url.pathname!==target.path||url.username||url.password||url.hash)return fail();
+   const state=url.searchParams.getAll('state'),redirect=url.searchParams.getAll('redirect_uri');
+   if(state.length!==1||!/^[a-zA-Z0-9_-]{6,256}$/.test(state[0])||redirect.length!==1||redirect[0]!==`${this.#callback.origin}/integrations/social/${provider}`||url.searchParams.getAll('response_type').length!==1||url.searchParams.get('response_type')!=='code'||url.searchParams.getAll('client_id').length!==1||!url.searchParams.get('client_id'))return fail();
+   return {url:url.href,state:state[0]};
+  },true);
+ }
+ private oauthProvider(provider:string){
+  if(provider==='linkedin')return {origin:'https://www.linkedin.com',path:'/oauth/v2/authorization'};
+  if(provider==='instagram-standalone')return {origin:'https://www.instagram.com',path:'/oauth/authorize'};
+  throw new PostizError('POSTIZ_PROVIDER_UNSUPPORTED');
+ }
+ async completeAuthorization(provider:string,state:string,code:string,timezone:string){
+  this.oauthProvider(provider);
+  if(!/^[a-zA-Z0-9_-]{6,256}$/.test(state)||!code||code.length>8000||/[\x00-\x1f\x7f]/.test(code)||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840)throw new PostizError('POSTIZ_CALLBACK_INVALID');
+  await this.verify();const value=await this.request('integrations/social-connect/'+provider,'POST',JSON.stringify({state,code,timezone}),'application/json');
+  return this.checked(value,v=>{const r=record(v);if(r.organizationId!==this.#remoteOrg||r.providerIdentifier!==provider||r.inBetweenSteps===true||r.isBetweenSteps===true||r.pages&&(!Array.isArray(r.pages)||r.pages.length))return fail();return {id:remoteId(r.id),internalId:remoteId(r.internalId),name:str(r.name,300)};},true);
  }
  private media(value:any,extension='png'){return this.checked(value,v=>{const r=record(v),url=new URL(str(r.path,2048));if(!this.#origins.has(url.origin)||url.username||url.password||url.hash||!url.pathname.toLowerCase().endsWith('.'+extension))return fail();return {id:remoteId(r.id),path:url.href};},true);}
  async uploadPNG(bytes:Buffer,expectedSHA:string){

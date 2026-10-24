@@ -40,7 +40,7 @@ export class SocialOAuthJobs {
   try{
    const client=this.client(scope,account);
    if(j.kind==='social.authorize'){
-    const auth=await client.beginLinkedIn(a.target_internal_id??undefined),token=`${scope.brandId}.${a.id}.${randomBytes(32).toString('base64url')}`,url=new URL(auth.url);url.searchParams.set('state',token);
+    const auth=await client.beginAuthorization(a.provider,a.target_internal_id??undefined),token=`${scope.brandId}.${a.id}.${randomBytes(32).toString('base64url')}`,url=new URL(auth.url);url.searchParams.set('state',token);
     return await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return current.status;if(!await this.check(db,current,a))return 'finished';if(new Date(a.expires_at).getTime()<=Date.now())return this.finish(db,current,'rejected','SOCIAL_AUTHORIZATION_EXPIRED');
      await db.query("UPDATE app.social_authorizations SET phase='awaiting_consent',authorization_url=$2,state_hash=$3,encrypted_state=$4 WHERE id=$1",[a.id,url.href,hash(token),this.#secrets!.seal(secretScope,'state',auth.state)]);
      await db.query("UPDATE app.jobs SET status='succeeded',updated_at=now() WHERE id=$1",[j.id]);return 'awaiting_consent';
@@ -48,13 +48,13 @@ export class SocialOAuthJobs {
    }
    let remoteId=c.remote_id,internalId=c.internal_id;
    if(c.phase!=='verifying'){
-    const result=await client.completeLinkedIn(this.#secrets!.open(secretScope,'state',a.encrypted_state),this.#secrets!.open(secretScope,'code',c.encrypted_code),c.timezone);remoteId=result.id;internalId=result.internalId;
+    const result=await client.completeAuthorization(a.provider,this.#secrets!.open(secretScope,'state',a.encrypted_state),this.#secrets!.open(secretScope,'code',c.encrypted_code),c.timezone);remoteId=result.id;internalId=result.internalId;
     if(a.target_remote_id&&(remoteId!==a.target_remote_id||internalId!==a.target_internal_id))throw new PostizError('POSTIZ_RECONNECT_IDENTITY_MISMATCH','unknown');
     // Persist the actual returned identity before any retryable read. A crash
     // before this commit leaves an uncertain result, never a second exchange.
     const recorded=await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return false;if(!await this.check(db,current,a))return false;await db.query("UPDATE app.social_callbacks SET phase='verifying',remote_id=$2,internal_id=$3,encrypted_code=NULL WHERE job_id=$1",[j.id,remoteId,internalId]);return true;});if(!recorded)return 'finished';
    }
-   const channels=await client.listIntegrations(),channel=channels.find(x=>x.id===remoteId&&x.provider==='linkedin'&&!x.disabled);
+   const channels=await client.listIntegrations(),channel=channels.find(x=>x.id===remoteId&&x.provider===a.provider&&!x.disabled);
    if(!channel)throw new PostizError('POSTIZ_AUTHORIZED_ACCOUNT_UNCONFIRMED','unknown');
    return await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return current.status;
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`social:${scope.brandId}`]);if(!await this.check(db,current,a))return 'finished';

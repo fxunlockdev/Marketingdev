@@ -42,8 +42,8 @@ before(async()=>{
  jobs=new AssetJobs(workerPool,null,null);handler=new SocialJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test'},encryptionKey});
  oauthSecrets=new OAuthSecrets(oauthKey);oauth=new SocialOAuthJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test',timeoutMs:1500},encryptionKey},oauthKey);
  behavior=async(req,res)=>{
-  if(req.url.split('?')[0]==='/api/public/v1/social/linkedin'){startCalls++;return startBehavior(req,res);}
-  if(req.url==='/api/integrations/social-connect/linkedin'){exchangeCalls++;let raw='';for await(const chunk of req)raw+=chunk;return exchangeBehavior(req,res,JSON.parse(raw));}
+  if(['/api/public/v1/social/linkedin','/api/public/v1/social/instagram-standalone'].includes(req.url.split('?')[0])){startCalls++;return startBehavior(req,res);}
+  if(['/api/integrations/social-connect/linkedin','/api/integrations/social-connect/instagram-standalone'].includes(req.url)){exchangeCalls++;let raw='';for await(const chunk of req)raw+=chunk;return exchangeBehavior(req,res,JSON.parse(raw));}
   if(req.url==='/api/public/v1/integrations'){listCalls++;return listBehavior(req,res);}
   res.writeHead(404);res.end();
  };
@@ -170,4 +170,29 @@ test('targeted reconnect preserves identity, is tenant scoped and rejects a diff
  const status=await api(authorizationPath(a));assert.equal(status.body.job.error_code,'POSTIZ_RECONNECT_IDENTITY_MISMATCH');
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.social_channels WHERE remote_id='other-channel'")).rows[0].n,0);
  assert.ok(!JSON.stringify((await read()).channels).includes('MOCK_PERSON'));
+});
+
+
+test('Instagram standalone binds OAuth, replay keys and reconnect to the exact provider and account',async()=>{
+ const path=endpoint()+'/oauth/instagram-standalone',key=randomUUID();
+ for(const [user,code] of [[null,401],[bob,404],[viewer,403]])assert.equal((await api(path,{user,method:'POST',body:{},key:randomUUID()})).status,code);
+ assert.equal((await api(endpoint()+'/oauth/instagram',{method:'POST',body:{},key:randomUUID()})).status,400);
+ const a=await api(path,{method:'POST',body:{},key});assert.equal(a.status,201);
+ assert.deepEqual((await api(path,{method:'POST',body:{},key})).body,a.body);
+ assert.equal((await api(endpoint()+'/oauth/linkedin',{method:'POST',body:{},key})).status,409);
+ startBehavior=(req,res)=>{assert.equal(req.url,'/api/public/v1/social/instagram-standalone');return json(res,{url:'https://www.instagram.com/oauth/authorize?'+new URLSearchParams({state:'MOCK_UPSTREAM_STATE',client_id:'MOCK_INSTAGRAM_APP',response_type:'code',redirect_uri:'https://desvio.test/integrations/social/instagram-standalone'})});};
+ assert.equal(await oauth.run(scope(a.body)),'awaiting_consent');
+ const ready=await status(a.body);assert.equal(ready.provider,'instagram-standalone');
+ const attempt={...a.body,state:new URL(ready.authorization_url).searchParams.get('state')};
+ exchangeBehavior=(req,res,body)=>{assert.equal(req.url,'/api/integrations/social-connect/instagram-standalone');assert.equal(body.state,'MOCK_UPSTREAM_STATE');return json(res,{id:'instagram-account',organizationId:identity(req.headers.authorization),providerIdentifier:'instagram-standalone',internalId:'IG_PERSON',name:'MOCK Instagram',token:'NEVER_RETURN_TOKEN'});};
+ listBehavior=(req,res)=>json(res,[{...channel('instagram-account'),identifier:'instagram-standalone'}]);
+ const j=await complete(attempt),before=exchangeCalls;assert.equal(await oauth.run(scope(j)),'succeeded');assert.equal(exchangeCalls,before+1);assert.equal(await oauth.run(scope(j)),'finished');assert.equal(exchangeCalls,before+1);
+ const saved=(await read()).channels.find(c=>c.provider==='instagram-standalone');assert.ok(saved.can_reconnect);assert.ok(!JSON.stringify(saved).includes('IG_PERSON'));
+ assert.equal((await api(endpoint()+'/oauth/linkedin',{method:'POST',body:{channelId:saved.id},key:randomUUID()})).status,409);
+ const reconnect=await api(path,{method:'POST',body:{channelId:saved.id},key:randomUUID()});assert.equal(reconnect.status,201);
+ startBehavior=(req,res)=>{assert.equal(new URL(req.url,'http://mock').searchParams.get('refresh'),'IG_PERSON');return json(res,{url:'https://www.instagram.com/oauth/authorize?'+new URLSearchParams({state:'MOCK_UPSTREAM_STATE',client_id:'MOCK_INSTAGRAM_APP',response_type:'code',redirect_uri:'https://desvio.test/integrations/social/instagram-standalone'})});};
+ assert.equal(await oauth.run(scope(reconnect.body)),'awaiting_consent');
+ const reconnectState=await status(reconnect.body),j2=await complete({...reconnect.body,state:new URL(reconnectState.authorization_url).searchParams.get('state')});
+ exchangeBehavior=(req,res)=>json(res,{id:'different-instagram',organizationId:identity(req.headers.authorization),providerIdentifier:'instagram-standalone',internalId:'OTHER_IG_PERSON',name:'Wrong account'});
+ assert.equal(await oauth.run(scope(j2)),'unknown');assert.equal((await status(reconnect.body)).job.error_code,'POSTIZ_RECONNECT_IDENTITY_MISMATCH');
 });

@@ -9,9 +9,9 @@ export class SocialConnections {
  read(user:string,id:string,session?:string){return this.scope(user,id,false,async(db,b)=>{
   const can_manage=(await db.query('SELECT app.social_manager($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed;
   if(session)await db.query("SELECT set_config('app.oauth_session',$1,true)",[uuid(session)]);
-  const authorization=session?(await db.query('SELECT id,phase,expires_at FROM app.social_authorizations ORDER BY created_at DESC LIMIT 1')).rows[0]??null:null;
+  const authorization=session?(await db.query('SELECT id,provider,phase,expires_at FROM app.social_authorizations ORDER BY created_at DESC LIMIT 1')).rows[0]??null:null;
   const account=(await db.query('SELECT revision,enabled,identity_verified_at FROM app.postiz_accounts WHERE brand_id=$1',[id])).rows[0];
-  const channels=(await db.query('SELECT id,provider,name,profile,(internal_id IS NOT NULL AND provider=\'linkedin\') AS can_reconnect,publishing_held,observed_state,token_health,last_seen_at,last_checked_at FROM app.social_channels ORDER BY provider,name,id')).rows;
+  const channels=(await db.query('SELECT id,provider,name,profile,(internal_id IS NOT NULL AND provider IN (\'linkedin\',\'instagram-standalone\')) AS can_reconnect,publishing_held,observed_state,token_health,last_seen_at,last_checked_at FROM app.social_channels ORDER BY provider,name,id')).rows;
   const jobs=(await db.query("SELECT id,status,error_code,cancel_requested,created_at,updated_at FROM app.jobs WHERE kind='social.sync' ORDER BY created_at DESC LIMIT 20")).rows;
   const provisioning=(await db.query(`SELECT COALESCE(r.job_id,p.job_id) AS id,p.job_id AS source_id,
    CASE WHEN r.job_id IS NULL THEN p.phase WHEN j.status IN ('running','retrying') THEN 'verifying' WHEN j.status='failed' THEN 'unknown' ELSE j.status END AS phase,

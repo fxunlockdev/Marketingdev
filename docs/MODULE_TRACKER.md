@@ -41,6 +41,10 @@ Release remains blocked by the trusted live acceptance runner and actual provide
 - Actual dev storage/worker scan/readback, replay and cross-business denial passed; fixtures were cleaned. See `railway-worker-job-patched047.json` and its cleanup record.
 - Offline and 93 target-selected provider/input contracts pass. Integration status is machine-generated; the release gate remains blocked until its outstanding acceptance requirements are met.
 
+## Instagram follow-up — in development
+
+Single-step Instagram connection/reconnect backend and customer selector/return route are implemented locally. Eighteen Postiz contracts and 34 social foundation cases pass; the production web build and all eight connection browser journeys pass. Migration 050 is not deployed. Instagram publication/media validation remains open; no live OAuth is claimed.
+
 ## Remaining product work
 
 1. Operator setup web UI and safe unresolved-outcome recovery controls. The guided local setup already configures saved Railway settings and per-business allowances without hand-written integrations.

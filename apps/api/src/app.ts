@@ -122,7 +122,7 @@ class SocialController {
  @Post('prepare') prepare(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.provision.prepare(req.actorId,id,key);}
  @Post('provisioning/:job/recheck') recheckSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string,@Headers('idempotency-key') key:string){return this.provision.recheck(req.actorId,id,job,key);}
  @Post('provisioning/:job/cancel') cancelSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.provision.cancel(req.actorId,id,job);}
- @Post('oauth/linkedin') start(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.oauth.start(req.actorId,req.sessionId,id,key,body);}
+ @Post('oauth/:provider') start(@Req() req:AuthRequest,@Param('id') id:string,@Param('provider') provider:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.oauth.start(req.actorId,req.sessionId,id,key,body,provider);}
  @Get('oauth/:attempt') authorization(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.read(req.actorId,req.sessionId,id,attempt);}
  @Post('oauth/:attempt/callback') callback(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.callback(req.actorId,req.sessionId,id,attempt,body);}
  @Get() read(@Req() req:AuthRequest,@Param('id') id:string){return this.service.read(req.actorId,id,req.sessionId);}

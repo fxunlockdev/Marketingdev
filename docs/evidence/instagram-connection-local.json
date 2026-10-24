@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-10-24T06:01:08.920064+00:00",
+  "passed": true,
+  "source_sha256": "d560922631c2d13e19a837dc6991c809edcf31d66dc7ad77c71a49332fdc8673",
+  "checks": {
+    "postiz_contracts": {
+      "passed": 18,
+      "log_sha256": "5d93a125adef9687e5e8ed103178570c77659cb7a707170bab1a0ae58e1a8956"
+    },
+    "social_foundation": {
+      "passed": 34,
+      "log_sha256": "b37a8d30938e181c1c6c0fb86ff457c1b2fcdbf38ee8c6b8004f5f27382a9ce9"
+    },
+    "connection_browser": {
+      "passed": 8,
+      "log_sha256": "3594f9804ffaa1836c3f9500b6017a3f2cb95c7353b4af3509b076ed9ba45ce0"
+    }
+  },
+  "live_oauth": false,
+  "deployed": false,
+  "scope": "Local Postiz MOCK contracts, persisted authorization/reconnect/tenant checks, actual Next/Nest/Temporal browser consent and provider-bound server return, reload and accessibility. Instagram publication and real Meta consent remain unverified."
+}
