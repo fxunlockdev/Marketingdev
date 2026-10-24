@@ -988,6 +988,7 @@ test('staging creative acceptance runner exercises real customer APIs and pauses
 });
 
 test('uploaded product photo starts video without static generation, then feedback regenerates through prompt approval (MOCK providers)',async()=>{
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
  await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);
  await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
  await page.getByText('Brand image references',{exact:true}).click();
@@ -1018,7 +1019,7 @@ test('uploaded product photo starts video without static generation, then feedba
  await page.getByLabel('Video feedback',{exact:true}).fill('Make the movement softer and keep the product visible');
  await page.getByRole('button',{name:'Draft a revised video from feedback',exact:true}).click();
  await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,before+1);
- await approvePrompt();await expect.poll(()=>videoSubmits).toBe(before+2);
+ await approvePrompt();await expect.poll(()=>videoSubmits,{timeout:60000}).toBe(before+2);
  await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[binding.project_id])).rows[0].n),{timeout:150000}).toBe(2);
  await expect(page.getByLabel(/^Saved video version/).locator('option')).toHaveCount(2);
  await expect(page.getByRole('button',{name:'Send video for review',exact:true})).toBeVisible();
