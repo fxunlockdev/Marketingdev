@@ -42,9 +42,7 @@ export function Field({
 export function Wordmark() {
   return (
     <a href="/" className="wordmark" aria-label="Desvio home">
-      <span className="brand-mark" aria-hidden="true">
-        d
-      </span>
+      <span className="brand-mark" aria-hidden="true" />
       desvio
       <span className="wordmark-dot" aria-hidden="true">
         .

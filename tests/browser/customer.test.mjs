@@ -269,7 +269,7 @@ test("V5 signup and real email verification lead to zero businesses and exact na
       .getPropertyValue("--ink")
       .trim(),
   }));
-  assert.deepEqual(colors, { paper: "#f5ead8", ink: "#201e1d" });
+  assert.deepEqual(colors, { paper: "#eee9df", ink: "#242220" });
 });
 
 test("three-step manual fallback saves evidence, corrections, goals and immutable brand memory", async () => {
@@ -733,7 +733,7 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
   assert.deepEqual(
-    visualAccessibility.violations.map((v) => v.id),
+    visualAccessibility.violations.map((v) => ({id:v.id,nodes:v.nodes.map(n=>n.target)})),
     [],
   );
 
@@ -952,4 +952,28 @@ test('Profile authenticator setup → gated sign-in → recovery code → replac
   await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('checkbox',{name:/I understand replacing codes/}).check();await panel.getByRole('button',{name:'Disable two-factor authentication',exact:true}).click();await expect(panel.getByText('Not enabled',{exact:true})).toBeVisible();
   assert.deepEqual(await alice.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});
  }finally{await context.close();}
+});
+
+test('Studio overview keeps real counts, working routes, narrow layouts and reduced-motion support',async()=>{
+ await alice.setViewportSize({width:1440,height:1050});
+ await alice.goto(base+`/b/${firstBusiness}/overview`);
+ const flow=alice.getByRole('region',{name:'Your creative workflow',exact:true});
+ await expect(flow).toBeVisible();
+ await expect(flow.getByRole('link',{name:/Your next good idea/})).toHaveAttribute('href',`/b/${firstBusiness}/canvas`);
+ await expect(flow.getByRole('link',{name:/YOUR FINAL SAY/})).toHaveAttribute('href',`/b/${firstBusiness}/review`);
+ const snapshot=await(await alice.request.get(base+`/api/v1/businesses/${firstBusiness}/overview`)).json();
+ await expect(alice.locator('.overview-metric').filter({hasText:'Awaiting review'}).locator('strong')).toHaveText(String(snapshot.counts.awaiting_review));
+ await alice.screenshot({path:'work/browser/studio-overview-desktop.png',fullPage:true,animations:'disabled'});
+ for(const width of [1440,768,390,320]){
+  await alice.setViewportSize({width,height:900});
+  assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);
+  assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+ }
+ await alice.screenshot({path:'work/browser/studio-overview-mobile.png',fullPage:true});
+ await alice.emulateMedia({reducedMotion:'reduce'});
+ assert.equal(await flow.locator('.studio-core').evaluate(e=>getComputedStyle(e).animationName),'none');
+ await flow.getByRole('link',{name:/Your next good idea/}).focus();
+ assert.equal(await alice.evaluate(()=>document.activeElement?.getAttribute('href')),`/b/${firstBusiness}/canvas`);
+ await alice.emulateMedia({reducedMotion:'no-preference'});
+ await alice.setViewportSize({width:1440,height:1050});
 });

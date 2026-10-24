@@ -1,0 +1,10 @@
+{
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "service_id": "a92160c2-54ef-4523-b13b-4a9a0e2dbdd2",
+  "checked_at": "2026-10-24T03:16:01.633Z",
+  "deployment_id": "40b6c699-0bc0-4cd8-a112-2647a88b5bee",
+  "status": "SUCCESS",
+  "scope": "Final form contrast correction on studio web deployment; API and worker unchanged.",
+  "observed_output": "40b6c699-0bc0-4cd8-a112-2647a88b5bee | SUCCESS | 2026-10-24 03:13:12.747 UTC | -\n737a8aa2-31b1-41b2-9859-229dfd72228e | REMOVED | 2026-10-24 03:06:14.043 UTC | -\n"
+}

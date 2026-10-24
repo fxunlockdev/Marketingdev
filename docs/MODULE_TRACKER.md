@@ -18,7 +18,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | Memory | Business-specific approved knowledge, evidence-linked performance hypotheses, human review, retirement and experiment reports | Actual model/performance acceptance and broader learning quality evaluation |
 | Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth workflow tested with mocks | Postiz/provisioner deployment, actual enterprise identity and media delivery passed; actual consent, full reconnect/disconnect lifecycle and additional channels. Meta app alone is not proof those paths are complete |
 | Team | Business-specific roles, invitations, escalation prevention and last-owner protection | Resend delivery for invitations; deployed multi-user acceptance |
-| Profile | Name/password changes, session controls, authenticator/recovery flows | Deployed security acceptance; Resend for reset/delivery flows |
+| Profile | Name/password changes, session controls, authenticator/recovery flows; actual dev synthetic password/session/MFA/recovery acceptance passed | Resend reset/delivery flows and broader operational security hardening |
 | Billing | Excluded | Not part of this goal's current scope |
 
 ## Current evidence
@@ -55,3 +55,7 @@ Private Postiz application deployment is SUCCESS; backend/orchestrator health an
 - Current full browser regression: 37/37 passed with MOCK providers; current contracts: 91/91 passed; offline checks passed. Full security retry passed (29 account, 172 foundation, six boundary tests and both dependency audits) after the initial local Temporal startup failure during a concurrent run. No new LIVE_VERIFIED status.
 
 - Canvas now exposes actual scoped allowance permission state (missing/disabled/expired/active) and expiry without credentials or a provider-readiness claim. A duplicate React key introduced with the panel was fixed before web deployment; ten focused Canvas browser journeys and ten operator database cases pass. API `5c75d8ee-f0ae-44d6-8c07-d594a711e4ef` and web `a185f516-13a2-4639-9d09-bc1e865baebf` are SUCCESS; deployed synthetic allowance readback/mobile/anonymous denial passed. Live generation still needs owner keys, activation and authorized allowances.
+
+- Shared studio design and business Overview are deployed with the requested cream/orange direction and reduced-motion-safe interactions. Actual public dev Overview/Canvas navigation, accessibility and widths down to 320px passed. This is design/navigation acceptance, not live provider acceptance. Profile password/session/authenticator/recovery checks also passed on dev; disposable fixtures were removed.
+
+- Studio regression: 37/38 initial full browser journeys; fixed animation-settling timing in the remaining accessibility assertion, then 9/9 publishing browser journeys passed. Contracts (91) and offline checks pass. See `studio-browser.json`; model and social transports remain MOCK in local acceptance.

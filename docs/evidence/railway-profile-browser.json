@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-10-24T03:02:13.120Z",
+  "passed": true,
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "checks": [
+    "name_persists",
+    "other_session_revoked",
+    "password_changed_old_password_rejected_other_session_revoked",
+    "authenticator_enabled",
+    "password_alone_denied",
+    "authenticator_login",
+    "recovery_login",
+    "authenticator_disabled",
+    "desktop_mobile_accessibility"
+  ],
+  "scope": "Actual deployed synthetic profile/password/session/authenticator acceptance. Email delivery and provider generation are excluded.",
+  "fixture_password_changed": false
+}

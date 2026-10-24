@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import "./v5.css";
+import "./studio.css";
 export const metadata: Metadata = {
   title: "Desvio · Your businesses, beautifully connected",
   description: "Your businesses, brand knowledge and creative work in one place.",
