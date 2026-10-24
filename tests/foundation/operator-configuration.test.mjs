@@ -133,3 +133,17 @@ test('Canvas allowance readback is scoped, read-only and distinguishes missing, 
   await assert.rejects(database.transaction(user,tenant.id,true,db=>db.query('UPDATE app.creative_grants SET enabled=true WHERE brand_id=$1',[b.id]),b.id),e=>e.code==='42501');
  }finally{await pool.end();}
 });
+
+test('explicit uncapped allowance persists without granting runtime write access and can be capped again',async()=>{
+ const m=manifest();m.grants[0].budget_micros=null;
+ const preview=await configureProviders(admin,m,options);
+ assert.equal(preview.manifest.grants[0].budget_micros,null);
+ assert.equal((await configureProviders(admin,m,{...options,approval:preview.preview_sha256})).status,'applied');
+ assert.equal((await admin.query('SELECT budget_micros FROM app.analysis_grants WHERE brand_id=$1',[brand])).rows[0].budget_micros,null);
+ for(const connectionString of [config.appDatabaseUrl,config.jobs.workerDatabaseUrl]){
+  const db=new Pool({connectionString});try{await assert.rejects(db.query('UPDATE app.analysis_grants SET budget_micros=NULL WHERE brand_id=$1',[brand]),{code:'42501'});}finally{await db.end();}
+ }
+ const capped=manifest(),p=await configureProviders(admin,capped,options);
+ await configureProviders(admin,capped,{...options,approval:p.preview_sha256});
+ assert.equal((await admin.query('SELECT budget_micros FROM app.analysis_grants WHERE brand_id=$1',[brand])).rows[0].budget_micros,'100000');
+});

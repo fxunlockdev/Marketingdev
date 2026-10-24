@@ -1,3 +1,9 @@
+## Owner requested uncapped self-testing — implementation under verification
+
+Added migration 055 allowing explicit NULL lifetime budgets on AI grants without changing existing caps. Shared worker checks treat only NULL as uncapped, deny malformed/missing caps and unsafe arithmetic, and continue usage reservations and idempotency. Guided operator setup accepts unlimited; manifest omission is still rejected. Owner authorization applies to their testing, not agent-run paid calls or other tenants. No business currently exists to receive this scoped allowance. Models, pricing, expiry, per-request estimates, recurring-loop limits, video output-origin checks and social authorization remain required.
+
+Build, all 148 contracts and 11 operator/database tests pass. Full make verify-security is currently running (work/uncapped-security.log); worker image build running (work/uncapped-image-preparation.log). Changes are not deployed. The previously deployed GPT release remains healthy. Direct uploaded-image video references were inspected and are still pending: current binding requires an approved Canvas PNG export. Next: finish regression, deploy 055/worker, then implement direct approved upload binding and customer selection with revocation and tenant tests.
+
 ## GPT-first dev release activated and connection acceptance passed — 24 October
 
 Deployed web d55e006f-dc3e-4d13-a1af-70a5a9ac645a and final API 6857c9d8-1f57-4416-8f4b-621655878b44, both SUCCESS. Activated trusted worker and isolated provisioner image sha256:95f53341791857d1e98feba2e5b4c9e0d443870b143f7e4a2a5470bd0b755179 with the new pinned Brand Engine and renderer. Runtime readback confirms saved OpenAI, Gemini and Higgsfield credential presence without exposing values. New creative flows remain GPT-only. Database is through 054.

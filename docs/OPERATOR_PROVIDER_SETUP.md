@@ -6,7 +6,7 @@ The dev app is https://desvio-dev-web-dev.up.railway.app. Add model credentials 
 
 1. Sign in and create a business. Add a website or brand files. Manual facts and brand approval can be tested without model keys.
 2. Save the server key, then run the guided setup's **activate saved Railway settings** option. The settings service is configuration storage: saving a key there does not update the running worker by itself.
-3. Use **configure business allowance** for onboarding, creative and planning. Enter eligible model IDs, verified rates, your chosen spending caps and expiry. For visual onboarding, include the verified image-token ceiling. These are distinct capability caps, not a shared total budget.
+3. Use **configure business allowance** for onboarding, creative and planning. Enter eligible model IDs, verified rates, your chosen spending caps (or explicit `unlimited`) and expiry. For visual onboarding, include the verified image-token ceiling. These are distinct capability caps, not a shared total budget.
 4. In onboarding, run brand analysis, review/correct the extracted facts and confirm the brand profile. In Canvas, generate a plan or image, edit the saved creative, and approve the resulting exact version in Review Inbox. An edit invalidates the previous approval.
 5. For video, complete the explicit Higgsfield/video settings and allowance below. Approve the video prompt before paid generation, then approve the finished asset separately. Static images do not need video-style prompt preapproval.
 
@@ -84,3 +84,7 @@ Postiz, its isolated provisioner and Desvio social/provisioning flags are deploy
 ### Visual onboarding allowance
 
 Screenshot/document-image analysis requires a positive `max_tokens_per_image` on the onboarding allowance, based on the selected model’s verified image-token ceiling. The guided setup now asks for this value. Zero disables visual analysis; it does not silently fall back to text when saved visual evidence exists. The exact image count multiplied by this ceiling participates in the existing reservation and business budget check. The optional manifest field accepts whole numbers from 0 through 1,000,000. Omitting it preserves an existing allowance’s value (or database default zero on first creation), so older manifest replays retain their content/hash. No price or token ceiling is guessed.
+
+### Explicit uncapped allowance
+
+Migration 055 adds an explicit uncapped lifetime allowance: the operator manifest sets `budget_micros: null`, or selects `unlimited` in guided setup. Omission remains invalid. Existing grants retain their caps; this does not automatically authorize other businesses or change enabled flags, expiry, model eligibility, per-request estimates, recurring-loop limits, tenant checks, idempotency, prompt review, or social consent. Usage reservations continue to be recorded. Provider account limits still apply. The owner requested uncapped self-testing on 24 October; no paid assistant-run tests are authorized by that preference. Apply only to the owner’s chosen test business.

@@ -1,3 +1,4 @@
+import {exceedsAllowance} from "./spending-allowance.js";
 import {ApiError as GeminiAPIError} from '@google/genai';
 import {GeminiPlanner} from './gemini-planner.js';
 import OpenAI from 'openai';
@@ -32,7 +33,7 @@ export class InsightJobs {
    if(grant.model!==model)throw new CreativeError('INSIGHT_CONFIG_CHANGED');
    const cost=Math.ceil(wire.maxInputTokens*Number(grant.input_micros_per_token)+wire.maxOutputTokens*Number(grant.output_micros_per_token));
    const used=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.insight_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3',[j.organization_id,j.brand_id,providerName])).rows[0].n);
-   if(!Number.isSafeInteger(cost)||cost<=0||cost+used>Number(grant.budget_micros))throw new CreativeError('INSIGHT_BUDGET_EXHAUSTED');
+   if(!Number.isSafeInteger(cost)||cost<=0||exceedsAllowance(cost+used,grant.budget_micros))throw new CreativeError('INSIGHT_BUDGET_EXHAUSTED');
    await db.query("INSERT INTO app.insight_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8)",[j.id,message.step,j.organization_id,j.brand_id,model,wire.sha256,cost,providerName]);
    return {submit:true};
   });

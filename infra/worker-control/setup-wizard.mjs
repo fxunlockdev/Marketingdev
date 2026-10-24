@@ -34,7 +34,9 @@ export async function setupWizard(io){
  const days=await io.ask('Allowance validity in whole days (1–30): ');
  if(!/^(?:[1-9]|[12]\d|30)$/.test(days))throw Error('Validity must be 1–30 days.');
  g.expires_at=new Date(io.now()+Number(days)*86400000).toISOString();
- g.budget_micros=dollars(await io.ask('Lifetime cap for this capability (USD): '));
+ const budget=await io.ask('Lifetime cap for this capability (USD, or unlimited): ');
+ g.budget_micros=budget.trim().toLowerCase()==='unlimited'?null:dollars(budget);
+ if(g.budget_micros===null)io.show('No Desvio lifetime spending ceiling for this capability. Usage is still recorded; provider limits still apply.');
  if(['planning','insights'].includes(kind))g.provider=await io.ask('Provider (openai or gemini): ');
  if(kind==='video'){
   const choice=await io.ask('Video: 1 = create, 2 = edit, 3 = both: ');

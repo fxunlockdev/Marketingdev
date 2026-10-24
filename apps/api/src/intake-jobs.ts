@@ -1,3 +1,4 @@
+import {exceedsAllowance} from "./spending-allowance.js";
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
 import {
@@ -447,7 +448,7 @@ export class IntakeJobs {
       if (
         !Number.isSafeInteger(reserved) ||
         reserved <= 0 ||
-        used + reserved > Number(grant.budget_micros)
+        exceedsAllowance(used + reserved,grant.budget_micros)
       )
         throw new IntakeError("AI_BUDGET_EXHAUSTED");
       // Mark before the external call. A crash in this window consumes a reservation but cannot duplicate spend.

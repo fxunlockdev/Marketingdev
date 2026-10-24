@@ -42,10 +42,11 @@ export function configurationManifest(input,now=Date.now()){
    else if(field==='models'){if(!Array.isArray(g.models)||!g.models.length||g.models.length>2||new Set(g.models).size!==g.models.length||g.models.some(m=>!['kling-video/v3.0/std/image-to-video','kling-video/o3/video-edit'].includes(m)))deny('CONFIGURATION_INVALID_VIDEO_MODEL');g.models=[...g.models].sort();}
    else if(field==='channel_id')g.channel_id=uuid(g.channel_id);
    else if(field==='remote_account_id'){if(typeof g[field]!=='string'||! /^[a-zA-Z0-9_-]{1,256}$/.test(g[field]))deny('CONFIGURATION_EXACT_ACCOUNT_REQUIRED');}
+   else if(field==='budget_micros'&&g[field]===null){} // Explicit uncapped lifetime allowance; never implied by omission.
    else number(g[field],field==='daily_limit'?100:field==='budget_micros'?1e9:field.endsWith('_per_token')?1000:1e8,!field.endsWith('_per_token'));
   }
   if((g.kind==='gemini_creative'||g.provider==='gemini')&&!/^gemini-[a-zA-Z0-9._-]{1,90}$/.test(g.text_model??g.model))deny('CONFIGURATION_INVALID_GEMINI_MODEL');
-  for(const k of ['max_image_request_micros','max_create_micros','max_edit_micros'])if(g[k]>g.budget_micros)deny('CONFIGURATION_CALL_CAP_EXCEEDS_BUDGET');
+  for(const k of ['max_image_request_micros','max_create_micros','max_edit_micros'])if(g.budget_micros!==null&&g[k]>g.budget_micros)deny('CONFIGURATION_CALL_CAP_EXCEEDS_BUDGET');
   const key=g.kind+':'+(d.key?g[d.key]:'');if(seen.has(key))deny('CONFIGURATION_DUPLICATE_GRANT');seen.add(key);return g;
  }).sort((a,b)=>(a.kind+':'+(a.provider??a.channel_id??'')).localeCompare(b.kind+':'+(b.provider??b.channel_id??'')));
  return {version:1,change_id:uuid(v.change_id),organization_id:uuid(v.organization_id),business_id:uuid(v.business_id),operator_reference:v.operator_reference,grants};

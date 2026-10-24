@@ -1,3 +1,4 @@
+import {exceedsAllowance} from "./spending-allowance.js";
 import {validateCarouselResult,carouselSlideBrief} from './carousel-planning.js';
 import {assertLearningCurrent} from './learning-context.js';
 import {GeminiPlanner} from "./gemini-planner.js";
@@ -113,7 +114,7 @@ export class CreativeJobs {
       if (
         !Number.isSafeInteger(reserved) ||
         reserved <= 0 ||
-        used + reserved > Number(grant.budget_micros)
+        exceedsAllowance(used + reserved,grant.budget_micros)
       )
         throw new CreativeError("CREATIVE_BUDGET_EXHAUSTED");
       if(j.kind==='creative.generate'){
