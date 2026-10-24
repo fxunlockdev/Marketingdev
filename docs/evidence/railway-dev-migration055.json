@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-10-24T07:36:42.250Z",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "service_id": "45ae520d-f681-424b-8758-6cee8789b2cf",
+  "deployment_id": "57a73720-1c0b-4577-b2be-4ec93f2bce25",
+  "deployment_status": "REMOVED",
+  "source_commit": "da273cd76a53dfa83c08adc982d1be570fb03aed",
+  "migrations": [
+    {
+      "file": "055_uncapped_business_allowances.sql",
+      "sha256": "c856de62938e6a1f3ff58e8bf793dc1bebf55aa25b5ab5317c8250d46fbbf846"
+    }
+  ],
+  "bootstrap_output": {
+    "status": "configured",
+    "replayed": true,
+    "roles": [
+      "desvio_app",
+      "desvio_auth",
+      "desvio_mail",
+      "desvio_worker",
+      "desvio_dispatcher",
+      "desvio_provisioner"
+    ]
+  },
+  "active_secret_variables_cleared": true,
+  "scope": "Actual dedicated dev migrations through 055, checksum replay and all six runtime-role login checks. API/web and customer/provider acceptance remain pending.",
+  "live_model_or_social_calls": false
+}

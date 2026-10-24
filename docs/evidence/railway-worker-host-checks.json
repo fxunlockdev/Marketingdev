@@ -1,10 +1,10 @@
 {
-  "checked_at": "2026-10-24T07:19:34.579Z",
+  "checked_at": "2026-10-24T07:43:01.123Z",
   "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:95f53341791857d1e98feba2e5b4c9e0d443870b143f7e4a2a5470bd0b755179",
+      "image_id": "sha256:4b8b503be729265cc1a88926128726ace29026f011fe857d5bf920de71e08bd9",
       "architecture": "amd64",
       "user": "node"
     },
