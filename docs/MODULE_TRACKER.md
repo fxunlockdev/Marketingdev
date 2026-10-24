@@ -23,7 +23,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 
 ## Current release evidence — 24 October 2026
 
-- API `31a66e24-33b7-4223-a820-cb0c9d66c0d2` and web `924f2bd6-c281-4e2a-a709-92dbf9d2f6f6`: SUCCESS observed in Railway.
+- API `31a66e24-33b7-4223-a820-cb0c9d66c0d2` and web `15ec6a27-9c36-4c37-b19a-299700bc752d`: SUCCESS observed in Railway.
 - Trusted worker `sha256:3363e29ed1a64af85dbeb219e74eaaa73d97d1809dd1225bcd3a66878978cdaf`: native dependency/isolation checks and coordinated activation passed. The separate provisioning worker is updated to this image too.
 - Migration 047 is checksum-verified; temporary migration service credentials were removed.
 - Patched full security run: 29 account tests, 176 foundation tests, six Python boundary tests, API build and both production dependency audits pass. Root production audit reports zero vulnerabilities after pinning patched body-parser/multer versions.
@@ -34,7 +34,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 
 ## Remaining product work
 
-1. Browser Back/Forward unsaved-edit protection, operator setup web UI and safe unresolved-outcome recovery controls. The guided local setup already configures saved Railway settings and per-business allowances without hand-written integrations.
+1. Operator setup web UI and safe unresolved-outcome recovery controls. The guided local setup already configures saved Railway settings and per-business allowances without hand-written integrations.
 2. Durable cancellation/rescheduling after a post has reached Postiz. Existing cancellation is limited to requests before submission; uncertainty never means cancellation succeeded.
 3. Meta and other social connectors beyond LinkedIn member. A Meta app alone does not complete these integrations.
 4. Comprehensive deployed provider acceptance, load/operational hardening and production release evidence. Advanced analytics/learning quality remains unverified with real data.
@@ -48,3 +48,5 @@ Real generation/editing, authorized social consent/publishing and real analytics
 ## Cost constraint
 
 Keep existing Railway services and capacity. Reduce duplicate requests, hidden/idle polling and unnecessary deployments/transfers. The security worker patch reused existing media images and transferred 294 MB instead of the earlier 1.7 GB bundle. No infrastructure was removed to lower cost.
+
+- Latest web-only follow-up: all 16 customer browser cases pass, including repeated canceled/accepted Back and Forward with dirty forms. Actual dev temporary unsaved draft acceptance passed with zero profile writes and retained shell (`railway-history-guard.json`). Earlier full 40-browser/security evidence belongs to the preceding release; this focused check does not claim fresh full-suite or live-provider verification.

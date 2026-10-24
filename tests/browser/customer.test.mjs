@@ -997,3 +997,28 @@ test('module navigation preserves the workspace shell and does not repeat accoun
   await expect(alice.locator('.v5-sidebar[data-probe="retained"]')).toBeVisible();assert.equal(initializes,0);
  }finally{alice.off('request',observe);await alice.unroute('**/api/auth/get-session');}
 });
+
+test('Back and Forward keep unsaved edits on cancel and navigate only after confirmation',async()=>{
+ await alice.goto(base+'/overview');
+ await alice.getByRole('link',{name:'Your account',exact:true}).click();
+ const input=alice.getByLabel('Your name',{exact:true});await expect(input).toBeVisible();
+ const original=await input.inputValue(),draft=original+' unsaved';await input.fill(draft);
+ await alice.evaluate(()=>{window.__historyGuardProbe='retained';});
+ let confirms=0;const stay=async dialog=>{assert.equal(dialog.type(),'confirm');confirms++;await dialog.dismiss();};
+ alice.on('dialog',stay);
+ try{
+  await alice.goBack();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(draft);
+  assert.equal(confirms,1);assert.equal(await alice.evaluate(()=>window.__historyGuardProbe),'retained');
+  // Repeating cancellation must not create phantom history entries.
+  await alice.goBack();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(draft);assert.equal(confirms,2);
+ }finally{alice.off('dialog',stay);}
+ alice.once('dialog',dialog=>dialog.accept());await alice.goBack();await expect(alice).toHaveURL(base+'/overview');
+ await alice.goForward();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(original);
+ // Build a genuine forward entry, return, then modify the retained form.
+ await alice.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Overview',exact:true}).click();
+ await expect(alice).toHaveURL(base+'/overview');
+ await alice.goBack();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(original);await input.fill(draft);
+ alice.once('dialog',dialog=>dialog.dismiss());await alice.goForward();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(draft);
+ alice.once('dialog',dialog=>dialog.accept());await alice.goForward();await expect(alice).toHaveURL(base+'/overview');
+ assert.equal(await alice.evaluate(()=>window.__historyGuardProbe),'retained');
+});
