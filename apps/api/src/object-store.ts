@@ -25,7 +25,7 @@ export class ObjectStore {
   }
   async referenceURL(key:string,expiresAt:Date) {
     const uuid='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}';
-    const signingDate=new Date(Math.floor(Date.now()/1000)*1000),expiresIn=Math.floor((expiresAt.getTime()-signingDate.getTime())/1000);
+    const signingDate=new Date(Math.floor(Date.now()/1000)*1000),expiresIn=Math.min(8*3600,Math.floor((expiresAt.getTime()-signingDate.getTime())/1000));
     if(!new RegExp(`^video-reference/${uuid}/${uuid}/${uuid}/[a-f0-9]{64}$`).test(key)||!Number.isInteger(expiresIn)||expiresIn<60||expiresIn>8*3600)throw new InvalidAsset('REFERENCE_LEASE_INVALID');
     return getSignedUrl(this.client,new GetObjectCommand({Bucket:this.config.bucket,Key:key,ResponseContentType:'image/png',ResponseContentDisposition:'attachment; filename="desvio-reference.png"'}),{expiresIn,signingDate});
   }

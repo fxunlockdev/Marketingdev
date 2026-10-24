@@ -6,7 +6,7 @@ Local update: owner confirmed GPT-first; Claude deferred. Brand Engine is checks
 
 Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
 
-Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 049. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
+Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is now through migration 054; API/web/worker updates for 050–054 remain pending. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
 
 | Module | Implemented and tested scope | Remaining before full acceptance |
 | --- | --- | --- |

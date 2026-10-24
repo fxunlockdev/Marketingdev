@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "222226bf73866f9afdf2974cf055849113b7fb9f",
-  "checked_at": "2026-10-24T06:00:58.361365+00:00",
+  "code_commit": "3b8a73c16435bb3c512a6a973c87c25346b61193",
+  "checked_at": "2026-10-24T06:56:24.414780+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -275,7 +275,7 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "higgsfield_transport": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/contracts.json"

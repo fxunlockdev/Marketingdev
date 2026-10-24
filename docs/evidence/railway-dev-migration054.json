@@ -1,0 +1,47 @@
+{
+  "checked_at": "2026-10-24T07:00:06.964Z",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "service_id": "45ae520d-f681-424b-8758-6cee8789b2cf",
+  "deployment_id": "155dc106-a93f-414f-8331-2d9b9e6ab115",
+  "deployment_status": "REMOVED",
+  "source_commit": "3b8a73c16435bb3c512a6a973c87c25346b61193",
+  "migrations": [
+    {
+      "file": "050_instagram_authorization.sql",
+      "sha256": "b039836fad4e6d194262a97072ac97cb12323a42a0e4b0dd6cc8bd859dc8e38d"
+    },
+    {
+      "file": "051_instagram_reel_publication.sql",
+      "sha256": "0e768380241efa978b5d59b5ab150295a37d404b0eeff28ff7c033f07b3f6a86"
+    },
+    {
+      "file": "052_channel_image_renditions.sql",
+      "sha256": "f8c38965a08a4793aa6eb93b8de8244b30574b74f6cbf4935a965ca4b60fcf0d"
+    },
+    {
+      "file": "053_instagram_image_publication.sql",
+      "sha256": "9de6abfd842e117a3810f0c49d0eb9a094878d294b3f89412794f0d232e771ef"
+    },
+    {
+      "file": "054_business_direction.sql",
+      "sha256": "82c41d40ba11f33e49c219b5402a0f451237cc2d69a7ffe79f78f04b557b4288"
+    }
+  ],
+  "bootstrap_output": {
+    "status": "configured",
+    "replayed": true,
+    "roles": [
+      "desvio_app",
+      "desvio_auth",
+      "desvio_mail",
+      "desvio_worker",
+      "desvio_dispatcher",
+      "desvio_provisioner"
+    ]
+  },
+  "active_secret_variables_cleared": true,
+  "scope": "Actual dedicated dev migrations through 054, checksum replay and all six runtime-role login checks. API/web and customer/provider acceptance remain pending.",
+  "live_model_or_social_calls": false,
+  "removal_verified_at": "2026-10-24T07:00:45.996Z"
+}

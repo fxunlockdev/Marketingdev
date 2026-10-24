@@ -1,3 +1,9 @@
+## Dev database 054 applied; video-reference clock boundary repaired
+
+Railway bootstrap 155dc106-a93f-414f-8331-2d9b9e6ab115 reached SUCCESS, replayed checksums and verified all six runtime-role logins through migration 054. Temporary service subsequently verified REMOVED and all seven administrator/runtime-password variables cleared. Evidence: railway-dev-migration054.json. Running API/web/worker still remain on the previous release; database migration alone does not make new features deployed.
+
+Updated GPT-only planning foundation passed all 18 tests; offline target passed. Canvas browser retry reached actual video generation/approval and later calendar flows, but exposed intermittent REFERENCE_LEASE_INVALID when the database deadline was slightly beyond the worker-clock eight-hour bound. Signing now caps lifetime at eight hours while never exceeding the database expiry; expired/invalid deadlines and invalid keys still reject. New deterministic signing contract passes. Browser suite completion and app/worker deployment remain pending. No real model/social calls.
+
 ## GPT-first confirmation and export test repair — verification running
 
 Owner deferred Claude and confirmed GPT-first testing. Removed the unused Anthropic SDK addition; package files retain their prior pins. The second marketing-skills ZIP is byte-identical to the existing archive and was not duplicated. GPT text planning / GPT Image / Higgsfield remain the selected path.
