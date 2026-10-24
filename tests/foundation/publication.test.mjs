@@ -44,7 +44,7 @@ async function fixture(overrides={}){
  return {id,sha256:sha,design,caption,project_id:p,media_id:media};
 }
 async function queue(v=current){return exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},randomUUID());}
-async function render(v){const j=await queue(v);assert.equal(await exportHandler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
+async function render(v,format='png'){const j=await exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256,format},randomUUID());assert.equal(await exportHandler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
 before(async()=>{
  config.socialEnabled=true;config.publishingEnabled=true;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses,renderer.image);exports=new CreativeExports(canvas,renderer.image);
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Render fixtures'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
@@ -58,6 +58,7 @@ after(async()=>{store.close();await app?.close();await Promise.all([admin.end(),
 // Actual local immutable rendered exports, approval API, private S3 and jobs.
 // All remote Postiz responses below are explicitly MOCK, never external posting.
 const encryptionKey=randomBytes(32).toString('hex'),credential='MOCK_'+randomBytes(24).toString('hex');
+let providerName='linkedin';
 let provider,providerBase,publisher,handler,channelId,mode='',uploads=0,submissions=0,postRows=[],lastPostMedia,lastUpload,afterUpload,remoteState='QUEUE';
 const reply=(res,value,status=200)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));};
 async function setupProvider(){
@@ -68,17 +69,17 @@ async function setupProvider(){
  await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,channelId]);
  provider=createServer(async(req,res)=>{const parts=[];for await(const p of req)parts.push(p);const raw=Buffer.concat(parts);assert.equal(req.headers.authorization,credential);
   if(req.url==='/api/public/v1/me')return reply(res,{organization:{id:binding.remote_organization_id,name:'MOCK org'}});
-  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false}]);
+  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:providerName,name:'MOCK staging profile',disabled:false}]);
   if(req.url.startsWith('/api/public/v1/analytics/post/'))return reply(res,mode==='analyticsFail'?{}:mode==='analyticsEmpty'?[]:[{label:'Impressions',data:[{date:'2026-10-23',total:120}],percentageChange:0}],mode==='analyticsFail'?503:200);
-  if(req.url==='/api/public/v1/upload'){uploads++;const start=raw.indexOf(Buffer.from('Content-Type: image/png\r\n\r\n'))+'Content-Type: image/png\r\n\r\n'.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);assert.equal((await sharp(lastUpload).metadata()).format,'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+'.png'});}
-  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();lastPostMedia=body.posts[0].value[0].image;postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:'linkedin'},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
+  if(req.url==='/api/public/v1/upload'){uploads++;const jpeg=raw.includes(Buffer.from('Content-Type: image/jpeg')),marker=`Content-Type: image/${jpeg?'jpeg':'png'}\r\n\r\n`,start=raw.indexOf(Buffer.from(marker))+marker.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);assert.equal((await sharp(lastUpload).metadata()).format,jpeg?'jpeg':'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+(jpeg?'.jpg':'.png')});}
+  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();lastPostMedia=body.posts[0].value[0].image;postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:providerName},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
   if(req.url.startsWith('/api/public/v1/posts?')){if(mode==='listFail')return reply(res,{},503);return reply(res,{posts:mode==='listMissing'?[]:mode==='listMismatch'?postRows.map(p=>({...p,integration:{...p.integration,id:'foreign-channel'}})):postRows});}reply(res,{},404);
  });await new Promise(r=>provider.listen(0,'127.0.0.1',r));providerBase='http://127.0.0.1:'+provider.address().port;
  publisher=new Publication(new SocialConnections(businesses,true),exports,true);handler=new PublicationJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test'},encryptionKey},renderer.image,true);
 }
 afterEach(()=>{mode='';afterUpload=undefined;remoteState='QUEUE';});
 after(async()=>{provider?.closeAllConnections();if(provider)await new Promise(r=>provider.close(r));});
-async function approvedPost(){const v=await fixture(),e=await render(v),date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'MOCK publication',objective:'Approved publication test',starts_on:start,timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:date,brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
+async function approvedPost(channel='linkedin'){const v=await fixture(),e=await render(v,channel==='instagram'?'instagram-jpeg':'png'),date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'MOCK publication',objective:'Approved publication test',starts_on:start,timezone:'UTC',slots:[{channel,format:'static',planned_at:date,brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
  let slot=(await plans.list(alice.id,brand.id,{start:start+'T00:00:00Z',end:new Date(Date.parse(start)+30*86400000).toISOString(),plan_id:p.id})).slots[0];slot=await plans.review(alice.id,brand.id,slot.id,{revision:slot.revision,creative_version_id:v.id,creative_sha256:v.sha256,decision:'pending_review'});
  await exports.approve(alice.id,brand.id,e.id,{sha256:e.sha256,source_sha256:v.sha256,context_type:'slot',context_id:slot.id,context_revision:slot.revision,confirmed:true});slot=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[slot.id])).rows[0];return {v,e,slot,body:{slot_id:slot.id,revision:slot.revision,export_id:e.id,channel_id:channelId,confirmed:true}};
 }
@@ -274,4 +275,19 @@ test('carousel resumes confirmed uploads after a pre-send read failure without u
  assert.equal(uploads,beforeUploads+1);assert.equal((await record(j)).phase,'queued');
  assert.deepEqual((await admin.query('SELECT phase FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows.map(s=>s.phase),['uploaded','queued']);
  assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);
+});
+
+
+test('approved Instagram JPEG is uploaded unchanged once and reconciled against its own provider',async()=>{
+ providerName='instagram-standalone';await admin.query('UPDATE app.social_channels SET provider=$2 WHERE id=$1',[channelId,providerName]);
+ try{
+  const f=await approvedPost('instagram'),bytes=await store.read((await admin.query('SELECT object_key FROM app.creative_exports WHERE id=$1',[f.e.id])).rows[0].object_key);
+  assert.equal(f.e.format,'instagram-jpeg');assert.ok((await publisher.ready(alice.id,brand.id)).posts.some(p=>p.export_id===f.e.id));
+  const j=await queuePost(f),count=submissions;remoteState='PUBLISHED';
+  assert.equal(await handler.run(scope(j)),'accepted');assert.deepEqual(lastUpload,bytes);assert.equal(submissions,count+1);
+  assert.equal((await handler.reconcile(scope(j))).state,'published');assert.equal(await handler.run(scope(j)),'accepted');assert.equal(submissions,count+1);
+  const changed=await approvedPost('instagram'),pending=await queuePost(changed),before=uploads;
+  await admin.query('DELETE FROM app.creative_export_approvals WHERE export_id=$1',[changed.e.id]);
+  assert.equal(await handler.run(scope(pending)),'rejected');assert.equal(uploads,before);
+ }finally{providerName='linkedin';await admin.query("UPDATE app.social_channels SET provider='linkedin' WHERE id=$1",[channelId]);}
 });

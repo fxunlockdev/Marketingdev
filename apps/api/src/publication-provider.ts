@@ -12,3 +12,5 @@ export function validReel(row:any){
   &&Number.isSafeInteger(bytes)&&bytes>=24&&bytes<=64*1024*1024
   &&bytes*8000/m.duration_ms<=25000000;
 }
+
+export function validInstagramImage(row:any){return row?.format==='instagram-jpeg'&&row.width===1080&&row.height===1080&&Number.isSafeInteger(row.bytes)&&row.bytes>0&&row.bytes<=8*1024*1024&&row.manifest?.rendition?.format==='instagram-jpeg'&&row.manifest.rendition.fit==='contain';}

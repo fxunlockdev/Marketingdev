@@ -1282,7 +1282,7 @@ function SlotPanel({
               </ul>
             </div>
           )}
-          {s.creative_version_id&&<CreativeExportPanel key={business.id+s.id+s.creative_version_id} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
+          {s.creative_version_id&&<CreativeExportPanel format={s.channel==='instagram'?'instagram-jpeg':'png'} key={business.id+s.id+s.creative_version_id+s.channel} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
           <details className="slot-activity">
             <summary>Version & decision history ({data.events.length})</summary>
             <ol>

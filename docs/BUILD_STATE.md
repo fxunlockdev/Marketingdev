@@ -1,3 +1,9 @@
+## Instagram single-image publishing — backend passes, browser/deployment pending
+
+Migration 053 permits single-image Instagram requests only when their saved export is an Instagram JPEG. Publication proofs choose exact format by slot channel. The worker rechecks approval, format and current caption before uploading unchanged JPEG bytes, submits to the stored provider and reconciles its actual identity. Existing LinkedIn PNG and Reel paths remain separate. Calendar review now requests the Instagram rendition and the publishing preview uses JPEG MIME.
+
+All 18 publishing foundation tests pass with real PostgreSQL/storage/rendering and MOCK Postiz, including exact JPEG bytes, one submission, provider-specific reconciliation and approval removal preventing upload. The first run passed the new image path but a shared fixture edit left an undefined channel variable in four existing carousel tests; fixed the fixture and all 18 pass on retry. Production web build passed. Evidence: instagram-image-publication-local.json. Next: browser journey from preparing/reviewing JPEG in calendar through publishing consent, then Instagram carousel format binding and comprehensive regression/deployment. No live model/OAuth/posting operation; dev remains on 049.
+
 ## Persisted Instagram renditions — local backend verified, not deployed
 
 Migration 052 adds immutable export format to existing scoped requests/exports and includes it in deduplication. Existing rows/defaults remain PNG and original PNG request fingerprints replay unchanged. JPEG uses its own job, object/hash, MIME-aware private download and exact-export approval; a PNG approval never approves the JPEG. Worker RLS binds the export format to the actual request. Existing video-reference and carousel candidate paths remain explicitly PNG until their channel-aware integration is ready.
