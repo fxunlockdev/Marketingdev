@@ -1,69 +1,47 @@
 # Desvio module tracker
 
-Updated 24 October 2026. Guided local setup now wraps tested Railway activation and business allowance preview/apply; the operator web UI and live provider acceptance still remain. Billing is excluded by owner request. “Implemented” below describes code and local acceptance, not LIVE_VERIFIED or production readiness. Provider calls in local tests use explicit mocks. Owner has shown saved provider credentials and will perform live tests; worker activation is verified; business allowances and video settings remain required.
+Updated 24 October 2026 after the onboarding compression fix. Billing is excluded by owner request. The owner confirmed that Meta developer setup and social-account authorization are their dependency. That does not make unfinished connector code or untested publishing complete.
 
-Local update: owner confirmed GPT-first; Claude deferred. Brand Engine is checksum-pinned alongside the original 52 skills. Static foundation (16), export/video (14), contracts (145), GPT-only planning (18), Canvas browser (11) and web build pass; coordinated dev deployment and worker/provisioner activation now passed. Real paid acceptance remains.
+**Onboarding test fix:** Website compression failure reproduced and fixed for gzip, Brotli and deflate. Actual Lodha HTTP reading passes inside the deployed worker; specific failure stage/cause/recovery and error reference pass an authenticated deployed UI check. See [crawl evidence](evidence/website-deployed-crawl.json) and [error UI evidence](evidence/website-error-ui.json). Owner must retry the failed job; live AI output remains unverified. Broader development is paused for test fixes.
 
-Latest: explicit uncapped business allowances are deployed (055), with usage tracking and tenant protections preserved. No customer business exists yet to receive an allowance. Frozen-source security, 149 contracts and deployed private job acceptance pass; direct uploaded-image video references and live provider acceptance remain pending.
+**Dev self-testing is enabled:** https://desvio-dev-web-dev.up.railway.app. Database migrations are through 057. Final API deployment `c9315e1f-355e-49ae-8151-0f670434c167` and web deployment `3b31e237-cc52-4368-a175-58f0ec0cc197` are deployed. Trusted worker runs `sha256:a506423f2a665f0405ab5156f76832b6c67f8cf905d15521e999f448643e7cbe`; isolated provisioner retains `sha256:546abb792932c8609233bcc50e2d2b444015fae72116148868df848f8e264a76`. Saved keys are active, video is enabled, and owner-workspace defaults automatically provision new businesses. No additional key entry or manual per-business setup is required for that workspace.
 
-Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
+This is enabled-for-testing status, not successful live generation or production acceptance. The owner will perform paid tests. No agent-run paid model request or social post has been made. Evidence: [video self-test release](evidence/railway-video-self-test-release.json), [security](evidence/security.json), [build history](BUILD_STATE.md).
 
-Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is now through migration 055; API/web/worker updates for 050–054 are deployed; credential presence and private job acceptance passed. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
-
-| Module | Implemented and tested scope | Remaining before full acceptance |
+| Module | Implemented/deployed scope | Still required for full acceptance |
 | --- | --- | --- |
-| Shared foundation | Password sessions, default three businesses, business scope/RLS, private media, durable queue/worker, restricted service roles | Full local security suite passes; comprehensive deployed tenant flows, operational hardening and release gate |
-| Overview | Business switcher and persisted publishing/approval/activity counts; saved results and reviewed recommendations | Real provider-derived metrics/learning and deployed customer journey |
-| Brands & onboarding | Website/document ingestion, visual evidence, proposed brand facts, correction and approved Brand Brain; optional business stage and 90-day growth target added locally (054; 19 planning foundation tests and 141 contracts pass, not deployed) | Deployed manual onboarding/fact approval passed; real AI-prefill acceptance, deployed crawler/document coverage and quality evaluation; no paid test performed |
-| Content Plan | Configurable days/posts, GPT-only new planning, calendar edits, recurring planning with limits and approval, Canvas linkage | Provider activation and actual model output/loop acceptance |
-| Review Inbox | Channel-based review, feedback, exact image/video/carousel versions, approval invalidation after edits | Broader deployed customer flow and real generated-media acceptance |
-| Canvas | Brand-guided planning, static image creation/editing, editable projects, video storyline/script/prompt approval before generation, video editing/rendering, carousels and ZIP download | Saved provider keys are activated; business model allowances and video runtime activation; real image create/edit and video create/edit acceptance |
-| Publishing & Analytics | Approved static/video/carousel → ordered upload → one LinkedIn submission → status reconciliation; uncertainty holds; saved metrics and format filters | Consented publishing; other channels; remote cancellation/rescheduling and unresolved-outcome operations |
-| Memory | Business-specific approved knowledge, evidence-linked performance hypotheses, human review, retirement and experiment reports | Actual model/performance acceptance and broader learning quality evaluation |
-| Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth; identity-bound reconnect and durable disconnect/recovery deployed through migration 047; saved-account verification recovery additionally passes seven connection browser journeys and the expanded 179-case foundation suite; migration 048 and matching API/web/provisioner are deployed with actual dev queue/private-media checks | Postiz/provisioner deployment, actual enterprise identity and media delivery passed; actual consent and additional channels. Meta app alone is not proof those paths are complete |
-| Team | Business-specific roles, invitations, escalation prevention and last-owner protection | Resend delivery for invitations; deployed multi-user acceptance |
-| Profile | Name/password changes, session controls, authenticator/recovery flows; actual dev synthetic password/session/MFA/recovery acceptance passed | Resend reset/delivery flows and broader operational security hardening |
-| Billing | Excluded | Not part of this goal's current scope |
+| Shared foundation | Password sessions; default three businesses; business scope/RLS; private media; durable queue; isolated worker/provisioner. Actual deployed login, private upload/scan/readback, replay and foreign-service denial pass. | Comprehensive deployed multi-user/provider isolation, load/recovery hardening and full release gate. |
+| Overview | Business switcher; persisted approval, publishing and activity counts; saved reviewed recommendations. Empty state has no fabricated metrics. | Actual business/model/social data acceptance. |
+| Brands & onboarding | Three-step website/document intake; rendered visual evidence; editable proposed facts; approved Brand Brain; business stage and growth target; logo/product/guideline uploads. GPT defaults now applied automatically for newly created owner businesses. | Owner live AI-prefill/quality test; broader site/document coverage, including scanned-document limitations. |
+| Content Plan | GPT-only planning for configurable days/posts; calendar/weekly views; recurring planning limits; Canvas linkage and human review. | Actual model output, loop and day-by-day customer acceptance. |
+| Review Inbox | Channel-based review; feedback; exact image/video/carousel versions; approval invalidation after edits. | Full deployed journey with genuine generated assets. |
+| Canvas | GPT text planning and GPT Image creation/editing; editable projects; video script/prompt editing and approval before Higgsfield; feedback/regeneration and final review; carousels/exports. Approved uploaded photos can be video references without first generating an image. Skills and Brand Engine are pinned in the isolated runtime. | Owner live image create/edit and video generation/regeneration tests; broader output quality. No LIVE_VERIFIED claim from mocks. |
+| Publishing & Analytics | Exact-approved image/video/carousel publishing pipeline, durable submission/reconciliation and uncertainty handling. LinkedIn member, Instagram single-image/Reel paths implemented; saved metrics and format filters. | Owner Meta app/account consent; actual publication/metrics tests; Instagram carousel renditions, other connectors, durable remote cancel/reschedule and unresolved-outcome operations. |
+| Memory | Business-specific approved knowledge, creative history and evidence-linked performance hypotheses with human review/retirement. | Actual model/performance data and learning quality evaluation. |
+| Connections | Hidden Postiz provisioning, scoped bindings, LinkedIn member/Instagram connection paths, identity-bound reconnect, durable disconnect, saved-credential verification recovery. Deployed private Postiz health and provisioner queues verified. | Owner app/account authorization; missing-credential ambiguous provisioning recovery; other connectors and live consent acceptance. |
+| Team | Business-specific roles, invitations, escalation prevention and last-owner protection. | Resend delivery configuration/testing and deployed multi-user acceptance. |
+| Profile | Name/password/session controls, authenticator and recovery flows; earlier deployed synthetic acceptance recorded. | Resend password-reset delivery and broader operational hardening. |
+| Billing | Excluded. | Outside this goal's scope. |
 
-## Current release — capped creative acceptance
+## Current evidence
 
-Migration 049 adds an immutable per-request generation ceiling. The opt-in staging runner now covers create → provider edit → editable save → human approval with private resumable journals and no automatic publication. All 11 Canvas browser journeys (MOCK providers), 96 contracts and offline checks pass; interrupted-response replay creates exactly two generation jobs. Full security retry passed: 180 foundation cases, 29 account tests, six boundaries and both dependency audits. Migration 049, API `3f92aa3b-fd10-4631-bda2-63c82ee8392a` and both workers are now deployed. Actual login, retained navigation, private file/queue/scan/readback and tenant denial passed. This does not replace the full live release gate.
+- Latest frozen security run passed with `source_unchanged=true`; offline and contract gates passed.
+- Video/export backend tests: 15 pass. Full contract suite: 151 pass, plus focused worker-host/settings checks. Paid provider responses are mocked in these tests.
+- Actual deployed owner login and retained navigation pass; private asset job, scanning, canonical/normalized readback, replay and foreign-service denial pass. Acceptance fixture and three objects removed.
+- Full browser refresh is running in `work/video-enabled-browser.log` (exec session 89640). Previous suites cover customer, Canvas, connections and publishing, but their older fingerprints are not current release proof. Reconcile the active process before starting another browser run; do not rebuild `.next` during it.
+- Release gate remains blocked for broader browser/live acceptance and the incomplete trusted full-product live runner. Do not replace that gate with manually asserted success.
 
-## Previous release evidence — 24 October 2026
+## Remaining engineering work
 
-Latest source `2bc63ec`: full browser **42/42**, foundation **179/179**, account **29/29**, six security boundaries, dependency audits, offline and contract checks pass. Migration 048 and API/web/both workers are deployed. Actual owner login, retained navigation, private media upload → durable queue → malware scan → readback, replay and cross-business denial passed, with exact test cleanup. See `railway-recheck-release.json`, `browser.json`, `security.json` and `BUILD_STATE.md`.
+1. Finish the current browser run and repair genuine failures; keep complete journey evidence current.
+2. Complete the missing publishing/recovery capabilities identified above using verified Postiz contracts; never report uncertain cancellation as stopped publishing.
+3. Finish operator setup UX, comprehensive deployed tenant/provider acceptance and operational hardening.
+4. Integrate the owner's live-test results and resolve provider/account errors without automatically repeating uncertain paid calls.
 
-Release remains blocked by the trusted live acceptance runner and actual provider/tenant acceptance. The M0 hard-coded live gate is still present and must be replaced with real, budget-guarded execution evidence. Missing-credential provisioning outcomes, remote publication cancellation/rescheduling, other social channels and operator setup web UI remain open; do not call these “100%”. Billing remains excluded.
+## Owner-dependent acceptance
 
+- Paid model tests and provider account entitlement/funding: owner will test using saved keys.
+- Meta developer app, social permissions and explicit account consent: owner dependency acknowledged 24 October. OAuth/publishing remain disabled until configured and authorized.
+- Resend sender credentials: still needed for public verification/reset/invitation delivery; temporary owner password login is usable.
 
-- API `31a66e24-33b7-4223-a820-cb0c9d66c0d2` and web `15ec6a27-9c36-4c37-b19a-299700bc752d`: SUCCESS observed in Railway.
-- Trusted worker `sha256:3363e29ed1a64af85dbeb219e74eaaa73d97d1809dd1225bcd3a66878978cdaf`: native dependency/isolation checks and coordinated activation passed. The separate provisioning worker is updated to this image too.
-- Migration 047 is checksum-verified; temporary migration service credentials were removed.
-- Patched full security run: 29 account tests, 176 foundation tests, six Python boundary tests, API build and both production dependency audits pass. Root production audit reports zero vulnerabilities after pinning patched body-parser/multer versions.
-- Six connection browser, nine publishing browser and 17 publishing backend cases passed with MOCK provider transports. The complete browser suite also passed all 40 journeys after the dependency patch (`browser.json`); this does not establish real OAuth or model acceptance.
-- Actual dev owner login/navigation: retained shell, zero repeated workspace bootstrap calls, no full-page reload. Evidence: `railway-recovery-browser.json`.
-- Actual dev storage/worker scan/readback, replay and cross-business denial passed; fixtures were cleaned. See `railway-worker-job-patched047.json` and its cleanup record.
-- Offline and 93 target-selected provider/input contracts pass. Integration status is machine-generated; the release gate remains blocked until its outstanding acceptance requirements are met.
-
-## Instagram follow-up — in development
-
-Single-step Instagram connection/reconnect backend and customer selector/return route are implemented locally. Eighteen Postiz contracts and 34 social foundation cases pass; the production web build and all eight connection browser journeys pass. Migration 050 is not deployed. Instagram Reel publication now passes local real database/rendering/worker and ten publishing browser journeys with MOCK Postiz; all 138 adapter contracts pass. Provider-specific account filtering and exact-video consent are wired. Migrations 050–051 remain undeployed. Static/carousel channel rendition approval, broader security verification and live OAuth/publication remain open. See instagram-reel-foundation.json and instagram-reel-browser.json.
-
-## Remaining product work
-
-1. Operator setup web UI and safe unresolved-outcome recovery controls. The guided local setup already configures saved Railway settings and per-business allowances without hand-written integrations.
-2. Durable cancellation/rescheduling after a post has reached Postiz. Existing cancellation is limited to requests before submission; uncertainty never means cancellation succeeded.
-3. Meta and other social connectors beyond LinkedIn member. A Meta app alone does not complete these integrations.
-4. Comprehensive deployed provider acceptance, load/operational hardening and production release evidence. Advanced analytics/learning quality remains unverified with real data.
-
-## Owner configuration and live acceptance
-
-Owner will add server keys and run paid tests. Keys go in Railway **dev → desvio-dev-worker-settings → Variables**. Saved settings require coordinated worker activation and explicit business/model allowances; video also needs its approved model/output configuration. See `OPERATOR_PROVIDER_SETUP.md` for the exact guided sequence. A key by itself does not enable spending.
-
-Real generation/editing, authorized social consent/publishing and real analytics must pass before LIVE_VERIFIED. Resend remains required for public signup, password-reset email and team invitation delivery. Private owner password login is available. No paid provider or real social call was made during this release.
-
-## Cost constraint
-
-Keep existing Railway services and capacity. Reduce duplicate requests, hidden/idle polling and unnecessary deployments/transfers. The security worker patch reused existing media images and transferred 294 MB instead of the earlier 1.7 GB bundle. No infrastructure was removed to lower cost.
-
-- Latest web-only follow-up: all 16 customer browser cases pass, including repeated canceled/accepted Back and Forward with dirty forms. Actual dev temporary unsaved draft acceptance passed with zero profile writes and retained shell (`railway-history-guard.json`). Earlier full 40-browser/security evidence belongs to the preceding release; this focused check does not claim fresh full-suite or live-provider verification.
+Keep existing Railway service capacity. Optimize repeated requests, idle polling and deployment transfers. No infrastructure reduction was authorized.

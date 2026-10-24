@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-10-24T09:02:23.414Z",
+  "passed": true,
+  "result": {
+    "pages": [
+      "https://www.lodhagroup.com/"
+    ],
+    "skipped": [],
+    "coverage": "server_html_only",
+    "pageLimit": 5,
+    "requests": 2
+  },
+  "pages": [
+    {
+      "url": "https://www.lodhagroup.com/",
+      "characters": 111256,
+      "has_title": true
+    }
+  ],
+  "scope": "Actual public Lodha crawl executed inside deployed trusted worker. No customer job mutation, renderer or model calls."
+}

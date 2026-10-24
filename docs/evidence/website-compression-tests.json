@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-24T08:58:43.599Z",
+  "passed": true,
+  "source_sha256": "9047ae91625bab0c3d10f91b573ae50454ea0ceb493e7ff621e0266cad1b6f9c",
+  "contracts": 156,
+  "focused_intake_compression": 11,
+  "video_download": 7,
+  "scope": "Local contract tests; mocked provider contracts, no paid calls. Real public website read and deployed UI checks recorded separately."
+}

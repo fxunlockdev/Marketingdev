@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-10-24T08:46:09.127Z",
+  "checked_at": "2026-10-24T09:02:35.038Z",
   "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
   "status": "configuration_matches",
   "running": true,
-  "desired_image": "sha256:546abb792932c8609233bcc50e2d2b444015fae72116148868df848f8e264a76",
+  "desired_image": "sha256:a506423f2a665f0405ab5156f76832b6c67f8cf905d15521e999f448643e7cbe",
   "video_enabled": true,
   "publishing_enabled": false,
   "credentials_present": {

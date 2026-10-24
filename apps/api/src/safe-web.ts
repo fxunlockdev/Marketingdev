@@ -1,3 +1,5 @@
+import {gunzip,brotliDecompress,inflate} from 'node:zlib';
+import {promisify} from 'node:util';
 import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { request as httpsRequest } from "node:https";
@@ -86,6 +88,16 @@ type WebResponse = {
   headers: Record<string, string | string[] | undefined>;
   bytes: Buffer;
 };
+// Keep compressed and decoded bodies bounded independently. Binary media callers
+// retain identity-only responses; text pages may use standard HTTP compression.
+export async function decodeWebsiteBody(bytes:Buffer,encoding:string|undefined,maxBytes:number){
+ if(bytes.length>maxBytes)throw new IntakeError('WEBSITE_PAGE_TOO_LARGE');
+ if(!encoding||encoding==='identity')return bytes;
+ const decoder=new Map([['gzip',promisify(gunzip)],['br',promisify(brotliDecompress)],['deflate',promisify(inflate)]]).get(encoding);
+ if(!decoder)throw new IntakeError('WEBSITE_ENCODING_UNSUPPORTED');
+ try{return await decoder(bytes,{maxOutputLength:maxBytes});}
+ catch(error:any){throw new IntakeError(error?.code==='ERR_BUFFER_TOO_LARGE'?'WEBSITE_PAGE_TOO_LARGE':'WEBSITE_COMPRESSION_INVALID');}
+}
 export type Resolve = (
   hostname: string,
 ) => Promise<{ address: string; family: number }[]>;
@@ -142,7 +154,7 @@ export class SafeWeb {
         },
         (res) => {
           const encoding = res.headers["content-encoding"];
-          if (encoding && encoding !== "identity") {
+          if (encoding && encoding !== 'identity' && (!accept.startsWith('text/') || !['gzip','br','deflate'].includes(encoding))) {
             res.destroy();
             finish(new IntakeError("WEBSITE_ENCODING_UNSUPPORTED"));
             return;
@@ -157,13 +169,14 @@ export class SafeWeb {
           res.on("error", () =>
             finish(new IntakeError("WEBSITE_FETCH_FAILED")),
           );
-          res.on("end", () =>
-            finish(undefined, {
-              status: res.statusCode ?? 0,
-              headers: res.headers,
-              bytes: Buffer.concat(chunks),
-            }),
-          );
+          res.on("end", async () => {
+            try {
+              const bytes=await decodeWebsiteBody(Buffer.concat(chunks),encoding,maxBytes);
+              const headers={...res.headers};
+              if(encoding&&encoding!=='identity'){delete headers['content-encoding'];headers['content-length']=String(bytes.length);}
+              finish(undefined,{status:res.statusCode??0,headers,bytes});
+            }catch(error){finish(error instanceof IntakeError?error:new IntakeError('WEBSITE_COMPRESSION_INVALID'));}
+          });
         },
       );
       const timer = setTimeout(
