@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-24T05:33:25.930609+00:00",
+  "passed": true,
+  "source_sha256": "28c7bad8871601e75199ae802c25c164aebd3882d4760414e202ed11e72c86b2",
+  "tests": 11,
+  "log_sha256": "0bee744fd42c7c28234d269f03c1d16e406e80e4517307485bf23d993926637a",
+  "scope": "Actual local customer APIs and Canvas browser journeys with MOCK model transports. Includes lost message response replay without duplicate paid jobs, create/edit, editable save, human approval pause/resume, private media and foreign-account denial. Not deployed or live provider evidence.",
+  "live_provider_calls": false
+}

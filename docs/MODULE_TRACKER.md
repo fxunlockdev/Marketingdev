@@ -21,6 +21,10 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | Profile | Name/password changes, session controls, authenticator/recovery flows; actual dev synthetic password/session/MFA/recovery acceptance passed | Resend reset/delivery flows and broader operational security hardening |
 | Billing | Excluded | Not part of this goal's current scope |
 
+## Pending release — capped creative acceptance
+
+Migration 049 adds an immutable per-request generation ceiling. The opt-in staging runner now covers create → provider edit → editable save → human approval with private resumable journals and no automatic publication. All 11 Canvas browser journeys (MOCK providers), 96 contracts and offline checks pass; interrupted-response replay creates exactly two generation jobs. Full security retry is pending. This change is not deployed and does not replace the full live release gate.
+
 ## Current release evidence — 24 October 2026
 
 Latest source `2bc63ec`: full browser **42/42**, foundation **179/179**, account **29/29**, six security boundaries, dependency audits, offline and contract checks pass. Migration 048 and API/web/both workers are deployed. Actual owner login, retained navigation, private media upload → durable queue → malware scan → readback, replay and cross-business denial passed, with exact test cleanup. See `railway-recheck-release.json`, `browser.json`, `security.json` and `BUILD_STATE.md`.

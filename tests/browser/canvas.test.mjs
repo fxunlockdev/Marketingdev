@@ -962,3 +962,27 @@ test('Canvas generates an entire carousel, reopens it for editing and reviews sa
 
  assert.deepEqual(errors,[]);
 });
+
+test('staging creative acceptance runner exercises real customer APIs and pauses for exact-version human review',async()=>{
+ const {creativeAcceptance}=await import('../../scripts/live/creative-acceptance.mjs');
+ const foreignContext=await browser.newContext(),anonymousContext=await browser.newContext();
+ const email=randomUUID()+'@example.test',password='live-harness-LOCAL-fixture-password';
+ const call=context=>async(path,body,key,method)=>{const r=await context.request.fetch(base+path,{method:method??(body===undefined?'GET':'POST'),headers:{origin:base,'content-type':'application/json',...(key?{'idempotency-key':key}:{})},data:body});return {status:r.status(),body:await r.json()};};
+ try{
+  await admin.query('DELETE FROM auth."rateLimit"');
+  const foreign=call(foreignContext),signed=await foreign('/api/auth/sign-up/email',{name:'Foreign acceptance fixture',email,password});assert.equal(signed.status,200);
+  await admin.query('UPDATE auth."user" SET "emailVerified"=true WHERE id=$1',[signed.body.user.id]);assert.equal((await foreign('/api/auth/sign-in/email',{email,password})).status,200);
+  const state={runId:randomUUID()},settings={organizationId:org,businessId:brand,budgetMicros:10000000};let saved;
+  const io={api:call(page.context()),foreign,anonymous:call(anonymousContext),media:async url=>Buffer.from(await (await fetch(url)).arrayBuffer()),save:async s=>{saved=JSON.parse(JSON.stringify(s));},wait:delay};
+  const before=generated,realApi=io.api;let lostResponse=false;
+  io.api=async(...args)=>{const result=await realApi(...args);if(!lostResponse&&args[0].endsWith('/messages')&&result.status>=200&&result.status<300){lostResponse=true;throw Error('LOCAL_RESPONSE_LOST');}return result;};
+  await assert.rejects(creativeAcceptance(io,settings,state),/LOCAL_RESPONSE_LOST/);assert.ok(lostResponse);assert.equal(saved.create.jobId,undefined);
+  io.api=realApi;Object.assign(state,JSON.parse(JSON.stringify(saved)));
+  const paused=await creativeAcceptance(io,settings,state);assert.equal(paused.status,'awaiting_human_approval');assert.equal(generated,before+2);assert.equal(saved.manualVersionId,paused.reviewVersionId);
+  assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.creative_requests WHERE thread_id=$1',[state.threadId])).rows[0].n),2);
+  const project=(await io.api(`/api/v1/businesses/${brand}/creative-projects/${state.edit.projectId}`)).body,version=project.versions.find(v=>v.id===state.manualVersionId);
+  assert.equal((await io.api(`/api/v1/businesses/${brand}/creative-versions/${version.id}/review`,{decision:'approved',revision:version.review_revision,feedback:'LOCAL test reviewer acceptance'})).status,201);
+  const resumed=await creativeAcceptance(io,settings,JSON.parse(JSON.stringify(saved)));assert.equal(resumed.status,'passed');assert.equal(generated,before+2);
+  const reserved=(await admin.query('SELECT sum(reserved_micros)::bigint AS n FROM app.creative_calls WHERE job_id=ANY($1::uuid[])',[[state.create.jobId,state.edit.jobId]])).rows[0].n;assert.ok(Number(reserved)<=settings.budgetMicros);
+ }finally{await foreignContext.close();await anonymousContext.close();}
+});

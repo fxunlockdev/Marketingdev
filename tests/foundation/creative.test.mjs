@@ -756,3 +756,17 @@ test('Gemini creative planning uses its own allowance and preserves OpenAI image
  const denied=await canvas.submit(alice,brand.id,thread.id,body,randomUUID());
  assert.equal(await mixed.run(scope(denied)),'rejected');assert.equal((await row(denied)).error_code,'CREATIVE_BUDGET_EXHAUSTED');assert.equal(calls,1);assert.equal(imageCalls,images+1);
 });
+
+test('immutable request ceiling bounds planning and image calls independently of a larger business allowance',async()=>{
+ await grant(100000000);transport=undefined;
+ for(const cap of [0,-1,1.5,1000000001,'1000'])assert.throws(()=>canvas.submit(alice,brand.id,thread.id,{...request(),max_cost_micros:cap},randomUUID()),/budget/);
+ const key=randomUUID(),body={...request('Capped acceptance fixture'),max_cost_micros:1};
+ const j=await canvas.submit(alice,brand.id,thread.id,body,key),calls=planCalls+imageCalls;
+ assert.equal((await canvas.submit(alice,brand.id,thread.id,body,key)).id,j.id);
+ await assert.rejects(canvas.submit(alice,brand.id,thread.id,{...body,max_cost_micros:100000},key),/different|another/);
+ assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await row(j)).error_code,'CREATIVE_REQUEST_BUDGET_EXHAUSTED');assert.equal(planCalls+imageCalls,calls);
+ const k=await canvas.submit(alice,brand.id,thread.id,{...request('Plan but do not exceed the image budget'),max_cost_micros:99999},randomUUID()),images=imageCalls;
+ assert.equal(await handler.run(scope(k)),'rejected');assert.equal((await row(k)).error_code,'CREATIVE_REQUEST_BUDGET_EXHAUSTED');assert.equal(imageCalls,images);
+ const reserved=Number((await admin.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE job_id=$1',[k.id])).rows[0].n);assert.ok(reserved>0&&reserved<=99999);
+ for(const p of [app,worker])await assert.rejects(p.query('UPDATE app.creative_requests SET max_cost_micros=1000000 WHERE job_id=$1',[k.id]),e=>e.code==='42501');
+});

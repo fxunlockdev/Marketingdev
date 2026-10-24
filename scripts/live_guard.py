@@ -1,6 +1,8 @@
-"""Fail-closed opt-in check. M0 has no live provider runner."""
+"""Fail-closed authorization for explicitly selected staging acceptance scopes."""
 from decimal import Decimal, InvalidOperation
 import os
+import subprocess
+from pathlib import Path
 
 
 def check_live_environment(env):
@@ -15,7 +17,7 @@ def check_live_environment(env):
             raise InvalidOperation
     except InvalidOperation:
         errors.append("A finite positive provider budget is required")
-    for key in ("LIVE_TEST_ORG_IDS", "LIVE_TEST_BRAND_IDS", "LIVE_TEST_SOCIAL_ACCOUNT_IDS"):
+    for key in (("LIVE_TEST_ORG_IDS", "LIVE_TEST_BRAND_IDS") if env.get("LIVE_TEST_SCOPE") == "creative" else ("LIVE_TEST_ORG_IDS", "LIVE_TEST_BRAND_IDS", "LIVE_TEST_SOCIAL_ACCOUNT_IDS")):
         values = [x.strip() for x in env.get(key, "").split(",") if x.strip()]
         if not values or any(x in {"*", "all"} for x in values):
             errors.append(key + " requires explicit allowlisted IDs")
@@ -24,10 +26,13 @@ def check_live_environment(env):
 
 def main():
     errors = check_live_environment(os.environ)
-    # Authorization is necessary, not sufficient: no callable live harness yet.
-    errors.append("Live provider workflow is NOT_IMPLEMENTED at M0; no network call attempted")
-    print("\n".join(errors))
-    return 2
+    if errors:
+        print("\n".join(errors))
+        return 2
+    if os.environ.get("LIVE_TEST_SCOPE") != "creative":
+        print("Full live acceptance remains NOT_IMPLEMENTED; select the guarded creative scope explicitly. No call attempted")
+        return 2
+    return subprocess.run(["node", "scripts/live/run-creative.mjs"], cwd=Path(__file__).resolve().parent.parent).returncode
 
 
 if __name__ == "__main__":

@@ -188,6 +188,7 @@ export class Canvas {
         "parent_version_id",
         "reference_ids",
         "text_provider",
+        "max_cost_micros",
       ]),
       prompt = plain(v.prompt, 4000),
       k = key(requestKey),
@@ -200,6 +201,7 @@ export class Canvas {
       throw new BadRequestException(
         "Choose a supported static image format, channel and size",
       );
+    if(v.max_cost_micros!==undefined&&(!Number.isSafeInteger(v.max_cost_micros)||Number(v.max_cost_micros)<1||Number(v.max_cost_micros)>1000000000))throw new BadRequestException("Use a positive whole-number request budget in microdollars");
     if(v.reference_ids!==undefined&&(!Array.isArray(v.reference_ids)||v.reference_ids.length>3))throw new BadRequestException("Choose up to three approved references");
     const referenceIds=(v.reference_ids??[]).map((r:unknown)=>uuid(String(r)));
     if(new Set(referenceIds).size!==referenceIds.length)throw new BadRequestException("Choose each reference once");
@@ -216,6 +218,7 @@ export class Canvas {
           size: v.size,
           parent,
           ...(textProvider==='gemini'?{text_provider:textProvider}:{}),
+          ...(v.max_cost_micros!==undefined?{max_cost_micros:v.max_cost_micros}:{}),
           ...(referenceIds.length?{reference_ids:referenceIds}:{}),
         }),
       );
@@ -316,7 +319,7 @@ export class Canvas {
         [job, b.organization_id, id, user],
       );
       await db.query(
-        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model,memory_context) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)",
+        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model,memory_context,max_cost_micros) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
         [
           job,
           b.organization_id,
@@ -331,7 +334,7 @@ export class Canvas {
           v.size,
           k,
           sha,
-          textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),
+          textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),v.max_cost_micros??null,
         ],
       );
       for(const [position,referenceId] of referenceIds.entries())await db.query('INSERT INTO app.creative_references(organization_id,brand_id,job_id,reference_id,position) VALUES($1,$2,$3,$4,$5)',[b.organization_id,id,job,referenceId,position]);

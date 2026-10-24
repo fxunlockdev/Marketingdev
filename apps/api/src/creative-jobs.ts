@@ -115,6 +115,13 @@ export class CreativeJobs {
         used + reserved > Number(grant.budget_micros)
       )
         throw new CreativeError("CREATIVE_BUDGET_EXHAUSTED");
+      if(j.kind==='creative.generate'){
+        const limit=(await db.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=$1',[j.id])).rows[0]?.max_cost_micros;
+        if(limit!==null&&limit!==undefined){
+          const spent=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE job_id=$1',[j.id])).rows[0].n);
+          if(!Number.isSafeInteger(spent)||spent+reserved>Number(limit))throw new CreativeError('CREATIVE_REQUEST_BUDGET_EXHAUSTED');
+        }
+      }
       await db.query(
         "INSERT INTO app.creative_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8)",
         [j.id, step, j.organization_id, j.brand_id, model, inputHash, reserved,providerName],
