@@ -91,6 +91,32 @@ export class PostizClient {
   await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'image/png'}),`desvio-${expectedSHA}.png`);
   return this.media(await this.request('public/v1/upload','POST',form));
  }
+ // Accept an already rendered and approved JPEG; never transform media during upload.
+ async uploadJPEG(bytes:Buffer,expectedSHA:string){
+  if(!Buffer.isBuffer(bytes)||bytes.length<24||bytes.length>8*1024*1024||! /^[a-f0-9]{64}$/.test(expectedSHA)||sha(bytes)!==expectedSHA)throw new PostizError('POSTIZ_MEDIA_INVALID');
+  try{
+   const decoder=sharp(bytes,{limitInputPixels:1536*1536}),m=await decoder.metadata();
+   // Deliberately bounded Desvio export envelope, not a claim of all Meta-supported sizes.
+   if(m.format!=='jpeg'||!m.width||!m.height||m.width<320||m.width>1440||m.width/m.height<0.8||m.width/m.height>1.91||m.pages&&m.pages!==1)throw new Error();
+   await decoder.raw().toBuffer();
+  }catch{throw new PostizError('POSTIZ_MEDIA_INVALID');}
+  await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'image/jpeg'}),`desvio-${expectedSHA}.jpg`);
+  return this.media(await this.request('public/v1/upload','POST',form),'jpg');
+ }
+ async submitInstagramImages(input:{integrationId:string;caption:string;media:{id:string;path:string}[];scheduledAt:string}){
+  let id:string,date:string,media:{id:string;path:string}[];
+  try{
+   id=remoteId(input.integrationId);date=iso(input.scheduledAt);
+   if(!Array.isArray(input.media)||input.media.length<1||input.media.length>10)throw new Error();
+   media=input.media.map(m=>this.media(m,'jpg'));
+   if(new Set(media.map(m=>m.id)).size!==media.length||new Set(media.map(m=>m.path)).size!==media.length||typeof input.caption!=='string'||!input.caption.trim()||[...input.caption].length>2200||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(input.caption))throw new Error();
+  }catch{throw new PostizError('POSTIZ_POST_INVALID');}
+  const target=(await this.listIntegrations()).find(i=>i.id===id);
+  if(!target||target.provider!=='instagram-standalone'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:media}],settings:{__type:'instagram-standalone',post_type:'post',is_trial_reel:false}}]};
+  const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
+  return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
+ }
  // Caller supplies the hash-bound canonical output of the isolated video renderer.
  async uploadMP4(bytes:Buffer,expectedSHA:string){
   if(!Buffer.isBuffer(bytes)||bytes.length<24||bytes.length>64*1024*1024||bytes.subarray(4,8).toString()!=='ftyp'||!/^[a-f0-9]{64}$/.test(expectedSHA)||sha(bytes)!==expectedSHA)throw new PostizError('POSTIZ_MEDIA_INVALID');

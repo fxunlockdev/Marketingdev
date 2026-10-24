@@ -173,3 +173,22 @@ test('Instagram scheduling acknowledgement is not publication and ambiguous resp
   await assert.rejects(client().submitInstagramReel(input),e=>e.outcome==='unknown');assert.equal(requests.filter(r=>r.method==='POST').length,1);
  }
 });
+
+
+test('Instagram JPEG upload preserves approved bytes and rejects incompatible media before transport',async()=>{
+ const bytes=await sharp(png).jpeg({quality:95}).toBuffer(),sha=createHash('sha256').update(bytes).digest('hex');
+ requests=[];handler=(req,res,body)=>{assert.equal(req.url,'/api/public/v1/upload');assert.ok(body.includes(bytes));assert.ok(body.includes(Buffer.from('Content-Type: image/jpeg')));assert.match(body.toString('latin1'),/name="adjust"\r\n\r\nfalse/);json(res,{id:'jpeg-a',path:base+'/media/'+sha+'.jpg'});};
+ assert.equal((await client().uploadJPEG(bytes,sha)).id,'jpeg-a');
+ const count=requests.length;
+ for(const invalid of [png,bytes.subarray(0,100),await sharp({create:{width:320,height:1000,channels:3,background:'#fff'}}).jpeg().toBuffer()])await assert.rejects(client().uploadJPEG(invalid,createHash('sha256').update(invalid).digest('hex')),e=>e.code==='POSTIZ_MEDIA_INVALID');
+ await assert.rejects(client().uploadJPEG(bytes,'a'.repeat(64)),e=>e.code==='POSTIZ_MEDIA_INVALID');assert.equal(requests.length,count);
+});
+test('Instagram image submission preserves slide order and rejects mixed media or duplicate slides',async()=>{
+ const media=[{id:'jpeg-a',path:base+'/a.jpg'},{id:'jpeg-b',path:base+'/b.jpg'}],input={integrationId:'channel-a',caption:'MOCK approved carousel',media,scheduledAt:'2027-01-01T10:00:00.000Z'};
+ let posts=0;handler=(req,res,body)=>{if(req.url==='/api/public/v1/integrations')return json(res,[{...integration,identifier:'instagram-standalone'}]);posts++;const wire=JSON.parse(body);assert.deepEqual(wire.posts[0].value[0].image,media);assert.equal(wire.posts[0].settings.post_type,'post');json(res,[{postId:'post-images',integration:'channel-a'}]);};
+ assert.equal((await client().submitInstagramImages(input)).status,'accepted');assert.equal(posts,1);
+ for(const images of [[],[media[0],media[0]],[{...media[0],path:base+'/a.png'}],[{...media[0],path:'https://foreign.test/a.jpg'}],Array(11).fill(media[0])])await assert.rejects(client().submitInstagramImages({...input,media:images}),e=>e.code==='POSTIZ_POST_INVALID');
+ assert.equal(posts,1);
+ handler=(req,res)=>{if(req.url==='/api/public/v1/integrations')return json(res,[{...integration,identifier:'instagram-standalone'}]);posts++;req.socket.destroy();};
+ await assert.rejects(client().submitInstagramImages(input),e=>e.outcome==='unknown');assert.equal(posts,2);
+});
