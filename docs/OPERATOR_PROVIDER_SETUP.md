@@ -2,7 +2,7 @@
 
 ## Owner test sequence
 
-The dev app is https://desvio-dev-web-dev.up.railway.app. Add model credentials in Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12` → **dev** → **desvio-dev-worker-settings** → **Variables**. Start with `OPENAI_API_KEY` for onboarding, planning and image creation/editing. `GEMINI_API_KEY` is optional for supported text workflows; Higgsfield setup is separate below. Never add these to the web service.
+The dev app is https://desvio-dev-web-dev.up.railway.app. Add model credentials in Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12` → **dev** → **desvio-dev-worker-settings** → **Variables**. Start with `OPENAI_API_KEY` for onboarding, planning and image creation/editing. New static/carousel creative planning, monthly content planning and video storylines/prompts use OpenAI GPT only. Static imagery continues through GPT Image; approved video requests use Higgsfield. `GEMINI_API_KEY` does not enable these creative flows or provide fallback. Historical Gemini records and unrelated supported workflows remain separate. Higgsfield setup is described below. Never add these to the web service.
 
 1. Sign in and create a business. Add a website or brand files. Manual facts and brand approval can be tested without model keys.
 2. Save the server key, then run the guided setup's **activate saved Railway settings** option. The settings service is configuration storage: saving a key there does not update the running worker by itself.

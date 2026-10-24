@@ -248,7 +248,7 @@ test("actual isolated Deep Agents loads pinned owner skills; file reads cannot e
     assert.ok(!denied.content.includes("root:"));
     return { content: JSON.stringify(brief("fact-a")), tool_calls: [] };
   });
-  assert.equal(result.skills.length, 4);
+  assert.equal(result.skills.length, 5);
   assert.equal(result.helpers_executed, false);
   assert.equal(calls, 2);
   await assert.rejects(
@@ -375,7 +375,7 @@ test("real Temporal workflow executes isolated owner skills, mocked OpenAI gener
   project = state.projects.find((p) => p.latest_version_id);
   version = (await canvas.project(alice, brand.id, project.id)).versions[0];
   assert.equal(version.status, "draft");
-  assert.equal(version.skill_manifest.skills.length, 3);
+  assert.equal(version.skill_manifest.skills.length, 4);
   assert.ok(version.skill_manifest.reserved_cost_micros >= 100000);
   const signed = await canvas.media(alice, brand.id, version.media_id);
   assert.equal((await fetch(signed.url)).status, 200);
@@ -732,29 +732,10 @@ test('queued generation loses authorization when its editor becomes Reviewer or 
 });
 
 
-test('Gemini creative planning uses its own allowance and preserves OpenAI image generation',async()=>{
- const {GoogleGenAI}=await import('@google/genai'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');
- await grant(100000000);let calls=0;
- const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
-  calls++;const wire=JSON.parse(init.body);
-  const raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text;
-  const input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
-  return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(brief(input.brand.facts.find(f=>f.field==='offering').id))}]},finishReason:'STOP'}]});
- }}}));
- await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org.id,brand.id]);
- const body={...request('Create with Gemini direction'),text_provider:'gemini'},key=randomUUID();
- const j=await canvas.submit(alice,brand.id,thread.id,body,key),before=planCalls,images=imageCalls;
- await assert.rejects(canvas.submit(alice,brand.id,thread.id,{...body,text_provider:'openai'},key),/another creative request/);
- const mixed=new CreativeJobs(jobs,skills,provider,gemini);
- assert.equal(await mixed.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.equal(calls,1);assert.equal(planCalls,before);assert.equal(imageCalls,images+1);
- const ledger=(await admin.query('SELECT provider,step FROM app.creative_calls WHERE job_id=$1 ORDER BY step',[j.id])).rows;
- assert.deepEqual(ledger,[{provider:'openai',step:'image'},{provider:'gemini',step:'plan:1'}]);
- const manifest=(await admin.query('SELECT skill_manifest FROM app.creative_versions WHERE job_id=$1',[j.id])).rows[0].skill_manifest;
- assert.equal(manifest.text_provider,'gemini');assert.equal(manifest.text_model,'gemini-fixture');
- assert.equal(await mixed.run(scope(j)),'finished');assert.equal(calls,1);
- await admin.query('UPDATE app.gemini_creative_grants SET budget_micros=1 WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
- const denied=await canvas.submit(alice,brand.id,thread.id,body,randomUUID());
- assert.equal(await mixed.run(scope(denied)),'rejected');assert.equal((await row(denied)).error_code,'CREATIVE_BUDGET_EXHAUSTED');assert.equal(calls,1);assert.equal(imageCalls,images+1);
+test('static creative requests reject non-GPT providers before recording or spending',async()=>{
+ const before=planCalls+imageCalls;
+ for(const provider of ['gemini','claude'])assert.throws(()=>canvas.submit(alice,brand.id,thread.id,{...request(),text_provider:provider},randomUUID()),/GPT only/);
+ assert.equal(planCalls+imageCalls,before);
 });
 
 test('immutable request ceiling bounds planning and image calls independently of a larger business allowance',async()=>{

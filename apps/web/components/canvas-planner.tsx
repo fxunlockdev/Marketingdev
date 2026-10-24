@@ -21,7 +21,7 @@ export function CanvasPlanner({business,threadId,onSubmitted,disabled=false,init
  return <details className="v5-panel" open={expanded} onToggle={e=>setExpanded(e.currentTarget.open)}><summary>Plan content in Canvas</summary><p>Ask for a launch sequence, a weekly theme or a daily post. Your approved brand guides the plan; every post stays a draft until reviewed.</p>
  {error!==undefined&&<Notice error={error}/>}
  {!business.has_approved_brand||prefs?.step!==3?<p><a href={`/b/${business.id}/onboarding`}>Confirm your brand and goals before planning.</a></p>:<form onSubmit={e=>{e.preventDefault();void submit();}}><fieldset disabled={disabled||busy||!['owner','admin','editor'].includes(business.role)||!!selected&&!plan}>
- <Field label="Planning model">{id=><select id={id} value={provider} onChange={e=>setProvider(e.target.value)}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
+ <Field label="Planning model">{id=><select id={id} value={provider} onChange={e=>setProvider(e.target.value)}><option value="openai">OpenAI GPT</option></select>}</Field>
  <Field label="What should we plan?">{id=><textarea id={id} placeholder="Plan a week of helpful posts introducing our services…" value={brief} required={natural} maxLength={2000} onChange={e=>setBrief(e.target.value)}/>}</Field>
  {plan&&<label className="publication-consent"><input type="checkbox" checked={useContext} onChange={e=>setUseContext(e.target.checked)}/> Use selected saved plan as context</label>}
  {plan&&useContext&&<p>Using “{plan.title}” and its current edits. This creates a new draft plan; the saved plan stays unchanged.</p>}

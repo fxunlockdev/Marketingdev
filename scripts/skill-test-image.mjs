@@ -15,6 +15,8 @@ export function prepareSkillImage() {
       "apps/skills/Dockerfile",
       "apps/skills/requirements.lock",
       "apps/skills/runtime.py",
+      "scripts/brand_engine_audit.py",
+      "inputs/brand-engine-gpt-2k.zip",
       "scripts/skill_audit.py",
       "inputs/marketingskills-main.zip",
     ]) {

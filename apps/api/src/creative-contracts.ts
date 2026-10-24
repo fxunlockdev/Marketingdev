@@ -64,6 +64,7 @@ export type SkillResult = {
 };
 export const selectedSkills = (format: CreativeInput["format"]) =>
   [
+    "brand-engine",
     "image",
     "product-marketing",
     "social",

@@ -447,7 +447,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   await expect(page.getByText('Generation allowances',{exact:true})).toHaveCount(1);
   await page.getByText('Generation allowances',{exact:true}).click();
 
-  await page.getByLabel('Creative planning model',{exact:true}).selectOption('gemini');
+  await page.getByLabel('Creative planning model',{exact:true}).selectOption('openai');
   await page.getByText('Brand image references',{exact:true}).click();
   await page.getByText('Add product photos',{exact:true}).click();
   await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'canvas-product.jpg',mimeType:'image/jpeg',buffer:photoBytes});
@@ -588,7 +588,7 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   await expect(page.getByLabel('Video idea',{exact:true})).toHaveValue(/TEST planned script/);
   await page.getByLabel('Video idea',{exact:true}).fill('TEST animate this brand image');
   await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
-  await page.getByLabel('Video script model',{exact:true}).selectOption('gemini');
+  await page.getByLabel('Video script model',{exact:true}).selectOption('openai');
   await page.getByRole('button',{name:'Draft video script',exact:true}).click();
   await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,0);
   await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt');
@@ -820,11 +820,11 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
 });
 
 test('Canvas creates a custom four-day plan and opens its actual saved calendar post',async()=>{
- await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'gemini',true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY')",[org,brand]);
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'openai',true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY') ON CONFLICT (organization_id,brand_id,provider) DO UPDATE SET enabled=true,budget_micros=10000000",[org,brand]);
  await page.goto(`${base}/b/${brand}/canvas`);
  await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
  await page.getByText('Plan content in Canvas',{exact:true}).click();
- await page.getByLabel('Planning model',{exact:true}).selectOption('gemini');
+ await page.getByLabel('Planning model',{exact:true}).selectOption('openai');
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
  await expect(page.getByText('Plan content in Canvas',{exact:true})).toHaveCount(1);
  await page.getByLabel('Set days and post counts myself',{exact:true}).check();
@@ -837,7 +837,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByRole('button',{name:'Plan my content',exact:true}).click();
  const preview=page.getByRole('region',{name:'Planned posts',exact:true});
  await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4,{timeout:60000});
- const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'gemini');
+ const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'openai');
  await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4);
  await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('TEST four-day launch sequence');
  await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Prepared 4 draft posts');
@@ -865,7 +865,7 @@ test('Canvas natural follow-up uses the edited selected plan and opens a new wee
  await expect(page.getByLabel('Use selected saved plan as context',{exact:true})).toBeChecked();
  await expect(page.getByLabel('Set days and post counts myself',{exact:true})).not.toBeChecked();
  await expect(page.getByLabel('Planning days',{exact:true})).toHaveCount(0);
- await page.getByLabel('Planning model',{exact:true}).selectOption('gemini');
+ await page.getByLabel('Planning model',{exact:true}).selectOption('openai');
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST: Make this a weekly plan with two videos and keep my edited script direction');
  await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2027-01-01');
  await page.getByRole('button',{name:'Plan my content',exact:true}).click();

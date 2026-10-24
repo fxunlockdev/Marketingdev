@@ -3,6 +3,7 @@ import { CreativeError, type CreativeInput, type SkillResult } from './creative-
 import { CREATIVE_SKILLS } from './creative-skill-pins.js';
 import { planTime } from './content-plan.js';
 export const PLANNING_SKILLS = {
+ "brand-engine":CREATIVE_SKILLS["brand-engine"],
  'marketing-plan':{skill_sha256:'2b75dfae852bdb61fd96eebe3d2b373f99f67c86ff830f796310f662ba8906e8',tree_sha256:'d3f0c84f21bf77fb851403e95bd1d0270d81ae664d61a39cd003764fe5571fd6'},
  'product-marketing':CREATIVE_SKILLS['product-marketing'], social:CREATIVE_SKILLS.social,
 };

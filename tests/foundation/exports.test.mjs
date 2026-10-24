@@ -197,7 +197,7 @@ test('approved export to original video skills, durable provider stage, actual m
  assert.equal(plansCalled,1);assert.equal(submits,1);assert.equal(statuses,1);assert.equal(downloads,1);
  const saved=(await service.list(alice.id,brand.id)).projects[0],version=await service.version(alice.id,brand.id,saved.latest_version_id);
  const attached=(await plans.list(alice.id,brand.id,linkedRange)).slots[0];assert.equal(attached.video_version_id,version.id);assert.equal(attached.state,'draft_ready');assert.equal(attached.revision,linkedSlot.revision+1);
- assert.equal(version.status,'draft');assert.equal(version.caption,'TEST FIXTURE video caption');assert.equal(version.duration_ms,3000);assert.equal(version.manifest.reference.sha256,e.sha256);assert.equal(version.manifest.plan.skills.length,4);
+ assert.equal(version.status,'draft');assert.equal(version.caption,'TEST FIXTURE video caption');assert.equal(version.duration_ms,3000);assert.equal(version.manifest.reference.sha256,e.sha256);assert.equal(version.manifest.plan.skills.length,5);
  const row=(await admin.query('SELECT * FROM app.video_versions WHERE id=$1',[version.id])).rows[0];assert.equal(digest(await store.read(row.object_key,64*1024*1024)),row.sha256);assert.equal(digest(await store.read(row.poster_key)),row.poster_sha256);
  assert.equal((await fetch(leasedURL)).status,404);assert.equal(await pipeline.step(scope(j)),'succeeded');assert.equal(submits,1);assert.equal(downloads,1);
  const endpoint=path(`video-versions/${version.id}`);
@@ -283,25 +283,10 @@ test('approved export to original video skills, durable provider stage, actual m
  const {proveVideoPublication}=await import('../fixtures/prove-video-publication.mjs');
  publicationAccount=await proveVideoPublication({admin,jobs,store,businesses,exports,plans,org,brand,alice,bob,editor,video:publishVersion,image,staticImage:renderer.image,provider:channel==='linkedin'?'linkedin':'instagram-standalone',account:publicationAccount});
  }
- const {GoogleGenAI}=await import('@google/genai'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');let geminiCalls=0;
- const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
-  geminiCalls++;const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
-  const brief={title:'Gemini test video',caption:'TEST FIXTURE video caption',video_prompt:'TEST FIXTURE subtle motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:3000,action:'Subtle motion',camera:'Static'}],overlays:[]};
-  return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(brief)}]},finishReason:'STOP'}]});
- }}}));
- await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org.id,brand.id]);
  const {slot_id:ignoredSlot,slot_revision:ignoredRevision,...unlinked}=body;
- const gj=await service.submit(alice.id,brand.id,thread,{...unlinked,text_provider:'gemini'},randomUUID()),beforeText=plansCalled,beforeGeminiPaid=submits;
- const gp=new VideoJobs(jobs,refs,new CreativeJobs(jobs,new SkillRuntime(skillImage),text,gemini),provider,downloader,new VideoRenderer(image));
- assert.equal(await gp.step(scope(gj)),'awaiting_approval');assert.equal(geminiCalls,1);assert.equal(plansCalled,beforeText);assert.equal(submits,beforeGeminiPaid);
- assert.equal(await gp.step(scope(gj)),'awaiting_approval');assert.equal(geminiCalls,1);
- const gd=await service.draft(alice.id,brand.id,gj.id);
- await service.saveDraft(alice.id,brand.id,gj.id,{brief:{...gd.brief,video_prompt:'TEST FIXTURE user edited motion'},revision:1,approve:true});
- assert.equal(await gp.step(scope(gj)),'accepted');assert.equal(submits,beforeGeminiPaid+1);
- assert.equal(await gp.step(scope(gj)),'completed');assert.equal(await gp.step(scope(gj)),'succeeded');
- const gv=(await admin.query('SELECT manifest FROM app.video_versions WHERE job_id=$1',[gj.id])).rows[0];assert.equal(gv.manifest.text_provider,'gemini');assert.equal(gv.manifest.text_model,'gemini-fixture');
-
-
+ const beforeText=plansCalled,beforeDeniedVideo=submits;
+ assert.throws(()=>service.submit(alice.id,brand.id,thread,{...unlinked,text_provider:'gemini'},randomUUID()),/GPT only/);
+ assert.equal(plansCalled,beforeText);assert.equal(submits,beforeDeniedVideo);
 });
 
 test('carousel is one immutable ordered composition; scoped reviewers approve exact canonical slides and edits invalidate it',async()=>{

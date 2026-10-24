@@ -2,6 +2,7 @@ import {validLearning} from './learning-context.js';
 import {CreativeError,type CreativeInput,type SkillResult} from './creative-contracts.js';
 import {CREATIVE_SKILLS} from './creative-skill-pins.js';
 export const VIDEO_SKILLS={
+ "brand-engine":CREATIVE_SKILLS["brand-engine"],
  video:{skill_sha256:'0a35e32dda553707996bf383c00ecf971d05127d35d5d814577457c23a3ab591',tree_sha256:'76696e47ce406b06143b50a08d75effa0a5dfd109f12beb86fd5e3d1b68900f1'},
  'ad-creative':CREATIVE_SKILLS['ad-creative'],'product-marketing':CREATIVE_SKILLS['product-marketing'],social:CREATIVE_SKILLS.social,
 };

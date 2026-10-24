@@ -328,7 +328,7 @@ export function ContentWorkspace({
               }}
             >
               <Field label="Plan duration (days)">{id=><input id={id} type="number" min={1} max={90} required value={planDays} onChange={e=>{setPlanDays(Number(e.target.value));setPostCount(Number(e.target.value));}}/>}</Field>
-              <Field label="Planning model">{id=><select id={id} value={planningProvider} onChange={e=>setPlanningProvider(e.target.value)}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
+              <Field label="Planning model">{id=><select id={id} value={planningProvider} onChange={e=>setPlanningProvider(e.target.value)}><option value="openai">OpenAI GPT</option></select>}</Field>
               <Field label="Videos in this plan">{id=><input id={id} type="number" min={0} max={Math.min(postCount,30)} required value={videoCount} onChange={e=>setVideoCount(Number(e.target.value))}/>}</Field>
               <Field label="Draft post count">{id=><input id={id} type="number" min={1} max={90} required value={postCount} onChange={e=>setPostCount(Number(e.target.value))}/>}</Field>
               <Field label="Plan starts on">

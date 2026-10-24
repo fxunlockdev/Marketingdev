@@ -387,7 +387,7 @@ export function CanvasScreen({ business }: { business: Business }) {
                   />
                 )}
               </Field>
-              <Field label="Creative planning model">{id=><select id={id} value={textProvider} onChange={e=>{setTextProvider(e.target.value);submitKey.current=crypto.randomUUID();}}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
+              <Field label="Creative planning model">{id=><select id={id} value={textProvider} onChange={e=>{setTextProvider(e.target.value);submitKey.current=crypto.randomUUID();}}><option value="openai">OpenAI GPT</option></select>}</Field>
               <p className="muted">Your selected model writes the creative brief. OpenAI generates and edits the image.</p>
               {!edit && (
                 <div className="studio-options">

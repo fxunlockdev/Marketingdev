@@ -83,7 +83,7 @@ test('real Temporal and isolated original skills persist 30 grounded channel dra
  const w=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:queue,workflowsPath:fileURLToPath(new URL('../../dist/asset-workflow.js',import.meta.url)),activities:{generatePlan:async s=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await handler.run(s);}finally{clearInterval(timer);}},failPlan:s=>handler.fail(s)}});
  try{const client=new Client({connection:clientConnection,namespace:config.jobs.namespace});assert.equal(await w.runUntil(()=>client.workflow.execute('generatePlanWorkflow',{workflowId:'plan-test-'+j.id,taskQueue:queue,args:[scope(b,j)]})),'succeeded');}finally{await connection.close();await clientConnection.close();}
  assert.equal(calls,before+1);const status=(await planning.jobs(alice,b.id)).jobs[0];assert.ok(status.output_plan_id);
- const result=await planning.detail(alice,b.id,status.output_plan_id);assert.equal(result.origin,'generated');assert.equal(result.strategy.slots.length,30);assert.deepEqual(result.skill_manifest.skills.map(s=>s.name).sort(),['marketing-plan','product-marketing','social']);assert.ok(result.skill_manifest.reserved_cost_micros>0);
+ const result=await planning.detail(alice,b.id,status.output_plan_id);assert.equal(result.origin,'generated');assert.equal(result.strategy.slots.length,30);assert.deepEqual(result.skill_manifest.skills.map(s=>s.name).sort(),['brand-engine','marketing-plan','product-marketing','social']);assert.ok(result.skill_manifest.reserved_cost_micros>0);
  const slots=await plans.list(alice,b.id,{...range,plan_id:result.id});assert.equal(slots.total,30);assert.ok(slots.slots.every(s=>s.state==='content_needed'&&s.creative_version_id===null&&s.approved_by===null));assert.equal(new Set(slots.slots.map(s=>s.strategy_slot_index)).size,30);
  assert.equal((await plans.list(alice,b.id,{...range,plan_id:result.id,channel:'linkedin'})).total,15);
  assert.equal((await planning.detail(alice,b.id,old.id)).objective,'Keep this');assert.equal(await countPlans(b),2);
@@ -175,40 +175,11 @@ test('mixed six-day planning persists editable scripts and no video generation u
  assert.equal((await plans.history(alice,b.id,slot.id)).events.at(-1).snapshot.video_draft.prompt,draft.prompt);
 });
 
-test('Gemini choice survives real skill tool turns, saves mixed plans and keeps independent funding and immutable model choice',async()=>{
- const {GoogleGenAI}=await import('@google/genai'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');
- const b=await fresh();await grant(b);const before=calls;let geminiCalls=0;
- const signed=[{functionCall:{name:'read_file',args:{file_path:'/skills/marketing-plan/SKILL.md'}},thoughtSignature:'TEST opaque signature'}];
- const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
-  geminiCalls++;const wire=JSON.parse(init.body);assert.ok(!JSON.stringify(wire).includes('LOCAL GEMINI MOCK'));
-  if(geminiCalls===1)return Response.json({candidates:[{content:{role:'model',parts:signed},finishReason:'STOP'}]});
-  assert.deepEqual(wire.contents.find(m=>m.role==='model').parts,signed);assert.ok(wire.contents.at(-1).parts[0].functionResponse.response.result.includes('marketing'));
-  const raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text;
-  const input=JSON.parse(raw.slice(raw.indexOf('\n')+1));return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(generatedPlan(input))}]},finishReason:'STOP'}]});
- }}}));
- await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'gemini',true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org.id,b.id]);
- const body={starts_on:'2026-11-01',provider:'gemini',duration_days:6,post_count:6,video_count:2},key=randomUUID(),j=await planning.submit(alice,b.id,body,key);
- await assert.rejects(planning.submit(alice,b.id,{...body,provider:'openai'},key),/another planning request/);
- const mixed=new PlanningJobs(jobs,skills,provider,gemini);assert.equal(await mixed.run(scope(b,j)),'succeeded');assert.equal(geminiCalls,2);assert.equal(calls,before);
- const request=(await admin.query('SELECT provider,selected_model,output_plan_id FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];assert.equal(request.provider,'gemini');assert.equal(request.selected_model,'gemini-fixture');
- await assert.rejects(app.database.transaction(alice,org.id,true,db=>db.query("UPDATE app.planning_requests SET selected_model='gemini-other' WHERE job_id=$1",[j.id]),b.id),e=>e.code==='42501');
- const saved=await planning.detail(alice,b.id,request.output_plan_id);assert.equal(saved.skill_manifest.provider,'gemini');assert.equal(saved.strategy.slots.filter(s=>s.format==='video').length,2);
- const ledger=(await admin.query('SELECT provider,status FROM app.planning_calls WHERE job_id=$1',[j.id])).rows;assert.equal(ledger.length,2);assert.ok(ledger.every(r=>r.provider==='gemini'&&r.status==='succeeded'));
- assert.equal(await mixed.run(scope(b,j)),'finished');assert.equal(geminiCalls,2);
- const changed=await planning.submit(alice,b.id,body,randomUUID());await admin.query("UPDATE app.planning_grants SET model='gemini-other' WHERE brand_id=$1 AND provider='gemini'",[b.id]);assert.equal(await mixed.run(scope(b,changed)),'rejected');assert.equal((await row(changed)).error_code,'PLAN_CONFIG_CHANGED');assert.equal(geminiCalls,2);
- assert.throws(()=>planning.submit(alice,b.id,{...body,provider:'claude'},randomUUID()));
+test('content planning rejects non-GPT providers before recording jobs or spending',async()=>{
+ const b=await fresh(),before=calls;
+ for(const provider of ['gemini','claude'])assert.throws(()=>planning.submit(alice,b.id,{starts_on:'2026-11-01',provider},randomUUID()),/GPT only/);
+ assert.equal((await planning.jobs(alice,b.id)).jobs.length,0);assert.equal(calls,before);
 });
-
-test('Gemini uncertain outcomes remain held and unavailable provider funding never falls back to OpenAI',async()=>{
- const {GoogleGenAI}=await import('@google/genai'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');let sent=0;const before=calls,b=await fresh();await grant(b);
- const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL MOCK',httpOptions:{retryOptions:{attempts:1},fetch:async()=>{sent++;throw new TypeError('MOCK lost response');}}})),mixed=new PlanningJobs(jobs,skills,provider,gemini),body={starts_on:'2026-11-01',provider:'gemini'};
- let j=await planning.submit(alice,b.id,body,randomUUID());assert.equal(await mixed.run(scope(b,j)),'rejected');assert.equal((await row(j)).error_code,'PLAN_STAGING_APPROVAL_REQUIRED');assert.equal(sent,0);assert.equal(calls,before);
- await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'gemini',true,'gemini-fixture',now()+interval '1 hour',1,0.01,0.02,'LOCAL TEST ONLY')",[org.id,b.id]);
- j=await planning.submit(alice,b.id,body,randomUUID());assert.equal(await mixed.run(scope(b,j)),'rejected');assert.equal((await row(j)).error_code,'PLAN_BUDGET_EXHAUSTED');assert.equal(sent,0);
- await admin.query("UPDATE app.planning_grants SET budget_micros=10000000 WHERE brand_id=$1 AND provider='gemini'",[b.id]);j=await planning.submit(alice,b.id,body,randomUUID());assert.equal(await mixed.run(scope(b,j)),'unknown');assert.equal(sent,1);assert.equal(calls,before);
- await assert.rejects(planning.submit(alice,b.id,body,randomUUID()),/uncertain/);assert.equal(await mixed.run(scope(b,j)),'finished');assert.equal(sent,1);
-});
-
 
 const loopBody={starts_on:'2090-01-01',duration_days:7,post_count:4,video_count:2,repeat_cycles:3,loop_budget_micros:1000000,confirm_recurring_spend:true};
 test('recurring planning persists bounded idempotent cycles, defers future work and refreshes approved context once per cycle',async()=>{

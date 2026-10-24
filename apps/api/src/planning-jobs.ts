@@ -32,6 +32,7 @@ export class PlanningJobs {
     if(prior.status==='submitted')await db.query("UPDATE app.planning_calls SET status='unknown' WHERE job_id=$1 AND step=$2",[j.id,message.step]);
     return {blocked:prior.status==='rejected'?'PLAN_PROVIDER_REJECTED':'PLAN_SUBMISSION_UNKNOWN'};
    }
+   if(providerName!=='openai')throw new CreativeError('PLAN_GPT_REQUIRED');
    if(loop&&(await db.query("SELECT job_id FROM app.planning_calls WHERE loop_id=$1 AND job_id<>$2 AND status IN ('submitted','unknown') LIMIT 1",[loop.id,j.id])).rowCount)throw new CreativeError('PLAN_LOOP_NEEDS_ATTENTION');
    const grant=(await db.query('SELECT * FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,providerName])).rows[0];
    if(!grant)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');

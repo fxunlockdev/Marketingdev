@@ -17,7 +17,7 @@ export class Planning {
   if(!Number.isInteger(days)||Number(days)<1||Number(days)>90||!Number.isInteger(count)||Number(count)<1||Number(count)>90)throw new BadRequestException('Choose 1–90 days and 1–90 posts');
   const videos=v.video_count??0;
   if(!Number.isInteger(videos)||Number(videos)<0||Number(videos)>Math.min(Number(count),30))throw new BadRequestException('Choose up to 30 videos within the total post count');
-  const provider=v.provider??'openai';if(!['openai','gemini'].includes(String(provider)))throw new BadRequestException('Choose OpenAI or Gemini');
+  const provider=v.provider??'openai';if(provider!=='openai')throw new BadRequestException('Content planning uses OpenAI GPT only');
   if(v.planning_mode!==undefined&&v.planning_mode!=='natural')throw new BadRequestException('Unsupported planning mode');
   const referenceId=v.reference_plan_id===undefined?undefined:uuid(String(v.reference_plan_id));
   if(v.planning_mode==='natural'&&!brief.trim())throw new BadRequestException('Describe what you want to plan');

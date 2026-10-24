@@ -3,7 +3,7 @@ import type {PoolClient} from 'pg';
 export type CreativeTextProvider='openai'|'gemini';
 export function creativeTextProvider(value:unknown):CreativeTextProvider{
  if(value===undefined)return 'openai';
- if(value!=='openai'&&value!=='gemini')throw new BadRequestException('Choose OpenAI or Gemini for creative planning');
+ if(value!=='openai')throw new BadRequestException('Creative planning uses OpenAI GPT only');
  return value;
 }
 export async function creativeTextModel(db:PoolClient,org:string,brand:string,provider:CreativeTextProvider):Promise<string|null>{

@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-10-24T06:55:12.149536+00:00",
+  "status": "MOCKED",
+  "deployed": false,
+  "paid_provider_calls": false,
+  "tests": {
+    "work/gpt-brand-exports-retry.log": 14,
+    "work/gpt-brand-creative.log": 16,
+    "work/gpt-brand-contracts.log": 144,
+    "work/brand-engine-planning.log": 19
+  },
+  "planning_note": "19-test Brand Engine run preceded GPT-only routing enforcement; updated planning suite running",
+  "web_build": "passed",
+  "browser": "temporary Temporal test server startup failed; retry pending",
+  "sha256": {
+    "work/gpt-brand-exports-retry.log": "241a8aa612a35626f295af3adfc41e58ac0eb77146bf2508d5eb95afd29c47ee",
+    "work/gpt-brand-creative.log": "f6a8c7c4c31c7df63612ce1a460d51e251e8b068a22c4615851efe94da8f2cbf",
+    "work/gpt-brand-contracts.log": "3c1022855ef46b644b0292f8d83118d8474e8114591c1e860521c699b41096b0",
+    "work/brand-engine-planning.log": "ade26e9b1b61838c310f78eca182f272211227dc51b25af1f9ab36e07deb9056",
+    "apps/api/src/creative-planning.ts": "27fa31cfd733aef30dc0560a52c5f61aeafd231648005c4b5a1f1208f0a76558",
+    "apps/api/src/creative-jobs.ts": "e29e7e8ff9f2489cb26c22d9989bad4d65b72fa2a1a31f465df4dfaf2b0f43b2",
+    "apps/api/src/planning.ts": "41300fec818bb41dacbebc2127502593ea2fa14cc36349d43cf69a79b30f929c",
+    "apps/api/src/planning-jobs.ts": "9cec6d172f8a972f44781f02313e0b1d4ceb9c23c21f77b993dca79266bd0406",
+    "apps/skills/runtime.py": "6a098447dc769c99dca7ab09aa28019fe65482185ca9e377a06fb5513f3b96be",
+    "scripts/brand_engine_audit.py": "f12521916163b85f2b64d744917db93ccb27c7f7adda3bd197fe0a07de0997a0",
+    "tests/foundation/exports.test.mjs": "96c598a21df7953004ff7a86e5921a9591a28bd3d9ec1f5ca3b6adef85e7b788"
+  }
+}

@@ -18,7 +18,7 @@ export function VideoRequest({business,threadId,reference}:{business:Business;th
  <p>First draft a script and prompt. Video generation starts only after you approve that draft. Drafting uses your text-model allowance.</p>
  {error!==undefined&&<Notice error={error}/>}<p role="status">{notice}</p>
  {!enabled?<p>Video generation is not configured yet.</p>:<fieldset disabled={busy||slotLoading||!['owner','admin','editor'].includes(business.role)}>
- <Field label="Video script model">{id=><select id={id} value={textProvider} onChange={e=>{setTextProvider(e.target.value);key.current=crypto.randomUUID();}}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
+ <Field label="Video script model">{id=><select id={id} value={textProvider} onChange={e=>{setTextProvider(e.target.value);key.current=crypto.randomUUID();}}><option value="openai">OpenAI GPT</option></select>}</Field>
  <Field label="Video idea">{id=><textarea id={id} value={prompt} maxLength={4000} onChange={e=>{setPrompt(e.target.value);key.current=crypto.randomUUID();}}/>}</Field>
  <Field label="Video length (seconds)">{id=><input id={id} type="number" min={3} max={15} value={duration} onChange={e=>{setDuration(Number(e.target.value));key.current=crypto.randomUUID();}}/>}</Field>
  <Field label="Video channel">{id=><select id={id} disabled={!!slot} value={channel} onChange={e=>{setChannel(e.target.value);key.current=crypto.randomUUID();}}><option value="instagram">Instagram</option><option value="linkedin">LinkedIn</option></select>}</Field>

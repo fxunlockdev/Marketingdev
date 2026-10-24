@@ -1,7 +1,8 @@
 import {CreativeError,validateBrief,type CreativeBrief,type CreativeInput,type SkillResult} from './creative-contracts.js';
 import {CREATIVE_SKILLS} from './creative-skill-pins.js';
 import {validLearning} from './learning-context.js';
-export const CAROUSEL_SKILLS={image:CREATIVE_SKILLS.image,social:CREATIVE_SKILLS.social,'product-marketing':CREATIVE_SKILLS['product-marketing'],copywriting:{skill_sha256:'13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567',tree_sha256:'e03f9c1f236b8e8a6ecd15afb29eb21aad2fd8ea18d044ce31c9f76d9976f626'}} as const;
+export const CAROUSEL_SKILLS={
+ "brand-engine":CREATIVE_SKILLS["brand-engine"],image:CREATIVE_SKILLS.image,social:CREATIVE_SKILLS.social,'product-marketing':CREATIVE_SKILLS['product-marketing'],copywriting:{skill_sha256:'13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567',tree_sha256:'e03f9c1f236b8e8a6ecd15afb29eb21aad2fd8ea18d044ce31c9f76d9976f626'}} as const;
 export type CarouselInput={task:'carousel';brand:CreativeInput['brand'];prompt:string;channel:'linkedin'|'instagram';slide_count:number};
 export type CarouselPlan={title:string;caption:string;visual_direction:string;palette:string[];warnings:string[];slides:{position:number;headline:string;body:string;cta:string;image_prompt:string;alt_text:string;fact_ids:string[]}[]};
 export type CarouselResult=Omit<SkillResult,'brief'>&{plan:CarouselPlan};

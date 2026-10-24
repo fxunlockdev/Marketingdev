@@ -2,6 +2,8 @@
 
 Updated 24 October 2026. Guided local setup now wraps tested Railway activation and business allowance preview/apply; the operator web UI and live provider acceptance still remain. Billing is excluded by owner request. “Implemented” below describes code and local acceptance, not LIVE_VERIFIED or production readiness. Provider calls in local tests use explicit mocks. Owner has shown saved provider credentials and will perform live tests; worker activation, allowances and video settings remain separate.
 
+Local update: owner confirmed GPT-first; Claude deferred. Brand Engine is checksum-pinned alongside the original 52 skills. Static foundation (16), export/video (14), contracts (144) and web build pass; updated planning/browser regression and coordinated deployment remain.
+
 Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
 
 Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 049. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.

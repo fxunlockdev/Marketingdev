@@ -95,6 +95,7 @@ export class CreativeJobs {
               : "CREATIVE_SUBMISSION_UNKNOWN",
         };
       }
+      if(providerName!=='openai')throw new CreativeError('CREATIVE_GPT_REQUIRED');
       if((await db.query('SELECT 1 FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id WHERE c.job_id=$1 AND r.revoked_at IS NOT NULL',[j.id])).rowCount)throw new CreativeError('CREATIVE_REFERENCE_REVOKED');
       const grant=await this.plannerGrant(db,j,providerName);
       if (!grant) throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");

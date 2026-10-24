@@ -1,3 +1,15 @@
+## GPT-first confirmation and export test repair — verification running
+
+Owner deferred Claude and confirmed GPT-first testing. Removed the unused Anthropic SDK addition; package files retain their prior pins. The second marketing-skills ZIP is byte-identical to the existing archive and was not duplicated. GPT text planning / GPT Image / Higgsfield remain the selected path.
+
+The export suite failed at JavaScript parsing before any test because the updated denial case redeclared beforePaid in the same scope. Renamed the test-local variable and verified parsing. All 14 export/video tests now pass, including actual isolated video rendering and private persisted output with MOCK providers. Updated planning suite is running. Canvas browser attempt terminated during temporary Temporal test-server startup (connection refused), before product assertions; retry sequentially after planning completes. Actual static creative foundation passed all 16 tests, including private uploaded references, image editing and approvals. All 144 contracts and the web build passed. Machine evidence: gpt-brand-engine-local.json. No deployment or live provider claim.
+
+## Brand Engine import — runtime verification in progress
+
+Imported the supplied brand-engine-gpt-2k.zip unchanged with an immutable archive checksum and per-file/skill/tree hashes in inventory/brand-engine.json. The existing networkless Deep Agents runtime mounts its Markdown only and pins brand-engine alongside the original skills for static, calendar, carousel and video planning. Runtime contracts require the new exact skill digest and actual skill read. Desvio's approved brand JSON, schemas, persistence and approval rules take precedence over the archive's local-folder/onboarding/autopilot instructions; no helpers or YAML agents execute. No implied 2K output claim or architecture change. No license file exists in this owner-supplied archive; no third-party license was invented.
+
+The imported runtime passed all 19 actual isolated planning tests with MOCK providers. GPT-only new request validation, fresh worker-call denial and matching UI choices are now implemented; cached paid results and uncertain historical operations retain their existing handling. New policy tests prove Gemini cannot submit a fresh creative call and cached output remains readable. Static/image, video/export, updated planning and web checks are running. Direct uploaded-image video selection remains pending. No deployment or live provider call.
+
 ## Upload guidance — local copy update
 
 Added an encouraging note beside Brand files in onboarding explaining that existing logos, product photos and guidelines help tailor creatives, and can be added later. Copy-only; no upload behavior change. Brand Engine runtime integration remains in progress and GPT-only enforcement is not yet complete. Not deployed.

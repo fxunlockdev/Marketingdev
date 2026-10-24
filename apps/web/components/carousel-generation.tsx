@@ -22,7 +22,7 @@ export function CarouselGeneration({businessId,canEdit,onOpen,onSlide}:{business
  <Field label="Carousel idea">{id=><textarea id={id} required maxLength={4000} value={prompt} onChange={e=>{setPrompt(e.target.value);changed();}}/>}</Field>
  <Field label="Number of carousel slides">{id=><input id={id} type="number" min={2} max={10} required value={count} onChange={e=>{setCount(Number(e.target.value));changed();}}/>}</Field>
  <Field label="Generate carousel for">{id=><select id={id} value={channel} onChange={e=>{setChannel(e.target.value);changed();}}><option value="linkedin">LinkedIn</option><option value="instagram">Instagram</option></select>}</Field>
- <Field label="Carousel planning model">{id=><select id={id} value={provider} onChange={e=>{setProvider(e.target.value);changed();}}><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>}</Field>
+ <Field label="Carousel planning model">{id=><select id={id} value={provider} onChange={e=>{setProvider(e.target.value);changed();}}><option value="openai">OpenAI GPT</option></select>}</Field>
  <p className="hint">Creates square images with OpenAI. Generation uses your configured allowance; no separate prompt approval is required for static images.</p><button type="submit" className="primary" disabled={!prompt.trim()||!data}>Generate carousel</button>
  </fieldset></form>}
  {running&&<p role="status">Your carousel is being prepared. You can leave this page and return later.</p>}{held&&<p role="status">A generation result needs reconciliation. Further generation is paused to prevent duplicate charges.</p>}
