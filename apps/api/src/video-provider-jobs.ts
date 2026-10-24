@@ -1,3 +1,4 @@
+import {authenticatedVideoOutput} from './video-output.js';
 import {exceedsAllowance} from "./spending-allowance.js";
 import {randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
@@ -114,7 +115,8 @@ export class VideoProviderJobs {
   if(!await this.#jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
   const r=(await db.query('SELECT phase,encrypted_output FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
   if(r?.phase!=='completed')throw new VideoStateError('VIDEO_OUTPUT_NOT_READY');
-  return this.#vault.open(scope,'output',r.encrypted_output) as {url:string};
+  const output=this.#vault.open(scope,'output',r.encrypted_output) as {url:string};
+  return authenticatedVideoOutput(output.url);
  });}
  async cancelPrepared(scope:JobScope,code:string){return this.transaction(scope,async(db,j)=>{
   const r=(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];

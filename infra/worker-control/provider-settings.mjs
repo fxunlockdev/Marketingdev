@@ -25,6 +25,13 @@ export function providerRuntimeSettings(input){
   if(!credentials.OPENAI_API_KEY&&!credentials.GEMINI_API_KEY)throw Error();
   if(!validHiggsfieldCredential(credentials.HIGGSFIELD_CREDENTIALS))throw Error();
   if(!/^[a-f0-9]{64}$/i.test(input.VIDEO_ENCRYPTION_KEY??''))throw Error();
+  const policy=input.HIGGSFIELD_OUTPUT_POLICY??'exact_origins';
+  if(!['exact_origins','authenticated_provider_result'].includes(policy))throw Error();
+  if(policy==='authenticated_provider_result'){
+   if(input.HIGGSFIELD_OUTPUT_ORIGINS)throw Error();
+   new VideoDownload([],undefined,policy);
+   return {...credentials,VIDEO_ENABLED:'true',VIDEO_ENCRYPTION_KEY:input.VIDEO_ENCRYPTION_KEY,HIGGSFIELD_OUTPUT_POLICY:policy};
+  }
   if(typeof input.HIGGSFIELD_OUTPUT_ORIGINS!=='string'||input.HIGGSFIELD_OUTPUT_ORIGINS.length>4096)throw Error();
   const origins=input.HIGGSFIELD_OUTPUT_ORIGINS.split(',');
   if(new Set(origins).size!==origins.length||origins.some(origin=>origin.includes('*')))throw Error();

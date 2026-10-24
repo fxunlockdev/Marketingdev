@@ -11,3 +11,9 @@ test('host configuration keeps exact pins, disabled providers and only allowlist
 test('remote Docker, extra administrative credentials, mutable images and implicit enabling are denied',()=>{
  for(const change of [{DOCKER_HOST:'tcp://example.test:2375'},{DOCKER_CONTEXT:'other'},{MIGRATION_DATABASE_URL:'secret'},{APP_DATABASE_URL:'secret'},{SMTP_PASSWORD:'secret'},{DESVIO_WORKER_IMAGE:'latest'},{VIDEO_RUNTIME_IMAGE:undefined},{POSTIZ_PUBLISHING_ENABLED:undefined},{APP_MODE:'production'}])assert.throws(()=>workerHostSpec({...fixture(),...change}),/WORKER_/);
 });
+
+test('worker host forwards only the explicit authenticated video policy and rejects conflicting modes',()=>{
+ const env={...fixture(),OPENAI_API_KEY:'fixture',VIDEO_ENABLED:'true',VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_CREDENTIALS:'fixture:key',HIGGSFIELD_OUTPUT_POLICY:'authenticated_provider_result'};
+ assert.equal(workerHostSpec(env).values.HIGGSFIELD_OUTPUT_POLICY,'authenticated_provider_result');
+ for(const change of [{HIGGSFIELD_OUTPUT_POLICY:'all'},{HIGGSFIELD_OUTPUT_POLICY:'exact_origins'},{HIGGSFIELD_OUTPUT_ORIGINS:'https://example.com'}])assert.throws(()=>workerHostSpec({...env,...change}),/WORKER_CONFIGURATION_INVALID/);
+});

@@ -50,7 +50,7 @@ const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
 const carousel=new CarouselJobs(jobs,creative,exporter);
 const video=config.video?new VideoJobs(jobs,new VideoReferences(undefined,jobs,config.video.encryptionKey,config.renderImage!,config.video.mode),creative,
  new VideoProviderJobs(jobs,new HiggsfieldClient({mode:config.video.mode,credentials:config.video.credentials,models:[HIGGSFIELD_MODELS.image],referenceOrigins:[new URL(config.storage.endpoint).origin]}),config.video.encryptionKey),
- new VideoDownload(config.video.outputOrigins),new VideoRenderer(config.video.image)):undefined;
+ new VideoDownload(config.video.outputOrigins,undefined,config.video.outputPolicy),new VideoRenderer(config.video.image)):undefined;
 const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue,config.provisionTaskQueue);
 async function carouselActivity<T>(action:()=>Promise<T>):Promise<T>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await action();}catch{throw ApplicationFailure.retryable('Carousel processing temporarily unavailable','CarouselUnavailable');}finally{clearInterval(timer);}}
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),

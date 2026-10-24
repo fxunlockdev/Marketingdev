@@ -84,7 +84,7 @@ export class VideoJobs {
    if(state.phase!=='completed')return this.providerStep(scope);
    let base=await this.transaction(scope,async(db,j)=>(await db.query('SELECT * FROM app.video_bases WHERE job_id=$1',[j.id])).rows[0]);
    if(!base){
-    const remote=await this.provider.output(scope),untrusted=await this.download.read(remote.url),clean=await this.renderer.render(untrusted.bytes,request.duration_seconds,[]);
+    const remote=await this.provider.output(scope),untrusted=await this.download.readProviderOutput(remote),clean=await this.renderer.render(untrusted.bytes,request.duration_seconds,[]);
     const key=`video/${scope.organizationId}/${scope.brandId}/${scope.jobId}/base/${clean.manifest.video_sha256}`;
     await this.jobs.store.persist(key,clean.video,'video/mp4',clean.manifest.video_sha256);
     base=await this.transaction(scope,async(db,j)=>{

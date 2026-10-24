@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-10-24T08:36:00.184782+00:00",
+  "passed": true,
+  "results": {
+    "contracts": {
+      "passed": 151,
+      "sha256": "d6bdbd40a3ff0d29c6dacbcb8c373204592b0acd465e93d6685b391321e37e6b"
+    },
+    "video_exports": {
+      "passed": 15,
+      "sha256": "52ec5ebff8123ec06f093d446c6429bd098522d02a395f9b469bdf5b22a5a78b"
+    },
+    "provider_settings_download": {
+      "passed": 13,
+      "sha256": "94e25cdbb5c4f7971f7827f561b36b8c4e05bd23b2ca5363336b275f3c64ca90"
+    },
+    "worker_host": {
+      "passed": 3,
+      "sha256": "ad04c599060ac5bcb30872439f30237e506924f438a65fd5650999a880d36d9b"
+    }
+  },
+  "deployed": false,
+  "paid_calls": false,
+  "scope": "Local backend export/video workflows with mocked provider responses, plus output provenance/SSRF and host configuration contracts. No live provider success."
+}

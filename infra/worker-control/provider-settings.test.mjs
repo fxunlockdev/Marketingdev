@@ -28,3 +28,9 @@ test('complete copied Higgsfield token is preserved unchanged and never implicit
  const active=providerRuntimeSettings({VIDEO_ENABLED:'true',OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:key,VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_OUTPUT_ORIGINS:'https://video.example.org'});
  assert.equal(active.HIGGSFIELD_CREDENTIALS,key);
 });
+
+test('authenticated provider output is an explicit exclusive operator policy',()=>{
+ const input={VIDEO_ENABLED:'true',OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key',VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_OUTPUT_POLICY:'authenticated_provider_result'};
+ assert.equal(providerRuntimeSettings(input).HIGGSFIELD_OUTPUT_POLICY,'authenticated_provider_result');
+ for(const change of [{HIGGSFIELD_OUTPUT_ORIGINS:'https://example.com'},{HIGGSFIELD_OUTPUT_POLICY:'any_url'},{VIDEO_ENCRYPTION_KEY:''}])assert.throws(()=>providerRuntimeSettings({...input,...change}),{message:'INVALID_VIDEO_SETTINGS'});
+});
