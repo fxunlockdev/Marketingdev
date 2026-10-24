@@ -1,0 +1,54 @@
+{
+  "checked_at": "2026-10-24T08:32:07.729584+00:00",
+  "passed": true,
+  "organization_id": "39c9d9c9-6247-44b4-8afa-d7bcada89bd6",
+  "change_id": "614e8723-b770-43f6-85aa-d8f3e6d89c6f",
+  "owner_session_verified": true,
+  "grants_read_back": [
+    {
+      "kind": "creative",
+      "enabled": true,
+      "quality": "high",
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "text_model": "gpt-4.1-2025-04-14",
+      "image_model": "gpt-image-2.5-sunburst",
+      "budget_micros": null,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8,
+      "max_image_request_micros": 5000000
+    },
+    {
+      "kind": "insights",
+      "model": "gpt-4.1-2025-04-14",
+      "enabled": true,
+      "provider": "openai",
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "budget_micros": null,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8
+    },
+    {
+      "kind": "onboarding",
+      "model": "gpt-4.1-2025-04-14",
+      "enabled": true,
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "budget_micros": null,
+      "max_tokens_per_image": 16384,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8
+    },
+    {
+      "kind": "planning",
+      "model": "gpt-4.1-2025-04-14",
+      "enabled": true,
+      "provider": "openai",
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "budget_micros": null,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8
+    }
+  ],
+  "migration": 57,
+  "live_provider_calls": false,
+  "scope": "Actual dev operator configuration and readback for future businesses only; no live model entitlement or generation proof."
+}
