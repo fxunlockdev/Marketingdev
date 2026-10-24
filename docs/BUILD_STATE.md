@@ -1,3 +1,9 @@
+## Instagram rendition renderer — locally verified, not deployed
+
+The existing isolated Fabric/canvas renderer now supports an explicit `instagram-jpeg` output mode alongside unchanged default PNG rendering. It fits all artwork into a white 1080-square JPEG without cropping, records the exact canonical PNG source hash and placement in its manifest, and includes a preview/approval warning. This is an explicit future channel rendition, never a publishing-time transformation of approved bytes. Worker adapter validates MIME, dimensions, byte hash and a full image decode.
+
+Actual pinned networkless container tests pass for square, landscape and portrait artwork: correct format/dimensions, source-hash binding, center artwork and padded border pixels, repeatable output hashes, unsupported-format denial and preserved PNG defaults. Three tests passed; TypeScript build passed. See `instagram-rendition-runtime.json`. The new local renderer image has not been activated in dev; existing approvals are untouched. Next: immutable stored rendition/request/approval schema and worker path, customer exact-JPEG preview, then publication binding. Do not enable the new image transport before that path passes.
+
 ## Instagram JPEG transport — local preparation, not customer enabled
 
 Added hash-checked JPEG upload without Postiz adjustment and ordered single-image/carousel submission to the pinned Instagram standalone provider. Upload performs actual decode and enforces a deliberately conservative Desvio image envelope; this is not a claim of all Meta-supported sizes. Submission validates account provider, caption, owned media URLs, order and duplicate slides; ambiguous responses are not retried. Build and all 22 Postiz transport contracts passed (`work/instagram-images-contracts.log`), including unchanged uploaded bytes, invalid/truncated JPEGs and unknown submission outcome. Provider is MOCK. No publication service/UI path enables these methods yet.
