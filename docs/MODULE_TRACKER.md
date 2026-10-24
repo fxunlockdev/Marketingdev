@@ -43,7 +43,7 @@ Release remains blocked by the trusted live acceptance runner and actual provide
 
 ## Instagram follow-up — in development
 
-Single-step Instagram connection/reconnect backend and customer selector/return route are implemented locally. Eighteen Postiz contracts and 34 social foundation cases pass; the production web build and all eight connection browser journeys pass. Migration 050 is not deployed. Instagram publication/media validation remains open; no live OAuth is claimed.
+Single-step Instagram connection/reconnect backend and customer selector/return route are implemented locally. Eighteen Postiz contracts and 34 social foundation cases pass; the production web build and all eight connection browser journeys pass. Migration 050 is not deployed. Instagram Reel publication now passes local real database/rendering/worker and ten publishing browser journeys with MOCK Postiz; all 138 adapter contracts pass. Provider-specific account filtering and exact-video consent are wired. Migrations 050–051 remain undeployed. Static/carousel channel rendition approval, broader security verification and live OAuth/publication remain open. See instagram-reel-foundation.json and instagram-reel-browser.json.
 
 ## Remaining product work
 

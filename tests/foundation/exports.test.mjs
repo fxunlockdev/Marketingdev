@@ -270,8 +270,10 @@ test('approved export to original video skills, durable provider stage, actual m
 
 
 
- // Extend the same real generation/render/approval journey to a consented MOCK LinkedIn publication.
- const publishRequest=await service.submit(alice.id,brand.id,thread,{...body,slot_id:undefined,slot_revision:undefined,channel:'linkedin'},randomUUID());
+ // Both channels use actual canonical rendering, approval and durable submission; remote Postiz is MOCK.
+ let publicationAccount;
+ for(const channel of ['linkedin','instagram']){
+ const publishRequest=await service.submit(alice.id,brand.id,thread,{...body,slot_id:undefined,slot_revision:undefined,channel},randomUUID());
  assert.equal(await pipeline.step(scope(publishRequest)),'awaiting_approval');const publishDraft=await service.draft(alice.id,brand.id,publishRequest.id);
  await service.saveDraft(alice.id,brand.id,publishRequest.id,{brief:{...publishDraft.brief,video_prompt:'TEST FIXTURE user edited motion'},revision:1,approve:true});
  assert.equal(await pipeline.step(scope(publishRequest)),'accepted');assert.equal(await pipeline.step(scope(publishRequest)),'completed');assert.equal(await pipeline.step(scope(publishRequest)),'succeeded');
@@ -279,7 +281,8 @@ test('approved export to original video skills, durable provider stage, actual m
  await service.review(alice.id,brand.id,publishVersion.id,{decision:'in_review',feedback:'Review for publishing',revision:1,sha256:publishVersion.sha256});
  await service.review(alice.id,brand.id,publishVersion.id,{decision:'approved',feedback:'Approve exact video',revision:2,sha256:publishVersion.sha256,confirmed:true});
  const {proveVideoPublication}=await import('../fixtures/prove-video-publication.mjs');
- await proveVideoPublication({admin,jobs,store,businesses,exports,plans,org,brand,alice,bob,editor,video:publishVersion,image,staticImage:renderer.image});
+ publicationAccount=await proveVideoPublication({admin,jobs,store,businesses,exports,plans,org,brand,alice,bob,editor,video:publishVersion,image,staticImage:renderer.image,provider:channel==='linkedin'?'linkedin':'instagram-standalone',account:publicationAccount});
+ }
  const {GoogleGenAI}=await import('@google/genai'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');let geminiCalls=0;
  const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
   geminiCalls++;const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));

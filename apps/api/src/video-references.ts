@@ -73,7 +73,8 @@ export class VideoReferences extends VideoReferenceBindings {
     const p=await this.proof(db,j);
     let lease=(await db.query('SELECT * FROM app.video_reference_leases WHERE job_id=$1',[j.id])).rows[0];
     if(!lease){
-     const expires=new Date(Math.floor(Date.now()/1000)*1000+8*3600*1000),key=`video-reference/${j.organization_id}/${j.brand_id}/${j.id}/${p.sha256}`;
+     // Use the database transaction clock used by the lease RLS ceiling.
+     const expires=new Date((await db.query("SELECT date_trunc('second',now())+interval '8 hours' AS expires")).rows[0].expires),key=`video-reference/${j.organization_id}/${j.brand_id}/${j.id}/${p.sha256}`;
      const url=await this.#store.referenceURL(key,expires);
      lease=(await db.query('INSERT INTO app.video_reference_leases(job_id,organization_id,brand_id,object_key,sha256,bytes,encrypted_url,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[j.id,j.organization_id,j.brand_id,key,p.sha256,p.bytes,this.#vault.seal(scope,'reference',{url}),expires])).rows[0];
     }

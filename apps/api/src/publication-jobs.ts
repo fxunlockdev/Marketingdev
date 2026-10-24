@@ -1,3 +1,4 @@
+import {publicationChannel,validReel} from './publication-provider.js';
 import {carouselPublicationProof} from './carousel-publication-proof.js';
 import {videoPublicationProof} from './video-publication-proof.js';
 import {randomUUID} from 'node:crypto';
@@ -22,9 +23,10 @@ export class PublicationJobs {
   if(!this.enabled||!this.image)throw new PostizError('PUBLISHING_NOT_CONFIGURED');
   if(!await this.#social.permitted(db,j))throw new PostizError('PUBLICATION_ACCESS_REVOKED');
   if(!(await db.query('SELECT 1 FROM app.publication_grants WHERE channel_id=$1 AND expires_at>now()',[r.channel_id])).rowCount)throw new PostizError('PUBLICATION_GRANT_EXPIRED');
-  const a=await this.account(db,r),c=(await db.query("SELECT remote_id FROM app.social_channels WHERE id=$1 AND provider='linkedin' AND observed_state='available' AND NOT publishing_held AND account_revision=$2",[r.channel_id,a.revision])).rows[0];if(c?.remote_id!==r.remote_channel_id)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const a=await this.account(db,r),c=(await db.query("SELECT remote_id,provider FROM app.social_channels WHERE id=$1 AND provider=$3 AND observed_state='available' AND NOT publishing_held AND account_revision=$2",[r.channel_id,a.revision,r.provider])).rows[0];if(c?.remote_id!==r.remote_channel_id)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
   const e=r.carousel_version_id?await carouselPublicationProof(db,r.slot_id,this.image):r.video_version_id?await videoPublicationProof(db,r.slot_id,this.videoImage):await this.#proof.publicationProof(db,r.slot_id),s=(await db.query(`SELECT s.revision,s.planned_at,s.channel,v.caption FROM app.content_slots s JOIN app.${r.carousel_version_id?'carousel_versions':r.video_version_id?'video_versions':'creative_versions'} v ON v.id=s.${r.carousel_version_id?'carousel_version_id':r.video_version_id?'video_version_id':'creative_version_id'} WHERE s.id=$1`,[r.slot_id])).rows[0];
-  if(!s||s.revision!==r.slot_revision||s.channel!=='linkedin'||e.id!==(r.carousel_version_id??r.video_version_id??r.export_id)||e.sha256!==(r.carousel_sha256??r.video_sha256??r.image_sha256)||s.caption!==r.caption||new Date(s.planned_at).getTime()!==new Date(r.scheduled_at).getTime())throw new PostizError('PUBLICATION_APPROVAL_CHANGED');
+  if(!s||s.revision!==r.slot_revision||s.channel!==publicationChannel(r.provider)||e.id!==(r.carousel_version_id??r.video_version_id??r.export_id)||e.sha256!==(r.carousel_sha256??r.video_sha256??r.image_sha256)||s.caption!==r.caption||new Date(s.planned_at).getTime()!==new Date(r.scheduled_at).getTime())throw new PostizError('PUBLICATION_APPROVAL_CHANGED');
+  if(r.provider==='instagram-standalone'&&(!r.video_version_id||!validReel(e)||[...r.caption].length>2200))throw new PostizError('PUBLICATION_MEDIA_INCOMPATIBLE');
   if(new Date(r.scheduled_at).getTime()<=Date.now())throw new PostizError('PUBLICATION_TIME_PASSED');return {a,e};
  }
  async run(scope:JobScope):Promise<string>{
@@ -48,7 +50,8 @@ export class PublicationJobs {
    await this.#jobs.transaction(scope,async(db,j)=>{await db.query("SET LOCAL idle_in_transaction_session_timeout='90s'");await publicationLocks(db,j.brand_id);const current=await this.request(db,j);if(current.phase!=='submitting')throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');const {a}=await this.validate(db,j,current);
     let media=current.remote_media;
     if(current.carousel_version_id){const slides=await this.slides(db,current);if(slides.some((s:any)=>s.phase!=='uploaded'))throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');media=slides.map((s:any)=>s.remote_media);}
-    const remote=await this.client(scope,a).submitLinkedIn({integrationId:current.remote_channel_id,caption:current.caption,media,mediaType:current.carousel_version_id?'carousel':current.video_version_id?'video':'image',scheduledAt:new Date(current.scheduled_at).toISOString()});
+    const input={integrationId:current.remote_channel_id,caption:current.caption,media,scheduledAt:new Date(current.scheduled_at).toISOString()};
+    const remote=await (current.provider==='instagram-standalone'?this.client(scope,a).submitInstagramReel(input):this.client(scope,a).submitLinkedIn({...input,mediaType:current.carousel_version_id?'carousel':current.video_version_id?'video':'image'}));
     await db.query("UPDATE app.publication_requests SET remote_post_id=$2,phase='accepted' WHERE job_id=$1",[j.id,remote.postId]);await this.#social.finish(db,j,'succeeded');
    });return 'accepted';
   }catch(e){
@@ -86,7 +89,7 @@ export class PublicationJobs {
    const input=await this.#jobs.transaction(scope,async(db,j)=>{const r=await this.request(db,j);if(!r||r.phase!=='accepted'||!r.remote_post_id)throw new PostizError('PUBLICATION_NOT_ACKNOWLEDGED');if(!await this.#social.permitted(db,j))throw new PostizError('PUBLICATION_ACCESS_REVOKED');return {r,a:await this.account(db,r)};});
    const date=new Date(input.r.scheduled_at).getTime(),posts=await this.client(scope,input.a).listPosts(new Date(date-86400000).toISOString(),new Date(date+86400000).toISOString());
    const matches=posts.filter(p=>p.id===input.r.remote_post_id);if(matches.length>1)throw new PostizError('POSTIZ_RESPONSE_INVALID');const p=matches[0];
-   if(p&&(p.integrationId!==input.r.remote_channel_id||p.provider!=='linkedin'||p.content!==input.r.caption||Date.parse(p.publishDate)!==date))throw new PostizError('PUBLICATION_REMOTE_CHANGED');
+   if(p&&(p.integrationId!==input.r.remote_channel_id||p.provider!==input.r.provider||p.content!==input.r.caption||Date.parse(p.publishDate)!==date))throw new PostizError('PUBLICATION_REMOTE_CHANGED');
    let analytics:any;
    if(p?.state==='published'){
     try{analytics={...await this.client(scope,input.a).postAnalytics(input.r.remote_post_id),error_code:null};}

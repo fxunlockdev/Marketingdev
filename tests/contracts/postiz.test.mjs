@@ -154,3 +154,22 @@ test('Instagram standalone permits only the audited OAuth endpoint and provider-
  provider='linkedin';await assert.rejects(client().completeAuthorization('instagram-standalone','MOCK_STATE','MOCK_CODE','-480'),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');
  requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).beginAuthorization('instagram-standalone'),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
 });
+
+
+test('Instagram Reel scheduling uses its own provider settings and refuses incompatible media/accounts before submission',async()=>{
+ const input={integrationId:'ig-channel',caption:'Approved Reel',media:{id:'video-a',path:base+'/uploads/approved.mp4'},scheduledAt:'2026-12-01T00:00:00Z'};
+ requests=[];let provider='instagram-standalone',disabled=false;
+ handler=(req,res,body)=>{if(req.url.endsWith('/integrations'))return json(res,[{...integration,id:'ig-channel',identifier:provider,disabled}]);assert.equal(req.url,'/api/public/v1/posts');const value=JSON.parse(body);assert.deepEqual(value.posts,[{integration:{id:'ig-channel'},value:[{content:input.caption,image:[input.media]}],settings:{__type:'instagram-standalone',post_type:'post',is_trial_reel:false}}]);return json(res,[{postId:'ig-post',integration:'ig-channel'}]);};
+ assert.deepEqual(await client().submitInstagramReel(input),{postId:'ig-post',integrationId:'ig-channel',status:'accepted'});assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ for(const patch of [{caption:''},{caption:'x'.repeat(2201)},{caption:'bad\u0000caption'},{media:{...input.media,path:base+'/uploads/image.png'}},{media:{...input.media,path:'https://foreign.test/a.mp4'}},{media:[input.media]},{scheduledAt:'bad'}]){requests=[];await assert.rejects(client().submitInstagramReel({...input,...patch}),e=>e.code==='POSTIZ_POST_INVALID'&&e.outcome==='not_sent');assert.equal(requests.length,0);}
+ for(const name of ['linkedin','instagram','facebook']){requests=[];provider=name;await assert.rejects(client().submitInstagramReel(input),e=>e.code==='POSTIZ_CHANNEL_UNAVAILABLE');assert.equal(requests.filter(r=>r.method==='POST').length,0);}
+ provider='instagram-standalone';disabled=true;await assert.rejects(client().submitInstagramReel(input),e=>e.code==='POSTIZ_CHANNEL_UNAVAILABLE');
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).submitInstagramReel(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+});
+test('Instagram scheduling acknowledgement is not publication and ambiguous responses never retry',async()=>{
+ const input={integrationId:'ig-channel',caption:'Approved Reel',media:{id:'video-a',path:base+'/uploads/approved.mp4'},scheduledAt:'2026-12-01T00:00:00Z'};
+ for(const mode of ['lost','wrong-account','duplicate','bad-schema']){
+  requests=[];handler=(req,res)=>{if(req.url.endsWith('/integrations'))return json(res,[{...integration,id:'ig-channel',identifier:'instagram-standalone'}]);if(mode==='lost')return req.socket.destroy();return json(res,mode==='wrong-account'?[{postId:'ig-post',integration:'foreign'}]:mode==='duplicate'?[{postId:'ig-post',integration:'ig-channel'},{postId:'ig-post2',integration:'ig-channel'}]:{});};
+  await assert.rejects(client().submitInstagramReel(input),e=>e.outcome==='unknown');assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ }
+});

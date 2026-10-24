@@ -45,7 +45,7 @@ export class VideoRenderer {
    const pm=await sharp(poster,{limitInputPixels:640*640}).metadata();
    if(pm.format!=='png'||!pm.width||!pm.height||pm.width>640||pm.height>640||Math.abs(pm.width*m.height-pm.height*m.width)>Math.max(m.width,m.height))throw new VideoStateError('VIDEO_RENDER_OUTPUT_INVALID');
    await sharp(poster,{limitInputPixels:640*640}).raw().toBuffer();
-   return {video,poster,metadata:m,manifest:{version:value.version,image:this.image,input_sha256:inputHash,video_sha256:value.video.sha256,poster_sha256:value.poster.sha256,overlays}};
+   return {video,poster,metadata:m,manifest:{version:value.version,image:this.image,input_sha256:inputHash,video_sha256:value.video.sha256,poster_sha256:value.poster.sha256,metadata:{codec:m.codec,audio:m.audio,width:m.width,height:m.height,duration_ms:m.duration_ms},overlays}};
   }finally{await promisify(execFile)('docker',['rm','-f',name],{timeout:10000}).catch(()=>{});}
  }
 }

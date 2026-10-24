@@ -67,6 +67,7 @@ before(async()=>{
 // Actual local immutable rendered exports, approval API, private S3 and jobs.
 // All remote Postiz responses below are explicitly MOCK, never external posting.
 const encryptionKey=randomBytes(32).toString('hex'),credential='MOCK_'+randomBytes(24).toString('hex');
+let instagramChannelId;
 let provider,providerBase,publisher,handler,channelId,mode='',uploads=0,submissions=0,postRows=[],lastUpload,afterUpload,remoteState='QUEUE';
 const reply=(res,value,status=200)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));};
 async function setupProvider(){
@@ -77,10 +78,10 @@ async function setupProvider(){
  await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,channelId]);
  provider=createServer(async(req,res)=>{const parts=[];for await(const p of req)parts.push(p);const raw=Buffer.concat(parts);assert.equal(req.headers.authorization,credential);
   if(req.url==='/api/public/v1/me')return reply(res,{organization:{id:binding.remote_organization_id,name:'MOCK org'}});
-  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false}]);
+  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false},...(instagramChannelId?[{id:'instagram-mock-channel',identifier:'instagram-standalone',name:'MOCK Instagram profile',disabled:false}]:[])]);
   if(req.url.startsWith('/api/public/v1/analytics/post/'))return reply(res,mode==='analyticsFail'?{}:mode==='analyticsEmpty'?[]:[{label:'Impressions',data:[{date:'2026-10-23',total:120}],percentageChange:0}],mode==='analyticsFail'?503:200);
   if(req.url==='/api/public/v1/upload'){uploads++;const video=raw.includes(Buffer.from('Content-Type: video/mp4')),marker=Buffer.from(`Content-Type: ${video?'video/mp4':'image/png'}\r\n\r\n`),start=raw.indexOf(marker)+marker.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);if(video)assert.equal(lastUpload.subarray(4,8).toString(),'ftyp');else assert.equal((await sharp(lastUpload).metadata()).format,'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+(video?'.mp4':'.png')});}
-  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:'linkedin'},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
+  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:body.posts[0].settings.__type},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
   if(req.url.startsWith('/api/public/v1/posts?')){if(mode==='listFail')return reply(res,{},503);return reply(res,{posts:mode==='listMissing'?[]:mode==='listMismatch'?postRows.map(p=>({...p,integration:{...p.integration,id:'foreign-channel'}})):postRows});}reply(res,{},404);
  });await new Promise(r=>provider.listen(0,'127.0.0.1',r));providerBase='http://127.0.0.1:'+provider.address().port;
  publisher=new Publication(new SocialConnections(businesses,true),exports,true,config.videoRenderImage);handler=new PublicationJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test'},encryptionKey},renderer.image,true,config.videoRenderImage);
@@ -219,4 +220,27 @@ test('carousel preview checks every saved slide before consent, publishes once a
  await page.getByLabel(/I authorize this exact carousel/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.equal(uploads,uploadCount+2);
  await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
  const panel=page.getByRole('region',{name:'Post performance',exact:true});await panel.getByLabel('Performance format',{exact:true}).selectOption('carousel');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);await expect(panel.getByRole('heading',{name:/Carousel/})).toBeVisible();
+});
+
+
+test('Instagram Reel offers only its channel account and persists exact approved video publication (MOCK Postiz)',async()=>{
+ instagramChannelId=randomUUID();const sync=randomUUID();
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'social.sync','succeeded')",[sync,org.id,brand.id,alice.id]);
+ await admin.query("INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id) VALUES($1,$2,$3,'instagram-mock-channel','instagram-standalone','MOCK Instagram profile','available',now(),now(),1,$4)",[instagramChannelId,org.id,brand.id,sync]);
+ await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,instagramChannelId]);
+ const f=await publishingVideo({admin,store,canvas,exports,plans,alice,org,brand,fixture,render,image:config.videoRenderImage,staticImage:renderer.image,channel:'instagram'});
+ remoteState='PUBLISHED';mode='';const count=submissions;
+ await page.setViewportSize({width:1280,height:900});await page.goto(url(brand)+'?slot='+f.slot.id);
+ await expect(page.getByLabel('Exact approved video to be published')).toBeVisible();
+ const account=page.getByLabel('Publish to',{exact:true});
+ await expect(account.locator('option')).toHaveText(['Choose a Instagram account','MOCK Instagram profile · Instagram']);
+ await account.selectOption(instagramChannelId);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
+ await expect(page.getByLabel(/I authorize this exact video/)).toBeEnabled();
+ assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
+ await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-instagram-confirm.png'});
+ await page.getByLabel(/I authorize this exact video/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();
+ await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});
+ await expect(card(f).getByText('MOCK Instagram profile · Instagram',{exact:true})).toBeVisible();
+ assert.equal(submissions,count+1);assert.deepEqual(lastUpload,f.bytes);
+ await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
 });

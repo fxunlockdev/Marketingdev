@@ -106,6 +106,20 @@ export class PostizClient {
   const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
   return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
  }
+ // Instagram standalone's pinned provider treats one MP4 + post_type=post as a Reel.
+ // Only the caller's already-approved canonical video may reach this transport.
+ async submitInstagramReel(input:{integrationId:string;caption:string;media:{id:string;path:string};scheduledAt:string}){
+  let id:string,date:string,media:{id:string;path:string};
+  try{
+   id=remoteId(input.integrationId);date=iso(input.scheduledAt);media=this.media(input.media,'mp4');
+   if(typeof input.caption!=='string'||!input.caption.trim()||[...input.caption].length>2200||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(input.caption))throw new Error();
+  }catch{throw new PostizError('POSTIZ_POST_INVALID');}
+  const target=(await this.listIntegrations()).find(i=>i.id===id);
+  if(!target||target.provider!=='instagram-standalone'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:[media]}],settings:{__type:'instagram-standalone',post_type:'post',is_trial_reel:false}}]};
+  const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
+  return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
+ }
  // Upstream soft-deletes the post group and swallows Temporal termination errors.
  // An accepted response cannot prove publishing stopped or remove a live social post.
  async requestScheduledPostRemoval(input:{postId:string;integrationId:string;scheduledAt:string;caption:string}){
