@@ -785,6 +785,8 @@ export function BrandOnboarding({ business }: { business: Business }) {
         cadence: direction.cadence,
         channels: direction.channels,
         must_avoid: direction.must_avoid,
+        business_stage: direction.business_stage ?? "",
+        growth_expectation: direction.growth_expectation ?? "",
         preferences_edited: dirty || state.preferences_edited || approve,
       };
       const saved = await api(
@@ -927,6 +929,18 @@ export function BrandOnboarding({ business }: { business: Business }) {
           <p>
             These preferences do not connect channels or authorize publication.
           </p>
+          <Field label="What stage is your business at?">
+            {(id) => <select id={id} disabled={!writable} value={state.business_stage ?? ""} onChange={e => change("business_stage", e.target.value)}>
+              <option value="">Choose a stage (optional)</option>
+              <option value="pre_launch">Preparing to launch</option>
+              <option value="launching">Just launched</option>
+              <option value="growing">Growing our customer base</option>
+              <option value="established">Established and expanding</option>
+            </select>}
+          </Field>
+          <Field label="What would success look like over the next 90 days?" hint="Optional. This guides your content; it is a target, not a promised result.">
+            {(id, hint) => <textarea id={id} aria-describedby={hint} disabled={!writable} maxLength={600} value={state.growth_expectation ?? ""} placeholder="For example: attract 20 qualified enquiries a month for our new service." onChange={e => change("growth_expectation", e.target.value)} />}
+          </Field>
           <Field label="Primary goal">
             {(id) => (
               <select

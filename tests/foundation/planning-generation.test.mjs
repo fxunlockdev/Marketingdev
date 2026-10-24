@@ -295,3 +295,26 @@ test('natural follow-up planning snapshots current edited context and saves reso
  assert.deepEqual((await admin.query('SELECT revision,video_draft FROM app.content_slots WHERE id=$1',[slot.id])).rows[0],before);
  assert.equal(await countPlans(b),2);assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_requests WHERE brand_id=$1',[b.id])).rows[0].n,0);
 });
+
+test('owner business stage and growth targets persist safely and reach mixed static/video planning',async()=>{
+ const b=await fresh();await grant(b);
+ const original=await businesses.onboarding(alice,b.id);
+ const patch={revision:original.revision,step:3,goal:'leads',timezone:'UTC',cadence:3,channels:['linkedin','instagram'],must_avoid:'No guaranteed returns',preferences_edited:true,business_stage:'launching',growth_expectation:'20 qualified enquiries per month within 90 days'};
+ const saved=await businesses.onboarding(alice,b.id,patch);
+ assert.equal(saved.business_stage,'launching');assert.equal(saved.growth_expectation,patch.growth_expectation);
+ await assert.rejects(businesses.onboarding(bob,b.id,{...patch,revision:saved.revision}),/not found/i);
+ await assert.rejects(businesses.onboarding(alice,b.id,{...patch,revision:saved.revision,business_stage:'invented'}),/business stage/i);
+ await assert.rejects(businesses.onboarding(alice,b.id,{...patch,revision:saved.revision,growth_expectation:'x'.repeat(601)}),/600/);
+ const {business_stage,growth_expectation,...legacy}=patch;
+ const preserved=await businesses.onboarding(alice,b.id,{...legacy,revision:saved.revision});
+ assert.equal(preserved.growth_expectation,growth_expectation);assert.equal(preserved.business_stage,business_stage);
+ const j=await planning.submit(alice,b.id,{starts_on:'2026-11-01',brief:'Plan a month of static and video content',video_count:4},randomUUID());
+ let received;
+ transport=async(url,init)=>{received=inputFrom(JSON.parse(init.body));return standard(url,init);};
+ try{assert.equal(await handler.run(scope(b,j)),'succeeded');}finally{transport=undefined;}
+ assert.equal(received.preferences.business_stage,business_stage);assert.equal(received.preferences.growth_expectation,growth_expectation);
+ const result=await planning.detail(alice,b.id,(await planning.jobs(alice,b.id)).jobs[0].output_plan_id);
+ assert.equal(result.skill_manifest.source_preferences.business_stage,business_stage);
+ assert.equal(result.strategy.slots.filter(s=>s.format==='video').length,4);
+ assert.equal(result.strategy.slots.filter(s=>s.format==='static').length,26);
+});
