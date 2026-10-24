@@ -127,3 +127,17 @@ test('ambiguous removal is never retried and a mismatched acknowledgment stays u
  }
  requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).requestScheduledPostRemoval(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.filter(r=>r.method==='DELETE').length,0);
 });
+
+test('targeted reconnect passes the provider identity as refresh and rejects unsafe identifiers before transport',async()=>{
+ requests=[];handler=(req,res)=>{assert.equal(req.url,'/api/public/v1/social/linkedin?refresh=member-a');json(res,{url:'https://www.linkedin.com/oauth/v2/authorization?'+new URLSearchParams({response_type:'code',client_id:'MOCK',state:'abcdef123',redirect_uri:'https://desvio.test/integrations/social/linkedin'})});};
+ await client().beginLinkedIn('member-a');assert.equal(requests.length,2);
+ for(const invalid of ['','../other','member&refresh=other'])await assert.rejects(client().beginLinkedIn(invalid));
+ assert.equal(requests.length,2);
+});
+
+test('channel removal verifies tenant, exact acknowledgement and holds ambiguous outcomes without retry',async()=>{
+ requests=[];handler=(req,res)=>{assert.equal(req.method,'DELETE');assert.equal(req.url,'/api/public/v1/integrations/channel-a');json(res,{id:'channel-a'});};
+ assert.deepEqual(await client().removeIntegration('channel-a'),{id:'channel-a',publishingStopped:false});
+ handler=(req,res)=>json(res,{id:'other'});await assert.rejects(client().removeIntegration('channel-a'),e=>e.outcome==='unknown');
+ handler=(req,res)=>req.socket.destroy();requests=[];await assert.rejects(client().removeIntegration('channel-a'),e=>e.outcome==='unknown');assert.equal(requests.filter(x=>x.method==='DELETE').length,1);
+});

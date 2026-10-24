@@ -18,6 +18,7 @@ export class SocialOAuthJobs {
  }
  private async check(db:any,j:any,a:any){
   if(!await this.permitted(db,j,a)){await this.finish(db,j,'canceled','SOCIAL_ACCESS_OR_SESSION_REVOKED');return null;}
+  if((await db.query('SELECT 1 FROM app.social_disconnects WHERE created_at >= $1',[a.created_at])).rowCount){await this.finish(db,j,'rejected','SOCIAL_CONNECTION_REMOVAL_STARTED');return null;}
   const account=(await db.query('SELECT * FROM app.postiz_accounts')).rows[0];if(!this.config||!this.#credentials||!this.#secrets||!account?.enabled||!account.identity_verified_at||account.revision!==a.account_revision){await this.finish(db,j,'rejected','POSTIZ_ACCOUNT_CHANGED');return null;}return account;
  }
  private client(scope:JobScope,account:any){return new PostizClient(this.config!.client,{organizationId:scope.organizationId,brandId:scope.brandId,remoteOrganizationId:account.remote_organization_id,apiKey:this.#credentials!.open(account,account.encrypted_credential)});}
@@ -39,25 +40,26 @@ export class SocialOAuthJobs {
   try{
    const client=this.client(scope,account);
    if(j.kind==='social.authorize'){
-    const auth=await client.beginLinkedIn(),token=`${scope.brandId}.${a.id}.${randomBytes(32).toString('base64url')}`,url=new URL(auth.url);url.searchParams.set('state',token);
+    const auth=await client.beginLinkedIn(a.target_internal_id??undefined),token=`${scope.brandId}.${a.id}.${randomBytes(32).toString('base64url')}`,url=new URL(auth.url);url.searchParams.set('state',token);
     return await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return current.status;if(!await this.check(db,current,a))return 'finished';if(new Date(a.expires_at).getTime()<=Date.now())return this.finish(db,current,'rejected','SOCIAL_AUTHORIZATION_EXPIRED');
      await db.query("UPDATE app.social_authorizations SET phase='awaiting_consent',authorization_url=$2,state_hash=$3,encrypted_state=$4 WHERE id=$1",[a.id,url.href,hash(token),this.#secrets!.seal(secretScope,'state',auth.state)]);
      await db.query("UPDATE app.jobs SET status='succeeded',updated_at=now() WHERE id=$1",[j.id]);return 'awaiting_consent';
     });
    }
-   let remoteId=c.remote_id;
+   let remoteId=c.remote_id,internalId=c.internal_id;
    if(c.phase!=='verifying'){
-    const result=await client.completeLinkedIn(this.#secrets!.open(secretScope,'state',a.encrypted_state),this.#secrets!.open(secretScope,'code',c.encrypted_code),c.timezone);remoteId=result.id;
+    const result=await client.completeLinkedIn(this.#secrets!.open(secretScope,'state',a.encrypted_state),this.#secrets!.open(secretScope,'code',c.encrypted_code),c.timezone);remoteId=result.id;internalId=result.internalId;
+    if(a.target_remote_id&&(remoteId!==a.target_remote_id||internalId!==a.target_internal_id))throw new PostizError('POSTIZ_RECONNECT_IDENTITY_MISMATCH','unknown');
     // Persist the actual returned identity before any retryable read. A crash
     // before this commit leaves an uncertain result, never a second exchange.
-    const recorded=await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return false;if(!await this.check(db,current,a))return false;await db.query("UPDATE app.social_callbacks SET phase='verifying',remote_id=$2,encrypted_code=NULL WHERE job_id=$1",[j.id,remoteId]);return true;});if(!recorded)return 'finished';
+    const recorded=await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return false;if(!await this.check(db,current,a))return false;await db.query("UPDATE app.social_callbacks SET phase='verifying',remote_id=$2,internal_id=$3,encrypted_code=NULL WHERE job_id=$1",[j.id,remoteId,internalId]);return true;});if(!recorded)return 'finished';
    }
    const channels=await client.listIntegrations(),channel=channels.find(x=>x.id===remoteId&&x.provider==='linkedin'&&!x.disabled);
    if(!channel)throw new PostizError('POSTIZ_AUTHORIZED_ACCOUNT_UNCONFIRMED','unknown');
-   return await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return current.status;if(!await this.check(db,current,a))return 'finished';
-    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`social:${scope.brandId}`]);
-    await db.query(`INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,profile,picture,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'available',now(),now(),$9,$10)
-     ON CONFLICT(remote_id) DO UPDATE SET provider=EXCLUDED.provider,name=EXCLUDED.name,profile=EXCLUDED.profile,picture=EXCLUDED.picture,observed_state=EXCLUDED.observed_state,last_seen_at=EXCLUDED.last_seen_at,last_checked_at=EXCLUDED.last_checked_at,account_revision=EXCLUDED.account_revision,last_job_id=EXCLUDED.last_job_id`,[randomUUID(),scope.organizationId,scope.brandId,channel.id,channel.provider,channel.name,channel.profile,channel.picture,account.revision,j.id]);
+   return await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return current.status;
+    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`social:${scope.brandId}`]);if(!await this.check(db,current,a))return 'finished';
+    await db.query(`INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,profile,picture,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id,internal_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'available',now(),now(),$9,$10,$11)
+     ON CONFLICT(remote_id) DO UPDATE SET provider=EXCLUDED.provider,name=EXCLUDED.name,profile=EXCLUDED.profile,picture=EXCLUDED.picture,observed_state=EXCLUDED.observed_state,last_seen_at=EXCLUDED.last_seen_at,last_checked_at=EXCLUDED.last_checked_at,account_revision=EXCLUDED.account_revision,last_job_id=EXCLUDED.last_job_id,internal_id=EXCLUDED.internal_id,publishing_held=false`,[randomUUID(),scope.organizationId,scope.brandId,channel.id,channel.provider,channel.name,channel.profile,channel.picture,account.revision,j.id,internalId]);
     return this.finish(db,current,'succeeded');
    });
   }catch(error){

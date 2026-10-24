@@ -155,6 +155,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     let active = true,
       timer: ReturnType<typeof setTimeout>;
     const load = async () => {
+      if(document.hidden){timer=setTimeout(load,2500);return;}
       try {
         const value: Conversation = await api(
           root + `/canvas/threads/${threadId}`,

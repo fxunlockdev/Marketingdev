@@ -85,3 +85,33 @@ test('snapshot promotion rolls back on database failure and a safe repeated read
  try{await assert.rejects(handler.run(scope(j)),/TEST social commit failure/);}finally{await admin.query('DROP TRIGGER test_social_failure ON app.social_channels');await admin.query('DROP FUNCTION app.test_social_failure()');}
  assert.equal((await read()).channels[0].name,'MOCK authorized account');assert.equal(await handler.run(scope(j)),'succeeded');assert.equal((await read()).channels[0].name,'MOCK updated name');assert.equal((await read()).channels.length,1);
 });
+
+test('disconnect holds publishing, requires confirmation, scopes identities and never repeats an uncertain deletion',async()=>{
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE brand_id=$1 AND kind='social.sync' AND status IN ('queued','running','retrying')",[brandA.id]);
+ await admin.query('UPDATE app.postiz_accounts SET enabled=true WHERE brand_id=$1',[brandA.id]);
+ let present=true,deletes=0,lose=false;
+ behavior=(req,res)=>{if(req.method==='DELETE'){deletes++;assert.equal(req.url,'/api/public/v1/integrations/disconnect-channel');present=false;if(lose)return req.socket.destroy();res.writeHead(200,{'content-type':'application/json'});return res.end(JSON.stringify({id:'disconnect-channel'}));}res.writeHead(200,{'content-type':'application/json'});res.end(JSON.stringify(present?[channel('disconnect-channel')]:[]));};
+ await handler.run(scope(await queue()));const c=(await read()).channels.find(c=>c.name&&c.observed_state==='available');assert.ok(c);
+ const path=endpoint()+'/channels/'+c.id+'/disconnect',key=randomUUID();
+ assert.equal((await api(path,{method:'POST',key,body:{}})).status,400);
+ assert.equal((await api(path,{user:viewer,method:'POST',key,body:{confirmHistoryRemoval:true}})).status,403);
+ assert.equal((await api(endpoint(brandB)+'/channels/'+c.id+'/disconnect',{user:bob,method:'POST',key,body:{confirmHistoryRemoval:true}})).status,404);
+ const pending=await api(path,{method:'POST',key,body:{confirmHistoryRemoval:true}});assert.equal(pending.status,201,JSON.stringify(pending.body));
+ assert.deepEqual((await api(path,{method:'POST',key,body:{confirmHistoryRemoval:true}})).body,pending.body);
+ assert.equal((await read()).channels.find(x=>x.id===c.id).publishing_held,true);
+ lose=true;await handler.run(scope(pending.body));await handler.run(scope(pending.body));assert.equal(deletes,1);
+ assert.equal((await admin.query('SELECT phase FROM app.social_disconnects WHERE job_id=$1',[pending.body.id])).rows[0].phase,'unknown');
+ assert.equal((await api(path,{method:'POST',key:randomUUID(),body:{confirmHistoryRemoval:true}})).status,409);
+ await handler.run(scope(await queue()));assert.equal(deletes,1);
+ assert.equal((await admin.query('SELECT phase FROM app.social_disconnects WHERE job_id=$1',[pending.body.id])).rows[0].phase,'absent');
+ const observed=(await read()).channels.find(x=>x.id===c.id);assert.equal(observed.publishing_held,true);assert.equal(observed.observed_state,'missing');
+});
+
+test('acknowledged disconnect requires observed absence; interrupted removal resumes with reads only',async()=>{
+ let present=true,deletes=0;behavior=(req,res)=>{res.writeHead(200,{'content-type':'application/json'});if(req.method==='DELETE'){deletes++;present=false;return res.end(JSON.stringify({id:'disconnect-channel'}));}res.end(JSON.stringify(present?[channel('disconnect-channel')]:[]));};
+ await handler.run(scope(await queue()));const c=(await read()).channels.find(c=>c.observed_state==='available');
+ const job=await service.disconnect(alice.id,brandA.id,c.id,randomUUID(),{confirmHistoryRemoval:true});assert.equal(await handler.run(scope(job)),'succeeded');assert.equal(deletes,1);
+ present=true;await handler.run(scope(await queue()));const second=await service.disconnect(alice.id,brandA.id,c.id,randomUUID(),{confirmHistoryRemoval:true});
+ await admin.query("UPDATE app.social_disconnects SET phase='removing' WHERE job_id=$1",[second.id]);present=false;
+ assert.equal(await handler.run(scope(second)),'succeeded');assert.equal(deletes,1);
+});

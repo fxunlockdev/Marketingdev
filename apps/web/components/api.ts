@@ -1,13 +1,29 @@
+// Coalesce only concurrent reads. Never cache credentials or completed API responses.
+const reads=new Map<string,Promise<unknown>>();
+export function api<T=any>(path:string,body?:unknown,method=body===undefined?'GET':'POST',key?:string):Promise<T>{
+ if(method==='GET'&&body===undefined){const existing=reads.get(path);if(existing)return existing as Promise<T>;
+  const pending=request<T>(path,body,method,key);reads.set(path,pending);
+  const clear=()=>{if(reads.get(path)===pending)reads.delete(path);};void pending.then(clear,clear);return pending;
+ }
+ reads.clear();return request<T>(path,body,method,key).then(value=>{
+  reads.clear();
+  if(typeof window!=='undefined'&&(/\/businesses(?:\/[^/]+)?$/.test(path)||path.includes('/brain/approve')||path==='/api/auth/update-user'||path.includes('/members')||path.includes('/invitations')))window.dispatchEvent(new Event('desvio-workspace-changed'));
+  return value;
+ });
+}
 export class ApiError extends Error {
+  readonly status:number;
+  readonly reauthenticate:boolean;
   constructor(
-    readonly status: number,
+    status: number,
     message: string,
-    readonly reauthenticate = false,
+    reauthenticate = false,
   ) {
     super(message);
+    this.status=status;this.reauthenticate=reauthenticate;
   }
 }
-export async function api<T = any>(
+async function request<T = any>(
   path: string,
   body?: unknown,
   method = body === undefined ? "GET" : "POST",

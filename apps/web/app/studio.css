@@ -61,3 +61,10 @@ input,select,textarea{border-color:#8f8679;background:#fffcf7}
 @media(prefers-reduced-motion:reduce){button,.button,.studio-emblem i,.overview-metric{transition:background-color 120ms,opacity 120ms}}
 @media(max-width:1100px){.studio-flow-grid{gap:24px;padding-inline:0}.studio-stage>strong{font-size:42px;letter-spacing:-2px}.studio-core{padding-inline:12px}.studio-pill{gap:10px;padding-inline:12px}}
 @media(max-width:700px){.studio-flow-heading{align-items:flex-start;flex-direction:column;gap:12px;margin-bottom:28px}.studio-flow-grid{grid-template-columns:1fr;gap:26px;padding-inline:8px}.studio-core{margin:0 12px;padding:24px}.studio-stage{gap:12px}.studio-stage>strong{font-size:40px}.studio-stage>strong br{display:none}.studio-stage>strong br:after{content:' '}.studio-stage-last{padding-inline-start:0}.studio-stage-detail{max-width:none}.studio-flow-foot{flex-wrap:wrap;padding:18px;line-height:1.5}.studio-flow-foot a{margin-inline-start:21px}.v5-main{padding-inline:20px}.v5-sidebar{padding:16px}.v5-sidebar>.wordmark{margin-bottom:0}.v5-account{margin-top:0}.overview-metric{padding:18px}.studio-step{font-size:10px}}
+
+/* First entry reserves the real shell geometry. Navigation keeps the mounted shell. */
+.shell-placeholder {display:block;width:70%;height:2.5rem;border-radius:12px;background:var(--line,#e6e0d6);opacity:.45;margin-block:1rem;}
+.shell-nav-placeholder {display:flex;align-items:center;gap:12px;padding:12px 14px;color:var(--muted,#766f65);}
+.shell-content-placeholder {height:240px;border-radius:28px;background:var(--line,#e6e0d6);opacity:.35;margin-block:24px;}
+.shell-content-placeholder.short {height:100px;width:75%;}
+@media(prefers-reduced-motion:no-preference){.workspace-opening .shell-content-placeholder{animation:shell-breathe 1.6s ease-in-out infinite alternate;}@keyframes shell-breathe{to{opacity:.55;}}}

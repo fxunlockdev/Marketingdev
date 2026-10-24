@@ -977,3 +977,23 @@ test('Studio overview keeps real counts, working routes, narrow layouts and redu
  await alice.emulateMedia({reducedMotion:'no-preference'});
  await alice.setViewportSize({width:1440,height:1050});
 });
+
+test('module navigation preserves the workspace shell and does not repeat account initialization',async()=>{
+ await alice.setViewportSize({width:1440,height:1000});await alice.goto(base+`/b/${firstBusiness}/overview`);
+ await expect(alice.getByRole('navigation',{name:'Main navigation'})).toBeVisible();
+ await expect(alice.locator('.studio-core')).toBeVisible();
+ let initializes=0;const observe=request=>{if(request.url().endsWith('/api/v1/accounts/current/initialize'))initializes++;};alice.on('request',observe);
+ await alice.evaluate(()=>{window.__workspaceNavigationProbe='retained';document.querySelector('.v5-sidebar').dataset.probe='retained';});
+ await alice.route('**/api/auth/get-session',async route=>{await new Promise(resolve=>setTimeout(resolve,800));await route.continue();});
+ try{
+  await alice.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Canvas',exact:true}).click();
+  await expect(alice).toHaveURL(new RegExp(`/b/${firstBusiness}/canvas$`));
+  await expect(alice.locator('.v5-sidebar[data-probe="retained"]')).toBeVisible();
+  assert.equal(await alice.evaluate(()=>window.__workspaceNavigationProbe),'retained');
+  await expect(alice.locator('.workspace-opening')).toHaveCount(0);
+  await alice.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Overview',exact:true}).click();
+  await expect(alice.locator('.studio-core')).toBeVisible();
+  await alice.goBack();await expect(alice).toHaveURL(new RegExp(`/b/${firstBusiness}/canvas$`));
+  await expect(alice.locator('.v5-sidebar[data-probe="retained"]')).toBeVisible();assert.equal(initializes,0);
+ }finally{alice.off('request',observe);await alice.unroute('**/api/auth/get-session');}
+});

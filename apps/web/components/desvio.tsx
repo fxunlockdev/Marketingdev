@@ -24,7 +24,7 @@ export function Desvio() {
     return <AuthScreen key={mode} mode={mode} />;
   if(pathname.startsWith("/clients"))return <LegacyBusinessLink pathname={pathname}/>;
   if(pathname==="/accept-invitation")return <Session key={pathname} pathname={pathname} />;
-  return <BusinessApp key={pathname} pathname={pathname} />;
+  return <BusinessApp pathname={pathname} />;
 }
 function Session({ pathname }: { pathname: string }) {
   const router = useRouter(),

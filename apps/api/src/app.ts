@@ -121,10 +121,11 @@ class SocialController {
  constructor(@Inject(SocialConnections) private readonly service:SocialConnections,@Inject(SocialOAuth) private readonly oauth:SocialOAuth,@Inject(SocialProvisioning) private readonly provision:SocialProvisioning){}
  @Post('prepare') prepare(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.provision.prepare(req.actorId,id,key);}
  @Post('provisioning/:job/cancel') cancelSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.provision.cancel(req.actorId,id,job);}
- @Post('oauth/linkedin') start(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.oauth.start(req.actorId,req.sessionId,id,key);}
+ @Post('oauth/linkedin') start(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.oauth.start(req.actorId,req.sessionId,id,key,body);}
  @Get('oauth/:attempt') authorization(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.read(req.actorId,req.sessionId,id,attempt);}
  @Post('oauth/:attempt/callback') callback(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.callback(req.actorId,req.sessionId,id,attempt,body);}
  @Get() read(@Req() req:AuthRequest,@Param('id') id:string){return this.service.read(req.actorId,id,req.sessionId);}
+ @Post('channels/:channel/disconnect') disconnect(@Req() req:AuthRequest,@Param('id') id:string,@Param('channel') channel:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.service.disconnect(req.actorId,id,channel,key,body);}
  @Post('refresh') refresh(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.service.refresh(req.actorId,id,key);}
  @Post('jobs/:job/cancel') cancel(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(req.actorId,id,job);}
 }

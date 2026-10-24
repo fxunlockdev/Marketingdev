@@ -59,10 +59,11 @@ export class PostizClient {
  async identity(){const value=await this.request('public/v1/me');const identity=this.checked(value,v=>{const org=record(record(v).organization);return {id:remoteId(org.id),name:str(org.name,500)};});if(identity.id!==this.#remoteOrg)throw new PostizError('POSTIZ_TENANT_MISMATCH');return identity;}
  private async verify(){try{await this.identity();}catch(e){if(e instanceof PostizError)throw e;throw new PostizError('POSTIZ_IDENTITY_UNVERIFIED');}}
  private integrations(value:any):PostizIntegration[]{return this.checked(value,v=>{if(!Array.isArray(v)||v.length>500)return fail();const seen=new Set<string>();return v.map(raw=>{const r=record(raw),id=remoteId(r.id);if(seen.has(id))return fail();seen.add(id);return {id,name:str(r.name,300),provider:str(r.identifier,100),disabled:bool(r.disabled),profile:optionalURL(r.profile),picture:optionalURL(r.picture)};});});}
+ async removeIntegration(id:string){id=remoteId(id);await this.verify();const value=await this.request('public/v1/integrations/'+encodeURIComponent(id),'DELETE');return this.checked(value,v=>{if(remoteId(record(v).id)!==id)return fail();return {id,publishingStopped:false as const};},true);}
  async listIntegrations(){await this.verify();return this.integrations(await this.request('public/v1/integrations'));}
  // First OAuth flow is LinkedIn member. Page/account selection remains a separate
  // verified workflow; no arbitrary provider URL is accepted here.
- async beginLinkedIn(){await this.verify();const value=await this.request('public/v1/social/linkedin','GET',undefined,undefined,true);return this.checked(value,v=>{
+ async beginLinkedIn(internalId?:string){const path='public/v1/social/linkedin'+(internalId===undefined?'':'?'+new URLSearchParams({refresh:remoteId(internalId)}));await this.verify();const value=await this.request(path,'GET',undefined,undefined,true);return this.checked(value,v=>{
   const url=new URL(str(record(v).url,8000));if(url.origin!=='https://www.linkedin.com'||url.pathname!=='/oauth/v2/authorization'||url.username||url.password||url.hash)return fail();
   const state=url.searchParams.getAll('state'),redirect=url.searchParams.getAll('redirect_uri');
   if(state.length!==1||!/^[a-zA-Z0-9_-]{6,256}$/.test(state[0])||redirect.length!==1||redirect[0]!==`${this.#callback.origin}/integrations/social/linkedin`||url.searchParams.get('response_type')!=='code'||!url.searchParams.get('client_id'))return fail();

@@ -56,6 +56,7 @@ export function BrandIntake({
     let live = true,
       inflight = false;
     async function poll() {
+      if(document.hidden)return;
       if (inflight) return;
       inflight = true;
       try {

@@ -93,7 +93,7 @@ test('publication requires auth, exact approval, explicit consent and a scoped s
  const capability=await publisher.list(alice.id,brand.id);assert.equal(capability.can_manage,true);assert.deepEqual(capability.destinations,[{id:channelId,name:'MOCK staging profile',provider:'linkedin'}]);assert.equal((await publisher.list(viewer.id,brand.id)).can_manage,false);
  await assert.rejects(publisher.submit(alice.id,brand.id,{...f.body,export_id:randomUUID()},randomUUID()),/current/);
  const unapproved=await approvedPost();await admin.query('DELETE FROM app.creative_export_approvals WHERE export_id=$1',[unapproved.e.id]);await assert.rejects(queuePost(unapproved),/final saved image/);
- await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");try{await assert.rejects(queuePost(f),/not authorized/);}finally{await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");}
+ await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");try{await assert.rejects(queuePost(f),/not authorized/);}finally{await admin.query('UPDATE app.social_channels SET publishing_held=false WHERE brand_id=$1',[brand.id]);await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");}
  await assert.rejects(publisher.submit(alice.id,brand.id,{...f.body,revision:99},randomUUID()),/current/);
  const ready=await publisher.ready(alice.id,brand.id);assert.ok(ready.posts.some(p=>p.slot_id===f.slot.id&&p.export_id===f.e.id));assert.ok(!ready.posts.some(p=>p.slot_id===unapproved.slot.id));assert.ok(!JSON.stringify(ready).includes('object_key'));assert.equal((await publisher.ready(alice.id,sibling.id)).posts.length,0);
  const results=await Promise.all([api(endpoint,{body:f.body,method:'POST',key}),api(endpoint,{body:f.body,method:'POST',key})]);results.forEach(r=>assert.equal(r.status,201,JSON.stringify(r.body)));assert.equal(results[0].body.id,results[1].body.id);const j=results[0].body;
@@ -120,12 +120,13 @@ test('lost upload or submit responses hold the slot without retrying mutations',
  for(const fault of ['uploadLost','postLost']){const f=await approvedPost(),j=await queuePost(f);mode=fault;const count=submissions;await handler.run(scope(j));assert.equal((await record(j)).phase,'unknown');const writes=uploads,posts=submissions;await handler.run(scope(j));assert.equal(uploads,writes);assert.equal(submissions,posts);assert.equal(submissions-count,fault==='postLost'?1:0);await assert.rejects(queuePost(f),/already/);await assert.rejects(publisher.reconcile(alice.id,brand.id,j.id,randomUUID()),/no acknowledged/);mode='';}
 });
 test('changed approval, expired grant, revoked access and disabled credentials prevent external writes',async()=>{
- for(const reason of ['approval','grant','access','account']){const f=await approvedPost(),j=await queuePost(f),count=uploads;
+ for(const reason of ['approval','grant','access','account','connectionHold']){const f=await approvedPost(),j=await queuePost(f),count=uploads;
   if(reason==='approval')await plans.edit(alice.id,brand.id,f.slot.id,{revision:f.slot.revision,brief:'Owner changed the brief',reset_approval:true});
   if(reason==='grant')await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");
   if(reason==='access')await admin.query("UPDATE app.memberships SET role='editor' WHERE organization_id=$1 AND user_id=$2",[org.id,alice.id]);
+  if(reason==='connectionHold')await admin.query('UPDATE app.social_channels SET publishing_held=true WHERE brand_id=$1',[brand.id]);
   if(reason==='account')await admin.query('UPDATE app.postiz_accounts SET enabled=false WHERE brand_id=$1',[brand.id]);
-  try{await handler.run(scope(j));assert.equal(uploads,count);assert.ok(['rejected','canceled'].includes((await record(j)).phase));}finally{await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");await admin.query("UPDATE app.memberships SET role='owner' WHERE organization_id=$1 AND user_id=$2",[org.id,alice.id]);await admin.query('UPDATE app.postiz_accounts SET enabled=true WHERE brand_id=$1',[brand.id]);}
+  try{await handler.run(scope(j));assert.equal(uploads,count);assert.ok(['rejected','canceled'].includes((await record(j)).phase));}finally{await admin.query('UPDATE app.social_channels SET publishing_held=false WHERE brand_id=$1',[brand.id]);await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");await admin.query("UPDATE app.memberships SET role='owner' WHERE organization_id=$1 AND user_id=$2",[org.id,alice.id]);await admin.query('UPDATE app.postiz_accounts SET enabled=true WHERE brand_id=$1',[brand.id]);}
  }
 });
 test('approval is rechecked after upload and before submission; accepted-post persistence loss is held',async()=>{

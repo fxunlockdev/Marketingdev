@@ -1,3 +1,4 @@
+const reconnectTargets=new Map();
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
@@ -29,8 +30,9 @@ before(async()=>{
   if(req.url==='/api/enterprise/create-user'){creates++;if(failCreate){req.socket.destroy();return;}const p=JSON.parse(Buffer.from(JSON.parse(raw).params.split('.')[1],'base64url')),id='web-remote-'+randomUUID(),apiKey='MOCK_POSTIZ_KEY_'+randomBytes(24).toString('hex');remote.set(apiKey,{id,name:'Desvio business###'+p.id});accounts.set(id,[]);return json(res,{id,apiKey});}
   if(!org)return json(res,{},401);
   if(req.url==='/api/public/v1/me')return json(res,{organization:org});
-  if(req.url==='/api/public/v1/social/linkedin'){const state='UPSTREAM_'+randomBytes(12).toString('hex');states.set(state,org.id);return json(res,{url:'https://www.linkedin.com/oauth/v2/authorization?'+new URLSearchParams({state,response_type:'code',client_id:'MOCK',redirect_uri:base+'/integrations/social/linkedin'})});}
-  if(req.url==='/api/integrations/social-connect/linkedin'){exchanges++;const p=JSON.parse(raw);lastExchange=p;assert.equal(states.get(p.state),org.id);states.delete(p.state);const id='web-account-'+randomUUID(),name='Avery at Northstar';accounts.get(org.id).push({id,name,identifier:'linkedin',disabled:false,profile:'https://www.linkedin.com/in/mock',picture:null});return json(res,{id,name,organizationId:org.id,providerIdentifier:'linkedin',internalId:'MOCK_PERSON'});}
+  if(req.url.split('?')[0]==='/api/public/v1/social/linkedin'){const state='UPSTREAM_'+randomBytes(12).toString('hex');states.set(state,org.id);if(new URL(req.url,'http://mock').searchParams.has('refresh'))reconnectTargets.set(state,accounts.get(org.id)[0]);return json(res,{url:'https://www.linkedin.com/oauth/v2/authorization?'+new URLSearchParams({state,response_type:'code',client_id:'MOCK',redirect_uri:base+'/integrations/social/linkedin'})});}
+  if(req.url==='/api/integrations/social-connect/linkedin'){exchanges++;const p=JSON.parse(raw);lastExchange=p;assert.equal(states.get(p.state),org.id);states.delete(p.state);const prior=reconnectTargets.get(p.state),id=prior?.id??'web-account-'+randomUUID(),name='Avery at Northstar';if(!prior)accounts.get(org.id).push({id,name,identifier:'linkedin',disabled:false,profile:'https://www.linkedin.com/in/mock',picture:null});return json(res,{id,name,organizationId:org.id,providerIdentifier:'linkedin',internalId:'MOCK_PERSON'});}
+  if(req.method==='DELETE'&&req.url.startsWith('/api/public/v1/integrations/')){const id=req.url.split('/').at(-1);accounts.set(org.id,accounts.get(org.id).filter(x=>x.id!==id));return json(res,{id});}
   if(req.url==='/api/public/v1/integrations'){if(delayList)await setTimeout(1200);return failList?json(res,{},401):json(res,accounts.get(org.id));}json(res,{},404);
  });await new Promise(r=>provider.listen(0,'127.0.0.1',r));providerBase='http://127.0.0.1:'+provider.address().port;
  app=await createApplication(config);await app.app.listen(0,'127.0.0.1');const apiOrigin=await app.app.getUrl(),webEnv={APP_ORIGIN:base,API_ORIGIN:apiOrigin,S3_BROWSER_ORIGIN:config.storage.endpoint};
@@ -81,4 +83,19 @@ test('unknown setup is held, readonly business grants hide management, and unava
  await viewer.goto(connections(brandA));await expect(viewer.getByText('You can view these accounts.',{exact:false})).toBeVisible();await expect(viewer.getByRole('button',{name:/Connect .*LinkedIn/})).toHaveCount(0);await expect(viewer.getByRole('button',{name:'Refresh accounts'})).toHaveCount(0);await expect(viewer.getByRole('heading',{name:'Avery at Northstar'})).toBeVisible();
  await admin.query('UPDATE app.postiz_accounts SET enabled=false WHERE brand_id=$1',[brandA.id]);try{await alice.goto(connections(brandA));await expect(alice.getByText('Connections for this business need an operator check.')).toBeVisible();await expect(alice.getByRole('button',{name:/Connect .*LinkedIn/})).toHaveCount(0);}finally{await admin.query('UPDATE app.postiz_accounts SET enabled=true WHERE brand_id=$1',[brandA.id]);}
  assert.deepEqual(errors,[]);assert.ok(!webLog.includes('MOCK_AUTH_CODE_'));assert.ok(!webLog.includes(signingSecret));assert.ok(!workerLog.includes(signingSecret));
+});
+
+
+test('account card reconnects the same identity, confirms destructive removal and retains the publishing hold',async()=>{
+ // Reuse the account established by the first journey; do not start a second
+ // connection and mistake the existing card for its completion.
+ await alice.goto(connections(brandA));
+ const card=alice.getByRole('listitem').filter({has:alice.getByRole('button',{name:'Disconnect Avery at Northstar',exact:true})}).first();
+ await expect(card).toBeVisible({timeout:30000});const before=exchanges;
+ await card.getByRole('button',{name:'Reconnect Avery at Northstar',exact:true}).click();await expect(alice.getByRole('link',{name:'Continue to LinkedIn'})).toBeVisible({timeout:30000});await alice.getByRole('link',{name:'Continue to LinkedIn'}).click();await alice.getByRole('link',{name:'Allow test connection'}).click();
+ await expect(alice.getByText('Your LinkedIn account was found and saved for this business.',{exact:true})).toBeVisible({timeout:30000});assert.equal(exchanges,before+1);
+ await card.getByRole('button',{name:'Disconnect Avery at Northstar',exact:true}).click();await expect(card.getByText(/removes the account and its post history/)).toBeVisible();await card.getByRole('button',{name:'Keep account',exact:true}).click();await expect(card.getByRole('button',{name:'Confirm disconnect and remove history'})).toHaveCount(0);
+ await card.getByRole('button',{name:'Disconnect Avery at Northstar',exact:true}).click();await card.getByRole('button',{name:'Confirm disconnect and remove history'}).click();
+ await expect(alice.getByText(/Removal requested. Publishing is paused/)).toBeVisible();
+ await expect(alice.getByRole('button',{name:'Disconnect Avery at Northstar',exact:true})).toHaveCount(0,{timeout:30000});await expect(alice.getByText(/Publishing is paused. Reconnect after removal/)).toBeVisible();
 });

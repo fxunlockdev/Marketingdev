@@ -1,3 +1,4 @@
+import {Desvio} from "../components/desvio";
 import type { Metadata } from "next";
 import "./globals.css";
 import "./v5.css";
@@ -15,6 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         <a className="skip" href="#main">
           Skip to content
         </a>
+        <Desvio />
         {children}
       </body>
     </html>

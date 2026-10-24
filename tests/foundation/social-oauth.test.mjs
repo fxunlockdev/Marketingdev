@@ -42,7 +42,7 @@ before(async()=>{
  jobs=new AssetJobs(workerPool,null,null);handler=new SocialJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test'},encryptionKey});
  oauthSecrets=new OAuthSecrets(oauthKey);oauth=new SocialOAuthJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test',timeoutMs:1500},encryptionKey},oauthKey);
  behavior=async(req,res)=>{
-  if(req.url==='/api/public/v1/social/linkedin'){startCalls++;return startBehavior(req,res);}
+  if(req.url.split('?')[0]==='/api/public/v1/social/linkedin'){startCalls++;return startBehavior(req,res);}
   if(req.url==='/api/integrations/social-connect/linkedin'){exchangeCalls++;let raw='';for await(const chunk of req)raw+=chunk;return exchangeBehavior(req,res,JSON.parse(raw));}
   if(req.url==='/api/public/v1/integrations'){listCalls++;return listBehavior(req,res);}
   res.writeHead(404);res.end();
@@ -147,4 +147,27 @@ test('authorization attempts are bounded and mutation responses that cannot be p
 test('lost authorization-start response is held without retry, and revoked session cannot start a provider flow',async()=>{
  const a=await begin(),before=startCalls;startBehavior=(req,res)=>req.socket.destroy();assert.equal(await oauth.run(scope(a)),'unknown');assert.equal(await oauth.run(scope(a)),'finished');assert.equal(startCalls,before+1);assert.equal((await status(a)).authorization_url,null);
  const b=await begin();await admin.query('UPDATE app.social_authorizations SET session_id=$2 WHERE id=$1',[b.id,randomUUID()]);assert.equal(await oauth.run(scope(b)),'finished');assert.equal(startCalls,before+1);
+});
+
+
+test('targeted reconnect preserves identity, is tenant scoped and rejects a different callback account',async()=>{
+ const original=await prepare(),connected=await callback(original);
+ assert.equal(await oauth.run(scope(connected.body)),'succeeded');
+ const saved=(await admin.query("SELECT id,internal_id FROM app.social_channels WHERE brand_id=$1 AND remote_id='oauth-channel'",[brandA.id])).rows[0];
+ assert.equal(saved.internal_id,'MOCK_PERSON');
+ const path=endpoint()+'/oauth/linkedin',key=randomUUID();
+ const request=()=>api(path,{method:'POST',key,body:{channelId:saved.id}});
+ const queued=await request();assert.equal(queued.status,201);assert.deepEqual((await request()).body,queued.body);
+ assert.equal((await api(path,{method:'POST',key,body:{}})).status,409);
+ assert.equal((await api(endpoint(brandB)+'/oauth/linkedin',{user:bob,method:'POST',key:randomUUID(),body:{channelId:saved.id}})).status,404);
+ const previous=startBehavior;startBehavior=(req,res)=>{assert.equal(new URL(req.url,'http://mock').searchParams.get('refresh'),'MOCK_PERSON');return previous(req,res);};
+ assert.equal(await oauth.run(scope(queued.body)),'awaiting_consent');
+ const ready=await api(authorizationPath(queued.body)),a={...queued.body,state:new URL(ready.body.authorization_url).searchParams.get('state')};
+ exchangeBehavior=(req,res)=>json(res,{id:'other-channel',organizationId:identity(req.headers.authorization),providerIdentifier:'linkedin',internalId:'OTHER_PERSON',name:'Wrong account'});
+ const returned=await callback(a),before=exchangeCalls;
+ assert.equal(await oauth.run(scope(returned.body)),'unknown');
+ await oauth.run(scope(returned.body));assert.equal(exchangeCalls,before+1);
+ const status=await api(authorizationPath(a));assert.equal(status.body.job.error_code,'POSTIZ_RECONNECT_IDENTITY_MISMATCH');
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.social_channels WHERE remote_id='other-channel'")).rows[0].n,0);
+ assert.ok(!JSON.stringify((await read()).channels).includes('MOCK_PERSON'));
 });

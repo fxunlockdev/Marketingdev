@@ -13,7 +13,7 @@ export function CarouselGeneration({businessId,canEdit,onOpen,onSlide}:{business
  const load=useCallback(async()=>setData(await api<State>(root)),[root]);
  useEffect(()=>{let alive=true;void api<State>(root).then(v=>{if(alive)setData(v);}).catch(e=>{if(alive)setError(e);});return()=>{alive=false;};},[root]);
  const running=data?.runs.some(active),held=data?.runs.some(r=>r.status==='unknown');
- useEffect(()=>{if(!running)return;const timer=setInterval(()=>void load().catch(setError),2500);return()=>clearInterval(timer);},[running,load]);
+ useEffect(()=>{if(!running)return;const timer=setInterval(()=>{if(!document.hidden)void load().catch(setError);},2500);return()=>clearInterval(timer);},[running,load]);
  function changed(){key.current=crypto.randomUUID();}
  async function generate(){if(lock.current)return;lock.current=true;setBusy(true);setError(undefined);try{await api(root,{prompt,slide_count:count,channel,size:'1024x1024',text_provider:provider},'POST',key.current);setPrompt('');changed();await load();}catch(e){setError(e);}finally{setBusy(false);lock.current=false;}}
  async function cancel(id:string){setBusy(true);setError(undefined);try{await api(`${root}/${id}/cancel`,{});await load();}catch(e){setError(e);}finally{setBusy(false);}}
@@ -26,7 +26,7 @@ export function CarouselGeneration({businessId,canEdit,onOpen,onSlide}:{business
  <p className="hint">Creates square images with OpenAI. Generation uses your configured allowance; no separate prompt approval is required for static images.</p><button type="submit" className="primary" disabled={!prompt.trim()||!data}>Generate carousel</button>
  </fieldset></form>}
  {running&&<p role="status">Your carousel is being prepared. You can leave this page and return later.</p>}{held&&<p role="status">A generation result needs reconciliation. Further generation is paused to prevent duplicate charges.</p>}
- <button type="button" disabled={busy} onClick={()=>void load().catch(setError)}>Refresh carousel progress</button>
+ <button type="button" disabled={busy} onClick={()=>{if(!document.hidden)void load().catch(setError);}}>Refresh carousel progress</button>
  {!data?<p role="status">Loading generation history…</p>:<ul>{data.runs.map(r=><li key={r.id}><h4>{r.prompt}</h4><p>{r.status==='succeeded'?'Ready for review':r.status==='unknown'?'Result needs reconciliation':r.status==='rejected'||r.status==='failed'?'Generation could not finish':r.cancel_requested?'Cancellation requested':r.status}</p>
  <ol>{data.slides.filter(s=>s.parent_job_id===r.id).map(s=><li key={s.position}>Slide {s.position+1} · {s.export_status==='succeeded'?'Saved final image':s.generation_status}{s.output_version_id&&<button type="button" disabled={busy} onClick={()=>onSlide(r.thread_id,s.project_id)}>Open generated slide {s.position+1}</button>}</li>)}</ol>
  {r.output_version_id&&<button type="button" disabled={busy} onClick={()=>void onOpen(r.project_id).catch(setError)}>Review generated carousel</button>}

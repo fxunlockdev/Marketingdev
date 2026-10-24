@@ -192,7 +192,7 @@ export function ContentWorkspace({
   }, [root, prefs, first, last, page, channel, state, inbox, reload]);
   useEffect(() => {
     if (!jobs.some(running)) return;
-    const timer = setInterval(() => setReload((n) => n + 1), 4000);
+    const timer = setInterval(() => {if(!document.hidden)setReload((n) => n + 1);}, 4000);
     return () => clearInterval(timer);
   }, [jobs]);
   function selectPost(id: string, day?: string) {

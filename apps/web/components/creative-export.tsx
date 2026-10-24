@@ -14,7 +14,7 @@ export function CreativeExportPanel({threadId,business,versionId,sourceSHA,conte
  const load=useCallback(async()=>{setState(await api(`${root}/creative-versions/${versionId}/exports`));},[root,versionId]);
  useEffect(()=>{setState(undefined);setError(undefined);requestKey.current=null;void load().catch(setError);},[load]);
  const saved=state?.exports.find(e=>e.renderer_image===state.renderer_image&&e.source_sha256===sourceSHA),job=state?.jobs.find(j=>active(j.status)),latestJob=state?.jobs[0];
- useEffect(()=>{if(!job)return;const timer=setInterval(()=>void load().catch(setError),2000);return()=>clearInterval(timer);},[job?.id,load]);
+ useEffect(()=>{if(!job)return;const timer=setInterval(()=>{if(!document.hidden)void load().catch(setError);},2000);return()=>clearInterval(timer);},[job?.id,load]);
  useEffect(()=>{setConfirmed(false);},[versionId,sourceSHA,context.id,context.revision,saved?.id,disabled]);
  useEffect(()=>{
   setPreview('');setLoaded(false);let canceled=false,url='';const controller=new AbortController();
