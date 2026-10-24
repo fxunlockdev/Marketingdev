@@ -445,3 +445,25 @@ test('carousel calendar attachment binds exact ordered versions, requires final 
  await assert.rejects(plans.review(alice.id,brand.id,s.id,decision('pending_review')),/current saved slides/);
  await assert.rejects(plans.scope(alice.id,brand.id,false,db=>exports.publicationProof(db,s.id)));
 });
+
+test('Instagram JPEG is a separate immutable export with exact approval, private download and stable replay',async()=>{
+ const v=await fixture(),key=randomUUID();
+ const pngJob=await exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},randomUUID());
+ const jpegJob=await exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256,format:'instagram-jpeg'},key);
+ assert.notEqual(jpegJob.id,pngJob.id);
+ assert.equal((await exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256,format:'instagram-jpeg'},key)).id,jpegJob.id);
+ await assert.rejects(exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},key),/another export/);
+ assert.equal(await handler.run(scope(pngJob)),'succeeded');assert.equal(await handler.run(scope(jpegJob)),'succeeded');
+ const list=await exports.list(alice.id,brand.id,v.id),png=list.exports.find(e=>e.format==='png'),jpeg=list.exports.find(e=>e.format==='instagram-jpeg');
+ assert.ok(png&&jpeg);assert.notEqual(png.id,jpeg.id);assert.notEqual(png.sha256,jpeg.sha256);assert.equal(jpeg.manifest.rendition.source_sha256,png.sha256);
+ assert.equal((await exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256,format:'instagram-jpeg'},randomUUID())).export_id,jpeg.id);
+ const grant=await exports.download(alice.id,brand.id,jpeg.id),response=await fetch(grant.url),bytes=Buffer.from(await response.arrayBuffer());assert.equal(response.headers.get('content-type'),'image/jpeg');assert.equal(digest(bytes),jpeg.sha256);assert.equal((await sharp(bytes).metadata()).format,'jpeg');
+ await assert.rejects(exports.download(bob.id,brand.id,jpeg.id));await assert.rejects(exports.download(alice.id,sibling.id,jpeg.id));
+ await canvas.review(alice.id,brand.id,v.id,{decision:'in_review',feedback:'Review exact PNG',revision:1});
+ await exports.approve(alice.id,brand.id,png.id,{sha256:png.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:2,confirmed:true});
+ assert.ok(!(await exports.list(alice.id,brand.id,v.id)).approvals.some(a=>a.export_id===jpeg.id));
+ await assert.rejects(exports.approve(alice.id,brand.id,jpeg.id,{sha256:png.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:3,confirmed:true}),/current saved export/);
+ await exports.approve(alice.id,brand.id,jpeg.id,{sha256:jpeg.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:3,confirmed:true});
+ assert.ok((await exports.list(alice.id,brand.id,v.id)).approvals.some(a=>a.export_id===jpeg.id));
+ await assert.rejects(jobs.transaction(scope(jpegJob),db=>db.query("UPDATE app.creative_exports SET format='png' WHERE id=$1",[jpeg.id])),e=>e.code==='42501');
+});

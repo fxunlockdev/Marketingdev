@@ -1,3 +1,9 @@
+## Persisted Instagram renditions — local backend verified, not deployed
+
+Migration 052 adds immutable export format to existing scoped requests/exports and includes it in deduplication. Existing rows/defaults remain PNG and original PNG request fingerprints replay unchanged. JPEG uses its own job, object/hash, MIME-aware private download and exact-export approval; a PNG approval never approves the JPEG. Worker RLS binds the export format to the actual request. Existing video-reference and carousel candidate paths remain explicitly PNG until their channel-aware integration is ready.
+
+All 14 export foundation tests pass with actual isolated rendering/private storage/PostgreSQL, including distinct outputs for one source, idempotency conflict across formats, stable completed replay, exact-byte download, foreign/sibling denial, wrong-hash approval denial and worker update denial. Evidence: instagram-rendition-foundation.json. The reusable final-image UI now filters by format, uses its MIME/download name and does not offer JPEG as a video reference. Default customer selection remains PNG; no incomplete Instagram publication path is enabled. Production web build passed. Next: connect Instagram slot rendition choice and final JPEG publication proof/worker; add browser test and complete carousel integration. Dev remains on migration 049.
+
 ## Instagram rendition renderer — locally verified, not deployed
 
 The existing isolated Fabric/canvas renderer now supports an explicit `instagram-jpeg` output mode alongside unchanged default PNG rendering. It fits all artwork into a white 1080-square JPEG without cropping, records the exact canonical PNG source hash and placement in its manifest, and includes a preview/approval warning. This is an explicit future channel rendition, never a publishing-time transformation of approved bytes. Worker adapter validates MIME, dimensions, byte hash and a full image decode.

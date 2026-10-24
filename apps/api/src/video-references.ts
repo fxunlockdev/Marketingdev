@@ -6,7 +6,7 @@ import {object,uuid} from './workspaces.js';
 import {VideoStateError,VideoVault} from './video-vault.js';
 const live=new Set(['queued','running','retrying']);
 const proofSQL=`SELECT e.*,v.project_id,v.status,v.review_revision,v.sha256 AS version_sha256,v.reviewed_by,p.latest_version_id,a.id AS approval_id,a.context_revision,a.context_type,a.context_id
- FROM app.creative_exports e JOIN app.creative_versions v ON v.id=e.version_id JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_export_approvals a ON a.export_id=e.id
+ FROM (SELECT * FROM app.creative_exports WHERE format='png') e JOIN app.creative_versions v ON v.id=e.version_id JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_export_approvals a ON a.export_id=e.id
  WHERE e.id=$1 AND a.id=$2`;
 const current=(p:any,image:string)=>p&&p.renderer_image===image&&p.status==='approved'&&p.reviewed_by&&p.latest_version_id===p.version_id&&p.source_sha256===p.version_sha256&&p.context_type==='canvas'&&p.context_id===p.version_id&&p.context_revision===p.review_revision;
 
