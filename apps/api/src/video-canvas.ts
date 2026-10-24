@@ -4,7 +4,7 @@ import {validateVideoBrief,type VideoPlanningInput} from './video-planning.js';
 import {BadRequestException,ConflictException,ForbiddenException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
 import {Canvas} from './canvas.js';
-import {VideoReferenceBindings} from './video-references.js';
+import {VideoReferenceBindings,uploadedVideoProofSQL} from './video-references.js';
 import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 export class VideoCanvas {
@@ -57,9 +57,9 @@ export class VideoCanvas {
  async regenerate(user:string,brand:string,id:string,body:unknown,key:unknown){id=uuid(id);const v=object(body,['feedback']);
   if(typeof v.feedback!=='string'||!v.feedback.trim()||v.feedback.length>2000)throw new BadRequestException('Describe the changes for this video');
   const prior=await this.canvas.scope(user,brand,true,async db=>{
-   const r=(await db.query('SELECT p.thread_id,r.channel,r.duration_seconds,r.approved_brief,r.text_provider,x.export_id,x.approval_id,x.source_sha256,x.export_sha256 FROM app.video_versions v JOIN app.video_projects p ON p.id=v.project_id JOIN app.video_requests r ON r.job_id=v.job_id JOIN app.video_references x ON x.job_id=v.job_id WHERE v.id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Video not found');return r;
+   const r=(await db.query('SELECT p.thread_id,r.channel,r.duration_seconds,r.approved_brief,r.text_provider,x.brand_reference_id,x.export_id,x.approval_id,x.source_sha256,x.export_sha256 FROM app.video_versions v JOIN app.video_projects p ON p.id=v.project_id JOIN app.video_requests r ON r.job_id=v.job_id JOIN app.video_references x ON x.job_id=v.job_id WHERE v.id=$1',[id])).rows[0];if(!r)throw new NotFoundException('Video not found');return r;
   });
-  return this.submit(user,brand,prior.thread_id,{parent_version_id:id,prompt:`Revise the saved video. Previous direction: ${prior.approved_brief.video_prompt.slice(0,1800)}\nRequested changes: ${v.feedback}`,channel:prior.channel,duration_seconds:prior.duration_seconds,text_provider:prior.text_provider,reference:{export_id:prior.export_id,approval_id:prior.approval_id,source_sha256:prior.source_sha256,export_sha256:prior.export_sha256,confirmed:true}},key);
+  return this.submit(user,brand,prior.thread_id,{parent_version_id:id,prompt:`Revise the saved video. Previous direction: ${prior.approved_brief.video_prompt.slice(0,1800)}\nRequested changes: ${v.feedback}`,channel:prior.channel,duration_seconds:prior.duration_seconds,text_provider:prior.text_provider,reference:prior.brand_reference_id?{brand_reference_id:prior.brand_reference_id,source_sha256:prior.source_sha256,confirmed:true}:{export_id:prior.export_id,approval_id:prior.approval_id,source_sha256:prior.source_sha256,export_sha256:prior.export_sha256,confirmed:true}},key);
  }
  draft(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async db=>{
   const row=(await db.query('SELECT r.job_id,r.prompt,r.channel,r.duration_seconds,j.cancel_requested,r.draft_revision,r.approved_revision,r.edited_brief,r.plan,j.status,j.error_code FROM app.video_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.job_id=$1',[id])).rows[0];
@@ -74,7 +74,9 @@ export class VideoCanvas {
    if(!r?.plan||r.draft_revision!==v.revision||!['queued','running','retrying'].includes(job.status)||job.cancel_requested||(await db.query('SELECT job_id FROM app.video_operations WHERE job_id=$1',[id])).rowCount)throw new ConflictException('Refresh the video draft; generation may already have started');
    if(v.approve&&!(await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[b.organization_id,brand])).rows[0].allowed)throw new ForbiddenException('Only a business owner or admin can approve generation');
    const brain=(await db.query('SELECT * FROM app.brand_brain_versions WHERE id=$1',[r.brain_id])).rows[0];
-   const ref=(await db.query('SELECT e.sha256,e.width,e.height FROM app.video_references r JOIN app.creative_exports e ON e.id=r.export_id WHERE r.job_id=$1',[id])).rows[0];
+   const binding=(await db.query('SELECT * FROM app.video_references WHERE job_id=$1',[id])).rows[0];
+   const ref=binding?.brand_reference_id?(await db.query(uploadedVideoProofSQL,[binding.brand_reference_id])).rows[0]:(await db.query('SELECT e.sha256,e.width,e.height FROM app.video_references r JOIN app.creative_exports e ON e.id=r.export_id WHERE r.job_id=$1',[id])).rows[0];
+   if(!ref||ref.revoked_at||ref.crop||ref.sha256!==binding.export_sha256)throw new ConflictException('The video reference approval has changed');
    const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:r.prompt,channel:r.channel,duration_seconds:r.duration_seconds,reference:{kind:'image',sha256:ref.sha256,width:ref.width,height:ref.height,duration_seconds:null,caption:''}};
    try{validateVideoBrief(v.brief,input);}catch{throw new BadRequestException('Check the video prompt, script timing and text overlays');}
    const next=r.draft_revision+1;

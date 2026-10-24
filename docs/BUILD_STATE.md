@@ -1,3 +1,11 @@
+## Uploaded product photo video references — local implementation, verification/deployment in progress
+
+Migration 056 adds a mutually exclusive, tenant-bound approved-upload source to video references. The API binds exact normalized image hashes, the worker rechecks approval before leasing/submission/promotion, and feedback regeneration preserves the uploaded source. Dedicated temporary leases use the actual JPEG/PNG content type and retain originals on revocation. Cropped references are explicitly excluded rather than silently ignoring the crop.
+
+Canvas now offers “Use [photo] for video”, creates a conversation without a paid static generation, and retains GPT script editing, prompt approval and final-video review. Unsaved video ideas are protected across conversation changes; polling stops while a prompt awaits approval. Paths: apps/api/src/video-references.ts, video-canvas.ts, video-jobs.ts; apps/web/components/brand-references.tsx, canvas.tsx, video-canvas.tsx.
+
+15 export/video backend tests and 149 contracts pass; web production build passes. An initial browser run was invalidated by a simultaneous UI rebuild replacing its assets; the final frozen-build browser run and full security run are in progress. New browser coverage uploads a product photo, drafts without image generation, approves, regenerates from feedback and approves the final clip, with MOCK provider transports and actual skills/storage/rendering. No paid provider call or live verification claim. Worker image built and transferred privately; activation, migration and deployment not yet confirmed. Existing dev video/business model setup and social authorization blockers remain.
+
 ## Uncapped allowance support deployed and verified — 24 October
 
 Migration 055 was applied by bootstrap deployment 57a73720-1c0b-4577-b2be-4ec93f2bce25, verified SUCCESS then REMOVED, with all seven temporary secret variables cleared and six runtime-role logins checked. Final API a7f4430a-8154-466b-8ea3-ecae73445343 is SUCCESS. Worker and isolated provisioner now run sha256:4b8b503be729265cc1a88926128726ace29026f011fe857d5bf920de71e08bd9; runtime readback matches desired settings and all three saved provider credentials are present. Existing web d55e006f-dc3e-4d13-a1af-70a5a9ac645a still passes owner login/navigation and anonymous denial.

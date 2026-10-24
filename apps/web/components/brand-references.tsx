@@ -4,8 +4,8 @@ import {api,type Workspace} from './api';
 import {BrandFiles} from './uploads';
 import {Notice} from './primitives';
 import {PrivateVisual} from './private-visual';
-type Reference={id:string;visual_id:string;label:string;kind:string;crop?:{left:number;top:number;width:number;height:number}|null};
-export function BrandReferences({businessId,writable,sources,selection,onSelectionChange,disabled=false,uploadWorkspace}:{businessId:string;writable:boolean;sources?:any[];selection?:string[];onSelectionChange?:(ids:string[])=>void;disabled?:boolean;uploadWorkspace?:Workspace}){
+type Reference={id:string;visual_id:string;label:string;kind:string;sha256:string;width:number;height:number;crop?:{left:number;top:number;width:number;height:number}|null};
+export function BrandReferences({businessId,writable,sources,selection,onSelectionChange,disabled=false,uploadWorkspace,onVideo}:{businessId:string;writable:boolean;sources?:any[];selection?:string[];onSelectionChange?:(ids:string[])=>void;disabled?:boolean;uploadWorkspace?:Workspace;onVideo?:(reference:{brand_reference_id:string;source_sha256:string;label:string})=>void}){
  const [uploadedSources,setUploadedSources]=useState<any[]>();
  const [references,setReferences]=useState<Reference[]>(),[error,setError]=useState<unknown>(),[busy,setBusy]=useState(false);
  const root=`/api/v1/businesses/${businessId}/canvas/references`;
@@ -20,6 +20,7 @@ export function BrandReferences({businessId,writable,sources,selection,onSelecti
   {references===undefined?(error?<button type="button" onClick={()=>{setError(undefined);void refresh().catch(setError);}}>Retry loading references</button>:<p role="status">Loading approved references…</p>):references.length===0?<p>No approved images yet. Upload a product photo or review your Brand sources, then approve a reference.</p>:<ul className="reference-list">{references.map(r=><li key={r.id}>
    {onSelectionChange?<label className="reference-choice"><input type="checkbox" checked={selection?.includes(r.id)??false} disabled={disabled||busy||(!selection?.includes(r.id)&&(selection?.length??0)>=3)} onChange={e=>onSelectionChange(e.target.checked?[...(selection??[]),r.id]:(selection??[]).filter(v=>v!==r.id))}/>{r.label}</label>:<strong>{r.label}</strong>}
    <PrivateVisual businessId={businessId} visualId={r.visual_id} label={`Preview ${r.label}`} alt={r.label} crop={r.crop}/>
+   {onVideo&&writable&&r.kind==='upload'&&(r.crop?<p>Video uses the full photo. Approve it without a crop to use it for video.</p>:r.width>=64&&r.height>=64?<button type="button" disabled={busy||disabled} onClick={()=>onVideo({brand_reference_id:r.id,source_sha256:r.sha256,label:r.label})}>Use {r.label} for video</button>:<p>Video references must be at least 64 × 64 pixels.</p>)}
    {writable&&<button type="button" disabled={busy||disabled} onClick={()=>void revoke(r.id)}>Remove approval for {r.label}</button>}
   </li>)}</ul>}
   {availableSources&&writable&&availableSources.filter(v=>!references?.some(r=>r.visual_id===v.id)).map(v=><ApproveReference key={v.id} businessId={businessId} visual={v} disabled={busy||disabled||!references} onSaved={refresh}/>)}

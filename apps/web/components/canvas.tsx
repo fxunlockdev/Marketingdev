@@ -9,7 +9,7 @@ import {
 import {GenerationAllowances} from './generation-allowances';
 import {CanvasCarousels} from './carousels';
 import {CanvasPlanner} from './canvas-planner';
-import {CanvasVideos,CanvasVideoContext} from './video-canvas';
+import {CanvasVideos,CanvasVideoContext,VideoRequest} from './video-canvas';
 import {BrandReferences} from "./brand-references";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
@@ -178,14 +178,21 @@ export function CanvasScreen({ business }: { business: Business }) {
       clearTimeout(timer);
     };
   }, [root, threadId, revision]);
-  const [planningDirty,setPlanningDirty]=useState(false);
+  const [planningDirty,setPlanningDirty]=useState(false),[videoDirty,setVideoDirty]=useState(false);
+  const [videoReference,setVideoReference]=useState<{brand_reference_id:string;source_sha256:string;label:string}|null>(null);
+  async function videoThread(){
+    if(threadId)return threadId;
+    const t=await api(root+"/canvas/threads",{title:"Product photo video"},"POST",threadKey.current);
+    setThreadId(t.id);await refreshThreads();return t.id;
+  }
   function choose(id: string) {
     if (id === threadId && id) return true;
     if (
-      (dirty || prompt || planningDirty) &&
+      (dirty || prompt || planningDirty || videoDirty) &&
       !confirm("Leave your unsaved edits and draft message?")
     )
       return false;
+    setVideoReference(null);
     setPlanningThread("");
     setThreadId(id);
     setConversation(undefined);
@@ -268,7 +275,7 @@ export function CanvasScreen({ business }: { business: Business }) {
       <Notice error={error} />
       <GenerationAllowances key={`allowances:${business.id}`} businessId={business.id}/>
       <CanvasVideoContext businessId={business.id}/>
-      <CanvasCarousels key={business.id} businessId={business.id} onOpenSlide={(thread,project)=>{if(thread===threadId&&project!==projectId&&(dirty||prompt||planningDirty)&&!confirm("Leave your unsaved edits and draft message?"))return;if(choose(thread))setProjectId(project);}}/>
+      <CanvasCarousels key={business.id} businessId={business.id} onOpenSlide={(thread,project)=>{if(thread===threadId&&project!==projectId&&(dirty||prompt||planningDirty||videoDirty)&&!confirm("Leave your unsaved edits and draft message?"))return;if(choose(thread))setProjectId(project);}}/>
       <div className="studio-layout">
         <aside className="studio-conversations" aria-label="Conversations">
           <button disabled={!initialized || !write || busy} onClick={() => choose("")}>
@@ -348,7 +355,7 @@ export function CanvasScreen({ business }: { business: Business }) {
           )}
           {!!conversation?.planning_runs.length&&<section aria-label="Conversation plans">{conversation.planning_runs.map(r=><p key={r.id}>{r.output_plan_id?<a href={`/b/${business.id}/content-plan?start=${r.starts_on}`}>Open calendar · {r.starts_on}</a>:r.cancel_requested?'Planning canceled':r.status==='queued'&&Date.parse(r.scheduled_at)>Date.now()?`Planning scheduled for ${r.starts_on}`:r.status==='unknown'?'Planning needs reconciliation before another request.':`Planning ${r.status}`}</p>)}</section>}
           {initialized&&<CanvasPlanner key={`planner:${business.id}:${threadId}`} business={business} threadId={threadId} onDirty={setPlanningDirty} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>}
-          <BrandReferences key={`references:${business.id}`} businessId={business.id} writable={write} uploadWorkspace={{id:business.organization_id,name:business.name,role:business.role}} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!initialized||!write||busy||held}/>
+          <BrandReferences key={`references:${business.id}`} businessId={business.id} writable={write} uploadWorkspace={{id:business.organization_id,name:business.name,role:business.role}} onVideo={reference=>{if(videoDirty&&!confirm("Replace the selected photo and discard its unsaved video idea?"))return;setVideoReference(reference);}} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!initialized||!write||busy||held}/>
           <form className="studio-composer" onSubmit={send}>
             <fieldset
               disabled={!initialized || !write || busy || held || !business.has_approved_brand}
@@ -466,6 +473,7 @@ export function CanvasScreen({ business }: { business: Business }) {
           </form>
         </section>
       </div>
+      {videoReference&&<section aria-label="Product photo video"><h2>Video from {videoReference.label}</h2><VideoRequest key={videoReference.brand_reference_id} business={business} threadId={threadId} ensureThread={videoThread} onDirty={setVideoDirty} reference={{brand_reference_id:videoReference.brand_reference_id,source_sha256:videoReference.source_sha256}} initiallyOpen/></section>}
       {threadId&&<CanvasVideos key={business.id+threadId} business={business} threadId={threadId}/>}
       {conversation?.projects.some((p) => p.latest_version_id) && (
         <section className="studio-projects">

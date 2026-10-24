@@ -452,3 +452,31 @@ test('Instagram JPEG is a separate immutable export with exact approval, private
  assert.ok((await exports.list(alice.id,brand.id,v.id)).approvals.some(a=>a.export_id===jpeg.id));
  await assert.rejects(jobs.transaction(scope(jpegJob),db=>db.query("UPDATE app.creative_exports SET format='png' WHERE id=$1",[jpeg.id])),e=>e.code==='42501');
 });
+
+test('uploaded product photo video consent is scoped, hash-bound, replay-safe and revocable',async()=>{
+ const {VideoReferences}=await import('../../dist/video-references.js');
+ const asset=randomUUID(),uploadJob=randomUUID(),visual=randomUUID(),videoJob=randomUUID();
+ const photo=await sharp(png).jpeg().toBuffer(),key=`evidence/${org.id}/${brand.id}/${visual}/${digest(photo)}`;
+ await store.persist(key,photo,'image/jpeg',digest(photo));
+ // Validated upload fixture; scanner/normalization has separate integration coverage.
+ await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'PRODUCT FIXTURE.jpg','image/jpeg',$5,$6,$7,$8,'ready')",[asset,org.id,brand.id,alice.id,photo.length,digest(photo),key+'-quarantine',key]);
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind,status) VALUES($1,$2,$3,$4,$5,'asset.validate','succeeded')",[uploadJob,org.id,brand.id,asset,alice.id]);
+ await admin.query('INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$7,$8,1024,1024)',[visual,org.id,brand.id,asset,uploadJob,key,digest(photo),photo.length]);
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.video','queued')",[videoJob,org.id,brand.id,alice.id]);
+ const upload=(await admin.query('SELECT * FROM app.uploaded_visuals WHERE id=$1',[visual])).rows[0];
+ const approved=await canvas.approveReference(alice.id,brand.id,{kind:'upload',visual_id:upload.id,label:'Video product photo',consent:true});
+ const refs=new VideoReferences(canvas,jobs,'ab'.repeat(32),renderer.image,'test');
+ const input={brand_reference_id:approved.id,source_sha256:upload.sha256,confirmed:true};
+ await assert.rejects(refs.bind(bob.id,brand.id,videoJob,input));
+ await assert.rejects(refs.bind(alice.id,sibling.id,videoJob,input));
+ await assert.rejects(refs.bind(alice.id,brand.id,videoJob,{...input,source_sha256:'0'.repeat(64)}));
+ await refs.bind(alice.id,brand.id,videoJob,input);await refs.bind(alice.id,brand.id,videoJob,input);
+ const proof=await refs.verify(scope({id:videoJob}));assert.equal(proof.brand_reference_id,approved.id);assert.equal(proof.sha256,upload.sha256);
+ const lease=await refs.prepare(scope({id:videoJob}));assert.equal(digest(Buffer.from(await(await fetch(lease.url)).arrayBuffer())),upload.sha256);
+ await canvas.revokeReference(alice.id,brand.id,approved.id);
+ await assert.rejects(refs.verify(scope({id:videoJob})),/REFERENCE_APPROVAL_CHANGED/);
+ await assert.rejects(refs.prepare(scope({id:videoJob})),/REFERENCE_APPROVAL_CHANGED/);
+ assert.equal((await admin.query('SELECT state FROM app.video_reference_leases WHERE job_id=$1',[videoJob])).rows[0].state,'revoked');
+ assert.equal(digest(await store.read(upload.object_key)),upload.sha256);
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[videoJob]);
+});

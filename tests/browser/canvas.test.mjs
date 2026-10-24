@@ -986,3 +986,46 @@ test('staging creative acceptance runner exercises real customer APIs and pauses
   const reserved=(await admin.query('SELECT sum(reserved_micros)::bigint AS n FROM app.creative_calls WHERE job_id=ANY($1::uuid[])',[[state.create.jobId,state.edit.jobId]])).rows[0].n;assert.ok(Number(reserved)<=settings.budgetMicros);
  }finally{await foreignContext.close();await anonymousContext.close();}
 });
+
+test('uploaded product photo starts video without static generation, then feedback regenerates through prompt approval (MOCK providers)',async()=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);
+ await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
+ await page.getByText('Brand image references',{exact:true}).click();
+ await page.getByText('Add product photos',{exact:true}).click();
+ await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'video-product.png',mimeType:'image/png',buffer:png});
+ await page.getByRole('button',{name:'Upload file',exact:true}).click();
+ const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+ await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
+ await approval.getByLabel('Reference name',{exact:true}).fill('Video product reference');
+ await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
+ await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
+ const imageCalls=generated,before=videoSubmits;
+ await page.getByRole('button',{name:'Use Video product reference for video',exact:true}).click();
+ const request=page.getByRole('region',{name:'Product photo video',exact:true});
+ await request.getByLabel('Video idea',{exact:true}).fill('TEST animate my uploaded product');
+ await request.getByLabel('Video length (seconds)',{exact:true}).fill('3');
+ await request.getByRole('button',{name:'Draft video script',exact:true}).click();
+ await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,before);assert.equal(generated,imageCalls);
+ async function approvePrompt(){
+  await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for uploaded photo');
+  await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
+  await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
+  await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+ }
+ await approvePrompt();await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});assert.equal(videoSubmits,before+1);
+ const binding=(await admin.query("SELECT r.brand_reference_id,r.export_id,v.manifest,v.project_id FROM app.video_versions v JOIN app.video_references r ON r.job_id=v.job_id WHERE r.brand_reference_id IS NOT NULL AND r.brand_id=$1",[brand])).rows[0];
+ assert.ok(binding.brand_reference_id);assert.equal(binding.export_id,null);assert.equal(binding.manifest.reference.kind,'upload');assert.equal(binding.manifest.reference.brand_reference_id,binding.brand_reference_id);assert.ok(binding.manifest.plan.skills.length>0);
+ await page.getByLabel('Video feedback',{exact:true}).fill('Make the movement softer and keep the product visible');
+ await page.getByRole('button',{name:'Draft a revised video from feedback',exact:true}).click();
+ await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,before+1);
+ await approvePrompt();await expect.poll(()=>videoSubmits).toBe(before+2);
+ await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[binding.project_id])).rows[0].n),{timeout:150000}).toBe(2);
+ await expect(page.getByLabel(/^Saved video version/).locator('option')).toHaveCount(2);
+ await expect(page.getByRole('button',{name:'Send video for review',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Send video for review',exact:true}).click();
+ await expect(page.getByLabel('I reviewed this saved video and caption.')).toBeEnabled();await page.getByLabel('I reviewed this saved video and caption.').check();
+ await page.getByRole('button',{name:'Approve final video',exact:true}).click();
+ await expect.poll(async()=>(await admin.query('SELECT v.status FROM app.video_versions v JOIN app.video_projects p ON p.latest_version_id=v.id WHERE p.id=$1',[binding.project_id])).rows[0].status).toBe('approved');
+ assert.equal(generated,imageCalls);assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+ await page.screenshot({path:'work/browser/uploaded-product-video-approved.png',fullPage:true});
+});
