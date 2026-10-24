@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-10-24T08:26:52.646676+00:00",
+  "passed": true,
+  "tests": 13,
+  "source_sha256": {
+    "database/migrations/057_workspace_provider_defaults.sql": "96df60528eb9f4b94e7bcef4b51b91e585fabdb9a8a0b521bddf90d2217de5f3",
+    "scripts/configure-providers.mjs": "9292cec38d771f40552026809f1b3ea982df8484e5c7a8416437a25dcdf8933d",
+    "tests/foundation/operator-configuration.test.mjs": "569bfc13545acaa533a11421c7e517701d2c33d70119a94f0ae59be32ec7e38c"
+  },
+  "log_sha256": "c68ec681ef643715328e6094107326ddf36eaf29e6370137dcea11cb5929195b",
+  "deployed": false,
+  "paid_calls": false,
+  "scope": "Actual PostgreSQL migration and operator tests: customer-role business creation, six provider grant types, workspace isolation, runtime access denial, expiry, replacement, replay and transaction rollback. No live provider or deployed readiness claim."
+}

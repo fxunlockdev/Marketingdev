@@ -24,9 +24,11 @@ const definitions={
  publishing:{table:'publication_grants',fields:['channel_id','remote_account_id','daily_limit'],key:'channel_id'},
 };
 export function configurationManifest(input,now=Date.now()){
- const v=object(input,['version','change_id','organization_id','business_id','operator_reference','grants']);
+ const v=object(input,['version','change_id','organization_id','business_id','operator_reference','grants','scope']);
  if(v.version!==1||typeof v.operator_reference!=='string'||!v.operator_reference.trim()||v.operator_reference.length>500||/[\x00-\x1f\x7f]/.test(v.operator_reference))deny('CONFIGURATION_INVALID_MANIFEST');
  if(!Array.isArray(v.grants)||!v.grants.length||v.grants.length>12)deny('CONFIGURATION_INVALID_GRANTS');
+ if(v.scope!==undefined&&v.scope!=='workspace_defaults')deny('CONFIGURATION_INVALID_SCOPE');
+ if(v.scope==='workspace_defaults'&&(v.business_id!==undefined||v.grants.some(g=>g.kind==='publishing')))deny('CONFIGURATION_DEFAULT_SCOPE_DENIED');
  const seen=new Set();
  const grants=v.grants.map(raw=>{
   const d=Object.hasOwn(definitions,raw?.kind)?definitions[raw.kind]:null;if(!d)deny('CONFIGURATION_UNKNOWN_CAPABILITY');
@@ -49,7 +51,7 @@ export function configurationManifest(input,now=Date.now()){
   for(const k of ['max_image_request_micros','max_create_micros','max_edit_micros'])if(g.budget_micros!==null&&g[k]>g.budget_micros)deny('CONFIGURATION_CALL_CAP_EXCEEDS_BUDGET');
   const key=g.kind+':'+(d.key?g[d.key]:'');if(seen.has(key))deny('CONFIGURATION_DUPLICATE_GRANT');seen.add(key);return g;
  }).sort((a,b)=>(a.kind+':'+(a.provider??a.channel_id??'')).localeCompare(b.kind+':'+(b.provider??b.channel_id??'')));
- return {version:1,change_id:uuid(v.change_id),organization_id:uuid(v.organization_id),business_id:uuid(v.business_id),operator_reference:v.operator_reference,grants};
+ return {version:1,change_id:uuid(v.change_id),organization_id:uuid(v.organization_id),...(v.scope==='workspace_defaults'?{scope:v.scope}:{business_id:uuid(v.business_id)}),operator_reference:v.operator_reference,grants};
 }
 async function verifyTarget(db,{mode,expectedDatabase}){
  if(!['test','development','staging'].includes(mode))deny('CONFIGURATION_MODE_DENIED');
@@ -69,7 +71,8 @@ export async function inspectConfiguration(pool,options){
   await db.query('BEGIN READ ONLY');await verifyTarget(db,options);
   const businesses=(await db.query('SELECT organization_id,id AS business_id,name FROM app.brands ORDER BY organization_id,id')).rows;
   const channels=(await db.query('SELECT organization_id,brand_id AS business_id,id AS channel_id,name,provider,remote_id AS remote_account_id,observed_state FROM app.social_channels ORDER BY organization_id,brand_id,id')).rows;
-  await db.query('COMMIT');return {businesses,channels};
+  const organizations=(await db.query('SELECT id AS organization_id,name FROM app.organizations ORDER BY id')).rows;
+  await db.query('COMMIT');return {organizations,businesses,channels};
  }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e instanceof ConfigurationError?e:new ConfigurationError('CONFIGURATION_INSPECTION_FAILED');}finally{db.release();}
 }
 export async function configureProviders(pool,input,{expectedDatabase,approval,mode}={}){
@@ -80,6 +83,7 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
   await db.query('BEGIN');await db.query("SET LOCAL lock_timeout='15s'; SET LOCAL statement_timeout='30s'");
   await verifyTarget(db,{mode,expectedDatabase});
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`members:${manifest.organization_id}`]);
+  if(manifest.scope==='workspace_defaults')return await configureDefaults(db,manifest,manifestHash,approval);
   const business=(await db.query('SELECT id,name FROM app.brands WHERE organization_id=$1 AND id=$2',[manifest.organization_id,manifest.business_id])).rows[0];
   if(!business)deny('CONFIGURATION_BUSINESS_MISMATCH');
   const prior=(await db.query('SELECT manifest_sha256,preview_sha256 FROM app.operator_configuration_changes WHERE change_id=$1',[manifest.change_id])).rows[0];
@@ -112,6 +116,20 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
   await db.query('INSERT INTO app.operator_configuration_changes(change_id,organization_id,brand_id,manifest_sha256,preview_sha256,operator_reference,configuration) VALUES($1,$2,$3,$4,$5,$6,$7)',[manifest.change_id,manifest.organization_id,manifest.business_id,manifestHash,previewHash,manifest.operator_reference,JSON.stringify({manifest,before:snapshots})]);
   await db.query('COMMIT');return {status:'applied',change_id:manifest.change_id,preview_sha256:previewHash,grants:manifest.grants.length};
  }catch(e){await db.query('ROLLBACK').catch(()=>{});if(e instanceof ConfigurationError)throw e;throw new ConfigurationError('CONFIGURATION_FAILED_ROLLED_BACK');}finally{db.release();}
+}
+
+async function configureDefaults(db,manifest,manifestHash,approval){
+ const workspace=(await db.query('SELECT id,name FROM app.organizations WHERE id=$1',[manifest.organization_id])).rows[0];
+ if(!workspace)deny('CONFIGURATION_WORKSPACE_MISMATCH');
+ const prior=(await db.query('SELECT manifest_sha256,preview_sha256 FROM app.operator_configuration_changes WHERE change_id=$1',[manifest.change_id])).rows[0];
+ if(prior){if(prior.manifest_sha256!==manifestHash)deny('CONFIGURATION_CHANGE_ID_REUSED');if(approval&&approval!==prior.preview_sha256)deny('CONFIGURATION_APPROVAL_MISMATCH');await db.query('COMMIT');return {status:'already_applied',change_id:manifest.change_id,preview_sha256:prior.preview_sha256};}
+ const previous=(await db.query('SELECT * FROM app.workspace_provider_defaults WHERE organization_id=$1 FOR UPDATE',[manifest.organization_id])).rows[0]??null;
+ const previewHash=digest({manifest,previous});
+ if(!approval){await db.query('ROLLBACK');return {status:'preview',preview_sha256:previewHash,workspace,manifest,previous,scope:'Applies only to subsequently created businesses in this workspace. Existing grants and usage are unchanged. No social authorization, provider eligibility or live verification is implied.'};}
+ if(approval!==previewHash)deny('CONFIGURATION_PREVIEW_STALE');
+ await db.query('INSERT INTO app.operator_configuration_changes(change_id,organization_id,brand_id,manifest_sha256,preview_sha256,operator_reference,configuration) VALUES($1,$2,NULL,$3,$4,$5,$6)',[manifest.change_id,manifest.organization_id,manifestHash,previewHash,manifest.operator_reference,JSON.stringify({manifest,before:previous})]);
+ await db.query('INSERT INTO app.workspace_provider_defaults(organization_id,change_id,grants,operator_reference) VALUES($1,$2,$3,$4) ON CONFLICT(organization_id) DO UPDATE SET change_id=EXCLUDED.change_id,grants=EXCLUDED.grants,operator_reference=EXCLUDED.operator_reference,updated_at=now()',[manifest.organization_id,manifest.change_id,JSON.stringify(manifest.grants),manifest.operator_reference]);
+ await db.query('COMMIT');return {status:'applied',change_id:manifest.change_id,preview_sha256:previewHash,grants:manifest.grants.length};
 }
 
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){

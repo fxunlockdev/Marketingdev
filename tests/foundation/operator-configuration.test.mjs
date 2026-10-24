@@ -147,3 +147,70 @@ test('explicit uncapped allowance persists without granting runtime write access
  await configureProviders(admin,capped,{...options,approval:p.preview_sha256});
  assert.equal((await admin.query('SELECT budget_micros FROM app.analysis_grants WHERE brand_id=$1',[brand])).rows[0].budget_micros,'100000');
 });
+
+test('workspace defaults provision future businesses atomically without crossing tenants or granting social access',async()=>{
+ const org=randomUUID();
+ await admin.query('INSERT INTO app.organizations(id,name,created_by) VALUES($1,$2,$3)',[org,'Defaults workspace',user]);
+ await admin.query("INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,'owner')",[org,user]);
+ const m=manifest();m.organization_id=org;delete m.business_id;m.scope='workspace_defaults';m.grants[0].enabled=true;m.grants[0].budget_micros=null;
+ const expiry=m.grants[0].expires_at;
+ for(const mutate of [v=>v.business_id=brand,v=>v.grants=[{kind:'publishing'}]]){
+  const invalid=structuredClone(m);mutate(invalid);assert.throws(()=>configurationManifest(invalid),{code:'CONFIGURATION_DEFAULT_SCOPE_DENIED'});
+ }
+ const preview=await configureProviders(admin,m,options);
+ assert.equal(preview.status,'preview');
+ assert.equal((await admin.query('SELECT * FROM app.workspace_provider_defaults WHERE organization_id=$1',[org])).rowCount,0);
+ await configureProviders(admin,m,{...options,approval:preview.preview_sha256});
+ assert.equal((await configureProviders(admin,m,{...options,approval:preview.preview_sha256})).status,'already_applied');
+ const created=randomUUID();
+ const customer=new Pool({connectionString:config.appDatabaseUrl});
+ try{const db=await customer.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true),set_config('app.org_id',$2,true)",[user,org]);await db.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[created,org,'Inherits models']);await db.query('COMMIT');}finally{db.release();}}finally{await customer.end();}
+ const grant=(await admin.query('SELECT * FROM app.analysis_grants WHERE brand_id=$1',[created])).rows[0];
+ assert.equal(grant.enabled,true);assert.equal(grant.budget_micros,null);assert.equal(grant.expires_at.toISOString(),expiry);assert.equal(grant.max_tokens_per_image,0);
+ assert.equal((await admin.query('SELECT change_id FROM app.business_provider_inheritance WHERE brand_id=$1',[created])).rows[0].change_id,m.change_id);
+ assert.equal((await admin.query('SELECT * FROM app.publication_grants WHERE brand_id=$1',[created])).rowCount,0);
+ const otherOrg=randomUUID(),otherBrand=randomUUID();
+ await admin.query('INSERT INTO app.organizations(id,name,created_by) VALUES($1,$2,$3)',[otherOrg,'Separate workspace',user]);
+ await admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[otherBrand,otherOrg,'No inherited models']);
+ assert.equal((await admin.query('SELECT * FROM app.analysis_grants WHERE brand_id=$1',[otherBrand])).rowCount,0);
+ for(const connectionString of [config.appDatabaseUrl,config.jobs.workerDatabaseUrl]){
+  const pool=new Pool({connectionString});try{
+   await assert.rejects(pool.query('SELECT * FROM app.workspace_provider_defaults'),{code:'42501'});
+   await assert.rejects(pool.query('DELETE FROM app.workspace_provider_defaults'),{code:'42501'});
+   await assert.rejects(pool.query('SELECT app.inherit_provider_defaults()'),{code:'42501'});
+  }finally{await pool.end();}
+ }
+ // Replacement affects future businesses only; neither extends old expiry nor resets usage.
+ const replacement=structuredClone(m);replacement.change_id=randomUUID();replacement.grants[0].enabled=false;
+ const next=await configureProviders(admin,replacement,options);
+ await configureProviders(admin,replacement,{...options,approval:next.preview_sha256});
+ assert.equal((await admin.query('SELECT enabled FROM app.analysis_grants WHERE brand_id=$1',[created])).rows[0].enabled,true);
+ const disabled=randomUUID();await admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[disabled,org,'Disabled inherited grant']);
+ assert.equal((await admin.query('SELECT enabled FROM app.analysis_grants WHERE brand_id=$1',[disabled])).rows[0].enabled,false);
+ await admin.query("UPDATE app.workspace_provider_defaults SET grants=jsonb_set(grants,'{0,expires_at}',to_jsonb('2000-01-01T00:00:00Z'::text)) WHERE organization_id=$1",[org]);
+ const expired=randomUUID();await admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[expired,org,'Expired default']);
+ assert.equal((await admin.query('SELECT * FROM app.analysis_grants WHERE brand_id=$1',[expired])).rowCount,0);
+});
+
+test('all model default types inherit exact settings and malformed policy rolls back business creation',async()=>{
+ const workspace=randomUUID();await admin.query('INSERT INTO app.organizations(id,name,created_by) VALUES($1,$2,$3)',[workspace,'All model defaults',user]);
+ const m=manifest();delete m.business_id;m.scope='workspace_defaults';m.organization_id=workspace;
+ const common={enabled:true,expires_at:m.grants[0].expires_at,...rates};
+ m.grants=[{...m.grants[0],max_tokens_per_image:4000},
+  {kind:'creative',...common,text_model:'test-text',image_model:'test-image',quality:'high',max_image_request_micros:1000},
+  {kind:'gemini_creative',...common,text_model:'gemini-test'},
+  {kind:'planning',...common,provider:'openai',model:'test-plan'},
+  {kind:'insights',...common,provider:'openai',model:'test-insights'},
+  {kind:'video',enabled:true,expires_at:common.expires_at,budget_micros:null,models:['kling-video/v3.0/std/image-to-video'],max_create_micros:1000,max_edit_micros:1000}];
+ const p=await configureProviders(admin,m,options);await configureProviders(admin,m,{...options,approval:p.preview_sha256});
+ const id=randomUUID();await admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[id,workspace,'All defaults']);
+ for(const table of ['analysis_grants','creative_grants','gemini_creative_grants','planning_grants','insight_grants','video_grants']){
+  const rows=(await admin.query(`SELECT * FROM app.${table} WHERE brand_id=$1`,[id])).rows;assert.equal(rows.length,1);assert.equal(rows[0].organization_id,workspace);
+ }
+ assert.equal((await admin.query('SELECT max_tokens_per_image FROM app.analysis_grants WHERE brand_id=$1',[id])).rows[0].max_tokens_per_image,4000);
+ // Even an administrator-corrupted template cannot create partially provisioned businesses.
+ await admin.query("UPDATE app.workspace_provider_defaults SET grants=grants||$2::jsonb WHERE organization_id=$1",[workspace,JSON.stringify([{kind:'publishing',expires_at:common.expires_at}])]);
+ const rejected=randomUUID();await assert.rejects(admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[rejected,workspace,'Must roll back']));
+ assert.equal((await admin.query('SELECT id FROM app.brands WHERE id=$1',[rejected])).rowCount,0);
+ assert.equal((await admin.query('SELECT * FROM app.analysis_grants WHERE brand_id=$1',[rejected])).rowCount,0);
+});
