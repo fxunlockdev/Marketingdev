@@ -6,6 +6,7 @@ import {
   useState,
   type FormEvent,
 } from "react";
+import {GenerationAllowances} from './generation-allowances';
 import {CanvasCarousels} from './carousels';
 import {CanvasPlanner} from './canvas-planner';
 import {CanvasVideos,CanvasVideoContext} from './video-canvas';
@@ -264,6 +265,7 @@ export function CanvasScreen({ business }: { business: Business }) {
         </div>
       )}
       <Notice error={error} />
+      <GenerationAllowances key={`allowances:${business.id}`} businessId={business.id}/>
       <CanvasVideoContext businessId={business.id}/>
       <CanvasCarousels key={business.id} businessId={business.id} onOpenSlide={(thread,project)=>{if(thread===threadId&&project!==projectId&&(dirty||prompt||planningDirty)&&!confirm("Leave your unsaved edits and draft message?"))return;if(choose(thread))setProjectId(project);}}/>
       <div className="studio-layout">

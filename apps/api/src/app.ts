@@ -207,6 +207,7 @@ class ContentPlanController {
 @UseGuards(SessionGuard)
 class CanvasController {
  constructor(@Inject(Canvas) private readonly service:Canvas){}
+ @Get('canvas/allowances') allowances(@Req() r:AuthRequest,@Param('id') id:string){return this.service.allowances(r.actorId,id);}
  @Get('canvas/references') references(@Req() r:AuthRequest,@Param('id') id:string){return this.service.references(r.actorId,id);}
  @Post('canvas/references') approveReference(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.approveReference(r.actorId,id,body);}
  @Post('canvas/references/:referenceId/revoke') revokeReference(@Req() r:AuthRequest,@Param('id') id:string,@Param('referenceId') ref:string){return this.service.revokeReference(r.actorId,id,ref);}

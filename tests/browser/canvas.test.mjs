@@ -430,6 +430,23 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER MOCK')",[org,brand]);
   const photoBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
   await page.goto(`${base}/b/${brand}/canvas`);
+  await page.getByText('Generation allowances',{exact:true}).click();
+  const allowances=page.getByRole('region',{name:'Generation allowances',exact:true});
+  await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI creative planning and images'})).toContainText('Allowance active');
+  await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI content calendar'})).toContainText('Not set up');
+  try {
+    await admin.query('UPDATE app.creative_grants SET enabled=false WHERE brand_id=$1',[brand]);
+    await allowances.getByRole('button',{name:'Refresh allowances'}).click();
+    await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI creative planning and images'})).toContainText('Disabled');
+    await expect(page.getByText('Generation allowances',{exact:true})).toHaveCount(1);
+  } finally {
+    await admin.query('UPDATE app.creative_grants SET enabled=true WHERE brand_id=$1',[brand]);
+  }
+  await allowances.getByRole('button',{name:'Refresh allowances'}).click();
+  await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI creative planning and images'})).toContainText('Allowance active');
+  await expect(page.getByText('Generation allowances',{exact:true})).toHaveCount(1);
+  await page.getByText('Generation allowances',{exact:true}).click();
+
   await page.getByLabel('Creative planning model',{exact:true}).selectOption('gemini');
   await page.getByText('Brand image references',{exact:true}).click();
   await page.getByText('Add product photos',{exact:true}).click();

@@ -104,3 +104,32 @@ test('visual onboarding token cap persists explicitly, rejects unsafe caps, and 
  for(const value of [-1,1.5,1000001,'1000',null]){const bad=manifest();bad.grants[0].max_tokens_per_image=value;assert.throws(()=>configurationManifest(bad),{code:'CONFIGURATION_INVALID_IMAGE_TOKEN_CAP'});}
  const disable=manifest();disable.grants[0].max_tokens_per_image=0;const dp=await configureProviders(admin,disable,options);await configureProviders(admin,disable,{...options,approval:dp.preview_sha256});assert.equal(await cap(),0);
 });
+
+test('Canvas allowance readback is scoped, read-only and distinguishes missing, disabled and expired permission',async()=>{
+ const {TenantDatabase}=await import('../../dist/database.js');
+ const {Workspaces}=await import('../../dist/workspaces.js');
+ const {Businesses}=await import('../../dist/businesses.js');
+ const {Canvas}=await import('../../dist/canvas.js');
+ const pool=new Pool({connectionString:config.appDatabaseUrl});
+ try{
+  const database=new TenantDatabase(pool),workspaces=new Workspaces(database),canvas=new Canvas(new Businesses(database,workspaces),null);
+  const tenant=await workspaces.create(user,{name:'Allowance visibility fixture'});
+  const b=await workspaces.createBrand(user,tenant.id,{name:'Visible business'},randomUUID());
+  const sibling=await workspaces.createBrand(user,tenant.id,{name:'Separate business'},randomUUID());
+  assert.ok((await canvas.allowances(user,b.id)).allowances.every(x=>x.state==='missing'));
+  await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,enabled,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by) VALUES($1,$2,false,'test-text','test-image','low',now()+interval '1 hour',100000,0.1,0.2,10000,'TEST ONLY')",[tenant.id,b.id]);
+  const state=async()=>(await canvas.allowances(user,b.id)).allowances.find(x=>x.capability==='creative_openai').state;
+  assert.equal(await state(),'disabled');
+  await admin.query('UPDATE app.creative_grants SET enabled=true WHERE brand_id=$1',[b.id]);
+  assert.equal(await state(),'active');
+  await admin.query("UPDATE app.creative_grants SET expires_at=now()-interval '1 second' WHERE brand_id=$1",[b.id]);
+  assert.equal(await state(),'expired');
+  assert.ok((await canvas.allowances(user,sibling.id)).allowances.every(x=>x.state==='missing'));
+  await assert.rejects(canvas.allowances(randomUUID(),b.id),e=>e.getStatus()===404);
+  const report=await canvas.allowances(user,b.id);
+  assert.deepEqual(Object.keys(report).sort(),['allowances','scope']);
+  for(const allowance of report.allowances)assert.deepEqual(Object.keys(allowance).sort(),['capability','expires_at','state']);
+  assert.equal(report.scope,'allowances_only');
+  await assert.rejects(database.transaction(user,tenant.id,true,db=>db.query('UPDATE app.creative_grants SET enabled=true WHERE brand_id=$1',[b.id]),b.id),e=>e.code==='42501');
+ }finally{await pool.end();}
+});

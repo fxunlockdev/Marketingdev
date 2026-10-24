@@ -49,6 +49,20 @@ export class Canvas {
       id,reviewOnly,
     );
   }
+  allowances(user:string,id:string){
+    return this.scope(user,id,false,async(db,b)=>{
+      // Only permission metadata is exposed. Neither credentials nor a provider-health claim.
+      const rows=(await db.query(`
+        SELECT 'creative_openai' AS capability,enabled,expires_at,expires_at<=now() AS expired FROM app.creative_grants WHERE organization_id=$1 AND brand_id=$2
+        UNION ALL SELECT 'creative_gemini',enabled,expires_at,expires_at<=now() FROM app.gemini_creative_grants WHERE organization_id=$1 AND brand_id=$2
+        UNION ALL SELECT 'planning_'||provider,enabled,expires_at,expires_at<=now() FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2
+        UNION ALL SELECT 'video',enabled,expires_at,expires_at<=now() FROM app.video_grants WHERE organization_id=$1 AND brand_id=$2`,[b.organization_id,id])).rows;
+      return {scope:'allowances_only',allowances:['creative_openai','creative_gemini','planning_openai','planning_gemini','video'].map(capability=>{
+        const row=rows.find((r:any)=>r.capability===capability);
+        return {capability,state:!row?'missing':!row.enabled?'disabled':row.expired?'expired':'active',expires_at:row?.expires_at??null};
+      })};
+    });
+  }
   references(user:string,id:string){
     return this.scope(user,id,false,async(db,b)=>({references:(await db.query(`SELECT ${referenceColumns} FROM app.brand_references r ${referenceJoins} WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.revoked_at IS NULL ORDER BY r.approved_at,r.id`,[b.organization_id,id])).rows.map(({object_key,...r}:any)=>r)}));
   }
