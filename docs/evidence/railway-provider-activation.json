@@ -1,7 +1,7 @@
 {
-  "checked_at": "2026-10-24T07:42:35.857Z",
+  "checked_at": "2026-10-24T08:15:38.561Z",
   "status": "activated",
-  "preview_sha256": "498511e2a23ddcb59cc82c208a53e3b588ca68b31af0a6bc454dfedab6c14e8a",
-  "backup_container": "desvio-worker-rollback-d3f3d786-1c6c-4e25-a9ca-ab9254511f85",
+  "preview_sha256": "7614ed49888216deff7fe2bd3190be9261751b5017e266ee7cb5f2dd262c0361",
+  "backup_container": "desvio-worker-rollback-3b74ec21-ac61-4aa1-9d77-b052094ce317",
   "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
 }
