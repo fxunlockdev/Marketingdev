@@ -1,10 +1,10 @@
 {
-  "checked_at": "2026-10-24T05:47:28.200Z",
+  "checked_at": "2026-10-24T07:19:44.038Z",
   "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
-  "container_id": "0820c8f57e4edcf28c848fe7f258ebe664462a8715733e1bc6bd559cb907f039",
+  "container_id": "e26c8ad8bc29c191cc08e981851d435fe43a20439b83d72672202ef127c2adc0",
   "running": true,
-  "image_id": "sha256:e8ba93bf1c94f60225bdc76d51daf96bd786cfefb52927dde5c9e8d06266c242",
-  "configuration_hash": "d7dfb9f29c293938bb3b123ebb5faa8b03dd84585ae7483b984da541e5724d6f",
+  "image_id": "sha256:95f53341791857d1e98feba2e5b4c9e0d443870b143f7e4a2a5470bd0b755179",
+  "configuration_hash": "8d355d533a2e47baeaec57a7b41ac6b96674ccfe2287ad0c9cb9fe236fbc6733",
   "socket_mounted": false,
   "scope": "Restricted provisioner container process only; registration, real Postiz account provisioning and tenant isolation remain separate acceptance."
 }

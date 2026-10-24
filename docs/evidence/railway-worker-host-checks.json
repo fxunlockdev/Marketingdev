@@ -1,10 +1,10 @@
 {
-  "checked_at": "2026-10-24T05:47:17.696Z",
+  "checked_at": "2026-10-24T07:19:34.579Z",
   "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:e8ba93bf1c94f60225bdc76d51daf96bd786cfefb52927dde5c9e8d06266c242",
+      "image_id": "sha256:95f53341791857d1e98feba2e5b4c9e0d443870b143f7e4a2a5470bd0b755179",
       "architecture": "amd64",
       "user": "node"
     },
@@ -16,13 +16,13 @@
     },
     {
       "role": "skills",
-      "image_id": "sha256:e00d2d1b83e6d8b68d33556a98068ca361cbd1f1265be546ef5f96185a80fc31",
+      "image_id": "sha256:163116efa89f6154741b0d705f800d0b47378f319d05ebd471dcd2bfdffbb82a",
       "architecture": "amd64",
       "user": "65534:65534"
     },
     {
       "role": "static_renderer",
-      "image_id": "sha256:58db638e690bffcf383415df6295f69ee4b0329b3a691cc462b2e8f4b154796d",
+      "image_id": "sha256:3acac21a8c3699076221d08a132dc87e78d7baf745425cdcfe4e5006b7e78ae6",
       "architecture": "amd64",
       "user": "65534:65534"
     },
@@ -33,7 +33,7 @@
       "user": "65534:65534"
     }
   ],
-  "scanner_version": "ClamAV 1.5.4/28162/Fri Oct 23 06:24:08 2026",
+  "scanner_version": "ClamAV 1.5.4/28163/Sat Oct 24 06:26:10 2026",
   "clean_accepted": true,
   "antivirus_test_rejected": true,
   "signatures_fresh": true,

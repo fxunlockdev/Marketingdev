@@ -1,15 +1,15 @@
 {
-  "checked_at": "2026-10-24T05:48:54.654Z",
+  "checked_at": "2026-10-24T07:20:17.779Z",
   "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
   "status": "configuration_matches",
   "running": true,
-  "desired_image": "sha256:e8ba93bf1c94f60225bdc76d51daf96bd786cfefb52927dde5c9e8d06266c242",
+  "desired_image": "sha256:95f53341791857d1e98feba2e5b4c9e0d443870b143f7e4a2a5470bd0b755179",
   "video_enabled": false,
   "publishing_enabled": false,
   "credentials_present": {
-    "OPENAI_API_KEY": false,
-    "GEMINI_API_KEY": false,
-    "HIGGSFIELD_CREDENTIALS": false
+    "OPENAI_API_KEY": true,
+    "GEMINI_API_KEY": true,
+    "HIGGSFIELD_CREDENTIALS": true
   },
   "changed_services": false,
   "paid_calls": false,

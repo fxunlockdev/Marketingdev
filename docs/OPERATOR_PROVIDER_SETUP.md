@@ -10,7 +10,7 @@ The dev app is https://desvio-dev-web-dev.up.railway.app. Add model credentials 
 4. In onboarding, run brand analysis, review/correct the extracted facts and confirm the brand profile. In Canvas, generate a plan or image, edit the saved creative, and approve the resulting exact version in Review Inbox. An edit invalidates the previous approval.
 5. For video, complete the explicit Higgsfield/video settings and allowance below. Approve the video prompt before paid generation, then approve the finished asset separately. Static images do not need video-style prompt preapproval.
 
-This is the setup path for owner testing, not proof that live model calls have passed. Social OAuth/publishing stays separately gated; Meta channels are not yet implemented merely by supplying a Meta app. No paid request or social post is made by the setup wizard.
+This is the setup path for owner testing, not proof that live model calls have passed. Social OAuth/publishing stays separately gated; Supplying a Meta app alone does not verify a social connection or publication. No paid request or social post is made by the setup wizard.
 
 ## Guided local setup
 
@@ -79,7 +79,7 @@ Postiz, its isolated provisioner and Desvio social/provisioning flags are deploy
 
 ## OAuth app readiness
 
-`POSTIZ_OAUTH_ENABLED` is an explicit API switch, separate from Postiz provisioning and encryption-key presence. It defaults to false; an encryption key alone must not advertise a usable social authorization flow. Set it true only after the audited LinkedIn app credentials (`LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`) are configured on the private Postiz service with the exact callback `https://desvio-dev-web-dev.up.railway.app/integrations/social/linkedin`, and that service has redeployed successfully. API startup rejects activation without Postiz enabled and a valid OAuth encryption key. Coordinated activation preserves this explicit switch while social is enabled and temporarily disables it during worker replacement. This does not verify app permissions or authorize publishing. Meta channels are separate unfinished integrations.
+`POSTIZ_OAUTH_ENABLED` is an explicit API switch, separate from Postiz provisioning and encryption-key presence. It defaults to false; an encryption key alone must not advertise a usable social authorization flow. Set it true only after the audited LinkedIn app credentials (`LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`) are configured on the private Postiz service with the exact callback `https://desvio-dev-web-dev.up.railway.app/integrations/social/linkedin`, and that service has redeployed successfully. API startup rejects activation without Postiz enabled and a valid OAuth encryption key. Coordinated activation preserves this explicit switch while social is enabled and temporarily disables it during worker replacement. This does not verify app permissions or authorize publishing. Instagram standalone OAuth, Reel and single-JPEG paths have local mock-provider coverage; Meta app configuration and live acceptance remain pending.
 
 ### Visual onboarding allowance
 

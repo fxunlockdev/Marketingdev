@@ -1,15 +1,15 @@
 {
-  "checked_at": "2026-10-23T15:06:45.687Z",
+  "checked_at": "2026-10-24T07:17:13.027Z",
   "passed": true,
   "project": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
   "environment": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
   "sandbox": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
-  "image": "sha256:1d91dc8906c70727e43fb19a858e3486b1754839f0a1fede9a825a159db25774",
+  "image": "sha256:95f53341791857d1e98feba2e5b4c9e0d443870b143f7e4a2a5470bd0b755179",
   "operation": "list",
   "result": "listed",
   "business_count": 0,
   "channel_count": 0,
-  "operator_source_sha256": "f4bace13b9895441f648e9774ff3086309660b9bc34e9b9ae8ebe3b8f8930dbc",
+  "operator_source_sha256": "0722c7ea3990e22b47ba068461629df293694e40ca772a9561d928bec8683320",
   "paid_calls": false,
   "scope": "One-shot dev administrator transport and checksum-verified configuration only; no model eligibility, pricing, generation, social connectivity or launch readiness proof."
 }
