@@ -1,0 +1,41 @@
+{
+  "checked_at": "2026-10-23T06:50:49.437Z",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "service_id": "45ae520d-f681-424b-8758-6cee8789b2cf",
+  "deployment_id": "c260d293-7b1f-44d8-8818-eb326edfb614",
+  "bootstrap_output": {
+    "replayed": false,
+    "roles": [
+      "desvio_app",
+      "desvio_auth",
+      "desvio_mail",
+      "desvio_worker",
+      "desvio_dispatcher",
+      "desvio_provisioner"
+    ],
+    "timestamp": "2026-10-23T06:46:49.302770390Z",
+    "message": "",
+    "scope": "database-roles-and-migrations-only",
+    "level": "info",
+    "status": "configured"
+  },
+  "active_secret_variables_cleared": true,
+  "service_state": {
+    "id": "45ae520d-f681-424b-8758-6cee8789b2cf",
+    "name": "desvio-dev-bootstrap",
+    "isLinked": false,
+    "source": null,
+    "status": null,
+    "deploymentStopped": false,
+    "deploymentId": null,
+    "latestDeployment": null,
+    "url": null,
+    "volumes": [],
+    "regions": [],
+    "replicas": null,
+    "volumeMigrating": false
+  },
+  "live_model_or_social_calls": false,
+  "scope": "Actual dedicated Railway database migration/role bootstrap and six runtime login checks; one-shot secret cleanup. No connected app, hosted worker or provider readiness claim."
+}

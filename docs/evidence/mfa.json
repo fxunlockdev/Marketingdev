@@ -1,0 +1,39 @@
+{
+  "suite": "mfa",
+  "scope": "Pinned Better Auth authenticator enrollment, pending-sign-in denial, TOTP and single-use recovery, encrypted auth-only secret storage, recovery replacement and disable; real account services and customer browser including local QR generation and accessibility. Real local SMTP/DB, not deployed delivery or provider acceptance.",
+  "checked_at": "2026-10-23T08:58:35.318425+00:00",
+  "source_sha256": "673ef1d5a0bf719b17fc80128772eee86bd124d294828240ffe5850f344d5052",
+  "source_sha256_start": "673ef1d5a0bf719b17fc80128772eee86bd124d294828240ffe5850f344d5052",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--accounts"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\n\u2714 actual sign-in sessions, client ownership and absence of forged-user access (717.389041ms)\n\u2714 strict mutation origin and malformed input checks (18.590791ms)\n\u2714 failed outbox insert rolls back brand, audit and idempotency together (26.398458ms)\n\u2714 concurrent retries create one persisted brand, audit and outbox entry (28.525583ms)\n\u2714 cross-client IDs fail for reads, edits and writes even with forged organization headers (22.275292ms)\n\u2714 multiple brands share a workspace but a brand-scoped transaction cannot read its sibling (17.97825ms)\n\u2714 optimistic revisions reject stale saves and persist the accepted edit (28.681166ms)\n\u2714 database RLS and least privileges prevent foreign access without application predicates (7.051291ms)\n\u2714 viewer role and revoked membership are enforced on every request (12.874125ms)\n\u2714 revoked session cannot access saved work and survives API restart with a new sign-in (102.354833ms)\n\u2714 auth migration matches pinned SDK and runtime refuses privileged database credentials (28.918292ms)\n\u2714 expired session, tampered cookie and wrong password are rejected; passwords are hashed (295.849083ms)\n\u2714 authentication rate limit cannot be bypassed by spoofing proxy/IP headers (168.333083ms)\n\u2714 database restart preserves sessions and edits and pooled connections recover (548.541333ms)\n\u2714 verification is required and queued emails keep links/recipients encrypted at rest (317.797916ms)\n\u2714 password recovery hides account existence, rejects external redirects and revokes all sessions atomically (631.79525ms)\n\u2714 expired recovery tokens and untrusted verification callbacks cannot change the account (358.00075ms)\n\u2714 invitations are scoped, idempotent, recipient-bound and accept once without duplicate membership/audit (199.10475ms)\n\u2714 revoked, expired and sender-deauthorized invitations cannot grant access (658.845042ms)\n\u2714 replacing an invitation invalidates its older grant and cancels queued mail (392.297625ms)\n\u2714 team management denies escalation, rejects foreign members and preserves the last owner under races (36.183208ms)\n\u2714 SMTP temporary/permanent failures and lost acknowledgements preserve honest durable status (464.650166ms)\n\u2714 concurrent invitations cannot exceed the workspace daily cap (164.726791ms)\n\u2714 concurrent email workers, corrupt ciphertext, expired mail and interrupted workers do not duplicate delivery (124.984ms)\n\u2714 business invitations grant only selected clients, preserve independent roles and reject foreign scopes (1324.735834ms)\n\u2714 profile name, password changes and session controls remain bound to the authenticated user (913.640459ms)\n\u2714 delegated business admins manage scoped teammates without account or sibling escalation (1678.214833ms)\n\u2714 authenticator enrollment, pending sign-in, one-use recovery and disabling use real identity provider (914.2295ms)\n\u2139 tests 28\n\u2139 suites 0\n\u2139 pass 28\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 10767.75\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--customer-web"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\nActual isolated Deep Agents skill runtime sha256:3c63ec2d56b49ad89f89c0c5dc6e2ac1638c5e6242a85ee1ccc00c196b2eff9d; no network or credentials\nActual isolated Fabric renderer sha256:1552c52bc501f40aeb8bbe772d643527984e3fc1a4dc651c85e4cf88ce5876ea; no network or credentials\nActual local Garage 2.4.1, ClamAV 1.5.4 and Temporal CLI 1.9.1 services ready; no paid providers\nTemporal CLI 1.9.1 (Server 1.32.0, UI 2.54.1)\n\nTemporal Server:      localhost:65379\nTemporal Persistence: /Users/viloljoshi/Documents/Codex/2026-10-21/i-want-you-to-design-blaze-2/work/Marketingdev/work/asset-services-tNvYnY/temporal.db\nTemporal Metrics:     http://localhost:65388/metrics\nLocal browser proof at http://127.0.0.1:65406; actual backend/storage/scanner/worker, local SMTP only\n\u2714 V5 signup and real email verification lead to zero businesses and exact navigation (7196.489667ms)\n\u2714 three-step manual fallback saves evidence, corrections, goals and immutable brand memory (1393.60225ms)\n\u2714 real private upload survives refresh and download returns the original bytes (4345.218083ms)\n\u2714 failed and stale fact edits preserve entered corrections and require explicit recovery (429.388417ms)\n\u2714 three saved businesses, server fourth rejection, selector isolation and truthful Canvas (752.861833ms)\n\u2714 selected-business viewer sees only their business and cannot edit or open siblings (908.318833ms)\n\u2714 password recovery invokes actual identity flow and an expired session retains unsaved goals (1124.0665ms)\n\u2714 warm business UI passes scoped desktop/mobile accessibility and contains no browser secrets (588.635041ms)\n\u2714 saved AI recommendation pre-fills step three and user changes survive reload (explicit database fixture, no live model) (3248.560625ms)\n\u2714 retained visual styles stay editable without AI and unsaved edits survive replacement or empty background analysis (2100.369208ms)\n\u2714 business Team invites through real email, accepts selected access, changes roles and removes only that business (2798.104ms)\n\u2714 Profile saves identity, revokes a separate session and changes the real password with other-session logout (951.368417ms)\n\u2714 Profile authenticator setup \u2192 gated sign-in \u2192 recovery code \u2192 replacement and disable (1830.377709ms)\n\u2139 tests 13\n\u2139 suites 0\n\u2139 pass 13\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 31722.517958\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}

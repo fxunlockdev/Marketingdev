@@ -35,3 +35,28 @@ test('thirty-day planning crosses month/year boundaries and leap days without be
   assert.notEqual(plan.slots[0].planned_at.slice(0,7),plan.slots[29].planned_at.slice(0,7));
  }
 });
+
+test('daily, weekly and custom horizons preserve exact counts and reject out-of-period drafts',()=>{
+ for(const [days,count] of [[1,1],[1,2],[4,4],[6,12],[7,7],[90,90]]){
+  const context={...structuredClone(input),duration_days:days,post_count:count},result=generatedPlan(context);
+  assert.equal(validateGeneratedPlan(result,context).slots.length,count);
+  result.slots[0].planned_at=new Date(Date.parse(context.preferences.starts_on)+days*86400000).toISOString();
+  assert.throws(()=>validateGeneratedPlan(result,context),/PLAN_OUTPUT_INVALID/);
+ }
+ for(const days of [0,91,1.5,NaN])assert.throws(()=>validateGeneratedPlan(generatedPlan(input),{...input,duration_days:days}),/PLAN_OUTPUT_INVALID/);
+});
+
+test('mixed plans require the exact video count and complete bounded concepts without enabling generation',()=>{
+ const context={...structuredClone(input),duration_days:6,post_count:6,video_count:2};
+ const plan=generatedPlan(context);assert.equal(validateGeneratedPlan(plan,context).slots.filter(s=>s.format==='video').length,2);
+ for(const change of [p=>p.slots[0]=null,p=>delete p.slots[0].video_draft,p=>p.slots[0].video_draft.duration_seconds=60,p=>p.slots[0].video_draft.script='',p=>p.slots[0].video_draft.approved=true,p=>p.slots[2].format='video']){const bad=structuredClone(plan);change(bad);assert.throws(()=>validateGeneratedPlan(bad,context));}
+ for(const video_count of [-1,7,1.5])assert.throws(()=>validateGeneratedPlan(plan,{...context,video_count}));
+});
+
+
+test('natural planning resolves bounded days and mix while retaining dates, channels and approved-fact validation',()=>{
+ const context={...structuredClone(input),planning_mode:'natural'},settings={duration_days:7,post_count:7,video_count:2};
+ const value={...generatedPlan({...context,...settings}),settings};assert.equal(validateGeneratedPlan(value,context).slots.length,7);
+ for(const change of [p=>delete p.settings,p=>p.settings.duration_days=0,p=>p.settings.duration_days=91,p=>p.settings.post_count=91,p=>p.settings.video_count=8,p=>p.settings.video_count=1.5,p=>p.settings.publish=true,p=>p.settings.starts_on='2027-01-01',p=>p.slots.pop(),p=>p.slots[0].fact_ids=['fabricated']]){const bad=structuredClone(value);change(bad);assert.throws(()=>validateGeneratedPlan(bad,context),/PLAN_OUTPUT_INVALID/);}
+ assert.throws(()=>validateGeneratedPlan(value,input),/PLAN_OUTPUT_INVALID/);
+});

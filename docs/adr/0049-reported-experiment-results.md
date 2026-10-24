@@ -1,0 +1,9 @@
+# 0049 — Human-reported experiment results
+
+Extend Memory using the existing tenant-scoped insight service. Migration 042 adds append-only experiment records with method, completed date range, human conclusion and results/limitations. Only business owners/admins may append to an exact current approved-for-testing hypothesis. Readers retain business-scoped access. The application and workers cannot update/delete records; workers receive no access to this table. Results are not model instructions or approved Brand Brain facts.
+
+Each record retains the actor, hypothesis revision, creation time and an idempotency fingerprint. The lesson row lock serializes concurrent retries and review changes. A reused request key returns the same record only for the same actor/payload. Invalid dates, future completion, stale revisions, foreign businesses, unsupported outcomes and missing confirmation fail closed. Twenty records per hypothesis bound storage/read responses.
+
+The conclusion is explicitly human-reported (supported, not supported, inconclusive), never automatically validated or causal. This implements recording and reviewing experiment reports, not statistical validation or automated metric attribution. Results do not silently change active creative context. Owners can separately retire a hypothesis using the existing review controls. Records are immutable; corrections are new records that explain which earlier result they supersede.
+
+Acceptance passed at unchanged source `bbba26c93c01fc5e8d37e760266e0012985c52ec25466c8b40e0938ba8eded72` (13 service and eight browser journeys, offline five and contracts 83): real database/HTTP authorization, immutable storage and idempotency plus connected Memory browser entry/readback, read-only access and accessibility. Paid model transports remain MOCK; no cloud or live-provider completion is implied.

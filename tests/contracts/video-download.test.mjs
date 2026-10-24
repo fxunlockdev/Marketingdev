@@ -66,3 +66,25 @@ test('Video download refuses redirects, expired URLs, MIME/encoding/length misma
 test('Video download redacts network errors and signed URLs', async () => {
   await assert.rejects(new VideoDownload([origin], { fetch: async () => { throw new Error('https://cdn.example.com?signed-secret'); } }).read(origin + '/out'), code('VIDEO_DOWNLOAD_FAILED'));
 });
+
+test('authenticated provider output policy rejects raw, forged and serialized URLs',async()=>{
+ const {authenticatedVideoOutput}=await import('../../dist/video-output.js');let calls=0;
+ const downloader=new VideoDownload([],{fetch:async()=>{calls++;return response();}},'authenticated_provider_result');
+ const output=authenticatedVideoOutput('https://new-provider-cdn.example.com/result.mp4?secret');
+ assert.ok(Object.isFrozen(output));
+ await assert.rejects(downloader.read(output.url),code('VIDEO_DOWNLOAD_URL_BLOCKED'));
+ for(const fake of [{url:output.url},JSON.parse(JSON.stringify(output)),null])await assert.rejects(downloader.readProviderOutput(fake),code('VIDEO_OUTPUT_PROVENANCE_REQUIRED'));
+ assert.equal(calls,0);assert.equal((await downloader.readProviderOutput(output)).state,'untrusted_video');assert.equal(calls,1);
+ assert.throws(()=>new VideoDownload([],undefined,'unknown'),code('VIDEO_DOWNLOAD_CONFIG_INVALID'));
+ assert.throws(()=>new VideoDownload([origin],undefined,'authenticated_provider_result'),code('VIDEO_DOWNLOAD_CONFIG_INVALID'));
+});
+
+test('authenticated output preserves SSRF, redirect and content safeguards',async()=>{
+ const {authenticatedVideoOutput}=await import('../../dist/video-output.js');
+ const output=authenticatedVideoOutput(origin+'/out.mp4');
+ for(const addresses of [[{address:'127.0.0.1',family:4}],[{address:'169.254.169.254',family:4}],[{address:'8.8.8.8',family:4},{address:'10.0.0.1',family:4}]]){
+  await assert.rejects(new VideoDownload([],new SafeWeb(async()=>addresses),'authenticated_provider_result').readProviderOutput(output),code('VIDEO_DOWNLOAD_FAILED'));
+ }
+ for(const url of ['http://example.com/x','https://127.0.0.1/x','https://user:secret@example.com/x','https://example.com/x#fragment'])await assert.rejects(new VideoDownload([],undefined,'authenticated_provider_result').readProviderOutput(authenticatedVideoOutput(url)),code('VIDEO_DOWNLOAD_URL_BLOCKED'));
+ for(const [result,error] of [[{...response(),status:302},'VIDEO_DOWNLOAD_REDIRECT_BLOCKED'],[{...response(),headers:{'content-type':'text/html'}},'VIDEO_DOWNLOAD_INVALID']])await assert.rejects(new VideoDownload([],{fetch:async()=>result},'authenticated_provider_result').readProviderOutput(output),code(error));
+});

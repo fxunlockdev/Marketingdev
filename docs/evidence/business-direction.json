@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-10-24T06:43:28.357Z",
+  "status": "MOCKED",
+  "deployed": false,
+  "live_provider_calls": false,
+  "foundation_passed": 19,
+  "contracts_passed": 141,
+  "api_build": "passed",
+  "web_build": "passed",
+  "coverage": [
+    "Migration replay",
+    "Optional values persist with legacy-client preservation",
+    "Foreign business access denied",
+    "Invalid stage/oversized target rejected",
+    "Isolated actual skill runtime receives stage and ambition",
+    "Mixed month includes 26 static briefs and 4 editable video concepts"
+  ],
+  "sha256": {
+    "database/migrations/054_business_direction.sql": "82c41d40ba11f33e49c219b5402a0f451237cc2d69a7ffe79f78f04b557b4288",
+    "apps/api/src/businesses.ts": "a9b0e2f059411418c987a8a605abb9fe50fe7c9b26f01b2aad44a5aa867b448e",
+    "apps/api/src/planning.ts": "bdf9a36c72d7f7a875d6e30ffd3e62e36b1808227bf149631190caf8998398f8",
+    "apps/api/src/planning-jobs.ts": "28a4a0e8de62237bbcb48b0ab136b9e214770af45444efa1933e08ccf08571fa",
+    "apps/skills/runtime.py": "e93e02509f03f8788cde2dbba47ddf10973ddadb0624adfc301896b2020e746b",
+    "apps/web/components/businesses.tsx": "1c8356e5ec2dcbdd5d292d404f7ac2d5267713a5e73cab16d6c9f5ef0f10ee06",
+    "work/business-direction-foundation.log": "37bc21b7a59eea32a1c5e09275b81a8aa4bbf9043528a034143afc8d5753d12c",
+    "work/business-direction-contracts.log": "ea43f0f94a0d6520a3c2898f95c5802bc6a4b77cbc4e1f195194a04d0f2d520c"
+  }
+}

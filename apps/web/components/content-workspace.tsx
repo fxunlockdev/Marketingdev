@@ -1,8 +1,10 @@
 "use client";
+import {CalendarCarouselReview} from './carousels';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor } from "./creative-editor";
+import {VideoReview} from './video-canvas';
 import {CreativeExportPanel} from './creative-export';
 import { useUnsavedChanges } from "./unsaved";
 import {
@@ -47,7 +49,7 @@ function jobText(j: any) {
   if (j.status === "rejected" || j.status === "failed") {
     if (
       j.error_code?.includes("APPROVAL_REQUIRED") ||
-      j.error_code?.includes("NOT_CONFIGURED")
+      j.error_code?.includes("NOT_CONFIGURED") || j.error_code?.includes("CONFIG_CHANGED")
     )
       return "AI setup is required. Contact your workspace administrator.";
     if (j.error_code?.includes("BUDGET"))
@@ -101,14 +103,33 @@ export function ContentWorkspace({
     [selection, setSelection] = useState<any[]>([]),
     [confirmed, setConfirmed] = useState(false),
     [message, setMessage] = useState("");
+  const [moveDay, setMoveDay] = useState<string>();
+  const dragged = useRef<string | null>(null);
   const [postDirty, setPostDirty] = useState(false),
     trigger = useRef<HTMLElement | null>(null);
   const [generate, setGenerate] = useState(false),
     [start, setStart] = useState(""),
+    [planDays,setPlanDays]=useState(30),
+    [planningProvider,setPlanningProvider]=useState('openai'),[postCount,setPostCount]=useState(30),[videoCount,setVideoCount]=useState(0),
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
-  const canWrite = business.role !== "viewer",
-    canReview = ["owner", "admin"].includes(business.role);
+  useEffect(()=>{const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
+  const [exporting,setExporting]=useState(false),exportActive=useRef(true);
+  useEffect(()=>{exportActive.current=true;return()=>{exportActive.current=false;};},[]);
+  async function exportCalendar(format:'csv'|'ics'){
+    if(!prefs||!first||!last||exporting)return;
+    setExporting(true);setError(undefined);
+    try{
+      const query=new URLSearchParams({start:dayStart(first,prefs.timezone),end:dayStart(last,prefs.timezone),format,...(channel?{channel}:{}),...(state?{state}:{})});
+      const file=await api(`${root}/content-plan/export?${query}`);
+      if(!exportActive.current)return;
+      const url=URL.createObjectURL(new Blob([file.content],{type:file.content_type}));
+      const link=document.createElement('a');link.href=url;link.download=file.filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      setMessage(`Exported ${file.count} saved posts. This does not schedule or publish them.`);
+    }catch(e){if(exportActive.current)setError(e);}finally{if(exportActive.current)setExporting(false);}
+  }
+  const canWrite = ['owner','admin','editor'].includes(business.role),
+    canReview = ["owner", "admin", "reviewer"].includes(business.role);
   useUnsavedChanges(!!brief || busy);
   useEffect(() => {
     let active = true;
@@ -117,7 +138,8 @@ export function ContentWorkspace({
         if (active) {
           setPrefs(p);
           const today = localMinute(Date.now(), p.timezone).slice(0, 10);
-          setAnchor(today);
+          const requested=new URLSearchParams(location.search).get('start');
+          setAnchor(requested&&/^\d{4}-\d{2}-\d{2}$/.test(requested)&&Number.isFinite(Date.parse(requested))?requested:today);
           setStart(today);
         }
       })
@@ -170,10 +192,10 @@ export function ContentWorkspace({
   }, [root, prefs, first, last, page, channel, state, inbox, reload]);
   useEffect(() => {
     if (!jobs.some(running)) return;
-    const timer = setInterval(() => setReload((n) => n + 1), 4000);
+    const timer = setInterval(() => {if(!document.hidden)setReload((n) => n + 1);}, 4000);
     return () => clearInterval(timer);
   }, [jobs]);
-  function selectPost(id: string) {
+  function selectPost(id: string, day?: string) {
     if (
       postDirty &&
       !window.confirm("Discard your unsaved post changes and feedback?")
@@ -181,6 +203,7 @@ export function ContentWorkspace({
       return;
     trigger.current = document.activeElement as HTMLElement;
     setPostDirty(false);
+    setMoveDay(day);
     setSelected(id);
   }
   function filter(change: () => void) {
@@ -204,7 +227,7 @@ export function ContentWorkspace({
     setBusy(true);
     setError(undefined);
     try {
-      const body = { starts_on: start, brief };
+      const body = { provider:planningProvider,starts_on: start, brief, duration_days:planDays,post_count:postCount,video_count:videoCount };
       await api(
         `${root}/content-plan/generate`,
         body,
@@ -229,17 +252,20 @@ export function ContentWorkspace({
     setBusy(true);
     setError(undefined);
     try {
-      await api(`${root}/reviews/bulk-approve`, {
-        confirmed,
+      await api(`${root}/reviews/${inbox ? "bulk-approve" : "bulk-submit"}`, {
+        ...(inbox ? {confirmed} : {}),
         items: selection.map((s) => ({
           id: s.id,
           revision: s.revision,
           creative_version_id: s.creative_version_id,
           creative_sha256: s.creative_sha256,
+          video_version_id: s.video_version_id,
+          video_sha256: s.video_sha256,
+          carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,
         })),
       });
       setMessage(
-        `${selection.length} ${selection.length === 1 ? "post" : "posts"} approved. Nothing has been scheduled or published.`,
+        `${selection.length} ${selection.length === 1 ? "post" : "posts"} ${inbox ? "approved" : "sent for review"}. Nothing has been scheduled or published.`,
       );
       setSelection([]);
       setConfirmed(false);
@@ -274,7 +300,7 @@ export function ContentWorkspace({
             aria-controls="plan-generator"
             onClick={() => setGenerate((v) => !v)}
           >
-            Create 30-day plan
+            Create content plan
           </button>
         )}
       </div>
@@ -282,9 +308,9 @@ export function ContentWorkspace({
       {message && <p role="status">{message}</p>}
       {generate && (
         <section id="plan-generator" className="v5-panel">
-          <h2>Plan the next 30 days</h2>
+          <h2>Plan the next {planDays} days</h2>
           <p>
-            Your approved brand and saved goals guide 30 draft posts across your
+            Your approved brand and saved goals guide {postCount} draft posts across your
             selected channels. Nothing publishes automatically.
           </p>
           {!business.has_approved_brand || prefs?.step !== 3 ? (
@@ -301,6 +327,10 @@ export function ContentWorkspace({
                 void plan();
               }}
             >
+              <Field label="Plan duration (days)">{id=><input id={id} type="number" min={1} max={90} required value={planDays} onChange={e=>{setPlanDays(Number(e.target.value));setPostCount(Number(e.target.value));}}/>}</Field>
+              <Field label="Planning model">{id=><select id={id} value={planningProvider} onChange={e=>setPlanningProvider(e.target.value)}><option value="openai">OpenAI GPT</option></select>}</Field>
+              <Field label="Videos in this plan">{id=><input id={id} type="number" min={0} max={Math.min(postCount,30)} required value={videoCount} onChange={e=>setVideoCount(Number(e.target.value))}/>}</Field>
+              <Field label="Draft post count">{id=><input id={id} type="number" min={1} max={90} required value={postCount} onChange={e=>setPostCount(Number(e.target.value))}/>}</Field>
               <Field label="Plan starts on">
                 {(id) => (
                   <input
@@ -462,7 +492,10 @@ export function ContentWorkspace({
             )}
           </Field>
           <button onClick={() => setReload((n) => n + 1)}>Refresh posts</button>
+          {!inbox&&<><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('csv')}>Export CSV</button><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('ics')}>Export calendar</button></>}
+          {!inbox && canWrite && view !== 'list' && <button onClick={() => filter(() => setView('list'))}>Select drafts for review</button>}
         </div>
+        {!inbox&&canWrite&&view!=='list'&&<p>Drag a post to another day, then review and save the new date. You can also open any post and edit its planned date using the keyboard.</p>}
         <div className="plan-actions" aria-label="Calendar navigation">
           <button
             disabled={!first || first <= "2000-01-01"}
@@ -531,7 +564,11 @@ export function ContentWorkspace({
                   aria-label="Days in this view"
                 >
                   {calendarDays.map((day) => (
-                    <section key={day} role="listitem" className="plan-day">
+                    <section key={day} role="listitem" className="plan-day" data-calendar-day={day}
+                      onDragOver={e=>{if(canWrite&&dragged.current)e.preventDefault();}}
+                      onDrop={e=>{e.preventDefault();const id=dragged.current;dragged.current=null;
+                        if(canWrite&&id&&data.slots.some((s:any)=>s.id===id&&s.state!=='cancelled'))selectPost(id,day);
+                      }}>
                       <h2>
                         {new Intl.DateTimeFormat("en", {
                           timeZone: "UTC",
@@ -552,6 +589,9 @@ export function ContentWorkspace({
                           <button
                             key={s.id}
                             className="plan-card"
+                            draggable={canWrite&&s.state!=='cancelled'&&!busy}
+                            onDragStart={e=>{dragged.current=s.id;trigger.current=e.currentTarget;e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',s.id);}}
+                            onDragEnd={()=>{dragged.current=null;}}
                             onClick={() => selectPost(s.id)}
                             aria-label={`Open ${name(s.channel)} post: ${s.hook || s.brief}`}
                           >
@@ -561,6 +601,7 @@ export function ContentWorkspace({
                                 11,
                               )}
                             </span>
+                            <span>{s.format === 'video' ? 'Video' : s.format==='carousel'?'Carousel':'Static post'}</span>
                             <strong>{s.hook || s.brief}</strong>
                             <span className={`plan-state state-${s.state}`}>
                               {labels[s.state]}
@@ -574,14 +615,13 @@ export function ContentWorkspace({
                 <ul className="plan-post-list">
                   {data.slots.map((s: any) => (
                     <li key={s.id}>
-                      {inbox &&
-                        canReview &&
-                        s.state === "pending_review" &&
+                      {(inbox ? canReview && s.state === "pending_review" : canWrite && ['draft_ready','changes_requested'].includes(s.state)) &&
                         !s.has_newer_version && (
                           <label className="plan-select">
                             <input
                               type="checkbox"
                               checked={selection.some((x) => x.id === s.id)}
+                              disabled={busy || (selection.length >= 30 && !selection.some((x) => x.id === s.id))}
                               onChange={(e) => {
                                 setSelection((old) =>
                                   e.target.checked
@@ -601,7 +641,8 @@ export function ContentWorkspace({
                         <span>
                           {name(s.channel)} · {when(s)} ({s.timezone})
                         </span>
-                        <strong>{s.hook || s.brief}</strong>
+                        <span>{s.format === 'video' ? 'Video' : s.format==='carousel'?'Carousel':'Static post'}</span>
+                            <strong>{s.hook || s.brief}</strong>
                         <span>{s.caption || s.brief}</span>
                         <span className={`plan-state state-${s.state}`}>
                           {labels[s.state]}
@@ -620,12 +661,11 @@ export function ContentWorkspace({
       </section>
       {selection.length > 0 && (
         <section className="v5-panel">
-          <h2>Approve {selection.length} selected posts</h2>
+          <h2>{inbox ? "Approve" : "Send for review:"} {selection.length} selected posts</h2>
           <p>
-            Approval applies to the selected saved versions. Any changed post
-            will stop the entire approval.
+            Select up to 30 posts. {inbox ? "Approval applies to the selected saved versions." : "Send these saved drafts to your Review Inbox. This does not approve or publish them."} Any changed post will stop the entire batch.
           </p>
-          <label>
+          {inbox && <label>
             <input
               type="checkbox"
               checked={confirmed}
@@ -633,14 +673,14 @@ export function ContentWorkspace({
             />
             I have reviewed these {selection.length} posts and approve their
             saved versions.
-          </label>
+          </label>}
           <div className="plan-actions">
             <button
               className="primary"
-              disabled={!confirmed || busy || selection.length > 30}
+              disabled={(inbox && !confirmed) || busy || selection.length > 30}
               onClick={() => void bulk()}
             >
-              Confirm bulk approval
+              {inbox ? "Confirm bulk approval" : "Send selected drafts for review"}
             </button>
             <button
               onClick={() => {
@@ -656,7 +696,8 @@ export function ContentWorkspace({
       )}
       {selected && (
         <SlotPanel
-          key={selected}
+          key={`${selected}:${moveDay??"open"}`}
+          moveTo={moveDay?{day:moveDay,timezone:prefs.timezone}:undefined}
           business={business}
           slotId={selected}
           onChanged={() => setReload((n) => n + 1)}
@@ -674,12 +715,14 @@ export function ContentWorkspace({
 function SlotPanel({
   business,
   slotId,
+  moveTo,
   onChanged,
   onClose,
   onDirty,
 }: {
   business: Business;
   slotId: string;
+  moveTo?: {day:string;timezone:string};
   onChanged: () => void;
   onClose: () => void;
   onDirty: (dirty: boolean) => void;
@@ -694,6 +737,7 @@ function SlotPanel({
     [message, setMessage] = useState(""),
     [ready, setReady] = useState(false),
     [chosen, setChosen] = useState("");
+  const pendingMove = useRef(moveTo);
   const dirtyRef = useRef(false),
     heading = useRef<HTMLHeadingElement>(null),
     key = useRef<{ body: string; key: string } | null>(null),
@@ -707,15 +751,24 @@ function SlotPanel({
         if (!alive.current) return;
         setData(d);
         if (replace || !dirtyRef.current) {
+          let planned = d.slot.planned_at;
+          const move = pendingMove.current;
+          if(move){
+            pendingMove.current=undefined;
+            const options=localCandidates(move.day+localMinute(planned,move.timezone).slice(10),move.timezone);
+            if(options.length===1){planned=options[0];setMessage('New date prepared. Review and save your changes to move this post. Social publishing is unchanged.');}
+            else setMessage('This date has a daylight-saving time change. Choose the planned date and time below.');
+          }
           setDraft({
             revision: d.slot.revision,
             brief: d.slot.brief,
             pillar: d.slot.pillar,
             hook: d.slot.hook,
             cta: d.slot.cta,
-            local: localMinute(d.slot.planned_at, d.slot.timezone),
+            video_draft: d.slot.video_draft,
+            local: localMinute(planned, d.slot.timezone),
           });
-          setChosen(d.slot.planned_at);
+          setChosen(planned);
         }
       } catch (e) {
         if (alive.current) setError(e);
@@ -732,7 +785,7 @@ function SlotPanel({
     };
   }, [load]);
   const s = data?.slot,
-    active = data?.generations.some(running),
+    active = data?.generations.some(running)||data?.videos?.some(running),
     held = data?.generations.some((j: any) => j.status === "unknown"),
     dirty =
       !!s &&
@@ -741,7 +794,9 @@ function SlotPanel({
         draft.pillar !== s.pillar ||
         draft.hook !== s.hook ||
         draft.cta !== s.cta ||
+        JSON.stringify(draft.video_draft)!==JSON.stringify(s.video_draft) ||
         draft.local !== localMinute(s.planned_at, s.timezone));
+  useEffect(()=>setReady(false),[s?.creative_version_id,s?.video_version_id,s?.carousel_version_id]);
   dirtyRef.current = dirty;
   useUnsavedChanges(dirty || !!feedback || busy);
   useEffect(
@@ -756,8 +811,8 @@ function SlotPanel({
     }, 3000);
     return () => clearInterval(timer);
   }, [active, load]);
-  const canWrite = business.role !== "viewer",
-    canReview = ["owner", "admin"].includes(business.role),
+  const canWrite = ['owner','admin','editor'].includes(business.role),
+    canReview = ["owner", "admin", "reviewer"].includes(business.role),
     locked = busy || !canWrite;
   async function act(
     action: () => Promise<unknown>,
@@ -789,12 +844,15 @@ function SlotPanel({
           revision: s.revision,
           creative_version_id: s.creative_version_id,
           creative_sha256: s.creative_sha256,
+          video_version_id: s.video_version_id,
+          video_sha256: s.video_sha256,
+          carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,
           decision,
           feedback,
         }),
       decision === "approved"
         ? "Approved this saved version. It has not been published."
-        : "Review decision saved.",
+        : decision === "reopen" ? "Review reopened. Approval was removed; this post needs review again." : "Review decision saved.",
     );
   }
   const candidates = draft && s ? localCandidates(draft.local, s.timezone) : [];
@@ -839,7 +897,7 @@ function SlotPanel({
           </p>
           <div className="slot-columns">
             <div>
-              {s.design ? (
+              {s.carousel_version_id ? <CalendarCarouselReview businessId={business.id} projectId={s.project_id} versionId={s.carousel_version_id} canEdit={canWrite} canReview={canReview} disabled={busy||dirty} onReady={setReady} onChanged={async()=>{await load(true);changed.current();}}/> : s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/canvas?thread=${s.thread_id}`}>Give video feedback in Canvas</a></> : s.design ? (
                 <>
                   <CreativeEditor
                     businessId={business.id}
@@ -867,11 +925,13 @@ function SlotPanel({
               ) : (
                 <div className="plan-empty">
                   <h3>This idea needs a creative</h3>
+                  {s.format==='video'&&!dirty&&<a href={`/b/${business.id}/canvas?slot=${s.id}`}>Create this video in Canvas</a>}
                   <p>
-                    Create an image from the saved brief, then review it here.
+                    {s.format==='video'?'Review your script below, then choose an approved reference image in Canvas.':'Create an image from the saved brief, then review it here.'}
                   </p>
                 </div>
               )}
+              {data?.videos?.map((run:any)=><div key={run.job_id}><p role="status">Video: {run.status.replaceAll('_',' ')}</p><a href={`/b/${business.id}/canvas?thread=${run.thread_id}`}>Open video prompt and review</a>{run.output_version_id&&run.output_version_id!==s.video_version_id&&<button disabled={locked||dirty||(s.state==='approved'&&!reset)} onClick={()=>void act(()=>api(`${root}/content-slots/${slotId}`,{revision:s.revision,video_version_id:run.output_version_id,reset_approval:reset},'PATCH'),'Saved video attached as an unapproved draft.')}>Attach this saved video</button>}</div>)}
               {s.has_newer_version && (
                 <div className="notice">
                   <p>
@@ -889,7 +949,7 @@ function SlotPanel({
                             `${root}/content-slots/${slotId}`,
                             {
                               revision: s.revision,
-                              creative_version_id: s.latest_version_id,
+                              [s.format==='carousel'?'carousel_version_id':s.format==='video'?'video_version_id':'creative_version_id']: s.latest_version_id,
                               reset_approval: reset,
                             },
                             "PATCH",
@@ -917,6 +977,7 @@ function SlotPanel({
                           pillar: draft.pillar,
                           hook: draft.hook,
                           cta: draft.cta,
+                          ...(s.format==='video'&&draft.video_draft?{video_draft:draft.video_draft}:{}),
                           planned_at: instant,
                           reset_approval: reset,
                         },
@@ -927,6 +988,7 @@ function SlotPanel({
                 }}
               >
                 <fieldset disabled={locked || s.state === "cancelled"}>
+                  {s.format==='video'&&draft.video_draft&&<section aria-label="Planned video script"><h3>Video concept</h3><p>Saving edits does not authorize paid generation.</p>{(['storyline','script','prompt'] as const).map(field=><Field key={field} label={`Planned video ${field}`}>{id=><textarea id={id} maxLength={field==='storyline'?600:1200} value={draft.video_draft[field]} onChange={e=>setDraft({...draft,video_draft:{...draft.video_draft,[field]:e.target.value}})}/>}</Field>)}<Field label="Planned video duration (seconds)">{id=><input id={id} type="number" min={3} max={15} value={draft.video_draft.duration_seconds} onChange={e=>setDraft({...draft,video_draft:{...draft.video_draft,duration_seconds:Number(e.target.value)}})}/>}</Field></section>}
                   <legend>Post brief & planned date</legend>
                   <Field label="Creative brief">
                     {(id) => (
@@ -1036,7 +1098,7 @@ function SlotPanel({
                       id={id}
                       maxLength={2000}
                       value={feedback}
-                      disabled={locked}
+                      disabled={busy || (!canWrite && !canReview)}
                       onChange={(e) => setFeedback(e.target.value)}
                     />
                   )}
@@ -1044,7 +1106,7 @@ function SlotPanel({
                 {dirty && (
                   <p>Save your post changes before creating or reviewing.</p>
                 )}
-                {canWrite && s.state !== "cancelled" && (
+                {canWrite && !["video","carousel"].includes(s.format) && s.state !== "cancelled" && (
                   <button
                     className="primary"
                     disabled={
@@ -1098,7 +1160,7 @@ function SlotPanel({
                       <button
                         className="primary"
                         disabled={
-                          busy || dirty || s.has_newer_version || !ready
+                          busy || dirty || s.has_newer_version || !ready || (s.format==='carousel'&&s.carousel_status!=='approved')
                         }
                         onClick={() => review("approved")}
                       >
@@ -1131,13 +1193,14 @@ function SlotPanel({
                       </p>
                     </>
                   )}
+                  {canReview&&['approved','rejected','changes_requested'].includes(s.state)&&<button disabled={busy||dirty} onClick={()=>review('reopen')}>Reopen review</button>}
                   {canWrite && s.state !== "cancelled" && (
                     <button
                       disabled={busy || dirty}
                       onClick={() => {
                         if (
                           window.confirm(
-                            "Cancel this planned post? Its saved creative and history will be kept.",
+                            "Cancel this planned post? Its saved creative and history will be kept. Active publishing requests must be managed in Publishing first.",
                           )
                         )
                           review("cancelled");
@@ -1219,7 +1282,7 @@ function SlotPanel({
               </ul>
             </div>
           )}
-          {s.creative_version_id&&<CreativeExportPanel key={business.id+s.id+s.creative_version_id} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
+          {s.creative_version_id&&<CreativeExportPanel format={s.channel==='instagram'?'instagram-jpeg':'png'} key={business.id+s.id+s.creative_version_id+s.channel} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
           <details className="slot-activity">
             <summary>Version & decision history ({data.events.length})</summary>
             <ol>

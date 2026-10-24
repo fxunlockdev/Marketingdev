@@ -1,0 +1,39 @@
+{
+  "suite": "resend-configuration",
+  "scope": "Fixed Resend SMTP configuration with server-side API key, sender validation and SMTP credential redirection denial; existing real local account/email queue regression. No external email delivery or Resend account verification.",
+  "checked_at": "2026-10-23T11:47:51.632908+00:00",
+  "source_sha256": "bbd6e4792f6127d7067a4471ce8bafb27fdf86f1e3f878ee1ef06dc8860855e5",
+  "source_sha256_start": "bbd6e4792f6127d7067a4471ce8bafb27fdf86f1e3f878ee1ef06dc8860855e5",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "tests/contracts/mail-config.test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "\u2714 Resend uses fixed TLS transport and cannot redirect its credential through SMTP overrides (1.00425ms)\n\u2714 local SMTP remains available while staging rejects missing credentials and unsafe configuration (0.121625ms)\n\u2714 explicit no-email dev mode keeps verified password authentication and never processes mail (238.383875ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 281.697042\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--accounts"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\n\u2714 actual sign-in sessions, client ownership and absence of forged-user access (763.213458ms)\n\u2714 strict mutation origin and malformed input checks (20.456209ms)\n\u2714 failed outbox insert rolls back brand, audit and idempotency together (27.415042ms)\n\u2714 concurrent retries create one persisted brand, audit and outbox entry (37.379709ms)\n\u2714 cross-client IDs fail for reads, edits and writes even with forged organization headers (25.149083ms)\n\u2714 multiple brands share a workspace but a brand-scoped transaction cannot read its sibling (19.278042ms)\n\u2714 optimistic revisions reject stale saves and persist the accepted edit (31.492958ms)\n\u2714 database RLS and least privileges prevent foreign access without application predicates (7.957ms)\n\u2714 viewer role and revoked membership are enforced on every request (16.200416ms)\n\u2714 revoked session cannot access saved work and survives API restart with a new sign-in (128.83425ms)\n\u2714 auth migration matches pinned SDK and runtime refuses privileged database credentials (65.808958ms)\n\u2714 expired session, tampered cookie and wrong password are rejected; passwords are hashed (306.450333ms)\n\u2714 authentication rate limit cannot be bypassed by spoofing proxy/IP headers (168.77775ms)\n\u2714 database restart preserves sessions and edits and pooled connections recover (1027.606ms)\n\u2714 verification is required and queued emails keep links/recipients encrypted at rest (334.10325ms)\n\u2714 password recovery hides account existence, rejects external redirects and revokes all sessions atomically (636.101125ms)\n\u2714 expired recovery tokens and untrusted verification callbacks cannot change the account (352.490625ms)\n\u2714 invitations are scoped, idempotent, recipient-bound and accept once without duplicate membership/audit (199.271458ms)\n\u2714 revoked, expired and sender-deauthorized invitations cannot grant access (661.305958ms)\n\u2714 replacing an invitation invalidates its older grant and cancels queued mail (392.876834ms)\n\u2714 team management denies escalation, rejects foreign members and preserves the last owner under races (37.582625ms)\n\u2714 SMTP temporary/permanent failures and lost acknowledgements preserve honest durable status (443.538791ms)\n\u2714 concurrent invitations cannot exceed the workspace daily cap (146.436916ms)\n\u2714 concurrent email workers, corrupt ciphertext, expired mail and interrupted workers do not duplicate delivery (130.163667ms)\n\u2714 business invitations grant only selected clients, preserve independent roles and reject foreign scopes (1484.752958ms)\n\u2714 profile name, password changes and session controls remain bound to the authenticated user (980.908167ms)\n\u2714 delegated business admins manage scoped teammates without account or sibling escalation (1771.26475ms)\n\u2714 authenticator enrollment, pending sign-in, one-use recovery and disabling use real identity provider (1003.377ms)\n\u2714 dev without email accepts an existing verified password account but denies public signup and unverified login (483.002667ms)\n\u2139 tests 29\n\u2139 suites 0\n\u2139 pass 29\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 12303.468458\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}

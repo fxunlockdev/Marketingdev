@@ -57,6 +57,40 @@ before(async()=>{
 });
 after(async()=>{await runtime?.close();await admin.end();});
 
+test('selected reviewers decide exact posts but cannot edit, generate, publish or cross business scope; analysts are read-only',async()=>{
+ const reviewer=await signup(),analyst=await signup();
+ for(const [u,role] of [[reviewer,'reviewer'],[analyst,'analyst']]){
+  await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org.id,u.id]);
+  await admin.query('INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,$4)',[org.id,brand.id,u.id,role]);
+ }
+ let [s]=await create();s=await plans.review(editor.id,brand.id,s.id,reviewBody(s,'pending_review'));
+ for(const user of [reviewer,analyst]){
+  assert.equal((await api(path(`content-plan?${query()}`),{user})).status,200);
+  assert.equal((await api(path(`content-plan?${query()}`,sibling),{user})).status,404);
+  assert.equal((await api(path(`content-slots/${s.id}`),{user,method:'PATCH',body:{revision:s.revision,brief:'Unauthorized rewrite'}})).status,403);
+  assert.equal((await api(path('reviews/bulk-submit'),{user,method:'POST',body:{items:[{id:s.id,...reviewBody(s,'pending_review')}].map(({decision,feedback,...item})=>item)}})).status,403);
+  await assert.rejects(canvas.createThread(user.id,brand.id,{title:'No paid work'},randomUUID()));
+  await runtime.database.transaction(user.id,org.id,false,async db=>{assert.equal((await db.query('SELECT app.social_manager($1,$2) AS allowed',[org.id,brand.id])).rows[0].allowed,false);},brand.id);
+ }
+ assert.equal((await api(path(`reviews/${s.id}`),{user:analyst,method:'POST',body:reviewBody(s,'approved')})).status,403);
+ // Even a review-marked transaction cannot mutate content, create jobs or alter a business.
+ const reviewTx=action=>runtime.database.transaction(reviewer.id,org.id,true,action,brand.id,true);
+ await assert.rejects(reviewTx(db=>db.query("UPDATE app.content_slots SET brief='tampered',state='approved',revision=revision+1,approved_by=$2,approved_at=now() WHERE id=$1",[s.id,reviewer.id])),e=>e.code==='42501');
+ await assert.rejects(reviewTx(db=>db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",[randomUUID(),org.id,brand.id,reviewer.id])),e=>e.code==='42501');
+ await assert.rejects(reviewTx(db=>db.query("UPDATE app.brands SET name='tampered' WHERE id=$1",[brand.id])),e=>e.code==='42501');
+ const approved=await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:reviewBody(s,'approved')});assert.equal(approved.status,201,JSON.stringify(approved.body));assert.equal(approved.body.approved_by,reviewer.id);
+ const undoBody=reviewBody(approved.body,'reopen');
+ assert.equal((await api(path(`reviews/${s.id}`),{user:editor,method:'POST',body:undoBody})).status,403);
+ assert.equal((await api(path(`reviews/${s.id}`),{user:analyst,method:'POST',body:undoBody})).status,403);
+ const reopened=await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:undoBody});assert.equal(reopened.status,201,JSON.stringify(reopened.body));assert.equal(reopened.body.state,'pending_review');assert.equal(reopened.body.approved_by,null);
+ assert.equal((await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:undoBody})).status,409);
+ const history=await plans.history(reviewer.id,brand.id,s.id);assert.ok(history.events.some(e=>e.action==='review_reopened'));
+
+ assert.equal((await api(path(`reviews/${s.id}`),{user:reviewer,method:'POST',body:reviewBody(s,'approved')})).status,409);
+ let [other]=await create();other=await plans.review(editor.id,brand.id,other.id,reviewBody(other,'pending_review'));
+ const feedback=await api(path(`reviews/${other.id}`),{user:reviewer,method:'POST',body:{...reviewBody(other,'changes_requested'),feedback:'Use clearer wording'}});assert.equal(feedback.status,201);assert.equal(feedback.body.state,'changes_requested');
+});
+
 test('30 real persisted slots across two channels; concurrent request replay creates one plan and no publishing job',async()=>{
  const slots=Array.from({length:30},(_,i)=>({...slot(i%2?'instagram':'linkedin'),planned_at:`2026-11-${String(i+1).padStart(2,'0')}T08:00:00Z`})),body=payload(slots),key=randomUUID();
  const results=await Promise.all(Array.from({length:3},()=>api(path('content-plans'),{method:'POST',key,body})));
@@ -98,6 +132,21 @@ test('stale approval and unconfirmed edits are denied; confirmed edits reset app
  const changed=await api(path(`content-slots/${s.id}`),{method:'PATCH',body:{...edit,reset_approval:true}});assert.equal(changed.status,200);assert.equal(changed.body.state,'draft_ready');assert.equal(changed.body.approved_by,null);
  assert.equal((await api(path(`reviews/${s.id}`),{method:'POST',body:reviewBody(s,'approved')})).status,409);
  const history=await plans.history(alice.id,brand.id,s.id);assert.equal(history.events[2].action,'approved');assert.equal(history.events[3].snapshot.planned_at,'2026-11-06T08:00:00.000Z');
+});
+test('bulk submission is editor-only, exact-version and atomic across stale or foreign selections',async()=>{
+ const slots=await create([slot(),slot('instagram')]);
+ const item=s=>({id:s.id,revision:s.revision,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256});
+ const items=slots.map(item),route=path('reviews/bulk-submit');
+ for(const user of [viewer,bob])assert.ok([403,404].includes((await api(route,{user,method:'POST',body:{items}})).status));
+ assert.equal((await api(route,{method:'POST',body:{items:[]}})).status,400);
+ assert.equal((await api(route,{method:'POST',body:{items:[items[0],items[0]]}})).status,400);
+ assert.equal((await api(route,{method:'POST',body:{items:[items[0],{...items[1],revision:99}]}})).status,409);
+ assert.equal((await api(route,{method:'POST',body:{items:[items[0],{...items[1],id:randomUUID()}]}})).status,404);
+ assert.ok((await plans.list(alice.id,brand.id,{...range,plan_id:slots[0].plan_id})).slots.every(s=>s.state==='draft_ready'&&s.revision===1));
+ const ok=await api(route,{user:editor,method:'POST',body:{items}});assert.equal(ok.status,201,JSON.stringify(ok.body));
+ assert.ok(ok.body.slots.every(s=>s.state==='pending_review'&&s.approved_by===null));
+ assert.equal((await api(route,{user:editor,method:'POST',body:{items}})).status,409);
+ for(const s of slots)assert.deepEqual((await plans.history(alice.id,brand.id,s.id)).events.map(e=>e.action),['created','pending_review']);
 });
 test('bulk approval requires confirmation and is atomic when any selected revision is stale',async()=>{
  let slots=await create([slot(),slot('instagram')]);slots=await Promise.all(slots.map(s=>plans.review(alice.id,brand.id,s.id,reviewBody(s,'pending_review'))));
@@ -182,4 +231,17 @@ test('authenticated slot detail/generation routes preserve revision, idempotency
  const replay=await api(path(`${endpoint}/generate-creative`),{method:'POST',key,body});assert.equal(replay.body.id,queued.body.id);
  const detail=await api(path(endpoint));assert.equal(detail.status,200);assert.equal(detail.body.slot.revision,s.revision+1);assert.equal(detail.body.generations[0].job_id,queued.body.id);assert.equal(detail.body.generations[0].attachment_status,'pending');
  assert.equal((await api(path(`${endpoint}/generate-creative`),{method:'POST',key:randomUUID(),body})).status,409);
+});
+
+test('calendar export reads all filtered saved posts with authenticated business isolation',async()=>{
+ const slots=Array.from({length:101},()=>({...slot(),creative_version_id:null}));
+ const created=await api(path('content-plans'),{method:'POST',key:randomUUID(),body:payload(slots)});assert.equal(created.status,201);
+ const url=path(`content-plan/export?${query({plan_id:created.body.id,format:'ics'})}`);
+ const exported=await api(url);assert.equal(exported.status,200);assert.equal(exported.body.count,101);
+ assert.equal(exported.body.content.split('BEGIN:VEVENT').length-1,101);
+ assert.equal((await api(url,{user:bob})).status,404);
+ assert.equal((await api(url,{user:null})).status,401);
+ assert.equal((await api(path(`content-plan/export?${query({plan_id:created.body.id,format:'csv',channel:'instagram'})}`))).body.count,0);
+ assert.equal((await api(path(`content-plan/export?${query({plan_id:created.body.id,format:'csv'})}`,sibling))).body.count,0);
+ assert.equal((await api(path(`content-plan/export?${query({format:'html'})}`))).status,400);
 });

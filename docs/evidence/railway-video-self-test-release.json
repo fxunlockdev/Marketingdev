@@ -1,0 +1,79 @@
+{
+  "checked_at": "2026-10-24T08:47:05.359073+00:00",
+  "passed": true,
+  "api_deployment": "c9315e1f-355e-49ae-8151-0f670434c167",
+  "api_status": "SUCCESS",
+  "worker_image": "sha256:546abb792932c8609233bcc50e2d2b444015fae72116148868df848f8e264a76",
+  "video_enabled": true,
+  "publishing_enabled": false,
+  "workspace_change_id": "7fa68773-93c5-4f2c-9046-91070c565d09",
+  "workspace_grants": [
+    {
+      "kind": "creative",
+      "enabled": true,
+      "quality": "high",
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "text_model": "gpt-4.1-2025-04-14",
+      "image_model": "gpt-image-2.5-sunburst",
+      "budget_micros": null,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8,
+      "max_image_request_micros": 5000000
+    },
+    {
+      "kind": "insights",
+      "model": "gpt-4.1-2025-04-14",
+      "enabled": true,
+      "provider": "openai",
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "budget_micros": null,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8
+    },
+    {
+      "kind": "onboarding",
+      "model": "gpt-4.1-2025-04-14",
+      "enabled": true,
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "budget_micros": null,
+      "max_tokens_per_image": 16384,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8
+    },
+    {
+      "kind": "planning",
+      "model": "gpt-4.1-2025-04-14",
+      "enabled": true,
+      "provider": "openai",
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "budget_micros": null,
+      "input_micros_per_token": 2,
+      "output_micros_per_token": 8
+    },
+    {
+      "kind": "video",
+      "models": [
+        "kling-video/o3/video-edit",
+        "kling-video/v3.0/std/image-to-video"
+      ],
+      "enabled": true,
+      "expires_at": "2026-11-23T08:31:14.060Z",
+      "budget_micros": null,
+      "max_edit_micros": 20000000,
+      "max_create_micros": 20000000
+    }
+  ],
+  "evidence": [
+    "railway-provider-activation.json",
+    "railway-worker-readiness.json",
+    "railway-worker-job-video057.json",
+    "railway-worker-job-cleanup-video057.json",
+    "railway-provisioner-authenticated-video-rollout.json",
+    "railway-uploaded-video-browser.json",
+    "security.json"
+  ],
+  "paid_provider_tests": false,
+  "owner_self_test_enabled": true,
+  "launch_ready": false,
+  "scope": "Actual deployed runtime activation, exact owner workspace defaults, login/navigation and private asset job acceptance. Owner may now test model generation; provider entitlement/output quality and actual live generation have not been verified. Social authorization remains pending."
+}

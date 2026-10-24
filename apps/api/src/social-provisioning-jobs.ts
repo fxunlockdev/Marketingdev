@@ -13,7 +13,13 @@ export class SocialProvisioningJobs {
  async run(scope:JobScope):Promise<string>{
   const input=await this.#jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='social.provision')throw new Error('JOB_KIND_DENIED');if(terminal.has(j.status))return null;
-   const p=(await db.query('SELECT * FROM app.social_provisioning WHERE job_id=$1',[j.id])).rows[0];if(!p)throw new Error('PROVISIONING_SCOPE_DENIED');
+   let p=(await db.query('SELECT * FROM app.social_provisioning WHERE job_id=$1',[j.id])).rows[0];
+   if(!p){const recovery=(await db.query('SELECT source_job_id FROM app.social_provision_checks WHERE job_id=$1',[j.id])).rows[0];
+    if(recovery){const saved=(await db.query('SELECT * FROM app.social_provisioning WHERE job_id=$1',[recovery.source_job_id])).rows[0];
+     if(!saved||saved.phase!=='unknown'||!saved.candidate_saved){await this.finish(db,j,'unknown','POSTIZ_RECOVERY_CANDIDATE_UNAVAILABLE');return null;}
+     p={...saved,phase:'verifying'};
+    }
+   }if(!p)throw new Error('PROVISIONING_SCOPE_DENIED');
    if(p.phase==='creating'){await this.finish(db,j,'unknown','POSTIZ_PROVISIONING_OUTCOME_UNKNOWN');return null;}
    if(!await this.#permission.permitted(db,j)){await this.finish(db,j,p.remote_organization_id?'unknown':'canceled','SOCIAL_ACCESS_REVOKED');return null;}
    if(!['queued','verifying'].includes(p.phase))throw new Error('PROVISIONING_STATE_INVALID');
@@ -44,7 +50,7 @@ export class SocialProvisioningJobs {
     return this.finish(db,j,'succeeded');
    });
   }catch(error){if(!(error instanceof PostizError))throw error;
-   const result=await this.#jobs.transaction(scope,async(db,j)=>{if(terminal.has(j.status))return j.status;const p=(await db.query('SELECT phase,remote_organization_id FROM app.social_provisioning WHERE job_id=$1',[j.id])).rows[0];
+   const result=await this.#jobs.transaction(scope,async(db,j)=>{if(terminal.has(j.status))return j.status;const p=(await db.query('SELECT phase,remote_organization_id FROM app.social_provisioning WHERE job_id=$1',[j.id])).rows[0]??input;
     if(p.phase==='verifying'&&['POSTIZ_TIMEOUT','POSTIZ_NETWORK_ERROR','POSTIZ_UNAVAILABLE','POSTIZ_RATE_LIMITED'].includes(error.code)){await db.query("UPDATE app.jobs SET status='retrying',error_code=$2,updated_at=now() WHERE id=$1",[j.id,error.code]);return 'retrying';}
     return this.finish(db,j,p.remote_organization_id||error.outcome==='unknown'?'unknown':'rejected',error.code);
    });if(result==='retrying')throw new SocialReadRetry(error.retryAfterSeconds??30);return result;

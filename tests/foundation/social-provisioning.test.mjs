@@ -28,7 +28,7 @@ async function prepare(b,user=alice,key=randomUUID()){const r=await api(endpoint
 const read=async(b,user=alice)=>(await api(endpoint(b),{user})).body;
 function created(payload){const result={id:'provisioned-'+randomUUID(),apiKey:'MOCK_ORG_KEY_'+randomBytes(24).toString('hex')};remote.set(result.apiKey,{id:result.id,name:provisionedName(payload.id)});return result;}
 before(async()=>{
- config.socialEnabled=true;config.socialProvisioningEnabled=true;config.oauthEncryptionKey=oauthKey;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);
+ config.socialEnabled=true;config.socialAuthorizationEnabled=true;config.socialProvisioningEnabled=true;config.oauthEncryptionKey=oauthKey;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);
  alice=await signup();bob=await signup();viewer=await signup();editor=await signup();selected=await signup();orgA=await ws.create(alice.id,{name:'Provisioning fixture A'});orgB=await ws.create(bob.id,{name:'Provisioning fixture B'});
  // Additional fixtures are isolated businesses; the customer default stays three.
  for(const org of [orgA,orgB])await admin.query('INSERT INTO app.account_entitlements(organization_id,max_active_businesses) VALUES($1,100) ON CONFLICT(organization_id) DO UPDATE SET max_active_businesses=100',[org.id]);
@@ -95,4 +95,65 @@ test('cancellation before submission avoids creation, and in-flight permission l
 test('known pre-creation rejection can be retried within a cap; existing disabled bindings cannot be re-enabled by setup',async()=>{
  const b=await business();createBehavior=(req,res)=>json(res,{success:false});for(let i=0;i<3;i++){const j=(await prepare(b)).job;assert.equal(await handler.run(scope(j,b)),'rejected');}assert.equal((await api(endpoint(b)+'/prepare',{method:'POST',body:{},key:randomUUID()})).status,409);
  createBehavior=(req,res,p)=>json(res,created(p));const other=await business(),j=(await prepare(other)).job;assert.equal(await handler.run(scope(j,other)),'succeeded');await admin.query('UPDATE app.postiz_accounts SET enabled=false WHERE brand_id=$1',[other.id]);assert.equal((await api(endpoint(other)+'/prepare',{method:'POST',body:{},key:randomUUID()})).status,409);assert.equal((await read(other)).configured,false);
+});
+
+test('unconfigured OAuth stays unavailable despite a verified binding and encryption key',async()=>{
+ const b=await business(),j=(await prepare(b)).job;assert.equal(await handler.run(scope(j,b)),'succeeded');
+ const disabled=await createApplication({...config,socialAuthorizationEnabled:false});
+ try{
+  await disabled.app.listen(0,'127.0.0.1');const url=await disabled.app.getUrl();
+  const state=await fetch(url+endpoint(b),{headers:{cookie:alice.cookie}});assert.equal(state.status,200);const data=await state.json();assert.equal(data.configured,true);assert.equal(data.authorization_available,false);assert.equal(data.setup_available,false);
+  const response=await fetch(url+endpoint(b)+'/oauth/linkedin',{method:'POST',headers:{cookie:alice.cookie,origin:config.origin,'content-type':'application/json','idempotency-key':randomUUID()},body:'{}'});assert.equal(response.status,409);
+  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='social.authorize'",[b.id])).rows[0].n,0);
+ }finally{await disabled.close();}
+});
+
+test('saved unknown candidates recover through a new read-only durable job without duplicate creation',async()=>{
+ const b=await business(),original=(await prepare(b)).job;
+ identityBehavior=(req,res)=>json(res,{error:'MOCK unavailable'},503);
+ await assert.rejects(handler.run(scope(original,b)),e=>e instanceof SocialReadRetry);
+ await handler.fail(scope(original,b));const count=creates;
+ const path=endpoint(b)+'/provisioning/'+original.id+'/recheck',key=randomUUID();
+ for(const user of [viewer,editor])assert.equal((await api(path,{user,method:'POST',body:{},key:randomUUID()})).status,403);
+ assert.equal((await api(path,{user:bob,method:'POST',body:{},key:randomUUID()})).status,404);
+ const first=await api(path,{method:'POST',body:{},key});assert.equal(first.status,201,JSON.stringify(first.body));
+ assert.notEqual(first.body.id,original.id);
+ assert.equal((await api(path,{method:'POST',body:{},key})).body.id,first.body.id);
+ assert.equal((await api(path,{method:'POST',body:{},key:randomUUID()})).body.id,first.body.id);
+ identityBehavior=(req,res,organization)=>json(res,{organization});
+ assert.equal(await workflow(first.body,b),'succeeded');assert.equal(creates,count);
+ assert.equal((await read(b)).configured,true);
+ assert.equal((await admin.query('SELECT phase FROM app.social_provisioning WHERE job_id=$1',[original.id])).rows[0].phase,'unknown');
+ assert.equal((await api(path,{method:'POST',body:{},key:randomUUID()})).status,409);
+});
+
+test('unknown creation without saved credentials cannot be rechecked',async()=>{
+ const b=await business(),j=(await prepare(b)).job;createBehavior=(req,res)=>req.socket.destroy();
+ assert.equal(await handler.run(scope(j,b)),'unknown');const count=creates;
+ assert.equal((await api(endpoint(b)+'/provisioning/'+j.id+'/recheck',{method:'POST',body:{},key:randomUUID()})).status,409);
+ assert.equal(creates,count);
+});
+
+test('rechecks preserve isolation and respect revoked permission, identity mismatch and rate caps',async()=>{
+ const b=await business(),original=(await prepare(b)).job;
+ identityBehavior=(req,res,organization)=>json(res,{organization:{...organization,name:'MOCK wrong business'}});
+ assert.equal(await handler.run(scope(original,b)),'unknown');const count=creates;
+ const path=endpoint(b)+'/provisioning/'+original.id+'/recheck';
+ const sibling=await business();assert.equal((await api(endpoint(sibling)+'/provisioning/'+original.id+'/recheck',{method:'POST',body:{},key:randomUUID()})).status,404);
+ const first=(await api(path,{method:'POST',body:{},key:randomUUID()})).body;
+ await jobs.transaction(scope(first,b),async db=>{
+  assert.equal((await db.query('SELECT * FROM app.social_provisioning')).rowCount,1);
+  assert.equal((await db.query("UPDATE app.social_provisioning SET phase='verifying' WHERE job_id=$1",[original.id])).rowCount,0);
+ });
+ assert.equal(await handler.run(scope(first,b)),'unknown');assert.equal((await read(b)).provisioning.can_recheck,true);
+ const second=(await api(path,{method:'POST',body:{},key:randomUUID()})).body;
+ await admin.query("UPDATE app.memberships SET role='editor' WHERE organization_id=$1 AND user_id=$2",[orgA.id,alice.id]);
+ try{assert.equal(await handler.run(scope(second,b)),'finished');}finally{await admin.query("UPDATE app.memberships SET role='owner' WHERE organization_id=$1 AND user_id=$2",[orgA.id,alice.id]);}
+ assert.equal((await read(b)).configured,false);
+ const third=(await api(path,{method:'POST',body:{},key:randomUUID()})).body;
+ assert.equal(await handler.run(scope(third,b)),'unknown');
+ assert.equal((await api(path,{method:'POST',body:{},key:randomUUID()})).status,409);
+ assert.equal(creates,count);
+ for(const sql of ['SELECT encrypted_credential FROM app.social_provisioning','SELECT remote_organization_id FROM app.social_provisioning'])await assert.rejects(app.database.pool.query(sql),e=>e.code==='42501');
+ await assert.rejects(ordinaryWorker.query('SELECT * FROM app.social_provision_checks'),e=>e.code==='42501');
 });

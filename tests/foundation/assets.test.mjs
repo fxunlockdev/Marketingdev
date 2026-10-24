@@ -1,3 +1,4 @@
+import {normalizeProductPhoto} from '../../dist/uploaded-visuals.js';
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -56,6 +57,21 @@ test('authenticated reservation is private, idempotent, format bounded and tenan
   assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.job_dispatch WHERE job_id=$1',[job.id])).rows[0].n,1);
   await dispatcher.runOnce();startWorker();const done=await waitStatus(job,['succeeded']);assert.equal(done.attempt,1);
   const download=await request(`${path()}/assets/${a.id}/download`,{method:'POST'});assert.equal(download.status,201);const r=await fetch(download.body.url);assert.equal(r.status,200);assert.equal(digest(Buffer.from(await r.arrayBuffer())),digest(png));assert.match(r.headers.get('content-disposition'),/^attachment;/);
+  const visual=(await admin.query('SELECT * FROM app.uploaded_visuals WHERE asset_id=$1',[a.id])).rows[0];
+  assert.ok(visual);assert.equal(visual.source_sha256,digest(png));
+  const normalized=await store.read(visual.object_key);assert.equal(digest(normalized),visual.sha256);assert.equal((await sharp(normalized).metadata()).format,'jpeg');
+  const referencePath=`/api/v1/businesses/${brand.id}/canvas/references`;
+  const approval={kind:'upload',visual_id:visual.id,label:'Product photo',consent:true,crop:{left:0,top:0,width:16,height:16}};
+  assert.equal((await request(referencePath,{method:'POST',cookie:bob.cookie,body:approval})).status,404);
+  assert.equal((await request(referencePath,{method:'POST',body:{...approval,consent:false}})).status,400);
+  assert.equal((await request(referencePath,{method:'POST',body:{...approval,crop:{left:0,top:0,width:9999,height:16}}})).status,400);
+  const approved=await request(referencePath,{method:'POST',body:approval});assert.equal(approved.status,201,JSON.stringify(approved.body));
+  const repeated=await request(referencePath,{method:'POST',body:approval});assert.equal(repeated.body.id,approved.body.id);
+  assert.equal((await request(referencePath,{method:'POST',body:{...approval,crop:null}})).status,409);
+  const preview=await request(`/api/v1/businesses/${brand.id}/visuals/${visual.id}`);assert.equal(preview.status,200);
+  assert.equal(digest(Buffer.from(await (await fetch(preview.body.url)).arrayBuffer())),visual.sha256);
+  assert.equal((await request(`/api/v1/businesses/${brand.id}/visuals/${visual.id}`,{cookie:bob.cookie})).status,404);
+  const intake=await request(`/api/v1/businesses/${brand.id}/intake`);assert.equal(intake.body.visuals.find(v=>v.id===visual.id).viewport,'upload');
   const canonical=(await admin.query('SELECT canonical_key FROM app.assets WHERE id=$1',[a.id])).rows[0].canonical_key;
   assert.equal(await store.persist(canonical,png,'image/png',digest(png)),'existing-verified');
   const alternate=Buffer.from('must not overwrite validated bytes');
@@ -112,6 +128,10 @@ test('upload limits serialize concurrent reservations and abandoning frees a slo
     assert.equal((await request(`${path()}/assets/${asset.id}/abandon`,{method:'POST'})).status,201);
     assert.equal((await request(`${path()}/assets/${asset.id}/complete`,{method:'POST'})).status,409);
     await reserve();
+    await admin.query("UPDATE app.assets SET state='canceled' WHERE brand_id=$1",[brand.id]);
+    // Explicit quota metadata fixture: original bytes alone fit, reserved image derivatives do not.
+    await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state,created_at) SELECT gen_random_uuid(),$1,$2,$3,'QUOTA FIXTURE','image/png',1,repeat('0',64),'quota-q-'||gen_random_uuid(),'quota-c-'||gen_random_uuid(),'ready',now()-interval '2 days' FROM generate_series(1,170)",[org.id,brand.id,alice.id]);
+    assert.equal((await request(path()+'/uploads',{method:'POST',key:randomUUID(),body:{filename:'too-much.png',contentType:'image/png',bytes:png.length,sha256:digest(png)}})).status,409);
     await admin.query("INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,'viewer')",[org.id,bob.id]);
     assert.equal((await request(path()+'/uploads',{method:'POST',cookie:bob.cookie,key:randomUUID(),body:{filename:'brand.png',contentType:'image/png',bytes:png.length,sha256:digest(png)}})).status,403);
     assert.equal((await request(`${path()}/assets/${asset.id}/abandon`,{method:'POST',cookie:bob.cookie})).status,403);
@@ -127,4 +147,10 @@ test('temporary scanner connection failure preserves work and retries safely',as
     assert.equal((await request(`${path()}/assets/${asset.id}/download`,{method:'POST'})).status,409);
     unavailable=false;const result=await waitStatus(job,['succeeded']);assert.ok(result.attempt>=2);
   }finally{unavailable=false;}
+});
+
+test('product photo normalization removes metadata and bounds dimensions without distorting aspect ratio',async()=>{
+ const bytes=await sharp({create:{width:4000,height:2000,channels:4,background:{r:200,g:10,b:30,alpha:0.5}}}).withMetadata({exif:{IFD0:{Artist:'PRIVATE TEST METADATA'}}}).png().toBuffer();
+ const v=await normalizeProductPhoto(bytes),meta=await sharp(v.data).metadata();assert.equal(v.width,3072);assert.equal(v.height,1536);assert.equal(meta.exif,undefined);assert.equal(meta.hasAlpha,false);assert.equal(v.sha256,digest(v.data));
+ await assert.rejects(normalizeProductPhoto(Buffer.from('invalid image')),/INVALID_IMAGE/);
 });

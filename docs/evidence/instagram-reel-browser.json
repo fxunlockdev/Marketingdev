@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-24T06:20:51.816488+00:00",
+  "passed": true,
+  "browser_tests": 10,
+  "contract_tests": 138,
+  "live_provider_calls": false,
+  "deployed": false,
+  "scope": "Actual Next/Nest authentication, PostgreSQL tenant scope, canonical rendering/private storage, Temporal publishing, browser preview/consent and status reload; explicitly MOCK Postiz and model transports. Screenshot inspected; accessibility checks pass.",
+  "source_sha256": {
+    "apps/api/src/postiz-client.ts": "dff8d617903f7af29336da31507be292b21aa17f1c9c167d43f96e86ec02f709",
+    "apps/api/src/publication.ts": "3a64c68ae7eaf1a23da2dda657774589e28357fff93bb75ebea9cbb15fe07e4d",
+    "apps/api/src/publication-jobs.ts": "a384705dbb61ebd43d40e299b9f9c17d5568ea8c08734cb72456b813ddb6741d",
+    "apps/api/src/publication-provider.ts": "bd7ee244f08956439bf787ee87dc496e0f3163a4e35487f204df6ce8faf6f5ab",
+    "apps/api/src/video-renderer.ts": "ade0c1f27b5efda9887690bc7458287cadeb935a94be5f4eb46ef0b0c13dbcf7",
+    "apps/api/src/video-references.ts": "e940d64e63dc7aae82a73e8f91a3161321308b593abe7106ea6e34b303ea11fb",
+    "apps/web/components/publishing.tsx": "03cab2688aaf22f0084d60cc904e1cda85e18101ac920f346b3d74f48ccbecc7",
+    "database/migrations/051_instagram_reel_publication.sql": "0e768380241efa978b5d59b5ab150295a37d404b0eeff28ff7c033f07b3f6a86",
+    "tests/browser/publishing.test.mjs": "680793830e3b7aeeeb6b7e7389c60254266b8a8a6bd030b6a6d8ae1eb5e915d4",
+    "tests/fixtures/publishing-video.mjs": "fa39068d20e09af1ac7bffb2baa8c4e35b75ae33117df594952aa8ff0b75abee"
+  },
+  "log_sha256": {
+    "browser": "763571c1e00c4b1e5798a3f2853023e53b337bb408041e253def4d8660b88c91",
+    "contracts": "124754b1a2490738d45ca578bfd02eaab0e3a85c9806c720c53af0df8ca8e8d3"
+  },
+  "screenshot_sha256": "873af5bd54f1ed97f7ae4ea08d608b5e53ee7d8519b2c5a023bce79828e839ea"
+}

@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-24T07:43:24.873Z",
+  "passed": true,
+  "image": "sha256:4b8b503be729265cc1a88926128726ace29026f011fe857d5bf920de71e08bd9",
+  "backup_container": "desvio-provisioner-rollback-20261024-uncapped",
+  "paid_calls": false,
+  "scope": "Dedicated provisioner replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+}

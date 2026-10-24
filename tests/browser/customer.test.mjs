@@ -269,7 +269,7 @@ test("V5 signup and real email verification lead to zero businesses and exact na
       .getPropertyValue("--ink")
       .trim(),
   }));
-  assert.deepEqual(colors, { paper: "#f5ead8", ink: "#201e1d" });
+  assert.deepEqual(colors, { paper: "#eee9df", ink: "#242220" });
 });
 
 test("three-step manual fallback saves evidence, corrections, goals and immutable brand memory", async () => {
@@ -340,6 +340,22 @@ test("real private upload survives refresh and download returns the original byt
     chunks = [];
   for await (const c of stream) chunks.push(c);
   assert.deepEqual(Buffer.concat(chunks), png);
+  await alice.getByRole('button',{name:'Refresh image sources',exact:true}).click();
+  await alice.getByText('Approve images for future creatives',{exact:true}).click();
+  const source=alice.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+  await source.getByRole('button',{name:'Inspect Uploaded product photo',exact:true}).click();await expect(source.getByRole('img',{name:'Uploaded product photo',exact:true})).toBeVisible();
+  await source.getByLabel('Use part of this image', {exact:true}).check();
+  await source.getByLabel('Crop width',{exact:true}).fill('32');await source.getByLabel('Crop height',{exact:true}).fill('32');
+  await source.getByRole('button',{name:'Preview selected crop',exact:true}).click();await expect(source.getByRole('img',{name:'Selected reference crop',exact:true})).toBeVisible();
+  await source.getByLabel('Reference name',{exact:true}).fill('Product photo crop');
+  await expect(source.getByRole('button',{name:'Approve image reference',exact:true})).toBeDisabled();
+  await source.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
+  await source.getByRole('button',{name:'Approve image reference',exact:true}).click();
+  await expect(alice.getByText('Product photo crop',{exact:true})).toBeVisible();
+  await alice.getByRole('button',{name:'Preview Product photo crop',exact:true}).click();await expect(alice.getByRole('img',{name:'Product photo crop',exact:true})).toBeVisible();
+  const references=await alice.request.get(base+brandUrl.replace(base,'').replace('/b/','/api/v1/businesses/').replace('/onboarding','')+'/canvas/references');assert.equal(references.status(),200);assert.deepEqual((await references.json()).references.find(r=>r.label==='Product photo crop').crop,{left:0,top:0,width:32,height:32});
+  await alice.screenshot({path:'work/browser/product-photo-crop.png',fullPage:true});
+
   assert.deepEqual(errors, []);
 });
 
@@ -697,7 +713,7 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   const referenceApproval=alice.getByRole('region',{name:'Approve reference: Document page 1'});
   await expect(referenceApproval.getByRole('button',{name:'Approve image reference'})).toBeDisabled();
   await referenceApproval.getByLabel('Reference name',{exact:true}).fill('My guideline reference');
-  await referenceApproval.getByRole('checkbox').check();
+  await referenceApproval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
   await referenceApproval.getByRole('button',{name:'Approve image reference'}).click();
   await expect(alice.getByRole('button',{name:'Remove approval for My guideline reference'})).toBeVisible();
   const privatePreview=`${base}/api/v1/businesses/${target.id}/visuals/${visualId}`;
@@ -717,7 +733,7 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
     .withTags(["wcag2a", "wcag2aa"])
     .analyze();
   assert.deepEqual(
-    visualAccessibility.violations.map((v) => v.id),
+    visualAccessibility.violations.map((v) => ({id:v.id,nodes:v.nodes.map(n=>n.target)})),
     [],
   );
 
@@ -784,6 +800,14 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   await expect(alice.getByText('Use spacious layouts with calm typography.',{exact:true})).toBeVisible();
   draft=await (await alice.request.get(brainURL)).json();
   assert.equal(draft.active.snapshot.facts.find(f=>f.field==='visual_direction_composition').value,'Use spacious layouts with calm typography.');
+  const approvedFact=draft.active.snapshot.facts.find(f=>f.field==='offering'),sourceRoute=`**/brain/sources/${approvedFact.source_id}`;
+  await alice.route(sourceRoute,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Source temporarily unavailable'})}),{times:1});
+  await alice.getByText('Evidence for offering',{exact:true}).click();await expect(alice.getByRole('button',{name:'Retry source evidence',exact:true})).toBeVisible();
+  await alice.getByRole('button',{name:'Retry source evidence',exact:true}).click();await expect(alice.locator('blockquote').filter({hasText:'offering: '+approvedFact.value})).toBeVisible();
+  await alice.getByText('Evidence for visual direction composition',{exact:true}).click();await expect(alice.getByText(/Approved visual interpretation with/)).toBeVisible();
+  const savedSources=alice.getByRole('region',{name:'Saved brand sources',exact:true});await savedSources.getByText(/Browse saved sources/).click();await expect(savedSources.getByRole('listitem')).toHaveCount(draft.sources.length);
+  assert.deepEqual((await new AxeBuilder({page:alice}).analyze()).violations,[]);
+
   await alice.screenshot({
     path: "work/browser/v5-ai-prefill.png",
     fullPage: true,
@@ -862,4 +886,139 @@ test('retained visual styles stay editable without AI and unsaved edits survive 
  await expect(alice.getByText('Your approved brand profile is saved.',{exact:true})).toBeVisible();
  const approved=await(await alice.request.get(brainURL)).json();
  assert.ok(!approved.active.snapshot.facts.some(f=>f.field==='visual_direction_composition'));
+});
+
+test('business Team invites through real email, accepts selected access, changes roles and removes only that business',async()=>{
+ await alice.goto(base+`/b/${firstBusiness}/team`);await expect(alice.getByRole('heading',{name:'Team',exact:true})).toBeVisible();
+ await alice.getByLabel('Teammate’s email').fill('browser-bob@example.test');await alice.getByLabel('Business role',{exact:true}).selectOption('viewer');await alice.getByRole('button',{name:'Send invitation',exact:true}).click();
+ await expect(alice.getByText('Invitation saved and email queued.',{exact:false})).toBeVisible();const link=await emailLink('browser-bob@example.test','Your Desvio client invitation');
+ await bob.goto(link);await bob.getByRole('button',{name:'Accept invitation',exact:true}).click();await expect(bob.getByRole('heading',{name:/^Welcome,/})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(2);
+ await alice.getByRole('button',{name:'Refresh team',exact:true}).click();await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption('editor');await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByText('Business role saved.',{exact:true})).toBeVisible();
+ await alice.reload();await expect(alice.getByRole('region',{name:'People with access'}).getByText('editor',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-desktop.png',fullPage:true});
+ await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-mobile.png',fullPage:true});
+ for(const role of ['reviewer','analyst']){await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption(role);await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByRole('region',{name:'People with access'}).getByText(role,{exact:true})).toBeVisible();}
+ await bob.goto(base+`/b/${firstBusiness}/team`);await expect(bob.getByRole('heading',{name:'Team',exact:true})).toBeVisible();await expect(bob.getByRole('button',{name:'Send invitation'})).toHaveCount(0);
+ await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption('admin');await alice.getByRole('button',{name:'Save role',exact:true}).click();
+ await bob.reload();await expect(bob.getByRole('button',{name:'Send invitation',exact:true})).toBeVisible();
+ await expect(bob.getByRole('link',{name:'account team settings',exact:true})).toHaveCount(0);await expect(bob.getByRole('group',{name:'Businesses they can access'}).getByRole('checkbox')).toHaveCount(1);
+ await expect(bob.getByLabel('Business role',{exact:true}).locator('option[value="admin"]')).toHaveCount(0);
+ await bob.getByLabel('Teammate’s email').fill('delegated-browser@example.test');await bob.getByLabel('Business role',{exact:true}).selectOption('reviewer');await bob.getByRole('button',{name:'Send invitation',exact:true}).click();
+ await expect(bob.getByText('Invitation saved and email queued.',{exact:false})).toBeVisible();assert.ok(await emailLink('delegated-browser@example.test','Your Desvio client invitation'));
+ await bob.getByRole('button',{name:'Revoke invitation to delegated-browser@example.test',exact:true}).click();await expect(bob.getByText('Invitation revoked for every business included in that invitation.',{exact:true})).toBeVisible();
+ assert.deepEqual((await new AxeBuilder({page:bob}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await bob.screenshot({path:'work/browser/delegated-business-team.png',fullPage:true});
+ await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByRole('button',{name:'Remove access',exact:true}).click();await alice.getByRole('button',{name:'Confirm removal',exact:true}).click();await expect(alice.getByText('Access to this business removed.',{exact:false})).toBeVisible();
+ await bob.reload();await expect(bob.getByRole('heading',{name:'Business unavailable'})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(1);await expect(bob.locator('.v5-business-card')).toContainText('Juniper Goods');await alice.setViewportSize({width:1440,height:1100});
+});
+
+test('Profile saves identity, revokes a separate session and changes the real password with other-session logout',async()=>{
+ await admin.query('DELETE FROM auth."rateLimit"');
+ const other=await browser.newContext();
+ try{
+  const login=()=>other.request.post(base+'/api/auth/sign-in/email',{headers:{origin:base},data:{email,password:password+'-new'}});
+  assert.equal((await login()).status(),200);
+  await alice.goto(base+'/profile');await expect(alice.getByRole('heading',{name:'Profile',exact:true})).toBeVisible();
+  await alice.getByLabel('Your name',{exact:true}).fill('Sam Desvio');await alice.getByRole('button',{name:'Save name',exact:true}).click();await expect(alice.getByText('Your name is saved.',{exact:true})).toBeVisible();
+  await alice.reload();await expect(alice.getByLabel('Your name',{exact:true})).toHaveValue('Sam Desvio');
+  await expect(alice.getByRole('heading',{name:'Active sessions',exact:true})).toBeVisible();
+  // Revoke all other authenticated browser sessions, preserving the current one.
+  await alice.getByRole('button',{name:'Sign out all other sessions',exact:true}).click();await alice.getByRole('button',{name:'Confirm sign-out of other sessions',exact:true}).click();await expect(alice.getByText('Other sessions signed out.',{exact:true})).toBeVisible();
+  assert.equal(await(await other.request.get(base+'/api/auth/get-session')).json(),null);
+  assert.equal((await login()).status(),200);
+  await alice.getByLabel('Current password',{exact:true}).fill(password+'-new');await alice.getByLabel('New password',{exact:true}).fill(password+'-profile');await alice.getByLabel('Confirm new password',{exact:true}).fill(password+'-profile');
+  await alice.getByRole('button',{name:'Change password',exact:true}).click();await expect(alice.getByText('Password changed. Other sessions have been signed out.',{exact:true})).toBeVisible();
+  assert.equal(await(await other.request.get(base+'/api/auth/get-session')).json(),null);await expect(alice.getByLabel('Current password',{exact:true})).toHaveValue('');
+  assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+  await alice.screenshot({path:'work/browser/profile-desktop.png',fullPage:true});await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await alice.screenshot({path:'work/browser/profile-mobile.png',fullPage:true});
+ }finally{await other.close();}
+});
+
+test('Profile authenticator setup → gated sign-in → recovery code → replacement and disable',async()=>{
+ const {createOTP}=await import('@better-auth/utils/otp'),{base32}=await import('@better-auth/utils/base32');
+ await alice.goto(base+'/profile');const panel=alice.getByRole('region',{name:'Two-factor authentication',exact:true});
+ await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('button',{name:'Set up authenticator app',exact:true}).click();
+ const qr=panel.getByRole('img',{name:'Scan this QR code with your authenticator app'});await expect(qr).toBeVisible();assert.ok((await qr.getAttribute('src')).startsWith('data:image/png;base64,'));
+ await panel.getByText('Enter a setup key manually',{exact:true}).click();const secret=await panel.getByLabel('Authenticator setup key').inputValue(),otp=createOTP(new TextDecoder().decode(base32.decode(secret))),codes=await panel.getByRole('list',{name:'Recovery codes',exact:true}).getByRole('listitem').allTextContents();assert.equal(codes.length,10);
+ await expect(panel.getByRole('button',{name:'Enable two-factor authentication',exact:true})).toBeDisabled();
+ assert.deepEqual((await new AxeBuilder({page:alice}).analyze()).violations,[]);assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await panel.screenshot({path:'work/browser/mfa-setup-mobile.png',mask:[qr,panel.getByLabel('Authenticator setup key'),panel.getByRole('list',{name:'Recovery codes',exact:true})]});
+ await panel.getByRole('checkbox',{name:'I saved these recovery codes somewhere secure.'}).check();await panel.getByLabel('Confirm authenticator code').fill(await otp.totp());await panel.getByRole('button',{name:'Enable two-factor authentication',exact:true}).click();await expect(panel.getByText('Enabled · authenticator app',{exact:true})).toBeVisible();
+ const context=await browser.newContext(),loginPage=await context.newPage();
+ async function signIn(){await loginPage.goto(base+'/sign-in');await loginPage.getByLabel('Email address',{exact:true}).fill(email);await loginPage.getByLabel('Password',{exact:true}).fill(password+'-profile');await loginPage.getByRole('button',{name:'Sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:'Verify it’s you.',exact:true})).toBeVisible();}
+ try{
+  await signIn();assert.equal(await(await loginPage.request.get(base+'/api/auth/get-session')).json(),null);assert.equal((await loginPage.request.get(base+'/api/v1/businesses')).status(),401);
+  assert.deepEqual((await new AxeBuilder({page:loginPage}).analyze()).violations,[]);await loginPage.screenshot({path:'work/browser/mfa-sign-in.png',fullPage:true});
+  await loginPage.getByLabel('Authenticator code',{exact:true}).fill(await otp.totp());await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^Welcome,/})).toBeVisible();
+  await loginPage.request.post(base+'/api/auth/sign-out',{headers:{origin:base},data:{}});await admin.query('DELETE FROM auth."rateLimit"');await signIn();await loginPage.getByRole('button',{name:'Use a recovery code',exact:true}).click();await loginPage.getByLabel('Recovery code',{exact:true}).fill(codes[0]);await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^Welcome,/})).toBeVisible();
+  await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('checkbox',{name:/I understand replacing codes/}).check();await panel.getByRole('button',{name:'Replace recovery codes',exact:true}).click();await expect(panel.getByRole('heading',{name:'Recovery codes',exact:true})).toBeVisible();const replacements=await panel.getByRole('list',{name:'Recovery codes',exact:true}).getByRole('listitem').allTextContents();assert.equal(replacements.length,10);assert.ok(replacements.every(c=>!codes.includes(c)));await panel.getByRole('button',{name:'I saved my new recovery codes',exact:true}).click();
+  await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('checkbox',{name:/I understand replacing codes/}).check();await panel.getByRole('button',{name:'Disable two-factor authentication',exact:true}).click();await expect(panel.getByText('Not enabled',{exact:true})).toBeVisible();
+  assert.deepEqual(await alice.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});
+ }finally{await context.close();}
+});
+
+test('Studio overview keeps real counts, working routes, narrow layouts and reduced-motion support',async()=>{
+ await alice.setViewportSize({width:1440,height:1050});
+ await alice.goto(base+`/b/${firstBusiness}/overview`);
+ const flow=alice.getByRole('region',{name:'Your creative workflow',exact:true});
+ await expect(flow).toBeVisible();
+ await expect(flow.getByRole('link',{name:/Your next good idea/})).toHaveAttribute('href',`/b/${firstBusiness}/canvas`);
+ await expect(flow.getByRole('link',{name:/YOUR FINAL SAY/})).toHaveAttribute('href',`/b/${firstBusiness}/review`);
+ const snapshot=await(await alice.request.get(base+`/api/v1/businesses/${firstBusiness}/overview`)).json();
+ await expect(alice.locator('.overview-metric').filter({hasText:'Awaiting review'}).locator('strong')).toHaveText(String(snapshot.counts.awaiting_review));
+ await alice.screenshot({path:'work/browser/studio-overview-desktop.png',fullPage:true,animations:'disabled'});
+ for(const width of [1440,768,390,320]){
+  await alice.setViewportSize({width,height:900});
+  assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow at ${width}`);
+  assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+ }
+ await alice.screenshot({path:'work/browser/studio-overview-mobile.png',fullPage:true});
+ await alice.emulateMedia({reducedMotion:'reduce'});
+ assert.equal(await flow.locator('.studio-core').evaluate(e=>getComputedStyle(e).animationName),'none');
+ await flow.getByRole('link',{name:/Your next good idea/}).focus();
+ assert.equal(await alice.evaluate(()=>document.activeElement?.getAttribute('href')),`/b/${firstBusiness}/canvas`);
+ await alice.emulateMedia({reducedMotion:'no-preference'});
+ await alice.setViewportSize({width:1440,height:1050});
+});
+
+test('module navigation preserves the workspace shell and does not repeat account initialization',async()=>{
+ await alice.setViewportSize({width:1440,height:1000});await alice.goto(base+`/b/${firstBusiness}/overview`);
+ await expect(alice.getByRole('navigation',{name:'Main navigation'})).toBeVisible();
+ await expect(alice.locator('.studio-core')).toBeVisible();
+ let initializes=0;const observe=request=>{if(request.url().endsWith('/api/v1/accounts/current/initialize'))initializes++;};alice.on('request',observe);
+ await alice.evaluate(()=>{window.__workspaceNavigationProbe='retained';document.querySelector('.v5-sidebar').dataset.probe='retained';});
+ await alice.route('**/api/auth/get-session',async route=>{await new Promise(resolve=>setTimeout(resolve,800));await route.continue();});
+ try{
+  await alice.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Canvas',exact:true}).click();
+  await expect(alice).toHaveURL(new RegExp(`/b/${firstBusiness}/canvas$`));
+  await expect(alice.locator('.v5-sidebar[data-probe="retained"]')).toBeVisible();
+  assert.equal(await alice.evaluate(()=>window.__workspaceNavigationProbe),'retained');
+  await expect(alice.locator('.workspace-opening')).toHaveCount(0);
+  await alice.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Overview',exact:true}).click();
+  await expect(alice.locator('.studio-core')).toBeVisible();
+  await alice.goBack();await expect(alice).toHaveURL(new RegExp(`/b/${firstBusiness}/canvas$`));
+  await expect(alice.locator('.v5-sidebar[data-probe="retained"]')).toBeVisible();assert.equal(initializes,0);
+ }finally{alice.off('request',observe);await alice.unroute('**/api/auth/get-session');}
+});
+
+test('Back and Forward keep unsaved edits on cancel and navigate only after confirmation',async()=>{
+ await alice.goto(base+'/overview');
+ await alice.getByRole('link',{name:'Your account',exact:true}).click();
+ const input=alice.getByLabel('Your name',{exact:true});await expect(input).toBeVisible();
+ const original=await input.inputValue(),draft=original+' unsaved';await input.fill(draft);
+ await alice.evaluate(()=>{window.__historyGuardProbe='retained';});
+ let confirms=0;const stay=async dialog=>{assert.equal(dialog.type(),'confirm');confirms++;await dialog.dismiss();};
+ alice.on('dialog',stay);
+ try{
+  await alice.goBack();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(draft);
+  assert.equal(confirms,1);assert.equal(await alice.evaluate(()=>window.__historyGuardProbe),'retained');
+  // Repeating cancellation must not create phantom history entries.
+  await alice.goBack();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(draft);assert.equal(confirms,2);
+ }finally{alice.off('dialog',stay);}
+ alice.once('dialog',dialog=>dialog.accept());await alice.goBack();await expect(alice).toHaveURL(base+'/overview');
+ await alice.goForward();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(original);
+ // Build a genuine forward entry, return, then modify the retained form.
+ await alice.getByRole('navigation',{name:'Main navigation'}).getByRole('link',{name:'Overview',exact:true}).click();
+ await expect(alice).toHaveURL(base+'/overview');
+ await alice.goBack();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(original);await input.fill(draft);
+ alice.once('dialog',dialog=>dialog.dismiss());await alice.goForward();await expect(alice).toHaveURL(base+'/profile');await expect(input).toHaveValue(draft);
+ alice.once('dialog',dialog=>dialog.accept());await alice.goForward();await expect(alice).toHaveURL(base+'/overview');
+ assert.equal(await alice.evaluate(()=>window.__historyGuardProbe),'retained');
 });

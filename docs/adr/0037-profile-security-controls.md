@@ -1,0 +1,9 @@
+# ADR 0037: profile and session controls
+
+Reuse the pinned Better Auth 1.7.12 implementation rather than introducing a second identity/session store. Audited installed contracts are in `node_modules/better-auth/dist/api/routes/update-user.mjs` and `session.mjs`: POST update-user, POST change-password with currentPassword/newPassword/revokeOtherSessions, GET list-sessions, POST revoke-session with token, and POST revoke-other-sessions.
+
+The server restricts the profile update endpoint to a trimmed 1–120 character display name, without control characters or additional fields. Email, roles and identity verification cannot be changed through this form. Existing same-origin, authenticated-session and rate-limit protections remain. Password changes require the current password and revoke other sessions atomically through the pinned library, which rotates the current cookie. Sensitive session actions retain the library's fresh/sensitive session rules.
+
+The UI supports display-name edits, confirmed password entry, real active sessions, individual sign-out and confirmed sign-out of all other sessions. Session tokens are used only in memory for the library's revocation contract; they are never rendered or persisted to web storage. Password fields are cleared on success. Browser-reported device text is displayed as untrusted text, not a verified device identity. Errors remain visible, and ordinary edits are retained on failure.
+
+Actual local auth/SMTP/database tests verify persistence, wrong-password denial, old-password denial after rotation, other-session revocation, cross-user revocation denial, unauthenticated access and origin protection. Browser acceptance exercises the actual UI and backend. No external mail delivery or deployment is implied. MFA, notification preferences, email changes and account deletion remain separate unfinished scope; billing is excluded by the owner.

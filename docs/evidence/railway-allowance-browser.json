@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-24T02:32:49.757Z",
+  "passed": true,
+  "business_id": "ac6668f5-5001-44eb-bccb-262474447232",
+  "anonymous_denied": true,
+  "missing_allowances_visible": true,
+  "refresh_without_duplicate_panels": true,
+  "mobile_no_overflow": true,
+  "scope": "Actual dev synthetic login/business/Canvas allowance readback and refresh. No paid generation, model health, remaining-budget or publication acceptance."
+}

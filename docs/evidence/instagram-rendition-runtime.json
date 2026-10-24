@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-10-24T06:24:48.372247+00:00",
+  "passed": true,
+  "tests": 3,
+  "scope": "Actual local networkless pinned Fabric/canvas container. Square, landscape and portrait decode, deterministic JPEG hashes, source PNG hash binding, no-crop fit/padding and unchanged default PNG output. Not a persisted customer rendition or live provider test.",
+  "source_sha256": {
+    "apps/media/runtime.mjs": "3cfec4525c1b98b80e93c34b0601c6eab05b7dfa286d011edae5c3adda459a03",
+    "apps/api/src/static-renderer.ts": "192ee6a0b7ac87128b9fc61a1646c781f1757d39857484bae103676500c43ef5",
+    "tests/runtime/instagram-rendition.test.mjs": "f70e95afdf1c6a17c7509250ef2ba66cde7035153afe4c1e5701a53805473178"
+  },
+  "log_sha256": "279e875a8d9942b3d9098f3bd050cb61725ce0e163c3f5a7b976264b8758bc98"
+}

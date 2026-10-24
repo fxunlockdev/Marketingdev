@@ -72,3 +72,123 @@ test('redirects, oversized JSON, broken schemas and timeout fail closed',async()
 test('unsafe endpoint and callback configurations are rejected before any network call',()=>{
  for(const patch of [{baseURL:'http://evil.test/api'},{baseURL:'https://user:password@example.test/api'},{baseURL:'https://example.test/api?secret=x'},{baseURL:'https://example.test/not-api'},{callbackOrigin:'https://desvio.test/path'},{mediaOrigins:['javascript:alert(1)']}])assert.throws(()=>new PostizClient({...config(),...patch},binding()),/POSTIZ_CONFIG_INVALID/);
 });
+
+
+test('canonical MP4 upload uses the pinned multipart contract and video-specific scheduling without accepting image paths',async()=>{
+ const mp4=Buffer.alloc(32);mp4.writeUInt32BE(32);mp4.write('ftypisom',4);const sha=createHash('sha256').update(mp4).digest('hex');let uploaded=0,scheduled=0;
+ handler=(req,res,body)=>{if(req.url==='/api/public/v1/upload'){uploaded++;assert.ok(body.includes(Buffer.from('video/mp4')));assert.ok(body.includes(Buffer.from(`desvio-${sha}.mp4`)));assert.ok(body.includes(Buffer.from('false')));return json(res,{id:'video-a',path:base+'/media/canonical.mp4'});}if(req.url==='/api/public/v1/integrations')return json(res,[integration]);if(req.url==='/api/public/v1/posts'){scheduled++;const value=JSON.parse(body);assert.deepEqual(value.posts[0].value[0].image,[{id:'video-a',path:base+'/media/canonical.mp4'}]);assert.equal(value.posts[0].settings.post_as_images_carousel,false);return json(res,[{postId:'video-post',integration:'channel-a'}]);}return json(res,{},404);};
+ const c=client(),media=await c.uploadMP4(mp4,sha);assert.equal(uploaded,1);
+ await assert.rejects(c.submitLinkedIn({integrationId:'channel-a',caption:'MOCK video',media,scheduledAt:'2026-12-01T00:00:00Z'}),e=>e.code==='POSTIZ_POST_INVALID');
+ assert.equal((await c.submitLinkedIn({integrationId:'channel-a',caption:'MOCK video',media,mediaType:'video',scheduledAt:'2026-12-01T00:00:00Z'})).status,'accepted');assert.equal(scheduled,1);
+ await assert.rejects(c.uploadMP4(png,hash),e=>e.code==='POSTIZ_MEDIA_INVALID');await assert.rejects(c.uploadMP4(mp4,'0'.repeat(64)),e=>e.code==='POSTIZ_MEDIA_INVALID');assert.equal(uploaded,1);
+ handler=(req,res)=>json(res,{id:'wrong-kind',path:base+'/media/wrong.png'});await assert.rejects(c.uploadMP4(mp4,sha),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');
+});
+
+test('post analytics verifies identity, preserves unknown data and rejects malformed numeric series',async()=>{
+ requests=[];handler=(req,res)=>{assert.equal(req.url,'/api/public/v1/analytics/post/post-a?date=30');json(res,[{label:'Impressions',data:[{date:'2026-10-23',total:'120'},{date:'2026-10-22',total:100}],percentageChange:999,token:'SECRET'}]);};
+ assert.deepEqual(await client().postAnalytics('post-a'),{state:'available',series:[{label:'Impressions',points:[{date:'2026-10-22',value:100},{date:'2026-10-23',value:120}]}]});
+ assert.deepEqual(requests.map(r=>r.path),['/api/public/v1/me','/api/public/v1/analytics/post/post-a?date=30']);
+ for(const value of [[],[{label:'Likes',data:[]}]]){handler=(req,res)=>json(res,value);assert.deepEqual(await client().postAnalytics('post-a'),{state:'unavailable',series:[]});}
+ handler=(req,res)=>json(res,{missing:true});assert.equal((await client().postAnalytics('post-a')).state,'missing');
+ for(const value of [[{label:'Likes',data:[{date:'2026-02-30',total:2}]}],[{label:'Likes',data:[{date:'2026-10-23',total:''}]}],[{label:'Likes',data:[{date:'2026-10-23',total:-1}]}],[{label:'Likes',data:[{date:'2026-10-23',total:1},{date:'2026-10-23',total:2}]}],[{label:'Likes',data:[]},{label:'likes',data:[]}],{missing:false}]){handler=(req,res)=>json(res,value);await assert.rejects(client().postAnalytics('post-a'),e=>e.code==='POSTIZ_ANALYTICS_INVALID');}
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).postAnalytics('post-a'),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+ await assert.rejects(client().postAnalytics('../other'),e=>e.code==='POSTIZ_RESPONSE_INVALID');await assert.rejects(client().postAnalytics('post-a',91),e=>e.code==='POSTIZ_DATE_RANGE_INVALID');
+});
+
+test('ordered carousel submits exactly one native LinkedIn multi-image post',async()=>{
+ const media=[{id:'slide-2',path:base+'/uploads/second.png'},{id:'slide-1',path:base+'/uploads/first.png'}];
+ const input={integrationId:'channel-a',caption:'Approved ordered carousel',media,mediaType:'carousel',scheduledAt:'2026-11-01T10:00:00Z'};
+ requests=[];handler=(req,res,body)=>{if(req.url.endsWith('/integrations'))return json(res,[integration]);assert.equal(req.url,'/api/public/v1/posts');const v=JSON.parse(body);assert.equal(v.posts.length,1);assert.deepEqual(v.posts[0].value,[{content:input.caption,image:media}]);assert.equal(v.posts[0].settings.post_as_images_carousel,false);return json(res,[{postId:'carousel-a',integration:'channel-a'}]);};
+ assert.deepEqual(await client().submitLinkedIn(input),{postId:'carousel-a',integrationId:'channel-a',status:'accepted'});
+ assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ for(const patch of [{media:[]},{media:[media[0]]},{media:Array.from({length:11},(_,i)=>({id:'slide-'+i,path:base+'/uploads/'+i+'.png'}))},{media:[media[0],media[0]]},{media:[media[0],{...media[1],id:media[0].id}]},{media:[media[0],{...media[1],path:media[0].path}]},{media:[media[0],{...media[1],path:'https://foreign.test/a.png'}]},{media:[media[0],{...media[1],path:base+'/uploads/video.mp4'}]},{mediaType:'video'},{mediaType:undefined}]){
+  requests=[];await assert.rejects(client().submitLinkedIn({...input,...patch}),e=>e.code==='POSTIZ_POST_INVALID'&&e.outcome==='not_sent');assert.equal(requests.length,0);
+ }
+ requests=[];handler=(req,res)=>{if(req.url.endsWith('/integrations'))return json(res,[integration]);req.socket.destroy();};
+ await assert.rejects(client().submitLinkedIn(input),e=>e.outcome==='unknown');assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).submitLinkedIn(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.filter(r=>r.method==='POST').length,0);
+});
+
+test('scheduled removal validates exact queued target and returns unconfirmed stopping, never canceled',async()=>{
+ const scheduledAt=new Date(Date.now()+86400000).toISOString(),input={postId:'post-a',integrationId:'channel-a',scheduledAt,caption:'Approved caption'};
+ const post={id:input.postId,content:input.caption,publishDate:scheduledAt,state:'QUEUE',releaseId:null,releaseURL:null,integration:{id:'channel-a',providerIdentifier:'linkedin'}};
+ requests=[];handler=(req,res)=>req.method==='DELETE'?json(res,{id:'post-a'}):json(res,{posts:[post]});
+ assert.deepEqual(await client().requestScheduledPostRemoval(input),{postId:'post-a',status:'removal_requested',publishingStopped:false});assert.equal(requests.filter(r=>r.method==='DELETE').length,1);assert.equal(requests.at(-1).path,'/api/public/v1/posts/post-a');
+ for(const patch of [{state:'PUBLISHED',releaseId:'live'},{integration:{id:'foreign',providerIdentifier:'linkedin'}},{content:'Changed caption'},{releaseURL:'https://linkedin.com/live'}]){
+  requests=[];handler=(req,res)=>json(res,{posts:[{...post,...patch}]});await assert.rejects(client().requestScheduledPostRemoval(input),e=>e.code==='POSTIZ_REMOVAL_TARGET_UNCONFIRMED');assert.equal(requests.filter(r=>r.method==='DELETE').length,0);
+ }
+ requests=[];await assert.rejects(client().requestScheduledPostRemoval({...input,scheduledAt:new Date().toISOString()}),e=>e.code==='POSTIZ_REMOVAL_INPUT_INVALID');assert.equal(requests.length,0);
+});
+test('ambiguous removal is never retried and a mismatched acknowledgment stays unknown',async()=>{
+ const scheduledAt=new Date(Date.now()+86400000).toISOString(),input={postId:'post-a',integrationId:'channel-a',scheduledAt,caption:'Approved'};
+ for(const mode of ['network','500','wrong-id','error']){
+  requests=[];handler=(req,res)=>{if(req.method!=='DELETE')return json(res,{posts:[{id:'post-a',content:'Approved',publishDate:scheduledAt,state:'QUEUE',releaseId:null,releaseURL:null,integration:{id:'channel-a',providerIdentifier:'linkedin'}}]});if(mode==='network')return req.socket.destroy();if(mode==='500')return json(res,{secret:keyA},500);json(res,mode==='error'?{error:true}:{id:'foreign'});};
+  await assert.rejects(client().requestScheduledPostRemoval(input),e=>e.outcome==='unknown'&&!e.message.includes(keyA));assert.equal(requests.filter(r=>r.method==='DELETE').length,1);
+ }
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).requestScheduledPostRemoval(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.filter(r=>r.method==='DELETE').length,0);
+});
+
+test('targeted reconnect passes the provider identity as refresh and rejects unsafe identifiers before transport',async()=>{
+ requests=[];handler=(req,res)=>{assert.equal(req.url,'/api/public/v1/social/linkedin?refresh=member-a');json(res,{url:'https://www.linkedin.com/oauth/v2/authorization?'+new URLSearchParams({response_type:'code',client_id:'MOCK',state:'abcdef123',redirect_uri:'https://desvio.test/integrations/social/linkedin'})});};
+ await client().beginLinkedIn('member-a');assert.equal(requests.length,2);
+ for(const invalid of ['','../other','member&refresh=other'])await assert.rejects(client().beginLinkedIn(invalid));
+ assert.equal(requests.length,2);
+});
+
+test('channel removal verifies tenant, exact acknowledgement and holds ambiguous outcomes without retry',async()=>{
+ requests=[];handler=(req,res)=>{assert.equal(req.method,'DELETE');assert.equal(req.url,'/api/public/v1/integrations/channel-a');json(res,{id:'channel-a'});};
+ assert.deepEqual(await client().removeIntegration('channel-a'),{id:'channel-a',publishingStopped:false});
+ handler=(req,res)=>json(res,{id:'other'});await assert.rejects(client().removeIntegration('channel-a'),e=>e.outcome==='unknown');
+ handler=(req,res)=>req.socket.destroy();requests=[];await assert.rejects(client().removeIntegration('channel-a'),e=>e.outcome==='unknown');assert.equal(requests.filter(x=>x.method==='DELETE').length,1);
+});
+
+
+test('Instagram standalone permits only the audited OAuth endpoint and provider-bound callback',async()=>{
+ const good='https://www.instagram.com/oauth/authorize?'+new URLSearchParams({state:'MOCK_STATE',client_id:'MOCK_APP',response_type:'code',redirect_uri:'https://desvio.test/integrations/social/instagram-standalone'});
+ let url=good;handler=(req,res)=>{assert.equal(req.url,'/api/public/v1/social/instagram-standalone?refresh=IG_PERSON');json(res,{url});};
+ assert.equal((await client().beginAuthorization('instagram-standalone','IG_PERSON')).state,'MOCK_STATE');
+ for(const bad of [good.replace('www.instagram.com','evil.test'),good.replace('/oauth/authorize','/other'),good+'&state=SECOND',good+'&client_id=SECOND',good.replace('instagram-standalone','linkedin')]){url=bad;await assert.rejects(client().beginAuthorization('instagram-standalone','IG_PERSON'),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');}
+ requests=[];await assert.rejects(client().beginAuthorization('instagram'),e=>e.code==='POSTIZ_PROVIDER_UNSUPPORTED');assert.equal(requests.length,0);
+ let provider='instagram-standalone';handler=(req,res,body)=>{assert.equal(req.url,'/api/integrations/social-connect/instagram-standalone');assert.deepEqual(JSON.parse(body),{state:'MOCK_STATE',code:'MOCK_CODE',timezone:'-480'});json(res,{id:'ig-channel',organizationId:'org-a',providerIdentifier:provider,internalId:'IG_PERSON',name:'Instagram',token:'SECRET'});};
+ assert.deepEqual(await client().completeAuthorization('instagram-standalone','MOCK_STATE','MOCK_CODE','-480'),{id:'ig-channel',internalId:'IG_PERSON',name:'Instagram'});
+ provider='linkedin';await assert.rejects(client().completeAuthorization('instagram-standalone','MOCK_STATE','MOCK_CODE','-480'),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown');
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).beginAuthorization('instagram-standalone'),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+});
+
+
+test('Instagram Reel scheduling uses its own provider settings and refuses incompatible media/accounts before submission',async()=>{
+ const input={integrationId:'ig-channel',caption:'Approved Reel',media:{id:'video-a',path:base+'/uploads/approved.mp4'},scheduledAt:'2026-12-01T00:00:00Z'};
+ requests=[];let provider='instagram-standalone',disabled=false;
+ handler=(req,res,body)=>{if(req.url.endsWith('/integrations'))return json(res,[{...integration,id:'ig-channel',identifier:provider,disabled}]);assert.equal(req.url,'/api/public/v1/posts');const value=JSON.parse(body);assert.deepEqual(value.posts,[{integration:{id:'ig-channel'},value:[{content:input.caption,image:[input.media]}],settings:{__type:'instagram-standalone',post_type:'post',is_trial_reel:false}}]);return json(res,[{postId:'ig-post',integration:'ig-channel'}]);};
+ assert.deepEqual(await client().submitInstagramReel(input),{postId:'ig-post',integrationId:'ig-channel',status:'accepted'});assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ for(const patch of [{caption:''},{caption:'x'.repeat(2201)},{caption:'bad\u0000caption'},{media:{...input.media,path:base+'/uploads/image.png'}},{media:{...input.media,path:'https://foreign.test/a.mp4'}},{media:[input.media]},{scheduledAt:'bad'}]){requests=[];await assert.rejects(client().submitInstagramReel({...input,...patch}),e=>e.code==='POSTIZ_POST_INVALID'&&e.outcome==='not_sent');assert.equal(requests.length,0);}
+ for(const name of ['linkedin','instagram','facebook']){requests=[];provider=name;await assert.rejects(client().submitInstagramReel(input),e=>e.code==='POSTIZ_CHANNEL_UNAVAILABLE');assert.equal(requests.filter(r=>r.method==='POST').length,0);}
+ provider='instagram-standalone';disabled=true;await assert.rejects(client().submitInstagramReel(input),e=>e.code==='POSTIZ_CHANNEL_UNAVAILABLE');
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).submitInstagramReel(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+});
+test('Instagram scheduling acknowledgement is not publication and ambiguous responses never retry',async()=>{
+ const input={integrationId:'ig-channel',caption:'Approved Reel',media:{id:'video-a',path:base+'/uploads/approved.mp4'},scheduledAt:'2026-12-01T00:00:00Z'};
+ for(const mode of ['lost','wrong-account','duplicate','bad-schema']){
+  requests=[];handler=(req,res)=>{if(req.url.endsWith('/integrations'))return json(res,[{...integration,id:'ig-channel',identifier:'instagram-standalone'}]);if(mode==='lost')return req.socket.destroy();return json(res,mode==='wrong-account'?[{postId:'ig-post',integration:'foreign'}]:mode==='duplicate'?[{postId:'ig-post',integration:'ig-channel'},{postId:'ig-post2',integration:'ig-channel'}]:{});};
+  await assert.rejects(client().submitInstagramReel(input),e=>e.outcome==='unknown');assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ }
+});
+
+
+test('Instagram JPEG upload preserves approved bytes and rejects incompatible media before transport',async()=>{
+ const bytes=await sharp(png).jpeg({quality:95}).toBuffer(),sha=createHash('sha256').update(bytes).digest('hex');
+ requests=[];handler=(req,res,body)=>{assert.equal(req.url,'/api/public/v1/upload');assert.ok(body.includes(bytes));assert.ok(body.includes(Buffer.from('Content-Type: image/jpeg')));assert.match(body.toString('latin1'),/name="adjust"\r\n\r\nfalse/);json(res,{id:'jpeg-a',path:base+'/media/'+sha+'.jpg'});};
+ assert.equal((await client().uploadJPEG(bytes,sha)).id,'jpeg-a');
+ const count=requests.length;
+ for(const invalid of [png,bytes.subarray(0,100),await sharp({create:{width:320,height:1000,channels:3,background:'#fff'}}).jpeg().toBuffer()])await assert.rejects(client().uploadJPEG(invalid,createHash('sha256').update(invalid).digest('hex')),e=>e.code==='POSTIZ_MEDIA_INVALID');
+ await assert.rejects(client().uploadJPEG(bytes,'a'.repeat(64)),e=>e.code==='POSTIZ_MEDIA_INVALID');assert.equal(requests.length,count);
+});
+test('Instagram image submission preserves slide order and rejects mixed media or duplicate slides',async()=>{
+ const media=[{id:'jpeg-a',path:base+'/a.jpg'},{id:'jpeg-b',path:base+'/b.jpg'}],input={integrationId:'channel-a',caption:'MOCK approved carousel',media,scheduledAt:'2027-01-01T10:00:00.000Z'};
+ let posts=0;handler=(req,res,body)=>{if(req.url==='/api/public/v1/integrations')return json(res,[{...integration,identifier:'instagram-standalone'}]);posts++;const wire=JSON.parse(body);assert.deepEqual(wire.posts[0].value[0].image,media);assert.equal(wire.posts[0].settings.post_type,'post');json(res,[{postId:'post-images',integration:'channel-a'}]);};
+ assert.equal((await client().submitInstagramImages(input)).status,'accepted');assert.equal(posts,1);
+ for(const images of [[],[media[0],media[0]],[{...media[0],path:base+'/a.png'}],[{...media[0],path:'https://foreign.test/a.jpg'}],Array(11).fill(media[0])])await assert.rejects(client().submitInstagramImages({...input,media:images}),e=>e.code==='POSTIZ_POST_INVALID');
+ assert.equal(posts,1);
+ handler=(req,res)=>{if(req.url==='/api/public/v1/integrations')return json(res,[{...integration,identifier:'instagram-standalone'}]);posts++;req.socket.destroy();};
+ await assert.rejects(client().submitInstagramImages(input),e=>e.outcome==='unknown');assert.equal(posts,2);
+});

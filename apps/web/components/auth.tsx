@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import {MfaChallenge} from './mfa';
 import { api } from "./api";
 import { Field, Notice, Wordmark } from "./primitives";
 export function AuthScreen({ mode }: { mode: string }) {
@@ -12,7 +13,8 @@ export function AuthScreen({ mode }: { mode: string }) {
     [error, setError] = useState<unknown>(),
     [sent, setSent] = useState(false),
     [token, setToken] = useState(""),
-    [invite, setInvite] = useState("");
+    [invite, setInvite] = useState(""),
+    [challenge,setChallenge]=useState(false);
   const signup = mode === "sign-up",
     forgot = mode === "forgot-password",
     reset = mode === "reset-password",
@@ -27,6 +29,16 @@ export function AuthScreen({ mode }: { mode: string }) {
         setError(new Error("This reset link has expired. Request a new one."));
     }
   }, [reset]);
+  function finishSignIn(){
+        if (invite)
+          location.assign(
+            "/accept-invitation#token=" + encodeURIComponent(invite),
+          );
+        else {
+          router.replace("/");
+          router.refresh();
+        }
+  }
   async function submit(event: FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -64,16 +76,10 @@ export function AuthScreen({ mode }: { mode: string }) {
         setPassword("");
         setSent(true);
       } else {
-        await api("/api/auth/sign-in/email", { email, password });
+        const result=await api("/api/auth/sign-in/email", { email, password });
         setPassword("");
-        if (invite)
-          location.assign(
-            "/accept-invitation#token=" + encodeURIComponent(invite),
-          );
-        else {
-          router.replace("/");
-          router.refresh();
-        }
+        if(result.twoFactorRedirect){setChallenge(true);return;}
+        finishSignIn();
       }
     } catch (e) {
       setError(e);
@@ -81,7 +87,7 @@ export function AuthScreen({ mode }: { mode: string }) {
       setBusy(false);
     }
   }
-  const title = signup
+  const title = challenge ? "Verify it’s you." : signup
     ? "A clear home for every brand."
     : forgot
       ? "Let’s get you back in."
@@ -150,7 +156,7 @@ export function AuthScreen({ mode }: { mode: string }) {
                 Back to sign in
               </a>
             </section>
-          ) : (
+          ) : challenge ? <MfaChallenge onVerified={finishSignIn} onCancel={()=>{setChallenge(false);setError(undefined);}}/> : (
             <form onSubmit={submit} aria-busy={busy}>
               {signup && (
                 <Field label="Your name">

@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-23T16:01:09.645Z",
+  "verified": true,
+  "identities": 2,
+  "empty_accounts": 2,
+  "cross_binding_denials": 2,
+  "scope": "Actual private enterprise API creates two synthetic internal businesses; authenticated identity and empty integrations; Desvio adapter rejects crossed organization credentials. No OAuth, remote account publication or paid model test. Synthetic Postiz organizations retained for audit; credentials private."
+}

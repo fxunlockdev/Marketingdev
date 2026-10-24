@@ -5,10 +5,12 @@ import { api, type Workspace } from "./api";
 import { Wordmark, Loading, Notice, Field } from "./primitives";
 import {SocialCallbackResult} from "./connections";
 import { BusinessApp } from "./businesses";
+import {useHistoryEditGuard} from "./unsaved";
 import { AuthScreen } from "./auth";
 import { WorkspaceHome, BrandHome } from "./workspaces";
 import { TeamScreen } from "./team";
 export function Desvio() {
+  useHistoryEditGuard();
   const pathname = usePathname();
   const mode = pathname.split("/")[1];
   if(pathname==="/integrations/social/result")return <SocialCallbackResult/>;
@@ -24,7 +26,7 @@ export function Desvio() {
     return <AuthScreen key={mode} mode={mode} />;
   if(pathname.startsWith("/clients"))return <LegacyBusinessLink pathname={pathname}/>;
   if(pathname==="/accept-invitation")return <Session key={pathname} pathname={pathname} />;
-  return <BusinessApp key={pathname} pathname={pathname} />;
+  return <BusinessApp pathname={pathname} />;
 }
 function Session({ pathname }: { pathname: string }) {
   const router = useRouter(),

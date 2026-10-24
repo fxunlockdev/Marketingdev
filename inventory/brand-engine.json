@@ -1,0 +1,16 @@
+{
+  "archive_sha256": "9348eaa7f655a69434158087133d38e02c843f48fa54b039dc96da0b74f90125",
+  "files": {
+    "brand-engine/SKILL.md": "0381342dacb8390806381e9bc361d42a4cf43dae01d4b073ab24b1e80d3b72d1",
+    "brand-engine/agents/openai.yaml": "d7ce478f4712d0eb4d67288f1ab06e2324ea741263e355045ff1e41c9e73d98d",
+    "brand-engine/references/asset-recipes.md": "4053f19a705417ed42969bbac8f895e00e41150c23e154c93a6d60a5d6c88ecc",
+    "brand-engine/references/automation.md": "5b0b1b1503097138ffda5da4fc4fb80b9f47281ef121cc167615b19fef58615c",
+    "brand-engine/references/design-recipes.md": "0ea4c66aef67168c92eb87f283239ebc1e481481b21fbd5b22a6dc18855324d7",
+    "brand-engine/references/onboarding.md": "03a625341f73ec9450851a157cd3bc5f78e75025cae961252c9a415e5b71ddc2",
+    "brand-engine/references/pillars.md": "43e289d04ab43c455ab8c7f3e08b872b20361065fe3ecd9d94931103bfb0a2a7"
+  },
+  "skill_sha256": "0381342dacb8390806381e9bc361d42a4cf43dae01d4b073ab24b1e80d3b72d1",
+  "tree_sha256": "fc432a66ff2b6d1f5462ea62a7bf630f82836521ed9c492bf2b9b1045b53b3d2",
+  "license": "Owner supplied; no license file in archive",
+  "helpers_executed": false
+}

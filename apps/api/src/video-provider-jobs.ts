@@ -1,3 +1,5 @@
+import {authenticatedVideoOutput} from './video-output.js';
+import {exceedsAllowance} from "./spending-allowance.js";
 import {randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
 import {HiggsfieldClient,HiggsfieldError,type VideoIntent} from './higgsfield-client.js';
@@ -23,21 +25,22 @@ export class VideoProviderJobs {
   if(release)await db.query("UPDATE app.video_reservations SET state='released' WHERE job_id=$1",[j.id]);
   await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,phase==='canceled'?'canceled':phase==='unknown'?'unknown':phase==='failed'?'failed':'rejected',code]);return phase;
  }
- async prepare(scope:JobScope,intent:VideoIntent){
+ async prepare(scope:JobScope,intent:VideoIntent,beforePrepare?:(db:any,j:any)=>Promise<void>){
   const prepared=this.#provider.prepare(intent);
   return this.transaction(scope,async(db,j)=>{
    const prior=(await db.query('SELECT * FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
    if(prior){if(prior.intent_sha256!==prepared.sha256||prior.provider_key!==prepared.idempotencyKey)throw new VideoStateError('VIDEO_REPLAY_MISMATCH');return {phase:prior.phase};}
    if(!['queued','running','retrying'].includes(j.status)||!await this.#jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
+   if(beforePrepare)await beforePrepare(db,j);
    const g=await this.grant(db,j,prepared.model),reserve=Number(intent.kind==='image'?g.max_create_micros:g.max_edit_micros);
    const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.video_reservations WHERE organization_id=$1 AND brand_id=$2 AND state='held'",[j.organization_id,j.brand_id])).rows[0].n);
-   if(!Number.isSafeInteger(reserve)||reserve<=0||used+reserve>Number(g.budget_micros))throw new VideoStateError('VIDEO_BUDGET_EXHAUSTED');
+   if(!Number.isSafeInteger(reserve)||reserve<=0||exceedsAllowance(used+reserve,g.budget_micros))throw new VideoStateError('VIDEO_BUDGET_EXHAUSTED');
    await db.query('INSERT INTO app.video_reservations(job_id,organization_id,brand_id,model,reserved_micros) VALUES($1,$2,$3,$4,$5)',[j.id,j.organization_id,j.brand_id,prepared.model,reserve]);
    await db.query('INSERT INTO app.video_operations(job_id,organization_id,brand_id,provider_key,model,intent_sha256,encrypted_intent) VALUES($1,$2,$3,$4,$5,$6,$7)',[j.id,j.organization_id,j.brand_id,prepared.idempotencyKey,prepared.model,prepared.sha256,this.#vault.seal(scope,'intent',intent)]);
    return {phase:'prepared'};
   });
  }
- async step(scope:JobScope):Promise<string>{
+ async step(scope:JobScope,beforeSubmit?:(db:any,j:any)=>Promise<void>):Promise<string>{
   const state=await this.transaction(scope,async(db,j)=>{
    const r=(await db.query('SELECT * FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
    if(!r)throw new VideoStateError('VIDEO_INTENT_MISSING');
@@ -55,7 +58,8 @@ export class VideoProviderJobs {
     if(prepared.sha256!==r.intent_sha256||prepared.idempotencyKey!==r.provider_key||prepared.model!==r.model||held.state!=='held')throw new VideoStateError('VIDEO_REPLAY_MISMATCH');
     const currentCap=Number(intent.kind==='image'?g.max_create_micros:g.max_edit_micros);
     const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.video_reservations WHERE state='held'",[])).rows[0].n);
-    if(Number(held.reserved_micros)!==currentCap||used>Number(g.budget_micros))return {done:await this.stop(db,j,'rejected','VIDEO_BUDGET_CHANGED',true)};
+    if(Number(held.reserved_micros)!==currentCap||exceedsAllowance(used,g.budget_micros))return {done:await this.stop(db,j,'rejected','VIDEO_BUDGET_CHANGED',true)};
+    if(beforeSubmit)await beforeSubmit(db,j);
     await db.query("UPDATE app.video_operations SET phase='submitting' WHERE job_id=$1",[j.id]);
     await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);
     return {submit:intent,sha:r.intent_sha256};
@@ -111,7 +115,13 @@ export class VideoProviderJobs {
   if(!await this.#jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
   const r=(await db.query('SELECT phase,encrypted_output FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
   if(r?.phase!=='completed')throw new VideoStateError('VIDEO_OUTPUT_NOT_READY');
-  return this.#vault.open(scope,'output',r.encrypted_output) as {url:string};
+  const output=this.#vault.open(scope,'output',r.encrypted_output) as {url:string};
+  return authenticatedVideoOutput(output.url);
+ });}
+ async cancelPrepared(scope:JobScope,code:string){return this.transaction(scope,async(db,j)=>{
+  const r=(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
+  if(r?.phase==='prepared')return this.stop(db,j,'canceled',code,true);
+  return r?.phase??null;
  });}
  async exhausted(scope:JobScope){return this.transaction(scope,async(db,j)=>{
   const r=(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];

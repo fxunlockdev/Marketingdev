@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-24T03:08:44.275Z",
+  "passed": true,
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "business_id": "ad0a7735-3ae2-4dc2-a7cc-3e3d1c7e8e32",
+  "overview_real_api": true,
+  "canvas_route": true,
+  "desktop_mobile_accessibility": true,
+  "widths": [
+    1440,
+    768,
+    390,
+    320
+  ],
+  "reduced_motion": true,
+  "scope": "Actual deployed synthetic login, business creation, Overview and Canvas navigation. No paid model or social operation."
+}

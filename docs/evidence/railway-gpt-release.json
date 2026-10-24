@@ -1,0 +1,38 @@
+{
+  "checked_at": "2026-10-24T07:20:46.414Z",
+  "passed": true,
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "source_commit": "406bd9b7fbc55836c80bdafc62d2d44295496696",
+  "releases": [
+    {
+      "service_id": "21260f12-2ad2-413c-9f67-2a1c4d6f8c83",
+      "deployment_id": "6857c9d8-1f57-4416-8f4b-621655878b44",
+      "status": "SUCCESS"
+    },
+    {
+      "service_id": "a92160c2-54ef-4523-b13b-4a9a0e2dbdd2",
+      "deployment_id": "d55e006f-dc3e-4d13-a1af-70a5a9ac645a",
+      "status": "SUCCESS"
+    }
+  ],
+  "migration": {
+    "file": "050_instagram_authorization.sql",
+    "sha256": "b039836fad4e6d194262a97072ac97cb12323a42a0e4b0dd6cc8bd859dc8e38d"
+  },
+  "worker_image": "sha256:95f53341791857d1e98feba2e5b4c9e0d443870b143f7e4a2a5470bd0b755179",
+  "rollback_containers": [
+    "desvio-provisioner-rollback-20261024-gpt",
+    "desvio-worker-rollback-2e789cf3-7466-4ac9-9d40-f3792362defc"
+  ],
+  "checks": {
+    "owner_login": true,
+    "retained_shell": true,
+    "anonymous_denied": true,
+    "durable_private_file_job": true,
+    "fixture_cleanup": true,
+    "provisioner_registration": true
+  },
+  "scope": "Actual dev deployment, owner read-only browser smoke and private file/queue/scan/readback acceptance. GPT-only creative planning, image editing, video approval and interrupted-response replay are proven locally against MOCK model providers. No paid models, social consent or social publication tested.",
+  "live_model_or_social_calls": false
+}

@@ -43,12 +43,12 @@ export class Businesses {
         async (db) =>
           (
             await db.query(
-              `SELECT b.id,b.organization_id,b.name,b.website,b.revision,EXISTS(SELECT 1 FROM app.brand_brain_versions v WHERE v.organization_id=b.organization_id AND v.brand_id=b.id) AS has_approved_brand FROM app.brands b WHERE b.organization_id=$1 ORDER BY b.created_at,b.id LIMIT 100`,
+              `SELECT b.id,b.organization_id,b.name,b.website,b.revision,CASE WHEN m.business_scope='all' THEN m.role ELSE bm.role END AS role,EXISTS(SELECT 1 FROM app.brand_brain_versions v WHERE v.organization_id=b.organization_id AND v.brand_id=b.id) AS has_approved_brand FROM app.brands b JOIN app.memberships m ON m.organization_id=b.organization_id AND m.user_id=app.actor() LEFT JOIN app.business_memberships bm ON bm.organization_id=b.organization_id AND bm.brand_id=b.id AND bm.user_id=app.actor() WHERE b.organization_id=$1 ORDER BY b.created_at,b.id LIMIT 100`,
               [org.id],
             )
           ).rows,
       );
-      businesses.push(...rows.map((row) => ({ ...row, role: org.role })));
+      businesses.push(...rows);
     }
     return { businesses };
   }
@@ -116,6 +116,8 @@ export class Businesses {
             cadence: 3,
             channels: [],
             must_avoid: "",
+            business_stage: "",
+            growth_expectation: "",
             preferences_edited: false,
           };
           const recommendation =
@@ -162,7 +164,13 @@ export class Businesses {
           "channels",
           "must_avoid",
           "preferences_edited",
+          "business_stage",
+          "growth_expectation",
         ]);
+        const stage = value.business_stage ?? prior?.business_stage ?? "";
+        const growth = value.growth_expectation ?? prior?.growth_expectation ?? "";
+        if (typeof stage !== "string" || !["", "pre_launch", "launching", "growing", "established"].includes(stage) || typeof growth !== "string" || growth.length > 600 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(growth))
+          throw new BadRequestException("Choose a business stage and keep your growth goal within 600 characters");
         if (
           (value.preferences_edited !== undefined &&
             typeof value.preferences_edited !== "boolean") ||
@@ -206,7 +214,7 @@ export class Businesses {
           );
         const row = (
           await db.query(
-            `INSERT INTO app.business_onboarding(organization_id,brand_id,step,goal,timezone,cadence,channels,must_avoid,preferences_edited) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(organization_id,brand_id) DO UPDATE SET step=EXCLUDED.step,goal=EXCLUDED.goal,timezone=EXCLUDED.timezone,cadence=EXCLUDED.cadence,channels=EXCLUDED.channels,must_avoid=EXCLUDED.must_avoid,preferences_edited=business_onboarding.preferences_edited OR EXCLUDED.preferences_edited,revision=business_onboarding.revision+1,updated_at=now() RETURNING *`,
+            `INSERT INTO app.business_onboarding(organization_id,brand_id,step,goal,timezone,cadence,channels,must_avoid,preferences_edited,business_stage,growth_expectation) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(organization_id,brand_id) DO UPDATE SET step=EXCLUDED.step,goal=EXCLUDED.goal,timezone=EXCLUDED.timezone,cadence=EXCLUDED.cadence,channels=EXCLUDED.channels,must_avoid=EXCLUDED.must_avoid,business_stage=EXCLUDED.business_stage,growth_expectation=EXCLUDED.growth_expectation,preferences_edited=business_onboarding.preferences_edited OR EXCLUDED.preferences_edited,revision=business_onboarding.revision+1,updated_at=now() RETURNING *`,
             [
               business.organization_id,
               id,
@@ -217,6 +225,8 @@ export class Businesses {
               JSON.stringify(value.channels),
               value.must_avoid,
               value.preferences_edited ?? true,
+              stage,
+              growth,
             ],
           )
         ).rows[0];

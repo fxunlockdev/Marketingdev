@@ -1,0 +1,41 @@
+{
+  "suite": "carousel-planning",
+  "scope": "Typed coordinated carousel plan with exact slide order/count, shared caption/palette/direction, alt text and fact IDs; actual isolated owner social/image/copywriting/product-marketing skills, OpenAI and Gemini official text adapters with MOCK transports, sandbox boundaries and static/calendar/video runtime regression. No durable whole-carousel generation, image orchestration, UI or live quality claim.",
+  "checked_at": "2026-10-23T10:03:38.048514+00:00",
+  "source_sha256": "a8b0a7babaf0da93ea5d2cac7b6ef9de6fea97bf702c95318da2e0da2996a763",
+  "source_sha256_start": "a8b0a7babaf0da93ea5d2cac7b6ef9de6fea97bf702c95318da2e0da2996a763",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "tests/contracts/carousel-planning.test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "\u2714 carousel plan binds exact count/order, shared direction and caption, separate alt text and approved evidence (1.670542ms)\n\u2714 carousel contract rejects unsupported inputs, missing/extra/repeated slides and invented facts or executable fields (0.560375ms)\n\u2714 carousel runtime proof requires exact owner skill digests, read evidence and bounded read-only broker use (0.169667ms)\n\u2139 tests 3\n\u2139 suites 0\n\u2139 pass 3\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 137.095958\n"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "--test-concurrency=1",
+        "tests/runtime/carousel-skills.test.mjs",
+        "tests/runtime/video-skills.test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "Actual isolated Deep Agents skill runtime sha256:46cdab0c91a1af305d7b5cdbc2c1027c5a93c80a6f42e3a2e80a802d6ac7dcd7; no network or credentials\n\u2714 actual isolated carousel runtime loads original four skills with credential-free read-only boundaries (MOCK model) (1974.860209ms)\n\u2714 OpenAI and Gemini official planner adapters each return a coordinated carousel through the actual runtime (MOCK transport) (3049.810125ms)\n\u2714 carousel runtime fails closed on malformed output and unsupported tools; invalid input makes no model call (3166.558291ms)\nActual isolated Deep Agents skill runtime sha256:46cdab0c91a1af305d7b5cdbc2c1027c5a93c80a6f42e3a2e80a802d6ac7dcd7; no network or credentials\n\u2714 actual isolated Deep Agents loads four original video skills and references with read-only approved context (MOCK model) (1559.247458ms)\n\u2714 an edit gets its own immutable business context; unrelated files remain inaccessible (MOCK model) (1454.09425ms)\n\u2714 injected requests and model tool calls cannot execute, write, delegate or call external providers (6083.043041ms)\n\u2714 repeated reference requests stop at three broker calls without executing a helper (1464.799708ms)\n\u2714 invalid generated facts and broker failures fail closed without a paid retry (3225.002791ms)\n\u2714 adding the video branch preserves actual static creative and thirty-day planning skill runtimes (MOCK model) (3802.585792ms)\n\u2139 tests 9\n\u2139 suites 0\n\u2139 pass 9\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 32742.90075\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}

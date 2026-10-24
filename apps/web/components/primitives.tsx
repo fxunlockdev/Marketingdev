@@ -1,4 +1,5 @@
 "use client";
+import {AppLink} from "./app-link";
 import { useId, type ReactNode } from "react";
 import { ApiError, message } from "./api";
 export function Notice({ error }: { error: unknown }) {
@@ -41,21 +42,19 @@ export function Field({
 }
 export function Wordmark() {
   return (
-    <a href="/" className="wordmark" aria-label="Desvio home">
-      <span className="brand-mark" aria-hidden="true">
-        d
-      </span>
+    <AppLink href="/" className="wordmark" aria-label="Desvio home">
+      <span className="brand-mark" aria-hidden="true" />
       desvio
       <span className="wordmark-dot" aria-hidden="true">
         .
       </span>
-    </a>
+    </AppLink>
   );
 }
 export function Loading() {
   return (
     <p role="status" className="loading">
-      Loading your workspace…
+      Loading…
     </p>
   );
 }

@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-10-24T06:15:11.662093+00:00",
+  "passed": true,
+  "tests": 13,
+  "scope": "Local actual database, private storage, isolated rendering and approval/publication worker; MOCK model and Postiz transports. No live provider verification. Browser and deployment pending.",
+  "source_sha256": {
+    "apps/api/src/video-references.ts": "e940d64e63dc7aae82a73e8f91a3161321308b593abe7106ea6e34b303ea11fb",
+    "apps/api/src/video-renderer.ts": "ade0c1f27b5efda9887690bc7458287cadeb935a94be5f4eb46ef0b0c13dbcf7",
+    "apps/api/src/publication-provider.ts": "bd7ee244f08956439bf787ee87dc496e0f3163a4e35487f204df6ce8faf6f5ab",
+    "apps/api/src/publication.ts": "3a64c68ae7eaf1a23da2dda657774589e28357fff93bb75ebea9cbb15fe07e4d",
+    "apps/api/src/publication-jobs.ts": "a384705dbb61ebd43d40e299b9f9c17d5568ea8c08734cb72456b813ddb6741d",
+    "apps/api/src/postiz-client.ts": "dff8d617903f7af29336da31507be292b21aa17f1c9c167d43f96e86ec02f709",
+    "database/migrations/051_instagram_reel_publication.sql": "0e768380241efa978b5d59b5ab150295a37d404b0eeff28ff7c033f07b3f6a86",
+    "tests/fixtures/prove-video-publication.mjs": "6be7d2eebabdab8311d403e8abb1249ec16c62a7a0d06a0d4ce063526e3fd2d6",
+    "tests/foundation/exports.test.mjs": "82726249167b36fa5717fa6ca426376e430020c928f202a9721f9c3f4ff0f915"
+  },
+  "log_sha256": "5c63cfa4d73ed1c1af4cc63659c01de86c7e63dcc1a8ca8db33b93fb23a5cd70"
+}

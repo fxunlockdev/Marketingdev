@@ -1,0 +1,45 @@
+{
+  "suite": "operator",
+  "scope": "Actual disposable PostgreSQL, all six AI grant kinds and exact social allowlist configuration, preview/apply/replay, stale expiry, schema checksums, runtime-role denial and credential-free listing. Fixture accounts only; no live provider calls or cloud configuration.",
+  "checked_at": "2026-10-24T02:24:12.290023+00:00",
+  "source_sha256": "37c6c59296c8458e8727f33a8d2b8eecd148c1538a4f3c84891e25556d40d74f",
+  "source_sha256_start": "37c6c59296c8458e8727f33a8d2b8eecd148c1538a4f3c84891e25556d40d74f",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "--test",
+        "tests/contracts/provider-setup.test.mjs",
+        "tests/contracts/worker-readiness.test.mjs",
+        "tests/contracts/activation.test.mjs",
+        "tests/contracts/provisioner-host.test.mjs",
+        "tests/contracts/social-settings.test.mjs",
+        "tests/contracts/setup-wizard.test.mjs",
+        "infra/worker-control/provider-settings.test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "\u2714 copies only provider credentials, never infrastructure or enable flags (0.688625ms)\n\u2714 video activation requires complete explicit settings and never forwards unrelated controls (4.136416ms)\n\u2714 video setup rejects malformed keys, implicit flags and unsafe or ambiguous download origins (0.2745ms)\n\u2714 empty settings leave unpaid deployment usable; malformed secrets fail without disclosure (0.103791ms)\n\u2714 preview contains only exact pins, flags and fingerprints and rejects unready targets (3.496791ms)\n\u2714 matching configuration verifies worker without restarting or redeploying (1.900125ms)\n\u2714 activation disables video before replacing worker and only enables API after worker verification (0.326791ms)\n\u2714 wrong approval, stale snapshots and busy queues cannot mutate services (0.517708ms)\n\u2714 drift during idle preflight is rejected before service mutations (0.196792ms)\n\u2714 failed and ambiguous worker swaps restore exact previous worker and API before releasing lock (0.416666ms)\n\u2714 API verification failure rolls back both services and recovery ambiguity retains lock (0.3545ms)\n\u2714 social activation preserves publication opt-in and disables active APIs before worker swap (0.196625ms)\n\u2714 Railway setup requires exact dev scope, pinned image and explicit preview approval (1.068208ms)\n\u2714 payload rejects malformed targets and gathers actual migration sources without connection commands (9.796208ms)\n\u2714 provisioner rejects model/storage/admin credentials and mutable image tags (0.724083ms)\n\u2714 provisioner refuses admin database role, shared queue and reused secret (0.430542ms)\n\u2714 configuration identity binds signing/encryption credentials without exposing them (0.338ms)\n\u2714 money conversion is decimal exact and rejects ambiguous/negative/zero inputs (0.5515ms)\n\u2714 activation requires explicit confirmation and applies only exact returned preview (0.570209ms)\n\u2714 guided creative allowance preserves exact model, rates, selected tenant and cap (1.337042ms)\n\u2714 cancelled authorization only saves/previews and never applies (0.204875ms)\n\u2714 missing business, malformed selection and cap violations never apply (0.2585ms)\n\u2714 invalid preview cannot authorize and video choices preserve implemented contracts (0.340791ms)\n\u2714 onboarding wizard records the explicit visual token ceiling without guessing it (0.259875ms)\n\u2714 social settings remain disabled without explicit activation and never forward privileged secrets (3.000083ms)\n\u2714 social settings reject wrong environment and mismatched or reused encryption keys (0.23425ms)\n\u2714 readiness distinguishes matching, absent, stopped and changed workers without leaking credentials (2.220541ms)\n\u2714 readiness rejects wrong image platform, missing pins and unrelated containers (0.322375ms)\n\u2139 tests 28\n\u2139 suites 0\n\u2139 pass 28\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 213.002667\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--operator"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\n\u2714 one-shot Railway runner lists, previews and applies disabled grants without leaking administrator credentials (533.313542ms)\n\u2714 strict manifest rejects secrets, prototype capabilities, duplicate grants, unsafe budgets and invalid dates (0.491417ms)\n\u2714 preview makes no changes; approval applies once and audit is immutable to runtime roles (107.688084ms)\n\u2714 expiry-only drift invalidates a preview and exact database/business boundaries are required (57.535083ms)\n\u2714 all six AI grant kinds persist atomically, with explicit model and cost bounds (69.19325ms)\n\u2714 unbound publishing accounts cannot receive permission and partial batches are not applied (29.395667ms)\n\u2714 exact verified social binding can be enabled and revoked; listing omits credentials (111.690416ms)\n\u2714 missing migration checksum prevents configuration without altering grants (15.339708ms)\n\u2714 visual onboarding token cap persists explicitly, rejects unsafe caps, and preserves omitted legacy fields (62.35125ms)\n\u2714 Canvas allowance readback is scoped, read-only and distinguishes missing, disabled and expired permission (273.470167ms)\n\u2139 tests 10\n\u2139 suites 0\n\u2139 pass 10\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 1334.461584\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}

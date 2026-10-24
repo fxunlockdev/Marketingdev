@@ -1,3 +1,19 @@
+import {readZip} from '../fixtures/read-zip.mjs';
+import {CarouselJobs} from '../../dist/carousel-jobs.js';
+import {carouselPlan} from '../fixtures/carousel-planning.mjs';
+import {MalwareScanner} from '../../dist/file-validation.js';
+import {GoogleGenAI} from '@google/genai';
+import {GeminiPlanner} from '../../dist/gemini-planner.js';
+import {ContentPlan} from '../../dist/content-plan.js';
+import {VideoJobs} from '../../dist/video-jobs.js';
+import {VideoReferences} from '../../dist/video-references.js';
+import {VideoProviderJobs} from '../../dist/video-provider-jobs.js';
+import {VideoRenderer} from '../../dist/video-renderer.js';
+import {VideoDownload} from '../../dist/video-download.js';
+import {canonicalJSON,hash} from '../../dist/brand-brain.js';
+import {prepareVideoImage} from '../../scripts/video-runtime-image.mjs';
+import {execFileSync} from 'node:child_process';
+let videoSubmits=0;
 import {PlanningJobs} from '../../dist/planning-jobs.js';
 import {ExportJobs} from '../../dist/export-jobs.js';
 import {StaticRenderer} from '../../dist/static-renderer.js';
@@ -6,7 +22,7 @@ import {Workspaces} from '../../dist/workspaces.js';
 import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
 // Browser integration proof uses real auth, RLS, Temporal, S3, Fabric and isolated
 // owner skills. Only the paid OpenAI transport is MOCK; no provider request leaves this test.
-import { test, before, after } from "node:test";
+import { test, before, after, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -100,7 +116,7 @@ async function post(path, body, key) {
 before(async () => {
   await mkdir("work/browser", { recursive: true });
   smtp = await startMailbox();
-  config.smtp.port = smtp.port;
+  config.smtp.port = smtp.port;config.videoEnabled=true;
   base = `http://127.0.0.1:${await port()}`;
   config.origin = base;
   config.jobs.taskQueue = "canvas-browser-" + randomUUID();
@@ -163,7 +179,7 @@ before(async () => {
     }
   });
   store = new ObjectStore(config.storage);
-  const jobs = new AssetJobs(workerPool, store, null);
+  const jobs = new AssetJobs(workerPool, store, new MalwareScanner(config.scanner));
   const provider = new CreativeProvider(
     undefined,
     new OpenAI({
@@ -185,7 +201,9 @@ before(async () => {
           assert.ok(
             input.brand.facts.every((f) => !f.value.includes("OTHER BUSINESS")),
           );
-          if(input.task==='content_plan')return modelResponse(generatedPlan(input));
+          if(input.task==='video')return modelResponse({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]});
+          if(input.task==='carousel'){const plan=carouselPlan(input.slide_count);for(const slide of plan.slides){slide.fact_ids=[input.brand.facts[0].id];slide.headline=`Story ${slide.position}`;slide.body='';slide.cta='';}return modelResponse(plan);}
+          if(input.task==='content_plan'){const settings=input.planning_mode==='natural'?{duration_days:7,post_count:7,video_count:2}:null;return modelResponse(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input));}
           planned++;
           const brief = {
             headline:
@@ -237,13 +255,29 @@ before(async () => {
       },
     }),
   );
+  const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{
+   assert.equal(new URL(url).pathname,'/v1beta/models/gemini-fixture:generateContent');const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));
+   if(input.task==='video')return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]})}]},finishReason:'STOP'}]});
+   if(input.task!=='content_plan'){
+    planned++;const brief={headline:planned===1?'TEST FIXTURE: A little everyday care':'TEST FIXTURE: Fresh perspective',body:'Refillable botanical soap',cta:'Explore the collection',caption:'TEST FIXTURE: Botanical soap, made for your everyday ritual.',image_prompt:'TEST FIXTURE: Still life with room for text',palette:['#e6d5bb','#201e1d'],fact_ids:[input.brand.facts.find(f=>f.field==='offering').id],warnings:['TEST FIXTURE — no live generation']};
+    return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(brief)}]},finishReason:'STOP'}]});
+   }
+   const settings=input.planning_mode==='natural'?{duration_days:7,post_count:7,video_count:2}:null;
+   return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input))}]},finishReason:'STOP'}]});
+  }}}));
   const handler = new CreativeJobs(
     jobs,
     new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),
-    provider,
+    provider,gemini,
   );
-  const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider);
+  const planner=new PlanningJobs(jobs,new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE),provider,gemini);
   const exporter=new ExportJobs(jobs,new StaticRenderer(process.env.RENDER_RUNTIME_IMAGE));
+  const carousel=new CarouselJobs(jobs,handler,exporter);
+  const carouselBeat=fn=>async(...args)=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await fn(...args);}finally{clearInterval(timer);}};
+  const videoImage=prepareVideoImage(),videoKey='ab'.repeat(32);
+  const clip=Buffer.from(execFileSync('docker',['run','--rm','--network','none','--read-only','--cap-drop=ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--entrypoint','python',videoImage,'-c',"import sys,base64; sys.path.insert(0,'/runtime'); import runtime as r; r.command('ffmpeg',['-v','error','-f','lavfi','-i','color=blue:size=320x180:duration=3:rate=24','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','/tmp/test.mp4']); print(base64.b64encode(open('/tmp/test.mp4','rb').read()).decode())"],{encoding:'utf8',timeout:30000}).trim(),'base64');
+  const videoProvider={prepare:intent=>({model:intent.model,idempotencyKey:intent.idempotencyKey,sha256:hash(canonicalJSON(intent))}),submit:async intent=>{videoSubmits++;assert.ok(intent.prompt.startsWith('TEST user edited video prompt'));assert.ok(intent.prompt.includes('TEST revised storyline'));assert.equal((await fetch(intent.referenceURL)).status,200);return {requestId:randomUUID()};},status:async()=>({state:'completed',videoURL:'https://video.example.org/fixture.mp4',errorCode:null}),cancel:async()=>{}};
+  const video=new VideoJobs(jobs,new VideoReferences(undefined,jobs,videoKey,process.env.RENDER_RUNTIME_IMAGE,'test'),handler,new VideoProviderJobs(jobs,videoProvider,videoKey),new VideoDownload(['https://video.example.org'],{fetch:async()=>({status:200,headers:{'content-type':'video/mp4'},bytes:clip})}),new VideoRenderer(videoImage));
   native = await NativeConnection.connect({ address: config.jobs.address });
   connection = await Connection.connect({ address: config.jobs.address });
   temporal = await Worker.create({
@@ -254,6 +288,11 @@ before(async () => {
       new URL("../../dist/asset-workflow.js", import.meta.url),
     ),
     activities: {
+      planCarousel:carouselBeat(s=>carousel.plan(s)),prepareCarouselExport:carouselBeat((s,p)=>carousel.prepareExport(s,p)),checkCarouselExport:carouselBeat((s,p)=>carousel.checkExport(s,p)),completeCarousel:carouselBeat(s=>carousel.complete(s)),failCarousel:carouselBeat(s=>carousel.fail(s)),
+      validate:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await jobs.validate(scope);}finally{clearInterval(timer);}},
+      fail:scope=>jobs.fail(scope),
+      stepVideo:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await video.step(scope);}finally{clearInterval(timer);}},
+      failVideo:scope=>video.exhausted(scope),
       exportCreative:async scope=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await exporter.run(scope);}finally{clearInterval(timer);}},
       failExport:scope=>exporter.fail(scope),
       generatePlan:scope=>planner.run(scope),
@@ -385,17 +424,43 @@ after(async () => {
   await smtp?.close();
   await Promise.all([admin.end(), workerPool.end(), dispatchPool.end()]);
 });
+afterEach(async()=>{if(errors.length)console.error('BROWSER ERRORS',JSON.stringify(errors));});
+
 test("Canvas browser creates a real queued job, renders a private creative and saves editable Fabric layers (MOCK OpenAI)", async () => {
-  const visualId=randomUUID(),sourceId=randomUUID(),captureJob=randomUUID();
-  referenceBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
-  const key=`evidence/${org}/${brand}/browser-reference/${digest(referenceBytes)}`;
-  await store.persist(key,referenceBytes,'image/jpeg',digest(referenceBytes));
-  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'website.extract','succeeded')",[captureJob,org,brand,actor]);
-  await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,'explicit-browser-fixture','{}','https://example.org/')",[sourceId,org,brand,digest(referenceBytes)]);
-  await admin.query("INSERT INTO app.website_visuals(id,organization_id,brand_id,source_id,job_id,viewport,parser_version,object_key,sha256,bytes,width,height,observations,coverage) VALUES($1,$2,$3,$4,$5,'desktop','explicit-browser-fixture',$6,$7,$8,1440,900,'{}','{}')",[visualId,org,brand,sourceId,captureJob,key,digest(referenceBytes),referenceBytes.length]);
-  const approval=await page.request.post(`${base}/api/v1/businesses/${brand}/canvas/references`,{headers:{origin:base},data:{kind:'website',visual_id:visualId,label:'Botanical brand reference',consent:true}});assert.equal(approval.status(),201);
+  await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER MOCK')",[org,brand]);
+  const photoBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
   await page.goto(`${base}/b/${brand}/canvas`);
+  await page.getByText('Generation allowances',{exact:true}).click();
+  const allowances=page.getByRole('region',{name:'Generation allowances',exact:true});
+  await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI creative planning and images'})).toContainText('Allowance active');
+  await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI content calendar'})).toContainText('Not set up');
+  try {
+    await admin.query('UPDATE app.creative_grants SET enabled=false WHERE brand_id=$1',[brand]);
+    await allowances.getByRole('button',{name:'Refresh allowances'}).click();
+    await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI creative planning and images'})).toContainText('Disabled');
+    await expect(page.getByText('Generation allowances',{exact:true})).toHaveCount(1);
+  } finally {
+    await admin.query('UPDATE app.creative_grants SET enabled=true WHERE brand_id=$1',[brand]);
+  }
+  await allowances.getByRole('button',{name:'Refresh allowances'}).click();
+  await expect(allowances.getByRole('listitem').filter({hasText:'OpenAI creative planning and images'})).toContainText('Allowance active');
+  await expect(page.getByText('Generation allowances',{exact:true})).toHaveCount(1);
+  await page.getByText('Generation allowances',{exact:true}).click();
+
+  await page.getByLabel('Creative planning model',{exact:true}).selectOption('openai');
   await page.getByText('Brand image references',{exact:true}).click();
+  await page.getByText('Add product photos',{exact:true}).click();
+  await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'canvas-product.jpg',mimeType:'image/jpeg',buffer:photoBytes});
+  await page.getByRole('button',{name:'Upload file',exact:true}).click();
+  const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+  await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
+  await approval.getByLabel('Use part of this image',{exact:true}).check();await approval.getByRole('combobox',{name:/^Crop shape/}).selectOption('square');
+  await approval.getByRole('button',{name:'Preview selected crop',exact:true}).click();await expect(approval.getByRole('img',{name:'Selected reference crop',exact:true})).toBeVisible();
+  await approval.getByLabel('Reference name',{exact:true}).fill('Botanical brand reference');
+  await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
+  await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
+  const normalized=(await admin.query("SELECT v.object_key FROM app.uploaded_visuals v JOIN app.assets a ON a.id=v.asset_id WHERE a.brand_id=$1 AND a.filename='canvas-product.jpg'",[brand])).rows[0];
+  referenceBytes=await sharp(await store.read(normalized.object_key)).extract({left:270,top:0,width:900,height:900}).png().toBuffer();
   await page.getByRole('checkbox',{name:'Botanical brand reference',exact:true}).check();
   await page
     .getByLabel("Describe your creative")
@@ -512,11 +577,46 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   const finalBytes=await readFile(await(await finalDownload).path());
   assert.equal((await import('node:crypto')).createHash('sha256').update(finalBytes).digest('hex'),exportApproval[0].sha256);
   await page.screenshot({path:'work/browser/canvas-final-image.png',fullPage:true});
-  await expect(
-    page.getByText(
-      "This saved version is approved. It has not been published.",
-    ),
-  ).toBeVisible();
+  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true)",[org,brand]);
+  const videoPlans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
+  const linkedPlan=await videoPlans.create(actor,brand,{title:'Browser video plan',objective:'Create a planned video',starts_on:'2027-01-01',timezone:'Asia/Kuala_Lumpur',slots:[{channel:'instagram',format:'video',brief:'TEST planned browser video',planned_at:'2027-01-06T04:00:00Z'}]},randomUUID());
+  let videoSlot=(await videoPlans.list(actor,brand,{start:'2027-01-01T00:00:00Z',end:'2027-02-01T00:00:00Z',plan_id:linkedPlan.id})).slots[0];
+  videoSlot=await videoPlans.edit(actor,brand,videoSlot.id,{revision:videoSlot.revision,video_draft:{storyline:'TEST planned storyline',script:'TEST planned script',prompt:'TEST planned prompt',duration_seconds:3}});
+  await page.goto(`${base}/b/${brand}/canvas?slot=${videoSlot.id}`);
+  await expect(page.getByRole('region',{name:'Video calendar context'})).toBeVisible();
+  await page.getByText('Make a video from this approved image',{exact:true}).click();
+  await expect(page.getByLabel('Video idea',{exact:true})).toHaveValue(/TEST planned script/);
+  await page.getByLabel('Video idea',{exact:true}).fill('TEST animate this brand image');
+  await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
+  await page.getByLabel('Video script model',{exact:true}).selectOption('openai');
+  await page.getByRole('button',{name:'Draft video script',exact:true}).click();
+  await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,0);
+  await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt');
+  await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline');
+  await page.getByRole('button',{name:'Save video draft',exact:true}).click();
+  await page.reload();await expect(page.getByLabel('Video prompt',{exact:true})).toHaveValue('TEST user edited video prompt');assert.equal(videoSubmits,0);
+  await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
+  await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+  await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});assert.equal(videoSubmits,1);
+  const player=page.getByLabel('Saved video preview',{exact:true});await player.evaluate(el=>el.play());await expect.poll(()=>player.evaluate(el=>el.currentTime)).toBeGreaterThan(0.25);await player.evaluate(el=>el.pause());
+  await page.getByRole('button',{name:'Send video for review',exact:true}).click();
+  await page.getByLabel('I reviewed this saved video and caption.').check();
+  await page.getByRole('button',{name:'Approve final video',exact:true}).click();
+  await expect(page.getByRole('region',{name:'Video review'}).getByRole('status')).toHaveText('approved');
+  const savedVideo=(await admin.query('SELECT status,manifest FROM app.video_versions WHERE brand_id=$1',[brand])).rows[0];assert.equal(savedVideo.status,'approved');assert.equal(savedVideo.manifest.plan.brief.video_prompt,'TEST user edited video prompt');
+  await page.screenshot({path:'work/browser/canvas-video-approved.png',fullPage:true});
+  const canvasURL=page.url();
+  await page.getByRole('link',{name:'Open linked video post in calendar',exact:true}).click();
+  await expect(page.getByLabel('Saved video preview',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Send for review',exact:true}).click();
+  await page.getByRole('button',{name:'Approve post',exact:true}).click();
+  await expect(page.getByText('Approved this saved version. It has not been published.',{exact:true})).toBeVisible();
+  const calendarVideo=(await admin.query("SELECT state,video_version_id,creative_version_id FROM app.content_slots WHERE brand_id=$1 AND format='video'",[brand])).rows[0];assert.equal(calendarVideo.state,'approved');assert.ok(calendarVideo.video_version_id);assert.equal(calendarVideo.creative_version_id,null);
+  await page.screenshot({path:'work/browser/calendar-video-approved.png',fullPage:true});
+  await page.goto(canvasURL.split('?')[0]);
+
+
+
   await page.getByRole("button", { name: "Revise image with AI" }).click();
   await page
     .getByLabel("Describe your changes")
@@ -636,15 +736,26 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await businesses.onboarding(actor,brand,{revision:0,step:3,goal:'awareness',timezone:'Asia/Kuala_Lumpur',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY')",[org,brand]);
  await page.goto(`${base}/b/${brand}/content-plan`);
- await page.getByRole('button',{name:'Create 30-day plan',exact:true}).click();
+ await page.getByRole('button',{name:'Create content plan',exact:true}).click();
  await page.getByLabel('Plan starts on').fill('2026-11-01');
  await page.getByLabel('Anything to focus on?').fill('TEST FIXTURE: explain refillable soap');
  await page.getByRole('button',{name:'Generate draft plan',exact:true}).click();
  await expect(page.getByText('30 posts in this view',{exact:true})).toBeVisible({timeout:30000});
+
+ const calendarDownload=page.waitForEvent('download');await page.getByRole('button',{name:'Export calendar',exact:true}).click();
+ const exportedCalendar=await calendarDownload;assert.equal(exportedCalendar.suggestedFilename(),'desvio-content-plan.ics');
+ const calendarText=await readFile(await exportedCalendar.path(),'utf8');assert.equal(calendarText.split('BEGIN:VEVENT').length-1,30);assert.ok(calendarText.includes('STATUS:TENTATIVE'));
  await page.screenshot({path:'work/browser/content-plan-desktop.png',fullPage:true});
  await page.getByRole('button',{name:'LinkedIn',exact:true}).click();
  await expect(page.getByText('15 posts in this view',{exact:true})).toBeVisible();
- await page.getByRole('button',{name:'Open LinkedIn post: TEST FIXTURE hook 1',exact:true}).click();
+ const beforeMove=(await admin.query("SELECT id,planned_at FROM app.content_slots WHERE brand_id=$1 AND hook='TEST FIXTURE hook 1'",[brand])).rows[0];
+ await page.getByRole('button',{name:'Open LinkedIn post: TEST FIXTURE hook 1',exact:true}).dragTo(page.locator('[data-calendar-day="2026-11-02"]'),{targetPosition:{x:20,y:15}});
+ await expect(page.getByText('New date prepared. Review and save your changes to move this post. Social publishing is unchanged.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query('SELECT planned_at FROM app.content_slots WHERE id=$1',[beforeMove.id])).rows[0].planned_at.toISOString(),beforeMove.planned_at.toISOString(),'Drop must not persist before review/save');
+ await expect(page.getByLabel('Planned date & time (Asia/Kuala_Lumpur)')).toHaveValue('2026-11-02T16:00');
+ await page.getByRole('button',{name:'Save post changes',exact:true}).click();
+ await expect(page.getByText('Post changes saved.',{exact:true})).toBeVisible();
+ assert.equal((await admin.query('SELECT planned_at FROM app.content_slots WHERE id=$1',[beforeMove.id])).rows[0].planned_at.toISOString(),'2026-11-02T08:00:00.000Z');
  await page.getByRole('button',{name:'Create creative',exact:true}).click();
  await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});
  const postSlot=(await admin.query("SELECT s.* FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.brand_id=$1 AND s.hook='TEST FIXTURE hook 1'",[brand])).rows[0];
@@ -659,7 +770,12 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByRole('button',{name:'Send for review',exact:true}).click();await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeVisible();
  await page.getByLabel('Feedback or creative direction').fill('TEST FIXTURE: calmer image');await page.getByRole('button',{name:'Request changes',exact:true}).click();
  await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Revise creative',exact:true}).click();
- await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});await page.getByRole('button',{name:'Send for review',exact:true}).click();await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeEnabled();
+ await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});
+ await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-01`);
+ await page.getByRole('button',{name:'Select drafts for review',exact:true}).click();
+ await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();
+ await page.getByRole('button',{name:'Send selected drafts for review',exact:true}).click();
+ await expect(page.getByText('1 post sent for review. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
  await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');
  await page.getByRole('button',{name:'Instagram',exact:true}).click();await expect(page.getByText('Nothing waiting here',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'LinkedIn',exact:true}).click();await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();
@@ -667,6 +783,12 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByRole('button',{name:'Confirm bulk approval',exact:true}).click();await expect(page.getByText('1 post approved. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
  assert.equal((await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[postSlot.id])).rows[0].state,'approved');
  await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeDisabled();
+ await page.getByRole('button',{name:'Reopen review',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeVisible();
+ await page.reload();await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();
+ await expect(page.getByRole('button',{name:'Approve post',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Approve post',exact:true}).click();
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='review_reopened'",[postSlot.id])).rows[0].n,1);
  await page.getByRole('button',{name:'Prepare final image',exact:true}).click();
  await expect(page.getByRole('img',{name:'Saved final image for approval'})).toBeVisible({timeout:30000});
  await expect(page.getByLabel('I reviewed this saved image and its text.')).toBeEnabled();await page.getByLabel('I reviewed this saved image and its text.').check();
@@ -691,8 +813,220 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  await page.getByRole('button',{name:'Attach latest Canvas version',exact:true}).click();await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();
  await expect(page.locator('.slot-caption')).toHaveText('TEST FIXTURE: Manual revision from review');
  const after=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.notEqual(after.creative_version_id,before.creative_version_id);
- assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='approved'",[before.id])).rows[0].n,1);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='approved'",[before.id])).rows[0].n,2);
  const other=(await admin.query("SELECT id FROM app.brands WHERE organization_id=$1 AND name='OTHER BUSINESS'",[org])).rows[0].id;
  await page.goto(`${base}/b/${other}/content-plan`);await page.getByLabel('Calendar date').fill('2026-11-01');await expect(page.getByText('Space for your next ideas',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Post details',exact:true})).toHaveCount(0);
  const denied=await page.request.get(`${base}/api/v1/businesses/${other}/content-slots/${before.id}`);assert.equal(denied.status(),404);assert.deepEqual(errors,[]);
+});
+
+test('Canvas creates a custom four-day plan and opens its actual saved calendar post',async()=>{
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'openai',true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY') ON CONFLICT (organization_id,brand_id,provider) DO UPDATE SET enabled=true,budget_micros=10000000",[org,brand]);
+ await page.goto(`${base}/b/${brand}/canvas`);
+ await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
+ await page.getByText('Plan content in Canvas',{exact:true}).click();
+ await page.getByLabel('Planning model',{exact:true}).selectOption('openai');
+ await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
+ await expect(page.getByText('Plan content in Canvas',{exact:true})).toHaveCount(1);
+ await page.getByLabel('Set days and post counts myself',{exact:true}).check();
+ await page.getByLabel('Planning days',{exact:true}).fill('4');
+ await page.getByLabel('Videos in this plan',{exact:true}).fill('2');
+ await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2026-12-01');
+ await page.getByLabel('Repeat this plan',{exact:true}).selectOption('3');
+ await page.getByLabel('Total loop planning budget (USD)',{exact:true}).fill('5');
+ await page.getByLabel('Allow recurring AI planning charges', {exact:false}).check();
+ await page.getByRole('button',{name:'Plan my content',exact:true}).click();
+ const preview=page.getByRole('region',{name:'Planned posts',exact:true});
+ await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4,{timeout:60000});
+ const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'openai');
+ await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4);
+ await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('TEST four-day launch sequence');
+ await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Prepared 4 draft posts');
+ await expect(page.getByRole('region',{name:'Conversation plans'}).getByRole('link',{name:'Open calendar · 2026-12-01'})).toBeVisible();
+ await expect(page.getByRole('region',{name:'Planning loops'})).toContainText('1 of 3 plans prepared');
+ await page.getByRole('button',{name:'Stop planning loop',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Planning loops'})).toContainText('Stopped');
+ const loopRow=(await admin.query('SELECT l.* FROM app.planning_loops l JOIN app.planning_requests r ON r.loop_id=l.id WHERE r.output_plan_id=$1',[saved.id])).rows[0];assert.ok(loopRow.stopped_at);assert.equal(Number(loopRow.budget_micros),5000000);
+ await page.screenshot({path:'work/browser/canvas-planning-loop.png',fullPage:true});
+ await preview.getByRole('link',{name:'Edit or review this post',exact:true}).first().click();
+ await expect(page.getByLabel('Calendar date',{exact:true})).toHaveValue('2026-12-01');
+ await expect(page.getByRole('region',{name:'Post details',exact:true})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Planned video script',exact:true})).toHaveValue('TEST script 1');
+ await page.getByLabel('Planned video prompt',{exact:true}).fill('TEST edited calendar video prompt');
+ await page.getByRole('button',{name:'Save post changes',exact:true}).click();
+ await page.reload();await expect(page.getByLabel('Planned video prompt',{exact:true})).toHaveValue('TEST edited calendar video prompt');
+ await page.screenshot({path:'work/browser/canvas-custom-plan.png',fullPage:true});assert.deepEqual(errors,[]);
+});
+
+
+test('Canvas natural follow-up uses the edited selected plan and opens a new weekly calendar',async()=>{
+ const original=(await admin.query("SELECT id FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];
+ const before=(await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at,id',[original.id])).rows;
+ await page.goto(`${base}/b/${brand}/canvas`);await page.getByText('Plan content in Canvas',{exact:true}).click();
+ await expect(page.getByLabel('Use selected saved plan as context',{exact:true})).toBeChecked();
+ await expect(page.getByLabel('Set days and post counts myself',{exact:true})).not.toBeChecked();
+ await expect(page.getByLabel('Planning days',{exact:true})).toHaveCount(0);
+ await page.getByLabel('Planning model',{exact:true}).selectOption('openai');
+ await page.getByLabel('What should we plan?',{exact:true}).fill('TEST: Make this a weekly plan with two videos and keep my edited script direction');
+ await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2027-01-01');
+ await page.getByRole('button',{name:'Plan my content',exact:true}).click();
+ const preview=page.getByRole('region',{name:'Planned posts',exact:true});await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(7,{timeout:60000});await expect(preview).toContainText('7 days · 7 posts · 2 videos');
+ const request=(await admin.query("SELECT input,output_plan_id FROM app.planning_requests WHERE brand_id=$1 AND input->>'planning_mode'='natural'",[brand])).rows[0];
+ assert.equal(request.input.reference_plan.id,original.id);assert.ok(request.input.reference_plan.slots.some(s=>s.video_draft?.prompt==='TEST edited calendar video prompt'));assert.ok(request.output_plan_id);
+ assert.deepEqual((await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at,id',[original.id])).rows,before);
+ // A slow initial conversation fetch must not replace an already-open planner.
+ await page.route('**/canvas/threads',async route=>{await delay(600);await route.continue();});
+ await page.reload();await page.getByText('Plan content in Canvas',{exact:true}).click();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(7);
+ await page.unroute('**/canvas/threads');
+ await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Make this a weekly plan');
+ await page.screenshot({path:'work/browser/canvas-natural-followup.png',fullPage:true});assert.deepEqual(errors,[]);
+});
+
+test('Reviewer can give calendar feedback without editing or generation; Analyst sees read-only controls',async()=>{
+ const plans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
+ const v=(await admin.query('SELECT v.* FROM app.creative_versions v JOIN app.creative_projects p ON p.latest_version_id=v.id WHERE v.brand_id=$1 ORDER BY v.created_at DESC LIMIT 1',[brand])).rows[0];
+ const p=await plans.create(actor,brand,{title:'TEST reviewer access',objective:'Review boundaries',starts_on:'2027-03-01',timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:'2027-03-01T10:00:00Z',brief:'Reviewer approval fixture',creative_version_id:v.id}]},crypto.randomUUID());
+ let s=(await plans.list(actor,brand,{start:'2027-03-01T00:00:00Z',end:'2027-04-01T00:00:00Z',plan_id:p.id})).slots[0];
+ s=await plans.review(actor,brand,s.id,{revision:s.revision,creative_version_id:v.id,creative_sha256:v.sha256,decision:'pending_review'});
+ const context=await browser.newContext({viewport:{width:1440,height:1000}}),reviewPage=await context.newPage(),email='reviewer-'+randomUUID()+'@example.test';
+ const signup=await context.request.post(base+'/api/auth/sign-up/email',{headers:{origin:base},data:{name:'Review teammate',email,password:'reviewer-browser-password'}});assert.equal(signup.status(),200);const reviewerId=(await signup.json()).user.id;
+ await admin.query('UPDATE auth."user" SET "emailVerified"=true WHERE id=$1',[reviewerId]);
+ assert.equal((await context.request.post(base+'/api/auth/sign-in/email',{headers:{origin:base},data:{email,password:'reviewer-browser-password'}})).status(),200);
+ await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org,reviewerId]);
+ await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'reviewer')",[org,brand,reviewerId]);
+ try{
+  await reviewPage.goto(`${base}/b/${brand}/content-plan?start=2027-03-01&slot=${s.id}`);
+  await expect(reviewPage.getByLabel('Creative brief',{exact:true})).toBeDisabled();
+  await expect(reviewPage.getByRole('button',{name:'Revise creative',exact:true})).toHaveCount(0);
+  await expect(reviewPage.getByLabel('Feedback or creative direction')).toBeEnabled();
+  await reviewPage.getByLabel('Feedback or creative direction').fill('Reviewer: simplify the message.');
+  await reviewPage.getByRole('button',{name:'Request changes',exact:true}).click();
+  await expect(reviewPage.getByLabel('Feedback or creative direction')).toHaveValue('');
+  assert.equal((await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[s.id])).rows[0].state,'changes_requested');
+  await admin.query("UPDATE app.business_memberships SET role='analyst' WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3",[org,brand,reviewerId]);
+  await reviewPage.reload();await expect(reviewPage.getByLabel('Feedback or creative direction')).toBeDisabled();await expect(reviewPage.getByRole('button',{name:'Approve post',exact:true})).toHaveCount(0);
+  await reviewPage.goto(`${base}/b/${brand}/canvas`);await expect(reviewPage.getByRole('button',{name:'+ New conversation',exact:true})).toBeDisabled();
+  assert.deepEqual((await new AxeBuilder({page:reviewPage}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+ }finally{await context.close();}
+});
+
+test('Canvas composes generated slides as one carousel, reviews exact pixels, reorders into a new draft and survives reload',async()=>{
+ await page.goto(`${base}/b/${brand}/canvas`);const root=`/api/v1/businesses/${brand}`;const slides=[];
+ for(let i=0;i<2;i++){
+  const t=await post(root+'/canvas/threads',{title:`TEST carousel slide ${i+1}`},randomUUID());assert.equal(t.status,201);
+  const j=await post(root+`/canvas/threads/${t.body.id}/messages`,{prompt:`TEST carousel slide ${i+1}: botanical soap story`,format:'static',channel:'linkedin',size:'1024x1024',parent_version_id:null},randomUUID());assert.equal(j.status,201);
+  await waitFor(async()=> (await admin.query('SELECT status FROM app.jobs WHERE id=$1',[j.body.id])).rows[0].status==='succeeded');
+  const v=(await admin.query('SELECT v.id,v.sha256 FROM app.creative_requests r JOIN app.creative_versions v ON v.id=r.output_version_id WHERE r.job_id=$1',[j.body.id])).rows[0];
+  const e=await post(root+`/creative-versions/${v.id}/exports`,{source_sha256:v.sha256},randomUUID());assert.equal(e.status,201);
+  await waitFor(async()=> (await admin.query('SELECT count(*)::int AS n FROM app.creative_exports WHERE version_id=$1',[v.id])).rows[0].n===1);
+  slides.push((await admin.query('SELECT id FROM app.creative_exports WHERE version_id=$1',[v.id])).rows[0].id);
+ }
+ await page.reload();const panel=page.getByRole('region',{name:'Carousels',exact:true});await panel.getByText('Carousels · compose and review slides',{exact:true}).click();
+ await panel.getByLabel('Carousel title',{exact:true}).fill('TEST botanical story');await panel.getByLabel('Shared carousel caption',{exact:true}).fill('A single story across two slides.');
+ for(let i=0;i<2;i++){await panel.getByRole('button',{name:'Add slide',exact:true}).click();await panel.getByLabel(`Saved image for slide ${i+1}`,{exact:true}).selectOption(slides[i]);await panel.getByLabel(`Alt text for slide ${i+1}`,{exact:true}).fill(`Botanical slide ${i+1}`);}
+ const corruptPreview='**/creative-exports/'+slides[0]+'/download';await page.route(corruptPreview,async route=>{const response=await route.fetch(),grant=await response.json();await route.fulfill({response,json:{...grant,sha256:'0'.repeat(64)}});});
+ await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(panel.getByText('Carousel saved as a draft. Review the complete slide order and caption.',{exact:true})).toBeVisible();
+ const review=panel.getByRole('region',{name:'Review carousel',exact:true}),consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});
+ await expect(review.getByText('Slide integrity check failed.',{exact:true})).toBeVisible();await expect(consent).toBeDisabled();await page.unroute(corruptPreview);await review.getByRole('button',{name:'Reload slide preview',exact:true}).click();
+ await expect(review.getByRole('button',{name:'Send carousel for review',exact:true})).toBeDisabled();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(review.getByRole('button',{name:'Approve carousel',exact:true})).toBeVisible();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await panel.getByRole('button',{name:'Move slide 2 up',exact:true}).click();await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
+ const id=await panel.getByLabel('Saved carousel',{exact:true}).inputValue();await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await panel.getByLabel('Saved carousel',{exact:true}).selectOption(id);await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
+ await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-carousel-mobile.png',fullPage:true});
+ const sibling=(await admin.query('SELECT id FROM app.brands WHERE organization_id=$1 AND id<>$2 LIMIT 1',[org,brand])).rows[0];assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/carousels/${id}`)).status(),404);
+ assert.deepEqual(errors,[]);
+});
+
+
+test('Canvas generates an entire carousel, reopens it for editing and reviews saved slides after reload',async()=>{
+ await page.setViewportSize({width:1280,height:900});await page.goto(`${base}/b/${brand}/canvas`);
+ const panel=page.getByRole('region',{name:'Carousels',exact:true});await panel.getByText('Carousels · compose and review slides',{exact:true}).click();
+ const generation=panel.getByRole('region',{name:'Generate a carousel',exact:true});
+ await generation.getByLabel('Carousel idea',{exact:true}).fill('TEST a coordinated refill story');await generation.getByLabel('Number of carousel slides',{exact:true}).fill('2');
+ await generation.getByRole('button',{name:'Generate carousel',exact:true}).click();
+ await expect(generation.getByRole('button',{name:'Review generated carousel',exact:true})).toBeVisible({timeout:60000});
+ await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();
+ const review=panel.getByRole('region',{name:'Review carousel',exact:true});await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img')).toHaveCount(2);
+ const consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-generated-carousel-mobile.png',fullPage:true});
+ const carouselDownload=page.waitForEvent('download');await panel.getByRole('button',{name:'Download carousel ZIP',exact:true}).click();const savedBundle=await carouselDownload;assert.equal(savedBundle.suggestedFilename(),'desvio-carousel.zip');const bundleEntries=await readZip(await readFile(await savedBundle.path()));assert.deepEqual(bundleEntries.map(e=>e.name),['slide-01.png','slide-02.png','caption.txt','manifest.json']);const bundleManifest=JSON.parse(bundleEntries[3].bytes.toString());assert.equal(bundleManifest.status_at_download,'approved');assert.equal(bundleManifest.slides.length,2);
+ await panel.getByText('Add carousel to calendar',{exact:true}).click();await panel.getByLabel(/^Carousel calendar time/).fill('2026-11-03T10:00');await panel.getByRole('button',{name:'Add saved carousel to calendar',exact:true}).click();await panel.getByRole('link',{name:'Open carousel in calendar',exact:true}).click();
+ const postDetails=page.getByRole('region',{name:'Post details',exact:true});await expect(postDetails.getByRole('region',{name:'Review carousel',exact:true}).getByRole('img')).toHaveCount(2);
+ await expect(postDetails.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled();await postDetails.getByRole('button',{name:'Send for review',exact:true}).click();
+ const slotId=new URL(page.url()).searchParams.get('slot');assert.ok(slotId);
+ await page.goto(`${base}/b/${brand}/review?start=2026-11-03&slot=${slotId}`);await expect(postDetails.getByRole('button',{name:'Approve post',exact:true})).toBeEnabled();
+ await postDetails.getByLabel('Feedback or creative direction',{exact:true}).fill('Please revisit the carousel order.');await postDetails.getByRole('button',{name:'Request changes',exact:true}).click();
+ await waitFor(async()=>(await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[slotId])).rows[0].state==='changes_requested');
+ await postDetails.getByRole('button',{name:'Send for review',exact:true}).click();await postDetails.getByRole('button',{name:'Approve post',exact:true}).click();await waitFor(async()=>(await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[slotId])).rows[0].state==='approved');
+ await page.reload();await expect(postDetails.getByRole('button',{name:'Reopen review',exact:true})).toBeVisible();
+ assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/carousel-calendar-review-mobile.png',fullPage:true});
+
+ assert.deepEqual(errors,[]);
+});
+
+test('staging creative acceptance runner exercises real customer APIs and pauses for exact-version human review',async()=>{
+ const {creativeAcceptance}=await import('../../scripts/live/creative-acceptance.mjs');
+ const foreignContext=await browser.newContext(),anonymousContext=await browser.newContext();
+ const email=randomUUID()+'@example.test',password='live-harness-LOCAL-fixture-password';
+ const call=context=>async(path,body,key,method)=>{const r=await context.request.fetch(base+path,{method:method??(body===undefined?'GET':'POST'),headers:{origin:base,'content-type':'application/json',...(key?{'idempotency-key':key}:{})},data:body});return {status:r.status(),body:await r.json()};};
+ try{
+  await admin.query('DELETE FROM auth."rateLimit"');
+  const foreign=call(foreignContext),signed=await foreign('/api/auth/sign-up/email',{name:'Foreign acceptance fixture',email,password});assert.equal(signed.status,200);
+  await admin.query('UPDATE auth."user" SET "emailVerified"=true WHERE id=$1',[signed.body.user.id]);assert.equal((await foreign('/api/auth/sign-in/email',{email,password})).status,200);
+  const state={runId:randomUUID()},settings={organizationId:org,businessId:brand,budgetMicros:10000000};let saved;
+  const io={api:call(page.context()),foreign,anonymous:call(anonymousContext),media:async url=>Buffer.from(await (await fetch(url)).arrayBuffer()),save:async s=>{saved=JSON.parse(JSON.stringify(s));},wait:delay};
+  const before=generated,realApi=io.api;let lostResponse=false;
+  io.api=async(...args)=>{const result=await realApi(...args);if(!lostResponse&&args[0].endsWith('/messages')&&result.status>=200&&result.status<300){lostResponse=true;throw Error('LOCAL_RESPONSE_LOST');}return result;};
+  await assert.rejects(creativeAcceptance(io,settings,state),/LOCAL_RESPONSE_LOST/);assert.ok(lostResponse);assert.equal(saved.create.jobId,undefined);
+  io.api=realApi;Object.assign(state,JSON.parse(JSON.stringify(saved)));
+  const paused=await creativeAcceptance(io,settings,state);assert.equal(paused.status,'awaiting_human_approval');assert.equal(generated,before+2);assert.equal(saved.manualVersionId,paused.reviewVersionId);
+  assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.creative_requests WHERE thread_id=$1',[state.threadId])).rows[0].n),2);
+  const project=(await io.api(`/api/v1/businesses/${brand}/creative-projects/${state.edit.projectId}`)).body,version=project.versions.find(v=>v.id===state.manualVersionId);
+  assert.equal((await io.api(`/api/v1/businesses/${brand}/creative-versions/${version.id}/review`,{decision:'approved',revision:version.review_revision,feedback:'LOCAL test reviewer acceptance'})).status,201);
+  const resumed=await creativeAcceptance(io,settings,JSON.parse(JSON.stringify(saved)));assert.equal(resumed.status,'passed');assert.equal(generated,before+2);
+  const reserved=(await admin.query('SELECT sum(reserved_micros)::bigint AS n FROM app.creative_calls WHERE job_id=ANY($1::uuid[])',[[state.create.jobId,state.edit.jobId]])).rows[0].n;assert.ok(Number(reserved)<=settings.budgetMicros);
+ }finally{await foreignContext.close();await anonymousContext.close();}
+});
+
+test('uploaded product photo starts video without static generation, then feedback regenerates through prompt approval (MOCK providers)',async()=>{
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);
+ await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
+ await page.getByText('Brand image references',{exact:true}).click();
+ await page.getByText('Add product photos',{exact:true}).click();
+ await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'video-product.png',mimeType:'image/png',buffer:png});
+ await page.getByRole('button',{name:'Upload file',exact:true}).click();
+ const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+ await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
+ await approval.getByLabel('Reference name',{exact:true}).fill('Video product reference');
+ await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
+ await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
+ const imageCalls=generated,before=videoSubmits;
+ await page.getByRole('button',{name:'Use Video product reference for video',exact:true}).click();
+ const request=page.getByRole('region',{name:'Product photo video',exact:true});
+ await request.getByLabel('Video idea',{exact:true}).fill('TEST animate my uploaded product');
+ await request.getByLabel('Video length (seconds)',{exact:true}).fill('3');
+ await request.getByRole('button',{name:'Draft video script',exact:true}).click();
+ await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,before);assert.equal(generated,imageCalls);
+ async function approvePrompt(){
+  await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for uploaded photo');
+  await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
+  await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
+  await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+ }
+ await approvePrompt();await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});assert.equal(videoSubmits,before+1);
+ const binding=(await admin.query("SELECT r.brand_reference_id,r.export_id,v.manifest,v.project_id FROM app.video_versions v JOIN app.video_references r ON r.job_id=v.job_id WHERE r.brand_reference_id IS NOT NULL AND r.brand_id=$1",[brand])).rows[0];
+ assert.ok(binding.brand_reference_id);assert.equal(binding.export_id,null);assert.equal(binding.manifest.reference.kind,'upload');assert.equal(binding.manifest.reference.brand_reference_id,binding.brand_reference_id);assert.ok(binding.manifest.plan.skills.length>0);
+ await page.getByLabel('Video feedback',{exact:true}).fill('Make the movement softer and keep the product visible');
+ await page.getByRole('button',{name:'Draft a revised video from feedback',exact:true}).click();
+ await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,before+1);
+ await approvePrompt();await expect.poll(()=>videoSubmits,{timeout:60000}).toBe(before+2);
+ await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[binding.project_id])).rows[0].n),{timeout:150000}).toBe(2);
+ await expect(page.getByLabel(/^Saved video version/).locator('option')).toHaveCount(2);
+ await expect(page.getByRole('button',{name:'Send video for review',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Send video for review',exact:true}).click();
+ await expect(page.getByLabel('I reviewed this saved video and caption.')).toBeEnabled();await page.getByLabel('I reviewed this saved video and caption.').check();
+ await page.getByRole('button',{name:'Approve final video',exact:true}).click();
+ await expect.poll(async()=>(await admin.query('SELECT v.status FROM app.video_versions v JOIN app.video_projects p ON p.latest_version_id=v.id WHERE p.id=$1',[binding.project_id])).rows[0].status).toBe('approved');
+ assert.equal(generated,imageCalls);assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>v.id),[]);
+ await page.screenshot({path:'work/browser/uploaded-product-video-approved.png',fullPage:true});
 });

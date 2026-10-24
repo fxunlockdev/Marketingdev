@@ -1,0 +1,58 @@
+{
+  "checked_at": "2026-10-23T06:38:02.881837+00:00",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "services": [
+    {
+      "id": "758bf0c1-56b5-452f-be8d-fe67af927267",
+      "name": "Postgres-Rh6A",
+      "isLinked": false,
+      "source": {
+        "repo": null,
+        "image": "ghcr.io/railwayapp-templates/postgres-ssl:18"
+      },
+      "status": "SUCCESS",
+      "deploymentStopped": false,
+      "deploymentId": "70cfb553-6b50-41f9-a9c0-7c08f73d1e22",
+      "latestDeployment": {
+        "id": "70cfb553-6b50-41f9-a9c0-7c08f73d1e22",
+        "status": "SUCCESS",
+        "createdAt": "2026-10-23T06:37:08.430Z",
+        "deploymentStopped": false
+      },
+      "url": null,
+      "volumes": [
+        {
+          "name": "postgres-volume-YdSV",
+          "mountPath": "/var/lib/postgresql/data",
+          "currentSizeMb": 0.0,
+          "sizeMb": 5000,
+          "state": "READY"
+        }
+      ],
+      "regions": [
+        {
+          "name": "sfo",
+          "location": null,
+          "configured": 1
+        }
+      ],
+      "replicas": {
+        "configured": 1,
+        "running": 1,
+        "crashed": 0,
+        "exited": 0,
+        "total": 1
+      },
+      "volumeMigrating": false
+    }
+  ],
+  "buckets": [
+    {
+      "id": "9355c904-bbb8-434b-b1b9-7f7a11ff7f32",
+      "name": "desvio-dev-media"
+    }
+  ],
+  "live_provider_calls": false,
+  "scope": "Infrastructure inventory only. PostgreSQL template is version 18; Desvio bootstrap, private storage configuration, worker lifecycle and application deployment remain unverified."
+}

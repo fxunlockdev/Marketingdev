@@ -44,9 +44,9 @@ async function fixture(overrides={}){
  return {id,sha256:sha,design,caption,project_id:p,media_id:media};
 }
 async function queue(v=current){return exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256},randomUUID());}
-async function render(v){const j=await queue(v);assert.equal(await exportHandler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
+async function render(v,format='png'){const j=await exports.submit(alice.id,brand.id,v.id,{source_sha256:v.sha256,format},randomUUID());assert.equal(await exportHandler.run(scope(j)),'succeeded');return (await exports.list(alice.id,brand.id,v.id)).exports[0];}
 before(async()=>{
- config.socialEnabled=true;config.publishingEnabled=true;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses);exports=new CreativeExports(canvas,renderer.image);
+ config.socialEnabled=true;config.publishingEnabled=true;app=await createApplication(config);await app.app.listen(0,'127.0.0.1');base=await app.app.getUrl();ws=new Workspaces(app.database);businesses=new Businesses(app.database,ws);brain=new BrandBrain(app.database);canvas=new Canvas(businesses,store);plans=new ContentPlan(businesses,renderer.image);exports=new CreativeExports(canvas,renderer.image);
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Render fixtures'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
  for(const [u,role] of [[editor,'editor'],[viewer,'viewer']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',[org.id,u.id,role]);
  for(const [field,value] of [['brand_name','Render fixtures'],['offering','Creative workflow tools'],['audience','Business owners']])await brain.manual(alice.id,org.id,brand.id,{field,value},randomUUID());
@@ -58,7 +58,8 @@ after(async()=>{store.close();await app?.close();await Promise.all([admin.end(),
 // Actual local immutable rendered exports, approval API, private S3 and jobs.
 // All remote Postiz responses below are explicitly MOCK, never external posting.
 const encryptionKey=randomBytes(32).toString('hex'),credential='MOCK_'+randomBytes(24).toString('hex');
-let provider,providerBase,publisher,handler,channelId,mode='',uploads=0,submissions=0,postRows=[],lastUpload,afterUpload,remoteState='QUEUE';
+let providerName='linkedin';
+let provider,providerBase,publisher,handler,channelId,mode='',uploads=0,submissions=0,postRows=[],lastPostMedia,lastUpload,afterUpload,remoteState='QUEUE';
 const reply=(res,value,status=200)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));};
 async function setupProvider(){
  const binding={organization_id:org.id,brand_id:brand.id,remote_organization_id:'publication-mock-org',revision:1};
@@ -68,16 +69,17 @@ async function setupProvider(){
  await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,channelId]);
  provider=createServer(async(req,res)=>{const parts=[];for await(const p of req)parts.push(p);const raw=Buffer.concat(parts);assert.equal(req.headers.authorization,credential);
   if(req.url==='/api/public/v1/me')return reply(res,{organization:{id:binding.remote_organization_id,name:'MOCK org'}});
-  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false}]);
-  if(req.url==='/api/public/v1/upload'){uploads++;const start=raw.indexOf(Buffer.from('Content-Type: image/png\r\n\r\n'))+'Content-Type: image/png\r\n\r\n'.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);assert.equal((await sharp(lastUpload).metadata()).format,'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+'.png'});}
-  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:'linkedin'},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
+  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:providerName,name:'MOCK staging profile',disabled:false}]);
+  if(req.url.startsWith('/api/public/v1/analytics/post/'))return reply(res,mode==='analyticsFail'?{}:mode==='analyticsEmpty'?[]:[{label:'Impressions',data:[{date:'2026-10-23',total:120}],percentageChange:0}],mode==='analyticsFail'?503:200);
+  if(req.url==='/api/public/v1/upload'){uploads++;const jpeg=raw.includes(Buffer.from('Content-Type: image/jpeg')),marker=`Content-Type: image/${jpeg?'jpeg':'png'}\r\n\r\n`,start=raw.indexOf(Buffer.from(marker))+marker.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);assert.equal((await sharp(lastUpload).metadata()).format,jpeg?'jpeg':'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+(jpeg?'.jpg':'.png')});}
+  if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();lastPostMedia=body.posts[0].value[0].image;postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:providerName},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
   if(req.url.startsWith('/api/public/v1/posts?')){if(mode==='listFail')return reply(res,{},503);return reply(res,{posts:mode==='listMissing'?[]:mode==='listMismatch'?postRows.map(p=>({...p,integration:{...p.integration,id:'foreign-channel'}})):postRows});}reply(res,{},404);
  });await new Promise(r=>provider.listen(0,'127.0.0.1',r));providerBase='http://127.0.0.1:'+provider.address().port;
  publisher=new Publication(new SocialConnections(businesses,true),exports,true);handler=new PublicationJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test'},encryptionKey},renderer.image,true);
 }
 afterEach(()=>{mode='';afterUpload=undefined;remoteState='QUEUE';});
 after(async()=>{provider?.closeAllConnections();if(provider)await new Promise(r=>provider.close(r));});
-async function approvedPost(){const v=await fixture(),e=await render(v),date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'MOCK publication',objective:'Approved publication test',starts_on:start,timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:date,brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
+async function approvedPost(channel='linkedin'){const v=await fixture(),e=await render(v,channel==='instagram'?'instagram-jpeg':'png'),date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'MOCK publication',objective:'Approved publication test',starts_on:start,timezone:'UTC',slots:[{channel,format:'static',planned_at:date,brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
  let slot=(await plans.list(alice.id,brand.id,{start:start+'T00:00:00Z',end:new Date(Date.parse(start)+30*86400000).toISOString(),plan_id:p.id})).slots[0];slot=await plans.review(alice.id,brand.id,slot.id,{revision:slot.revision,creative_version_id:v.id,creative_sha256:v.sha256,decision:'pending_review'});
  await exports.approve(alice.id,brand.id,e.id,{sha256:e.sha256,source_sha256:v.sha256,context_type:'slot',context_id:slot.id,context_revision:slot.revision,confirmed:true});slot=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[slot.id])).rows[0];return {v,e,slot,body:{slot_id:slot.id,revision:slot.revision,export_id:e.id,channel_id:channelId,confirmed:true}};
 }
@@ -92,7 +94,7 @@ test('publication requires auth, exact approval, explicit consent and a scoped s
  const capability=await publisher.list(alice.id,brand.id);assert.equal(capability.can_manage,true);assert.deepEqual(capability.destinations,[{id:channelId,name:'MOCK staging profile',provider:'linkedin'}]);assert.equal((await publisher.list(viewer.id,brand.id)).can_manage,false);
  await assert.rejects(publisher.submit(alice.id,brand.id,{...f.body,export_id:randomUUID()},randomUUID()),/current/);
  const unapproved=await approvedPost();await admin.query('DELETE FROM app.creative_export_approvals WHERE export_id=$1',[unapproved.e.id]);await assert.rejects(queuePost(unapproved),/final saved image/);
- await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");try{await assert.rejects(queuePost(f),/not authorized/);}finally{await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");}
+ await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");try{await assert.rejects(queuePost(f),/not authorized/);}finally{await admin.query('UPDATE app.social_channels SET publishing_held=false WHERE brand_id=$1',[brand.id]);await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");}
  await assert.rejects(publisher.submit(alice.id,brand.id,{...f.body,revision:99},randomUUID()),/current/);
  const ready=await publisher.ready(alice.id,brand.id);assert.ok(ready.posts.some(p=>p.slot_id===f.slot.id&&p.export_id===f.e.id));assert.ok(!ready.posts.some(p=>p.slot_id===unapproved.slot.id));assert.ok(!JSON.stringify(ready).includes('object_key'));assert.equal((await publisher.ready(alice.id,sibling.id)).posts.length,0);
  const results=await Promise.all([api(endpoint,{body:f.body,method:'POST',key}),api(endpoint,{body:f.body,method:'POST',key})]);results.forEach(r=>assert.equal(r.status,201,JSON.stringify(r.body)));assert.equal(results[0].body.id,results[1].body.id);const j=results[0].body;
@@ -119,12 +121,13 @@ test('lost upload or submit responses hold the slot without retrying mutations',
  for(const fault of ['uploadLost','postLost']){const f=await approvedPost(),j=await queuePost(f);mode=fault;const count=submissions;await handler.run(scope(j));assert.equal((await record(j)).phase,'unknown');const writes=uploads,posts=submissions;await handler.run(scope(j));assert.equal(uploads,writes);assert.equal(submissions,posts);assert.equal(submissions-count,fault==='postLost'?1:0);await assert.rejects(queuePost(f),/already/);await assert.rejects(publisher.reconcile(alice.id,brand.id,j.id,randomUUID()),/no acknowledged/);mode='';}
 });
 test('changed approval, expired grant, revoked access and disabled credentials prevent external writes',async()=>{
- for(const reason of ['approval','grant','access','account']){const f=await approvedPost(),j=await queuePost(f),count=uploads;
+ for(const reason of ['approval','grant','access','account','connectionHold']){const f=await approvedPost(),j=await queuePost(f),count=uploads;
   if(reason==='approval')await plans.edit(alice.id,brand.id,f.slot.id,{revision:f.slot.revision,brief:'Owner changed the brief',reset_approval:true});
   if(reason==='grant')await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");
   if(reason==='access')await admin.query("UPDATE app.memberships SET role='editor' WHERE organization_id=$1 AND user_id=$2",[org.id,alice.id]);
+  if(reason==='connectionHold')await admin.query('UPDATE app.social_channels SET publishing_held=true WHERE brand_id=$1',[brand.id]);
   if(reason==='account')await admin.query('UPDATE app.postiz_accounts SET enabled=false WHERE brand_id=$1',[brand.id]);
-  try{await handler.run(scope(j));assert.equal(uploads,count);assert.ok(['rejected','canceled'].includes((await record(j)).phase));}finally{await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");await admin.query("UPDATE app.memberships SET role='owner' WHERE organization_id=$1 AND user_id=$2",[org.id,alice.id]);await admin.query('UPDATE app.postiz_accounts SET enabled=true WHERE brand_id=$1',[brand.id]);}
+  try{await handler.run(scope(j));assert.equal(uploads,count);assert.ok(['rejected','canceled'].includes((await record(j)).phase));}finally{await admin.query('UPDATE app.social_channels SET publishing_held=false WHERE brand_id=$1',[brand.id]);await admin.query("UPDATE app.publication_grants SET expires_at=now()+interval '1 day'");await admin.query("UPDATE app.memberships SET role='owner' WHERE organization_id=$1 AND user_id=$2",[org.id,alice.id]);await admin.query('UPDATE app.postiz_accounts SET enabled=true WHERE brand_id=$1',[brand.id]);}
  }
 });
 test('approval is rechecked after upload and before submission; accepted-post persistence loss is held',async()=>{
@@ -151,6 +154,140 @@ test('publication is disabled by default, holds daily reservations, and stores i
 });
 
 test('overview aggregates actual business records and denies foreign tenants',async()=>{
- const r=await api(path('overview'));assert.equal(r.status,200);assert.equal(r.body.business_id,brand.id);assert.equal(r.body.analytics_available,false);
- const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);
+ const r=await api(path('overview'));assert.equal(r.status,200);assert.equal(r.body.business_id,brand.id);assert.equal(r.body.analytics_available,(await publisher.analytics(alice.id,brand.id)).posts.some(p=>p.state==='available'));assert.equal(r.body.performance.available_count,(await publisher.analytics(alice.id,brand.id)).posts.filter(p=>p.state==='available').length);
+ const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);assert.deepEqual(other.body.performance.posts,[]);assert.deepEqual(other.body.recommendations,[]);assert.deepEqual(other.body.generation_activity,[]);
+});
+
+
+test('analytics observations persist independently of publishing status and stay business-scoped',async()=>{
+ const f=await approvedPost(),j=await queuePost(f);remoteState='PUBLISHED';
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal((await handler.reconcile(scope(j))).state,'published');
+ let result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);
+ assert.equal((await publisher.analytics(alice.id,brand.id,{channel:'instagram'})).posts.length,0);assert.equal((await publisher.analytics(alice.id,brand.id,{format:'video'})).posts.length,0);assert.throws(()=>publisher.analytics(alice.id,brand.id,{from:'2026-02-30'}),/valid publication/);
+ assert.equal(result.state,'available');assert.equal(result.series[0].points[0].value,120);assert.equal(result.semantics,'provider_reported');
+ let overview=(await api(path('overview'))).body;assert.equal(overview.performance.posts.find(p=>p.publication_id===j.id).metrics[0].value,120);assert.equal(overview.performance.posts.find(p=>p.publication_id===j.id).state,'available');
+ assert.equal((await api(path('analytics'),{user:viewer})).status,200);
+ assert.equal((await api(path('analytics'),{user:bob})).status,404);
+ assert.equal((await publisher.analytics(alice.id,sibling.id)).posts.length,0);
+ mode='analyticsFail';const check=await publisher.reconcile(alice.id,brand.id,j.id,randomUUID());assert.equal((await handler.reconcile(scope(check))).state,'published');
+ result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);assert.equal(result.state,'error');assert.deepEqual(result.series,[]);assert.equal((await record(j)).observed_state,'published');
+ overview=(await api(path('overview'))).body;assert.equal(overview.performance.posts.find(p=>p.publication_id===j.id).state,'error');assert.deepEqual(overview.performance.posts.find(p=>p.publication_id===j.id).metrics,[]);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.post_analytics WHERE publication_id=$1 AND state='available'",[j.id])).rows[0].n,1);
+ mode='analyticsEmpty';await handler.reconcile(scope(j));result=(await publisher.analytics(alice.id,brand.id)).posts.find(p=>p.publication_id===j.id);assert.equal(result.state,'unavailable');assert.deepEqual(result.series,[]);
+ await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.post_analytics SET state='available' WHERE publication_id=$1",[j.id]),brand.id),e=>e.code==='42501');
+});
+
+test('original analytics skills produce evidence-bound proposals; human review stays scoped and cannot rewrite brand facts',async()=>{
+ const {Insights}=await import('../../dist/insights.js'),{InsightJobs}=await import('../../dist/insight-jobs.js'),{SkillRuntime}=await import('../../dist/skill-runtime.js'),{CreativeProvider}=await import('../../dist/creative-provider.js'),{GeminiPlanner}=await import('../../dist/gemini-planner.js'),{default:OpenAI}=await import('openai'),{GoogleGenAI}=await import('@google/genai'),{prepareSkillImage}=await import('../../scripts/skill-test-image.mjs');
+ const service=new Insights(plans),runtime=new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE??prepareSkillImage());let calls=0,geminiCalls=0,bad=false,lost=false;
+ const analysis=input=>({insights:[{title:'TEST evidence-led experiment',summary:'The saved provider observation reports impressions; its measurement window is unknown.',hypothesis:'Unproven hypothesis: a different CTA may help.',next_test:'Compare two CTA variants over the same future window.',evidence_ids:[bad?randomUUID():input.observations[0].id],limitations:['Small sample; no causal conclusion.']}],limitations:['Provider measurement windows are unknown.']});
+ const text=new CreativeProvider(undefined,new OpenAI({apiKey:'LOCAL MOCK',maxRetries:0,fetch:async(url,init)=>{calls++;if(lost)throw new Error('MOCK lost response');const wire=JSON.parse(init.body),raw=wire.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).content,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));assert.equal(input.task,'performance_analysis');assert.ok(input.observations.every(o=>o.provider==='linkedin'));assert.ok(!JSON.stringify(input).includes(credential));return Response.json({object:'response',id:'mock-analysis',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(analysis(input)),annotations:[]}]}]});}}));
+ const gemini=new GeminiPlanner(undefined,new GoogleGenAI({apiKey:'LOCAL GEMINI MOCK',httpOptions:{apiVersion:'v1beta',retryOptions:{attempts:1},fetch:async(url,init)=>{geminiCalls++;const wire=JSON.parse(init.body),raw=wire.contents.flatMap(m=>m.parts).find(p=>p.text?.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')).text,input=JSON.parse(raw.slice(raw.indexOf('\n')+1));return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(analysis(input))}]},finishReason:'STOP'}]});}}}));
+ const worker=new InsightJobs(jobs,runtime,text,gemini);
+ await assert.rejects(service.submit(viewer.id,brand.id,{},randomUUID()));await assert.rejects(service.submit(bob.id,brand.id,{},randomUUID()));await assert.rejects(service.submit(alice.id,sibling.id,{},randomUUID()));
+ await assert.rejects(service.submit(alice.id,brand.id,{},randomUUID()),/allowance/);
+ for(const provider of ['openai','gemini'])await admin.query("INSERT INTO app.insight_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,$3,true,$4,now()+interval '1 hour',10000000,0.01,0.02,'LOCAL MOCK ONLY')",[org.id,brand.id,provider,provider==='gemini'?'gemini-fixture':'MOCK-text']);
+ const brainBefore=(await admin.query('SELECT sha256 FROM app.brand_brain_versions WHERE id=$1',[brainId])).rows[0].sha256,key=randomUUID(),j=await service.submit(alice.id,brand.id,{provider:'openai'},key);
+ assert.equal((await service.submit(alice.id,brand.id,{provider:'openai'},key)).id,j.id);await assert.rejects(service.submit(alice.id,brand.id,{provider:'gemini'},key),/different analysis/);
+ const native=await NativeConnection.connect({address:config.jobs.address}),connection=await Connection.connect({address:config.jobs.address}),taskQueue='insights-'+randomUUID();
+ const temporal=await Worker.create({connection:native,namespace:config.jobs.namespace,taskQueue,workflowsPath:fileURLToPath(new URL('../../dist/asset-workflow.js',import.meta.url)),activities:{generateInsights:async s=>{const ctx=Context.current(),timer=setInterval(()=>ctx.heartbeat(),1000);try{return await worker.run(s);}finally{clearInterval(timer);}},failInsights:s=>worker.fail(s)}}),dispatchPool=new Pool({connectionString:config.jobs.dispatcherDatabaseUrl});
+ try{const client=new Client({connection,namespace:config.jobs.namespace}),dispatcher=new JobDispatcher(dispatchPool,client,taskQueue);await admin.query('UPDATE app.job_dispatch SET dispatched_at=now() WHERE job_id<>$1',[j.id]);assert.equal(await temporal.runUntil(async()=>{await dispatcher.runOnce();return client.workflow.getHandle('desvio-insights-'+j.id).result();}),'succeeded');}finally{await dispatchPool.end();await native.close();await connection.close();}
+ assert.equal(calls,1);assert.equal(await worker.run(scope(j)),'finished');assert.equal(calls,1);
+ const saved=await service.read(alice.id,brand.id),lesson=saved.lessons[0];assert.equal(lesson.state,'proposed');assert.equal(lesson.evidence.length,1);assert.equal((await service.read(alice.id,sibling.id)).lessons.length,0);assert.equal((await api(path('insights'),{user:bob})).status,404);assert.equal((await api(path('insights'),{user:viewer})).status,200);
+ const decision={revision:1,decision:'testing',applicability:'Only future LinkedIn CTA experiments',confirmed:true};await assert.rejects(service.review(editor.id,brand.id,lesson.id,decision));await assert.rejects(service.review(alice.id,sibling.id,lesson.id,decision));await service.review(alice.id,brand.id,lesson.id,decision);await assert.rejects(service.review(alice.id,brand.id,lesson.id,decision),/Refresh/);
+ const experiment={revision:2,starts_on:'2026-01-01',ends_on:'2026-01-07',method:'Compare two CTA variants in equal windows.',outcome:'inconclusive',results:'Only two posts; unequal audience sizes prevent a reliable conclusion.',confirmed:true},experimentKey=randomUUID();
+ await assert.rejects(service.recordExperiment(editor.id,brand.id,lesson.id,experiment,randomUUID()));
+ await assert.rejects(service.recordExperiment(viewer.id,brand.id,lesson.id,experiment,randomUUID()));
+ await assert.rejects(service.recordExperiment(alice.id,sibling.id,lesson.id,experiment,randomUUID()));
+ await assert.rejects(service.recordExperiment(bob.id,brand.id,lesson.id,experiment,randomUUID()));
+ for(const patch of [{revision:1},{ends_on:'2099-01-01'},{starts_on:'2026-02-30'},{confirmed:false},{results:'short'},{outcome:'proven'}])await assert.rejects(async()=>service.recordExperiment(alice.id,brand.id,lesson.id,{...experiment,...patch},randomUUID()));
+ const experimentResponse=await api(path('insights')+'/'+lesson.id+'/experiments',{method:'POST',body:experiment,key:experimentKey});assert.equal(experimentResponse.status,201);const experimentId=experimentResponse.body.id;
+ assert.equal((await service.recordExperiment(alice.id,brand.id,lesson.id,experiment,experimentKey)).id,experimentId);
+ await assert.rejects(service.recordExperiment(alice.id,brand.id,lesson.id,{...experiment,results:'Different reported results for the same key.'},experimentKey),/different results/);
+ const reported=(await service.read(viewer.id,brand.id)).lessons.find(l=>l.id===lesson.id);assert.equal(reported.experiments.length,1);assert.equal(reported.experiments[0].outcome,'inconclusive');assert.equal(reported.state,'testing');assert.equal(reported.revision,2);
+ await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.memory_experiments SET outcome='supported' WHERE id=$1",[experimentId]),brand.id),e=>e.code==='42501');
+ assert.equal((await app.database.transaction(alice.id,org.id,false,db=>db.query('SELECT id FROM app.memory_experiments WHERE id=$1',[experimentId]),sibling.id)).rowCount,0);
+ const overview=(await api(path('overview'))).body;assert.ok(overview.recommendations.some(r=>r.id===lesson.id&&r.state==='testing'&&r.evidence_count===1));assert.ok(overview.generation_activity.some(r=>r.kind==='insight.generate'&&r.completed>0));
+ const {assertLearningCurrent}=await import('../../dist/learning-context.js');
+ const memoryThread=await canvas.createThread(alice.id,brand.id,{title:'Approved learning test'},randomUUID());
+ const memoryJob=await canvas.submit(alice.id,brand.id,memoryThread.id,{prompt:'Explore this business learning',format:'static',channel:'linkedin',size:'1024x1024',parent_version_id:null},randomUUID());
+ const memoryContext=(await admin.query('SELECT memory_context FROM app.creative_requests WHERE job_id=$1',[memoryJob.id])).rows[0].memory_context;assert.equal(memoryContext[0].id,lesson.id);assert.equal(memoryContext[0].kind,'unproven_hypothesis');await jobs.transaction(scope(memoryJob),db=>assertLearningCurrent(db,memoryContext));
+ await service.review(alice.id,brand.id,lesson.id,{...decision,revision:2,decision:'retired'});assert.ok(!(await api(path('overview'))).body.recommendations.some(r=>r.id===lesson.id));assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.memory_reviews WHERE lesson_id=$1',[lesson.id])).rows[0].n,2);
+ await assert.rejects(jobs.transaction(scope(memoryJob),db=>assertLearningCurrent(db,memoryContext)),e=>e.code==='MEMORY_CONTEXT_CHANGED');
+ assert.equal((await admin.query('SELECT sha256 FROM app.brand_brain_versions WHERE id=$1',[brainId])).rows[0].sha256,brainBefore);
+ await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.memory_lessons SET content='{}' WHERE id=$1",[lesson.id]),brand.id),e=>e.code==='42501');
+ const gj=await service.submit(alice.id,brand.id,{provider:'gemini'},randomUUID());assert.equal(await worker.run(scope(gj)),'succeeded');assert.equal(geminiCalls,1);assert.equal(calls,1);
+ bad=true;const invalid=await service.submit(alice.id,brand.id,{},randomUUID());assert.equal(await worker.run(scope(invalid)),'rejected');assert.equal((await admin.query('SELECT error_code FROM app.jobs WHERE id=$1',[invalid.id])).rows[0].error_code,'INSIGHT_OUTPUT_INVALID');bad=false;
+ await admin.query("UPDATE app.insight_grants SET budget_micros=1 WHERE provider='openai' AND brand_id=$1",[brand.id]);const denied=await service.submit(alice.id,brand.id,{},randomUUID()),before=calls;assert.equal(await worker.run(scope(denied)),'rejected');assert.equal(calls,before);
+ await admin.query("UPDATE app.insight_grants SET budget_micros=10000000 WHERE provider='openai' AND brand_id=$1",[brand.id]);lost=true;const unknown=await service.submit(alice.id,brand.id,{},randomUUID());assert.equal(await worker.run(scope(unknown)),'unknown');const afterLost=calls;assert.equal(await worker.run(scope(unknown)),'finished');assert.equal(calls,afterLost);await assert.rejects(service.submit(alice.id,brand.id,{},randomUUID()),/reconciliation/);
+});
+
+test('reopening review or canceling a planned post cannot claim to stop a queued or accepted publication',async()=>{
+ const f=await approvedPost(),j=await queuePost(f);
+ const body={revision:f.slot.revision,creative_version_id:f.v.id,creative_sha256:f.v.sha256};
+ for(const decision of ['reopen','cancelled'])await assert.rejects(plans.review(alice.id,brand.id,f.slot.id,{...body,decision}),/active or unresolved publication/);
+ assert.equal(await handler.run(scope(j)),'accepted');
+ for(const decision of ['reopen','cancelled'])await assert.rejects(plans.review(alice.id,brand.id,f.slot.id,{...body,decision}),/active or unresolved publication/);
+ assert.equal((await record(j)).phase,'accepted');
+ const local=await approvedPost(),pending=await queuePost(local);await publisher.cancel(alice.id,brand.id,pending.id);await handler.run(scope(pending));
+ const reopened=await plans.review(alice.id,brand.id,local.slot.id,{revision:local.slot.revision,creative_version_id:local.v.id,creative_sha256:local.v.sha256,decision:'reopen'});assert.equal(reopened.state,'pending_review');
+});
+
+async function approvedCarousel(){
+ const {Carousels}=await import('../../dist/carousels.js'),service=new Carousels(canvas,renderer.image);
+ const a=await fixture(),b=await fixture(),ea=await render(a),eb=await render(b);
+ const c=await service.save(alice.id,brand.id,{project_id:null,parent_id:null,title:'Publish ordered carousel',caption:'MOCK shared carousel caption',channel:'linkedin',pages:[{creative_version_id:a.id,export_id:ea.id,alt_text:'First slide'},{creative_version_id:b.id,export_id:eb.id,alt_text:'Second slide'}]},randomUUID());
+ let v=(await service.read(alice.id,brand.id,c.project_id)).versions[0];await service.review(alice.id,brand.id,c.id,{revision:v.review_revision,sha256:v.sha256,decision:'in_review',feedback:'',confirmed:true});await service.review(alice.id,brand.id,c.id,{revision:v.review_revision+1,sha256:v.sha256,decision:'approved',feedback:'',confirmed:true});
+ const date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'Carousel publishing',objective:'TEST',starts_on:start,timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:date,brief:'TEST'}]},randomUUID());
+ let slot=await plans.addCarousel(alice.id,brand.id,p.id,{carousel_version_id:c.id,planned_at:date,channel:'linkedin',brief:'TEST'},randomUUID());slot=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[slot.id])).rows[0];
+ for(const decision of ['pending_review','approved'])slot=await plans.review(alice.id,brand.id,slot.id,{revision:slot.revision,carousel_version_id:c.id,carousel_sha256:v.sha256,decision});
+ return {a,b,ea,eb,c,slot,body:{slot_id:slot.id,revision:slot.revision,carousel_version_id:c.id,channel_id:channelId,confirmed:true}};
+}
+test('carousel publication uploads ordered private slides once and reconciles one post; tenant and replay checks apply',async()=>{
+ const f=await approvedCarousel(),beforeUploads=uploads,beforePosts=submissions,key=randomUUID();remoteState='PUBLISHED';
+ await assert.rejects(publisher.submit(bob.id,brand.id,f.body,key));await assert.rejects(publisher.submit(alice.id,sibling.id,f.body,key));assert.throws(()=>publisher.submit(alice.id,brand.id,{...f.body,export_id:f.ea.id},key),/exactly one/);
+ const j=await publisher.submit(alice.id,brand.id,f.body,key);assert.deepEqual(await publisher.submit(alice.id,brand.id,f.body,key),j);
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);
+ const slides=(await admin.query('SELECT * FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows;
+ assert.deepEqual(slides.map(s=>s.export_id),[f.ea.id,f.eb.id]);assert.ok(slides.every(s=>s.phase==='uploaded'));assert.deepEqual(lastPostMedia,slides.map(s=>s.remote_media));assert.equal((await record(j)).carousel_version_id,f.c.id);
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);assert.equal((await handler.reconcile(scope(j))).state,'published');
+ const {insightObservationsSQL}=await import('../../dist/insights.js');const observations=await plans.scope(alice.id,brand.id,false,async db=>(await db.query(insightObservationsSQL)).rows);assert.equal(observations.find(o=>o.publication_id===j.id)?.format,'carousel');
+ assert.equal((await workerPool.query('SELECT * FROM app.publication_slides')).rowCount,0);
+});
+test('ambiguous later carousel upload retains earlier media and never retries or submits',async()=>{
+ const f=await approvedCarousel(),j=await queuePost(f),beforeUploads=uploads,beforePosts=submissions;
+ afterUpload=()=>{if(uploads===beforeUploads+2)mode='uploadLost';};
+ assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await record(j)).phase,'unknown');
+ const slides=(await admin.query('SELECT phase,remote_media FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows;
+ assert.deepEqual(slides.map(s=>s.phase),['uploaded','uploading']);assert.ok(slides[0].remote_media);assert.equal(slides[1].remote_media,null);
+ mode='';afterUpload=undefined;await handler.run(scope(j));assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts);
+});
+test('changed carousel approval after enqueue prevents any external upload',async()=>{
+ const f=await approvedCarousel(),j=await queuePost(f),beforeUploads=uploads,beforePosts=submissions;
+ await admin.query("UPDATE app.carousel_versions SET status='changes_requested',review_revision=review_revision+1 WHERE id=$1",[f.c.id]);
+ assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await record(j)).error_code,'PUBLICATION_APPROVAL_CHANGED');assert.equal(uploads,beforeUploads);assert.equal(submissions,beforePosts);
+});
+test('carousel resumes confirmed uploads after a pre-send read failure without uploading the first slide twice',async()=>{
+ const {PostizError}=await import('../../dist/postiz-client.js');
+ const f=await approvedCarousel(),j=await queuePost(f),beforeUploads=uploads,beforePosts=submissions,original=handler.client.bind(handler);let calls=0;
+ handler.client=(...args)=>{const c=original(...args),upload=c.uploadPNG.bind(c);c.uploadPNG=async(...input)=>{if(++calls===2)throw new PostizError('POSTIZ_NETWORK_ERROR','not_sent');return upload(...input);};return c;};
+ try{await assert.rejects(handler.run(scope(j)),/SOCIAL_READ_UNAVAILABLE/);}finally{handler.client=original;}
+ assert.equal(uploads,beforeUploads+1);assert.equal((await record(j)).phase,'queued');
+ assert.deepEqual((await admin.query('SELECT phase FROM app.publication_slides WHERE publication_id=$1 ORDER BY position',[j.id])).rows.map(s=>s.phase),['uploaded','queued']);
+ assert.equal(await handler.run(scope(j)),'accepted');assert.equal(uploads,beforeUploads+2);assert.equal(submissions,beforePosts+1);
+});
+
+
+test('approved Instagram JPEG is uploaded unchanged once and reconciled against its own provider',async()=>{
+ providerName='instagram-standalone';await admin.query('UPDATE app.social_channels SET provider=$2 WHERE id=$1',[channelId,providerName]);
+ try{
+  const f=await approvedPost('instagram'),bytes=await store.read((await admin.query('SELECT object_key FROM app.creative_exports WHERE id=$1',[f.e.id])).rows[0].object_key);
+  assert.equal(f.e.format,'instagram-jpeg');assert.ok((await publisher.ready(alice.id,brand.id)).posts.some(p=>p.export_id===f.e.id));
+  const j=await queuePost(f),count=submissions;remoteState='PUBLISHED';
+  assert.equal(await handler.run(scope(j)),'accepted');assert.deepEqual(lastUpload,bytes);assert.equal(submissions,count+1);
+  assert.equal((await handler.reconcile(scope(j))).state,'published');assert.equal(await handler.run(scope(j)),'accepted');assert.equal(submissions,count+1);
+  const changed=await approvedPost('instagram'),pending=await queuePost(changed),before=uploads;
+  await admin.query('DELETE FROM app.creative_export_approvals WHERE export_id=$1',[changed.e.id]);
+  assert.equal(await handler.run(scope(pending)),'rejected');assert.equal(uploads,before);
+ }finally{providerName='linkedin';await admin.query("UPDATE app.social_channels SET provider='linkedin' WHERE id=$1",[channelId]);}
 });

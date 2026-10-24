@@ -1,3 +1,4 @@
+import {runtimeArchitecture,assertRuntimeArchitecture,renderRuntimeImage} from './runtime-architecture.mjs';
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, copyFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,6 +8,7 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 // Explicitly stage an allowlisted context. Legacy Docker builders ignore
 // Dockerfile-specific ignore files; never send the checkout, credentials or node_modules.
 export function prepareRenderImage() {
+  const architecture=runtimeArchitecture(),tag=`desvio-render:${architecture}`;
   const context = mkdtempSync(join(tmpdir(), "desvio-render-build-"));
   try {
     for (const relative of [
@@ -22,19 +24,19 @@ export function prepareRenderImage() {
     execFileSync(
       "docker",
       [
-        "build",
+        "build", "--platform", `linux/${architecture}`, "--build-arg", `BASE_IMAGE=${renderRuntimeImage(architecture)}`,
         "-q",
         "-t",
-        "desvio-render:local",
+        tag,
         "-f",
         join(context, "apps/media/Dockerfile"),
         context,
       ],
-      { stdio: ["ignore", "pipe", "pipe"], timeout: 300000 },
+      { stdio: ["ignore", "pipe", "pipe"], timeout: 1800000 },
     );
     const image = execFileSync(
       "docker",
-      ["image", "inspect", "desvio-render:local", "--format", "{{.Id}}"],
+      ["image", "inspect", tag, "--format", "{{.Id}}"],
       { encoding: "utf8", timeout: 10000 },
     ).trim();
     if (!/^sha256:[a-f0-9]{64}$/.test(image))
@@ -42,6 +44,7 @@ export function prepareRenderImage() {
     console.log(
       `Actual isolated Fabric renderer ${image}; no network or credentials`,
     );
+    assertRuntimeArchitecture(image,architecture);
     return image;
   } finally {
     rmSync(context, { recursive: true, force: true });

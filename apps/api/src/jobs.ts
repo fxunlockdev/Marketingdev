@@ -1,3 +1,4 @@
+import {normalizeProductPhoto} from './uploaded-visuals.js';
 import {Pool,type PoolClient} from 'pg';
 import {randomUUID} from 'node:crypto';
 import {Client,WorkflowExecutionAlreadyStartedError,WorkflowIdReusePolicy} from '@temporalio/client';
@@ -26,8 +27,8 @@ export class AssetJobs {
   async permitted(db:PoolClient,job:any){
     if(job.cancel_requested)return false;
     const {rows:[member]}=await db.query('SELECT role,business_scope FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active',[job.organization_id,job.requested_by]);
-    if(!member||member.role==='viewer')return false;
-    if(member.business_scope==='selected'){const grant=(await db.query('SELECT role FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3 AND active',[job.organization_id,job.brand_id,job.requested_by])).rows[0];return !!grant&&grant.role!=='viewer';}
+    if(!member||!['owner','admin','editor'].includes(member.role))return false;
+    if(member.business_scope==='selected'){const grant=(await db.query('SELECT role FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3 AND active',[job.organization_id,job.brand_id,job.requested_by])).rows[0];return !!grant&&['admin','editor'].includes(grant.role);}
     return true;
   }
   async finish(db:PoolClient,job:any,status:string,code:string|null=null,scanner:string|null=null,etag:string|null=null){
@@ -52,9 +53,13 @@ export class AssetJobs {
       const scanner=await this.scanner.scan(bytes);await validateFormat(bytes,asset.content_type);
       // Persist immutable bytes that were actually scanned; never promote a mutable upload key.
       const etag=await this.store.persist(asset.canonical_key,bytes,asset.content_type,asset.sha256);
+      const visual=asset.content_type.startsWith('image/')?await normalizeProductPhoto(bytes):null;
+      const visualKey=visual?`uploaded-visuals/${asset.organization_id}/${asset.brand_id}/${asset.id}/${visual.sha256}`:null;
+      if(visual)await this.store.persist(visualKey!,visual.data,'image/jpeg',visual.sha256);
       const result=await this.transaction(scope,async(db,job)=>{
         if(terminal.has(job.status))return job.status;
         if(!await this.permitted(db,job))return this.finish(db,job,'canceled','ACCESS_REVOKED_OR_CANCELED');
+        if(visual)await db.query('INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(asset_id) DO NOTHING',[randomUUID(),job.organization_id,job.brand_id,asset.id,job.id,visualKey,visual.sha256,asset.sha256,visual.bytes,visual.width,visual.height]);
         return this.finish(db,job,'succeeded',null,scanner,etag);
       });
       // Cleanup is best effort; canonical success must not be undone by a cleanup outage.
@@ -78,11 +83,11 @@ export class JobDispatcher {
   async runOnce(){
     const lease=randomUUID();
     const {rows:[row]}=await this.pool.query(`UPDATE app.job_dispatch SET lease_id=$1,leased_until=now()+interval '30 seconds',attempts=attempts+1
-      WHERE job_id=(SELECT job_id FROM app.job_dispatch WHERE dispatched_at IS NULL AND (leased_until IS NULL OR leased_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
+      WHERE job_id=(SELECT job_id FROM app.job_dispatch WHERE dispatched_at IS NULL AND available_at<=now() AND (leased_until IS NULL OR leased_until<now()) ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1)
       RETURNING job_id,organization_id,brand_id,kind`,[lease]);
     if(!row)return false;
     try{
-      try{if(!['asset.validate','document.extract','website.extract','brand.analyze','creative.generate','plan.generate','creative.export','social.sync','social.authorize','social.connect','social.provision','social.publish','social.reconcile'].includes(row.kind))throw new Error('JOB_KIND_DENIED');if(row.kind==='social.provision'&&!this.provisionTaskQueue)throw new Error('PROVISIONING_QUEUE_UNAVAILABLE');await this.client.workflow.start(row.kind==='social.publish'?'publishSocialWorkflow':row.kind==='social.reconcile'?'reconcileSocialWorkflow':row.kind==='social.provision'?'provisionSocialWorkflow':['social.authorize','social.connect'].includes(row.kind)?'authorizeSocialWorkflow':row.kind==='social.sync'?'syncSocialWorkflow':row.kind==='creative.export'?'exportCreativeWorkflow':row.kind==='plan.generate'?'generatePlanWorkflow':row.kind==='creative.generate'?'generateCreativeWorkflow':row.kind==='document.extract'?'extractDocumentWorkflow':row.kind==='asset.validate'?'validateAssetWorkflow':'processIntakeWorkflow',{workflowId:`desvio-${row.kind==='social.publish'?'publish':row.kind==='social.reconcile'?'reconcile':row.kind==='social.provision'?'social-provision':['social.authorize','social.connect'].includes(row.kind)?'social-oauth':row.kind==='social.sync'?'social-sync':row.kind==='creative.export'?'export':row.kind==='plan.generate'?'plan':row.kind==='creative.generate'?'creative':row.kind==='document.extract'?'document':row.kind==='asset.validate'?'asset':'intake'}-${row.job_id}`,workflowIdReusePolicy:WorkflowIdReusePolicy.REJECT_DUPLICATE,
+      try{if(!['carousel.generate','insight.generate','asset.validate','document.extract','website.extract','brand.analyze','creative.generate','plan.generate','creative.export','creative.video','social.sync','social.authorize','social.connect','social.provision','social.publish','social.reconcile'].includes(row.kind))throw new Error('JOB_KIND_DENIED');if(row.kind==='social.provision'&&!this.provisionTaskQueue)throw new Error('PROVISIONING_QUEUE_UNAVAILABLE');await this.client.workflow.start(row.kind==='carousel.generate'?'generateCarouselWorkflow':row.kind==='insight.generate'?'generateInsightsWorkflow':row.kind==='social.publish'?'publishSocialWorkflow':row.kind==='social.reconcile'?'reconcileSocialWorkflow':row.kind==='social.provision'?'provisionSocialWorkflow':['social.authorize','social.connect'].includes(row.kind)?'authorizeSocialWorkflow':row.kind==='social.sync'?'syncSocialWorkflow':row.kind==='creative.video'?'generateVideoWorkflow':row.kind==='creative.export'?'exportCreativeWorkflow':row.kind==='plan.generate'?'generatePlanWorkflow':row.kind==='creative.generate'?'generateCreativeWorkflow':row.kind==='document.extract'?'extractDocumentWorkflow':row.kind==='asset.validate'?'validateAssetWorkflow':'processIntakeWorkflow',{workflowId:`desvio-${row.kind==='carousel.generate'?'carousel':row.kind==='insight.generate'?'insights':row.kind==='social.publish'?'publish':row.kind==='social.reconcile'?'reconcile':row.kind==='social.provision'?'social-provision':['social.authorize','social.connect'].includes(row.kind)?'social-oauth':row.kind==='social.sync'?'social-sync':row.kind==='creative.video'?'video':row.kind==='creative.export'?'export':row.kind==='plan.generate'?'plan':row.kind==='creative.generate'?'creative':row.kind==='document.extract'?'document':row.kind==='asset.validate'?'asset':'intake'}-${row.job_id}`,workflowIdReusePolicy:WorkflowIdReusePolicy.REJECT_DUPLICATE,
         taskQueue:row.kind==='social.provision'?this.provisionTaskQueue!:this.taskQueue,args:[{organizationId:row.organization_id,brandId:row.brand_id,jobId:row.job_id}]});}
       catch(error){if(!(error instanceof WorkflowExecutionAlreadyStartedError))throw error;}
       await this.pool.query('UPDATE app.job_dispatch SET dispatched_at=now(),leased_until=NULL,last_error=NULL WHERE job_id=$1 AND lease_id=$2',[row.job_id,lease]);

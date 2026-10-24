@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-24T06:34:05.210838+00:00",
+  "passed": true,
+  "tests": 18,
+  "scope": "Actual local PostgreSQL, private storage and isolated JPEG rendering, exact approval/submission/reconciliation with MOCK Postiz. Existing publication security and carousel recovery cases included. Not deployed or live verified.",
+  "source_sha256": {
+    "database/migrations/053_instagram_image_publication.sql": "9de6abfd842e117a3810f0c49d0eb9a094878d294b3f89412794f0d232e771ef",
+    "apps/api/src/creative-exports.ts": "67b6d119574c68f9e5406631750665cab5aa6113195f2d4202d488b2f8a3cd0a",
+    "apps/api/src/publication.ts": "da87bba81610d7fc3276623b7ef99eb5c592adf405ed7443c2e4402b3e86ec23",
+    "apps/api/src/publication-provider.ts": "7ff0691aa544870032c5592e1560a47c44a3ee833469f2c5c8a7c59066c55603",
+    "apps/api/src/publication-jobs.ts": "3b8c3736c97ed854a7bbf3c9747ad298ff42890462b74ccaeedede9ca745c4c0",
+    "tests/foundation/publication.test.mjs": "de138b3167af81d0aad0571af4a964282ef52e7e0b8e42b602adb458259aa633"
+  },
+  "log_sha256": "5d063800c2eb24d2d42f72e0f7b95eada15e64c07c9c90dc00b9457c147e8747"
+}

@@ -1,3 +1,10 @@
+import {Readable} from 'node:stream';
+import {StreamableFile} from '@nestjs/common';
+import {CarouselGeneration} from './carousel-generation.js';
+import {Carousels} from './carousels.js';
+import {Insights} from './insights.js';
+import {VideoCanvas} from './video-canvas.js';
+import {VideoReferenceBindings} from './video-references.js';
 import {BusinessOverview} from './business-overview.js';
 import {Publication} from './publication.js';
 import {SocialProvisioning} from './social-provisioning.js';
@@ -55,6 +62,47 @@ class SafeErrors implements ExceptionFilter {
   }
 }
 
+@Controller('api/v1/businesses/:id/carousel-generations')
+@UseGuards(SessionGuard)
+class CarouselGenerationController {
+ constructor(@Inject(CarouselGeneration) private readonly service:CarouselGeneration){}
+ @Get() read(@Req() r:AuthRequest,@Param('id') id:string){return this.service.read(r.actorId,id);}
+ @Post() submit(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,body,key);}
+ @Post(':job/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(r.actorId,id,job);}
+}
+
+@Controller('api/v1/businesses/:id/carousels')
+@UseGuards(SessionGuard)
+class CarouselsController {
+ constructor(@Inject(Carousels) private readonly service:Carousels){}
+ @Get() list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Get('versions/:version/download') async download(@Req() r:AuthRequest,@Param('id') id:string,@Param('version') version:string){
+  const bundle=await this.service.download(r.actorId,id,version);
+  return new StreamableFile(Readable.from(bundle.stream()),{type:'application/zip',disposition:'attachment; filename="desvio-carousel.zip"',length:bundle.length});
+ }
+ @Get(':project') read(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string){return this.service.read(r.actorId,id,project);}
+ @Post() save(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.save(r.actorId,id,body,key);}
+ @Post(':version/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('version') version:string,@Body() body:unknown){return this.service.review(r.actorId,id,version,body);}
+}
+
+@Controller('api/v1/businesses/:id/insights')
+@UseGuards(SessionGuard)
+class InsightsController {
+ constructor(@Inject(Insights) private readonly service:Insights){}
+ @Get() read(@Req() r:AuthRequest,@Param('id') id:string){return this.service.read(r.actorId,id);}
+ @Post() submit(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,body,key);}
+ @Post(':lesson/experiments') experiment(@Req() r:AuthRequest,@Param('id') id:string,@Param('lesson') lesson:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.recordExperiment(r.actorId,id,lesson,body,key);}
+ @Post(':lesson/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('lesson') lesson:string,@Body() body:unknown){return this.service.review(r.actorId,id,lesson,body);}
+ @Post(':job/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(r.actorId,id,job);}
+}
+
+@Controller('api/v1/businesses/:id/analytics')
+@UseGuards(SessionGuard)
+class AnalyticsController {
+ constructor(@Inject(Publication) private readonly service:Publication){}
+ @Get() read(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.analytics(r.actorId,id,query);}
+}
+
 @Controller('api/v1/businesses/:id/publications')
 @UseGuards(SessionGuard)
 class PublicationController {
@@ -72,11 +120,13 @@ class PublicationController {
 class SocialController {
  constructor(@Inject(SocialConnections) private readonly service:SocialConnections,@Inject(SocialOAuth) private readonly oauth:SocialOAuth,@Inject(SocialProvisioning) private readonly provision:SocialProvisioning){}
  @Post('prepare') prepare(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.provision.prepare(req.actorId,id,key);}
+ @Post('provisioning/:job/recheck') recheckSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string,@Headers('idempotency-key') key:string){return this.provision.recheck(req.actorId,id,job,key);}
  @Post('provisioning/:job/cancel') cancelSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.provision.cancel(req.actorId,id,job);}
- @Post('oauth/linkedin') start(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.oauth.start(req.actorId,req.sessionId,id,key);}
+ @Post('oauth/:provider') start(@Req() req:AuthRequest,@Param('id') id:string,@Param('provider') provider:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.oauth.start(req.actorId,req.sessionId,id,key,body,provider);}
  @Get('oauth/:attempt') authorization(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.read(req.actorId,req.sessionId,id,attempt);}
  @Post('oauth/:attempt/callback') callback(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.callback(req.actorId,req.sessionId,id,attempt,body);}
  @Get() read(@Req() req:AuthRequest,@Param('id') id:string){return this.service.read(req.actorId,id,req.sessionId);}
+ @Post('channels/:channel/disconnect') disconnect(@Req() req:AuthRequest,@Param('id') id:string,@Param('channel') channel:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.service.disconnect(req.actorId,id,channel,key,body);}
  @Post('refresh') refresh(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.service.refresh(req.actorId,id,key);}
  @Post('jobs/:job/cancel') cancel(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(req.actorId,id,job);}
 }
@@ -84,7 +134,11 @@ class SocialController {
 @Controller('api/v1')
 @UseGuards(SessionGuard)
 class BusinessController {
- constructor(@Inject(Businesses) private readonly service:Businesses,@Inject(Intake) private readonly intake:Intake,@Inject(BusinessOverview) private readonly overview:BusinessOverview){}
+ constructor(@Inject(Businesses) private readonly service:Businesses,@Inject(Intake) private readonly intake:Intake,@Inject(BusinessOverview) private readonly overview:BusinessOverview,@Inject(Team) private readonly team:Team){}
+ @Get('businesses/:id/team') businessTeam(@Req() r:AuthRequest,@Param('id') id:string){return this.team.businessList(r.actorId,id);}
+ @Post('businesses/:id/team/invitations') businessInvite(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.team.businessInvite(r.actorId,id,body,key);}
+ @Post('businesses/:id/team/invitations/:invitation/revoke') businessRevoke(@Req() r:AuthRequest,@Param('id') id:string,@Param('invitation') invitation:string){return this.team.businessRevoke(r.actorId,id,invitation);}
+ @Patch('businesses/:id/team/members/:target') businessChange(@Req() r:AuthRequest,@Param('id') id:string,@Param('target') target:string,@Body() body:unknown){return this.team.businessChange(r.actorId,id,target,body);}
  @Get('businesses/:id/overview') businessOverview(@Req() r:AuthRequest,@Param('id') id:string){return this.overview.read(r.actorId,id);}
  @Get('businesses/:id/visuals/:visualId') visualReference(@Req() r:AuthRequest,@Param('id') id:string,@Param('visualId') visualId:string){return this.intake.visual(r.actorId,id,visualId);}
  @Get('businesses/:id/intake') intakeStatus(@Req() r:AuthRequest,@Param('id') id:string){return this.intake.read(r.actorId,id);}
@@ -96,6 +150,22 @@ class BusinessController {
  @Get('businesses/:id/onboarding') onboarding(@Req() r:AuthRequest,@Param('id') id:string){return this.service.onboarding(r.actorId,id);}
  @Patch('businesses/:id/onboarding') saveOnboarding(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.onboarding(r.actorId,id,body);}
  @Get('businesses/:id') resolve(@Req() r:AuthRequest,@Param('id') id:string){return this.service.resolve(r.actorId,id);}
+}
+
+@Controller('api/v1/businesses/:id')
+@UseGuards(SessionGuard)
+class VideoController {
+ constructor(@Inject(VideoCanvas) private readonly service:VideoCanvas){}
+ @Get('video-jobs/:jobId/draft') draft(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.draft(r.actorId,id,j);}
+ @Post('video-jobs/:jobId/draft') saveDraft(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string,@Body() body:unknown){return this.service.saveDraft(r.actorId,id,j,body);}
+ @Post('video-versions/:versionId/regenerate') regenerate(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.regenerate(r.actorId,id,v,body,key);}
+ @Post('video-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
+ @Get('videos') list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Post('canvas/threads/:threadId/videos') submit(@Req() r:AuthRequest,@Param('id') id:string,@Param('threadId') t:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.submit(r.actorId,id,t,body,key);}
+ @Get('video-versions/:versionId') version(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.version(r.actorId,id,v);}
+ @Get('video-versions/:versionId/download') download(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.download(r.actorId,id,v);}
+ @Get('video-versions/:versionId/poster') poster(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.download(r.actorId,id,v,true);}
+ @Post('video-versions/:versionId/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown){return this.service.review(r.actorId,id,v,body);}
 }
 
 @Controller('api/v1/businesses/:id')
@@ -113,17 +183,24 @@ class ExportController {
 @UseGuards(SessionGuard)
 class ContentPlanController {
  constructor(@Inject(ContentPlan) private readonly service:ContentPlan,@Inject(Planning) private readonly planning:Planning,@Inject(SlotCreatives) private readonly creatives:SlotCreatives){}
+ @Get('content-plan/loops') loops(@Req() r:AuthRequest,@Param('id') id:string){return this.planning.loops(r.actorId,id);}
+ @Post('content-plan/loops/:loopId/stop') stopLoop(@Req() r:AuthRequest,@Param('id') id:string,@Param('loopId') loop:string){return this.planning.stopLoop(r.actorId,id,loop);}
  @Post('content-plan/generate') generate(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.planning.submit(r.actorId,id,body,key);}
  @Get('content-plan/jobs') jobs(@Req() r:AuthRequest,@Param('id') id:string){return this.planning.jobs(r.actorId,id);}
+ @Get('content-plans') catalog(@Req() r:AuthRequest,@Param('id') id:string){return this.service.catalog(r.actorId,id);}
+ @Post('content-plans/:planId/carousels') addCarousel(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addCarousel(r.actorId,id,p,body,key);}
+ @Post('content-plans/:planId/videos') addVideo(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addVideo(r.actorId,id,p,body,key);}
  @Get('content-plans/:planId') detail(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string){return this.planning.detail(r.actorId,id,p);}
  @Post('planning-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.planning.cancel(r.actorId,id,j);}
  @Post('content-plans') create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,id,body,key);}
+ @Get('content-plan/export') export(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.export(r.actorId,id,query);}
  @Get('content-plan') list(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query);}
  @Get('review-inbox') inbox(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query,true);}
  @Get('content-slots/:slotId') slot(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string){return this.creatives.detail(r.actorId,id,slot);}
  @Post('content-slots/:slotId/generate-creative') creative(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.creatives.generate(r.actorId,id,slot,body,key);}
  @Patch('content-slots/:slotId') edit(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown){return this.service.edit(r.actorId,id,slot,body);}
  @Get('content-slots/:slotId/history') history(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string){return this.service.history(r.actorId,id,slot);}
+ @Post('reviews/bulk-submit') submitReview(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.bulkSubmit(r.actorId,id,body);}
  @Post('reviews/bulk-approve') bulk(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.bulkApprove(r.actorId,id,body);}
  @Post('reviews/:slotId') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown){return this.service.review(r.actorId,id,slot,body);}
 }
@@ -132,6 +209,7 @@ class ContentPlanController {
 @UseGuards(SessionGuard)
 class CanvasController {
  constructor(@Inject(Canvas) private readonly service:Canvas){}
+ @Get('canvas/allowances') allowances(@Req() r:AuthRequest,@Param('id') id:string){return this.service.allowances(r.actorId,id);}
  @Get('canvas/references') references(@Req() r:AuthRequest,@Param('id') id:string){return this.service.references(r.actorId,id);}
  @Post('canvas/references') approveReference(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.approveReference(r.actorId,id,body);}
  @Post('canvas/references/:referenceId/revoke') revokeReference(@Req() r:AuthRequest,@Param('id') id:string,@Param('referenceId') ref:string){return this.service.revokeReference(r.actorId,id,ref);}
@@ -218,7 +296,7 @@ export async function createApplication(config: Config) {
     await database.assertRuntimeRole();
     const { rows: [role] } = await authPool.query('SELECT current_user AS name, rolsuper, rolbypassrls FROM pg_roles WHERE rolname=current_user');
     if (role.name !== 'desvio_auth' || role.rolsuper || role.rolbypassrls) throw new Error('Unsafe authentication database role');
-    const mail=new MailQueue(config.origin,config.mailEncryptionKey),mailWorker=new MailWorker(mailPool,mail,config);
+    const mail=new MailQueue(config.origin,config.mailEncryptionKey,!!config.smtp),mailWorker=new MailWorker(mailPool,mail,config);
     await mailWorker.assertRole();
     const auth = createAuth(authPool, config,mail), workspaces = new Workspaces(database),team=new Team(database,mail,config.origin);
     const server = express();
@@ -256,11 +334,18 @@ export async function createApplication(config: Config) {
     });
     server.all('/api/auth/{*path}', toNodeHandler(async request=>{
       const unavailable=()=>globalThis.Response.json({error:'Account service is temporarily unavailable. Please try again.',traceId:request.headers.get('x-desvio-trace-id')},{status:503});
+      if(request.method==='POST'&&new URL(request.url).pathname==='/api/auth/update-user'){
+        let body:any;try{body=await request.clone().json();}catch{return globalThis.Response.json({error:'Enter your name'},{status:400});}
+        if(!body||Array.isArray(body)||Object.keys(body).some(k=>k!=='name')||typeof body.name!=='string'||body.name!==body.name.trim()||!body.name||body.name.length>120||/[\u0000-\u001f\u007f]/.test(body.name))return globalThis.Response.json({error:'Enter a name of 1–120 characters'},{status:400});
+      }
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
-      {provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Publication,useValue:new Publication(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),config.publishingEnabled===true)},{provide:SocialProvisioning,useValue:new SocialProvisioning(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialProvisioningEnabled===true)},{provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.oauthEncryptionKey)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true,{provisioning:config.socialProvisioningEnabled===true,authorization:!!config.oauthEncryptionKey})},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces)),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces)))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces))},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
+    @Module({ controllers: [CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+ {provide:VideoCanvas,useFactory:()=>{const canvas=new Canvas(new Businesses(database,workspaces),store);return new VideoCanvas(canvas,new VideoReferenceBindings(canvas,config.renderImage),config.videoEnabled===true);}},
+      {provide:CarouselGeneration,useValue:new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},
+      {provide:Carousels,useValue:new Carousels(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},
+      {provide:Insights,useValue:new Insights(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Publication,useValue:new Publication(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),config.publishingEnabled===true,config.videoRenderImage)},{provide:SocialProvisioning,useValue:new SocialProvisioning(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialProvisioningEnabled===true)},{provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialAuthorizationEnabled===true?config.oauthEncryptionKey:undefined)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true,{provisioning:config.socialProvisioningEnabled===true,authorization:config.socialAuthorizationEnabled===true&&!!config.oauthEncryptionKey})},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces),config.renderImage)},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());

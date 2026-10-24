@@ -8,3 +8,5 @@
 !scripts/skill_audit.py
 !inputs
 !inputs/marketingskills-main.zip
+!scripts/brand_engine_audit.py
+!inputs/brand-engine-gpt-2k.zip

@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-10-24T08:14:20.603Z",
+  "source_commit": "01096e5269dc93c7be99cd6433b50eddcdc0dec1",
+  "results": [
+    {
+      "file": "work/upload-video-exports.log",
+      "sha256": "a56590ea4cfd23b737479d7db17c7798641f95b05b0aac9f27d2ab1fc3a3cc6f",
+      "passed": 15,
+      "failed": 0
+    },
+    {
+      "file": "work/upload-video-contracts.log",
+      "sha256": "1a2bacab91fb855a8433f5605e04f2265f3a3cf2a70f089adff2f16dfa538681",
+      "passed": 149,
+      "failed": 0
+    },
+    {
+      "file": "work/upload-video-browser-final.log",
+      "sha256": "d4df47dc2978219ccf060dd553c0c5e653c9803529e68f2c1a69db43e79e3ba5",
+      "passed": 11,
+      "failed": 1
+    },
+    {
+      "file": "work/upload-video-browser-focused.log",
+      "sha256": "32657898e9d9ccbc1abe847e767fd5c9995f8c3e4904046a9775dab712846a4d",
+      "passed": 1,
+      "failed": 0
+    }
+  ],
+  "scope": "Real PostgreSQL RLS/private image leases and actual browser upload/scanning/skills/Temporal/rendering. Uploaded photo to prompt editing/approval, video, feedback, regenerated version and final review. Provider responses explicitly MOCK.",
+  "browser_note": "Eleven existing journeys passed in the full frozen-build run; the new journey failed only its five-second submit wait. That wait was corrected to match asynchronous execution and the independent focused journey passed. Earlier concurrent web rebuild invalidated its run and is excluded.",
+  "paid_provider_calls": 0,
+  "live_verified": false,
+  "deployed_acceptance": false
+}

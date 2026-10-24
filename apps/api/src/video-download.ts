@@ -1,3 +1,4 @@
+import {isAuthenticatedVideoOutput,type AuthenticatedVideoOutput} from './video-output.js';
 import { createHash } from 'node:crypto';
 import { SafeWeb, websiteURL } from './safe-web.js';
 import {MAX_CANONICAL_VIDEO_BYTES} from './object-store.js';
@@ -18,17 +19,24 @@ const checkedURL = (value: string) => {
  * sandbox must fully decode/re-encode it before canonical private persistence. */
 export class VideoDownload {
   #origins: Set<string>;
-  constructor(origins: string[], private readonly web = new SafeWeb()) {
+  constructor(origins: string[], private readonly web = new SafeWeb(), private readonly policy: 'exact_origins'|'authenticated_provider_result' = 'exact_origins') {
     try {
-      if (!Array.isArray(origins) || !origins.length || origins.length > 10) throw new Error();
+      if (!['exact_origins','authenticated_provider_result'].includes(policy) || !Array.isArray(origins) || (!origins.length && policy==='exact_origins') || origins.length > 10 || (policy==='authenticated_provider_result' && origins.length)) throw new Error();
       this.#origins = new Set(origins.map(value => {
         const url = checkedURL(value); if (url.origin !== value) throw new Error(); return url.origin;
       }));
     } catch { throw new VideoDownloadError('VIDEO_DOWNLOAD_CONFIG_INVALID'); }
   }
   async read(remoteURL: string): Promise<{ state: 'untrusted_video'; bytes: Buffer; sha256: string }> {
+    return this.fetchOutput(remoteURL,false);
+  }
+  async readProviderOutput(output: AuthenticatedVideoOutput) {
+    if(!isAuthenticatedVideoOutput(output))throw new VideoDownloadError('VIDEO_OUTPUT_PROVENANCE_REQUIRED');
+    return this.fetchOutput(output.url,true);
+  }
+  private async fetchOutput(remoteURL:string,authenticated:boolean):Promise<{ state:'untrusted_video';bytes:Buffer;sha256:string }> {
     let url: URL;
-    try { url = checkedURL(remoteURL); if (!this.#origins.has(url.origin)) throw new Error(); }
+    try { url = checkedURL(remoteURL); if (!(authenticated && this.policy==='authenticated_provider_result') && !this.#origins.has(url.origin)) throw new Error(); }
     catch { throw new VideoDownloadError('VIDEO_DOWNLOAD_URL_BLOCKED'); }
     let response;
     try {

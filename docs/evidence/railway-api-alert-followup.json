@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-23T14:29:01.492Z",
+  "environment": "dev",
+  "service": "desvio-dev-api",
+  "observed": {
+    "content": [
+      {
+        "type": "text",
+        "text": "66d29c9e-a1a5-41eb-84b8-948834fdaf5a | SUCCESS | 2026-10-23 13:40:21.742 UTC | -\n01289a92-8e98-4093-899b-3384dd9f094b | REMOVED | 2026-10-23 12:47:48.736 UTC | -\n9ce5ba60-f1a1-4116-9911-bd0261f12ebb | REMOVED | 2026-10-23 11:48:44.713 UTC | -\nb34f9064-9610-4e85-a278-42c69bbee7a4 | FAILED | 2026-10-23 11:32:13.578 UTC | -\n"
+      }
+    ],
+    "isError": false
+  },
+  "scope": "Deployment read-back only; does not establish provider or production acceptance."
+}

@@ -1258,10 +1258,10 @@ summary:focus-visible {
 .publication-ready-list button { flex-shrink:0; }
 .publication-excerpt { max-width:650px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; overflow-wrap:anywhere; margin:8px 0 0; }
 .publication-confirm-grid { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:32px; }
-.publication-image img { display:block; width:100%; height:auto; border:1px solid var(--line); border-radius:12px; }
+.publication-image img, .publication-image video { display:block; width:100%; height:auto; border:1px solid var(--line); border-radius:12px; }
 .publication-caption { white-space:pre-wrap; overflow-wrap:anywhere; line-height:1.6; }
 .publication-consent { display:flex; align-items:flex-start; gap:12px; margin:22px 0; }
-.publication-consent input { width:18px; height:18px; flex:0 0 auto; margin:4px 0 0; }
+.publication-consent input { width:18px; height:18px; min-height:18px; padding:0; flex:0 0 auto; margin:4px 0 0; }
 .publication-filters { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; }
 .publication-filters button[aria-pressed=true] { background:var(--ink); color:var(--white); border-color:var(--ink); }
 .publication-list>li { border-top:1px solid var(--line); padding:26px 0; }
@@ -1300,3 +1300,13 @@ summary:focus-visible {
 .reference-library .reference-choice { display: flex; align-items: flex-start; gap: 10px; font-weight: 500; }
 .reference-library .reference-choice input[type="checkbox"] { width: 18px; height: 18px; min-height: 18px; flex: 0 0 18px; margin: 3px 0 0; padding: 0; }
 .reference-library section { border-top: 1px solid var(--line, #dfcbb7); margin-top: 20px; padding-top: 16px; }
+
+.performance-lessons fieldset { border: 0; padding: 0; margin: 18px 0; min-width: 0; }
+.performance-lessons .learning-consent, .mfa-settings .learning-consent { display: flex; align-items: flex-start; gap: 10px; margin: 16px 0; font-size: 14px; line-height: 1.6; }
+.performance-lessons .learning-consent input, .mfa-settings .learning-consent input,.carousel-composer .learning-consent input { width: 18px; height: 18px; min-height: 18px; padding: 0; margin: 2px 0 0; flex: 0 0 18px; }
+.performance-lessons .creative-review { overflow-wrap: anywhere; }
+.performance-lessons details { margin: 16px 0; }
+
+.publication-carousel { list-style: none; padding: 0; margin: 0; display: grid; gap: 20px; }
+.publication-carousel li { min-width: 0; }
+.publication-carousel img { display: block; width: 100%; height: auto; border-radius: 12px; }

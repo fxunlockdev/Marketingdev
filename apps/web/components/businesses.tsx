@@ -1,4 +1,9 @@
 "use client";
+import {AppLink} from "./app-link";
+import {MemoryEvidence,MemorySources} from './memory-evidence';
+import {PerformanceLessons} from './performance-lessons';
+import {Profile} from "./profile";
+import {BusinessTeam} from "./business-team";
 import {VisualReview} from "./visual-review";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -11,7 +16,7 @@ import {PublishingScreen} from "./publishing";
 import {BusinessOverviewPanel} from "./business-overview";
 import {ConnectionsScreen} from "./connections";
 import {CanvasScreen} from "./canvas";
-import { useUnsavedChanges } from "./unsaved";
+import { confirmNavigation, useUnsavedChanges } from "./unsaved";
 type Business = {
   id: string;
   organization_id: string;
@@ -75,6 +80,10 @@ function Icon({ name }: { name: string }) {
 const scopePath = (b: Business) =>
   `/api/v1/workspaces/${b.organization_id}/brands/${b.id}`;
 export function BusinessApp({ pathname }: { pathname: string }) {
+  const initialized=useRef(false),loadedAt=useRef(0);
+  const [workspaceRevision,setWorkspaceRevision]=useState(0);
+  useEffect(()=>{const changed=()=>{loadedAt.current=0;setWorkspaceRevision(n=>n+1);},focus=()=>{if(!document.hidden&&Date.now()-loadedAt.current>=30000)setWorkspaceRevision(n=>n+1);};window.addEventListener('desvio-workspace-changed',changed);window.addEventListener('focus',focus);document.addEventListener('visibilitychange',focus);return()=>{window.removeEventListener('desvio-workspace-changed',changed);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus);};},[]);
+  useEffect(()=>{setMenu(false);},[pathname]);
   const router = useRouter(),
     [session, setSession] = useState<any>(),
     [businesses, setBusinesses] = useState<Business[]>(),
@@ -83,6 +92,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
     [signoutError, setSignoutError] = useState<unknown>(),
     [menu, setMenu] = useState(false);
   useEffect(() => {
+    if(Date.now()-loadedAt.current<30000)return;
     let active = true;
     (async () => {
       try {
@@ -92,15 +102,17 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           router.replace("/sign-in");
           return;
         }
-        await api("/api/v1/accounts/current/initialize", {});
+        if(!initialized.current){await api("/api/v1/accounts/current/initialize", {});initialized.current=true;}
         const [list, plan] = await Promise.all([
           api("/api/v1/businesses"),
           api("/api/v1/accounts/current/entitlements"),
         ]);
         if (active) {
+          setError(undefined);
           setSession(user);
           setBusinesses(list.businesses);
           setEntitlement(plan);
+          loadedAt.current=Date.now();
         }
       } catch (e) {
         if (active) setError(e);
@@ -109,8 +121,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
     return () => {
       active = false;
     };
-  }, [router]);
-  if (error)
+  }, [router,pathname,workspaceRevision]);
+  if (error && (!session || !businesses))
     return (
       <main id="main" className="standalone">
         <Wordmark />
@@ -121,10 +133,10 @@ export function BusinessApp({ pathname }: { pathname: string }) {
     );
   if (!session || !businesses)
     return (
-      <main id="main" className="standalone">
-        <Wordmark />
-        <Loading />
-      </main>
+      <div className="v5-shell workspace-opening" aria-busy="true" aria-label="Opening Desvio">
+        <aside className="v5-sidebar"><Wordmark/><div className="shell-placeholder" aria-hidden="true"/>{sections.map(([key,title,icon])=><div className="shell-nav-placeholder" key={key}><Icon name={icon}/><span>{title}</span></div>)}</aside>
+        <div className="v5-body"><header className="v5-topbar"><span className="shell-placeholder" aria-hidden="true"/></header><main id="main" className="v5-main"><span className="sr-only" role="status">Opening your workspace</span><div className="shell-content-placeholder" aria-hidden="true"/><div className="shell-content-placeholder short" aria-hidden="true"/></main></div>
+      </div>
     );
   const parts = pathname.split("/").filter(Boolean),
     business =
@@ -142,7 +154,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         <Wordmark />
         <h1>Business unavailable</h1>
         <p>This link may have changed, or you may no longer have access.</p>
-        <a href="/brands">Your businesses</a>
+        <AppLink href="/brands">Your businesses</AppLink>
       </main>
     );
   const href = (key: string) =>
@@ -167,7 +179,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           {sections.map(([key, title, icon]) => (
             <div key={key}>
               {groups[key] && <p className="nav-group">{groups[key]}</p>}
-              <a
+              <AppLink
                 href={href(key)}
                 aria-current={
                   section === key ||
@@ -178,7 +190,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
               >
                 <Icon name={icon} />
                 <span>{title}</span>
-              </a>
+              </AppLink>
             </div>
           ))}
         </nav>
@@ -188,7 +200,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           </span>
           <div>
             <strong>{session.user.name}</strong>
-            <a href="/profile">Your account</a>
+            <AppLink href="/profile">Your account</AppLink>
           </div>
           <button
             className="quiet"
@@ -215,7 +227,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
                 aria-label="Business"
                 value={business?.id ?? ""}
                 onChange={(e) =>
-                  location.assign(
+                  confirmNavigation() && router.push(
                     e.target.value
                       ? `/b/${e.target.value}/${["brands", "billing", "profile"].includes(section) ? "overview" : section}`
                       : "/overview",
@@ -237,16 +249,17 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           </Field>
           <div className="header-actions">
             <span className="build-label">Development preview</span>
-            <a className="button" href={href("canvas")}>
+            <AppLink className="button" href={href("canvas")}>
               <Icon name="star" />
               Create
-            </a>
-            <a className="profile-link" href="/profile">
+            </AppLink>
+            <AppLink className="profile-link" href="/profile">
               Profile
-            </a>
+            </AppLink>
           </div>
         </header>
-        <main id="main" className="v5-main">
+        <main id="main" className="v5-main" key={pathname}>
+          <Notice error={error}/>
           {section === "brands" ? (
             isNew ? (
               <NewBusiness entitlement={entitlement} />
@@ -263,7 +276,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
               name={session.user.name}
             />
           ) : section === "profile" ? (
-            <Profile user={session.user} />
+            <Profile session={session} onChanged={setSession} />
           ) : section === "billing" ? (
             <Billing entitlement={entitlement} />
           ) : !business ? (
@@ -282,8 +295,10 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <PublishingScreen key={business.id} business={business}/>
           ) : section === "connections" ? (
             <ConnectionsScreen key={business.id} business={business}/>
+          ) : section === "team" ? (
+            <BusinessTeam key={business.id} business={business}/>
           ) : section === "memory" ? (
-            <Memory business={business} />
+            <Memory key={business.id} business={business} />
           ) : (
             <Unavailable section={section} business={business} title={label!} />
           )}
@@ -337,10 +352,10 @@ function BusinessCard({
           ? "Brand facts confirmed"
           : "Brand setup in progress"}
       </span>
-      <a className="button card-open" href={`/b/${business.id}/onboarding`}>
+      <AppLink className="button card-open" href={`/b/${business.id}/onboarding`}>
         {business.has_approved_brand ? "Review brand" : "Continue setup"}{" "}
         <span aria-hidden="true">→</span>
-      </a>
+      </AppLink>
     </article>
   );
 }
@@ -359,9 +374,9 @@ function BusinessesIndex({
             Each business has its own identity, content, channels and memory.
           </p>
         </PageTitle>
-        <a className="button primary" href="/brands/new">
+        <AppLink className="button primary" href="/brands/new">
           + Add business
-        </a>
+        </AppLink>
       </div>
       <p className="quota-caption">
         {entitlement.active_businesses} of {entitlement.max_active_businesses}{" "}
@@ -385,14 +400,14 @@ function BusinessesIndex({
               ? `${entitlement.max_active_businesses - entitlement.active_businesses} business slots remaining in your account.`
               : "You’ve used all your business slots. Your existing businesses remain available."}
           </p>
-          <a
+          <AppLink
             className="button primary"
             href={entitlement.can_create_business ? "/brands/new" : "/billing"}
           >
             {entitlement.can_create_business
               ? "Add a business"
               : "View business allowance"}
-          </a>
+          </AppLink>
         </article>
       </div>
       <div className="v5-guidance">
@@ -460,7 +475,7 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
             {entitlement.max_active_businesses} slots are in use. Paid upgrades
             are not available in this build.
           </p>
-          <a href="/brands">Back to your businesses</a>
+          <AppLink href="/brands">Back to your businesses</AppLink>
         </section>
       ) : (
         <form
@@ -554,13 +569,13 @@ function Overview({
             Bring in your business details and brand guidelines. Confirm the
             facts, set your direction, and keep every business’s work separate.
           </p>
-          <a
+          <AppLink
             className="button primary"
             href="/brands"
           >
             {rows.length ? "Continue brand setup" : "Add your first business"}{" "}
             <span aria-hidden="true">→</span>
-          </a>
+          </AppLink>
         </div>
         <div className="brand-orbit" aria-hidden="true">
           <span className="orbit-center">
@@ -575,7 +590,7 @@ function Overview({
         <>
           <div className="section-heading">
             <h2>Your businesses</h2>
-            <a href="/brands">Manage brands →</a>
+            <AppLink href="/brands">Manage brands →</AppLink>
           </div>
           <div className="v5-business-grid">
             {rows.map((b, i) => (
@@ -613,14 +628,14 @@ function ChooseBusiness({
           <ul className="business-choice">
             {businesses.map((b) => (
               <li key={b.id}>
-                <a href={`/b/${b.id}/${section}`}>{b.name} →</a>
+                <AppLink href={`/b/${b.id}/${section}`}>{b.name} →</AppLink>
               </li>
             ))}
           </ul>
         ) : (
-          <a className="button primary" href="/brands/new">
+          <AppLink className="button primary" href="/brands/new">
             Add business
-          </a>
+          </AppLink>
         )}
       </section>
     </>
@@ -663,7 +678,7 @@ function Unavailable({
                 ? "Approved brand facts saved"
                 : "Confirm your brand before creating"}
             </p>
-            <a href={`/b/${business.id}/onboarding`}>Review brand →</a>
+            <AppLink href={`/b/${business.id}/onboarding`}>Review brand →</AppLink>
           </aside>
           <section className="canvas-conversation">
             <span className="canvas-symbol" aria-hidden="true">
@@ -696,9 +711,9 @@ function Unavailable({
             Your business and approved brand information stay saved while this
             part of Desvio is being built.
           </p>
-          <a className="button" href={`/b/${business.id}/onboarding`}>
+          <AppLink className="button" href={`/b/${business.id}/onboarding`}>
             Continue brand setup
-          </a>
+          </AppLink>
         </section>
       )}
     </>
@@ -721,35 +736,9 @@ function Billing({ entitlement }: { entitlement: any }) {
           invoices and usage billing are not available in this build.
         </p>
         <p>No paid subscription is implied by this allowance.</p>
-        <a className="button" href="/brands">
+        <AppLink className="button" href="/brands">
           Manage businesses
-        </a>
-      </section>
-    </>
-  );
-}
-function Profile({ user }: { user: any }) {
-  return (
-    <>
-      <PageTitle eyebrow="Your account" title="Profile">
-        <p>Your identity and account access.</p>
-      </PageTitle>
-      <section className="v5-panel narrow">
-        <dl>
-          <dt>Name</dt>
-          <dd>{user.name}</dd>
-          <dt>Email</dt>
-          <dd>{user.email}</dd>
-          <dt>Email status</dt>
-          <dd>{user.emailVerified ? "Verified" : "Verification needed"}</dd>
-        </dl>
-        <a className="button" href="/forgot-password">
-          Reset password
-        </a>
-        <p className="hint">
-          Password recovery uses the account email flow. Additional profile
-          settings, MFA and device management are not available in this build.
-        </p>
+        </AppLink>
       </section>
     </>
   );
@@ -796,6 +785,8 @@ export function BrandOnboarding({ business }: { business: Business }) {
         cadence: direction.cadence,
         channels: direction.channels,
         must_avoid: direction.must_avoid,
+        business_stage: direction.business_stage ?? "",
+        growth_expectation: direction.growth_expectation ?? "",
         preferences_edited: dirty || state.preferences_edited || approve,
       };
       const saved = await api(
@@ -832,7 +823,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
         )}
       </>
     );
-  const writable = business.role !== "viewer",
+  const writable = ['owner','admin','editor'].includes(business.role),
     change = (key: string, value: any) => {
       setState({ ...state, [key]: value });
       setDirty(true);
@@ -857,10 +848,10 @@ export function BrandOnboarding({ business }: { business: Business }) {
           <p>
             Your goals and approved brand evidence are saved. Open Content Plan to prepare your first calendar; AI planning requires a configured model and available budget.
           </p>
-          <a className="button primary" href={`/b/${business.id}/memory`}>
+          <AppLink className="button primary" href={`/b/${business.id}/memory`}>
             View brand memory
-          </a>
-          <a className="button" href={`/b/${business.id}/content-plan`}>Open Content Plan</a>
+          </AppLink>
+          <AppLink className="button" href={`/b/${business.id}/content-plan`}>Open Content Plan</AppLink>
         </section>
       ) : state.step === 2 ? (
         <>
@@ -875,7 +866,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
           />
           {visualEditing&&<p role="status">Save or discard your visual edit before continuing to goals.</p>}
           <div className="wizard-actions">
-            <a href="/brands">Your businesses</a>
+            <AppLink href="/brands">Your businesses</AppLink>
             {writable && (
               <button
                 className="primary"
@@ -908,13 +899,13 @@ export function BrandOnboarding({ business }: { business: Business }) {
                   {state.recommendation.evidence?.map((e: any) => (
                     <div key={e.id}>
                       {e.website_url && (
-                        <a
+                        <AppLink
                           href={e.website_url}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
                           Source website
-                        </a>
+                        </AppLink>
                       )}
                       <blockquote>{e.text}</blockquote>
                     </div>
@@ -938,6 +929,18 @@ export function BrandOnboarding({ business }: { business: Business }) {
           <p>
             These preferences do not connect channels or authorize publication.
           </p>
+          <Field label="What stage is your business at?">
+            {(id) => <select id={id} disabled={!writable} value={state.business_stage ?? ""} onChange={e => change("business_stage", e.target.value)}>
+              <option value="">Choose a stage (optional)</option>
+              <option value="pre_launch">Preparing to launch</option>
+              <option value="launching">Just launched</option>
+              <option value="growing">Growing our customer base</option>
+              <option value="established">Established and expanding</option>
+            </select>}
+          </Field>
+          <Field label="What would success look like over the next 90 days?" hint="Optional. This guides your content; it is a target, not a promised result.">
+            {(id, hint) => <textarea id={id} aria-describedby={hint} disabled={!writable} maxLength={600} value={state.growth_expectation ?? ""} placeholder="For example: attract 20 qualified enquiries a month for our new service." onChange={e => change("growth_expectation", e.target.value)} />}
+          </Field>
           <Field label="Primary goal">
             {(id) => (
               <select
@@ -1065,7 +1068,7 @@ function BrandReview({
     manualKey = useRef(""),
     lastBody = useRef("");
   const path = scopePath(business),
-    writable = business.role !== "viewer";
+    writable = ['owner','admin','editor'].includes(business.role);
   useUnsavedChanges(!!value && !busy);
   async function load() {
     try {
@@ -1416,7 +1419,7 @@ function Memory({ business }: { business: Business }) {
                 {brain.active.snapshot.facts.map((f: any) => (
                   <div key={f.id}>
                     <dt>{f.field.replaceAll("_", " ")}</dt>
-                    <dd>{f.value}</dd>
+                    <dd><span>{f.value}</span><MemoryEvidence fact={f} path={scopePath(business)}/></dd>
                   </div>
                 ))}
               </dl>
@@ -1427,16 +1430,18 @@ function Memory({ business }: { business: Business }) {
               building this business’s memory.
             </p>
           )}
-          <a className="button" href={`/b/${business.id}/onboarding`}>
+          <AppLink className="button" href={`/b/${business.id}/onboarding`}>
             Review brand facts
-          </a>
+          </AppLink>
           <p className="availability-note">
-            Approved visual directions appear above. Performance lessons and experiments are still being implemented.
+            Approved visual directions appear above. Review performance hypotheses separately below; they never replace these facts.
           </p>
         </section>
       ) : (
         !error && <Loading />
       )}
+      {brain&&<MemorySources sources={brain.sources} businessId={business.id}/>}
+      <PerformanceLessons key={business.id} businessId={business.id}/>
     </>
   );
 }

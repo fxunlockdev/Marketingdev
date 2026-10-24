@@ -1,0 +1,25 @@
+{
+  "image": "sha256:3363e29ed1a64af85dbeb219e74eaaa73d97d1809dd1225bcd3a66878978cdaf",
+  "probe": {
+    "uid": 1000,
+    "arch": "x64",
+    "client": "Docker version 29.1.2, build 890dcca",
+    "worker": "function",
+    "pngBytes": 90,
+    "child": {
+      "uid": 65534,
+      "net": [
+        "lo"
+      ],
+      "socket": false,
+      "sentinel": null,
+      "caps": "0000000000000000"
+    }
+  },
+  "live_calls": false,
+  "scope": "Trusted worker packaging and actual credential-free child boundary only; no connected Temporal/database/cloud lifecycle claim",
+  "versions": {
+    "bodyParser": "2.4.0",
+    "multer": "2.5.0"
+  }
+}

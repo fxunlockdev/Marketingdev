@@ -389,3 +389,169 @@ test('concurrent email workers, corrupt ciphertext, expired mail and interrupted
   await assert.rejects(runtime.mailWorker.db.query('SELECT * FROM app.brands'),e=>e.code==='42501');
   await assert.rejects(runtime.database.pool.query('SET ROLE desvio_access'),e=>e.code==='42501');
 });
+
+
+test('business invitations grant only selected clients, preserve independent roles and reject foreign scopes',async()=>{
+ const owner=await signup('scoped-owner'),seat=await signup('scoped-seat'),org=await createOrg(owner,'Selected business team');
+ const create=async name=>{const r=await request(`/api/v1/workspaces/${org.id}/brands`,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{name}});assert.equal(r.status,201);return r.body;};
+ const a=await create('Selected A'),b=await create('Selected B'),c=await create('Private C'),endpoint=`/api/v1/workspaces/${org.id}/invitations`;
+ const send=async(ids,role)=>{const r=await request(endpoint,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{email:seat.email,role,business_ids:ids}});assert.equal(r.status,201,JSON.stringify(r.body));await drainMail();const link=messageLink(smtp.messages.findLast(m=>m.to.value[0].address===seat.email&&m.subject==='Your Desvio client invitation'));return new URLSearchParams(link.hash.slice(1)).get('token');};
+ assert.equal((await request(endpoint,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{email:seat.email,role:'viewer',business_ids:[brandA.id]}})).status,404);
+ const token=await send([a.id],'viewer');for(let i=0;i<2;i++)assert.equal((await request('/api/v1/invitations/accept',{method:'POST',cookie:seat.cookie,body:{token}})).status,201);
+ let list=(await request('/api/v1/businesses',{cookie:seat.cookie})).body.businesses;assert.deepEqual(list.filter(x=>x.organization_id===org.id).map(x=>[x.id,x.role]),[[a.id,'viewer']]);
+ assert.equal((await request(`/api/v1/workspaces/${org.id}/members`,{cookie:seat.cookie})).status,403);
+ assert.equal((await request(endpoint,{cookie:seat.cookie,method:'POST',key:randomUUID(),body:{email:owner.email,role:'admin',business_ids:[c.id]}})).status,403);
+ const second=await send([b.id],'editor');assert.equal((await request('/api/v1/invitations/accept',{method:'POST',cookie:seat.cookie,body:{token:second}})).status,201);
+ list=(await request('/api/v1/businesses',{cookie:seat.cookie})).body.businesses;assert.deepEqual(new Map(list.filter(x=>x.organization_id===org.id).map(x=>[x.id,x.role])),new Map([[a.id,'viewer'],[b.id,'editor']]));assert.ok(!list.some(x=>x.id===c.id));
+ const direct=new TenantDatabase(runtime.database.pool);await assert.rejects(direct.transaction(seat.id,org.id,true,async()=>{},a.id));await direct.transaction(seat.id,org.id,true,async()=>{},b.id);await assert.rejects(direct.transaction(seat.id,org.id,false,async()=>{},c.id));
+ assert.equal((await request(`/api/v1/workspaces/${org.id}/members/${seat.id}`,{cookie:owner.cookie,method:'PATCH',body:{role:'owner',active:true}})).status,403);
+ await assert.rejects(direct.transaction(seat.id,org.id,false,db=>db.query('SELECT * FROM app.team_members()')));
+ const teamPath=`/api/v1/businesses/${b.id}/team`;
+ const team=(await request(teamPath,{cookie:owner.cookie}));assert.equal(team.status,200,JSON.stringify(team.body));assert.equal(team.body.can_manage,true);assert.ok(team.body.members.some(m=>m.user_id===seat.id&&m.role==='editor'));
+ assert.equal((await request(teamPath+'/members/'+seat.id,{cookie:seat.cookie,method:'PATCH',body:{role:'admin',active:true}})).status,403);
+ assert.equal((await request(teamPath+'/members/'+owner.id,{cookie:owner.cookie,method:'PATCH',body:{role:'viewer',active:false}})).status,403);
+ assert.equal((await request(teamPath+'/members/'+seat.id,{cookie:owner.cookie,method:'PATCH',body:{role:'admin',active:true}})).status,200);
+ await direct.transaction(seat.id,org.id,false,async db=>{assert.equal((await db.query('SELECT app.social_manager($1,$2) AS allowed',[org.id,b.id])).rows[0].allowed,true);assert.equal((await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[org.id,a.id])).rows[0].allowed,false);},b.id);
+ assert.equal((await request(teamPath+'/members/'+seat.id,{cookie:owner.cookie,method:'PATCH',body:{role:'viewer',active:false}})).status,200);
+ assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:second}})).status,201);
+ assert.equal((await request(teamPath,{cookie:seat.cookie})).status,404);assert.equal((await request(`/api/v1/businesses/${a.id}/team`,{cookie:seat.cookie})).status,200);
+ assert.ok((await request(teamPath,{cookie:owner.cookie})).body.activity.some(e=>e.action==='business.member_removed'));
+ for(const role of ['reviewer','analyst']){
+  const scopedToken=await send([a.id],role);assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:scopedToken}})).status,201);
+  const roles=(await request('/api/v1/businesses',{cookie:seat.cookie})).body.businesses;assert.equal(roles.find(x=>x.id===a.id).role,role);
+  await assert.rejects(direct.transaction(seat.id,org.id,true,async()=>{},a.id));
+  assert.equal((await request(endpoint,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{email:seat.email,role}})).status,400);
+ }
+ const third=await send([c.id],'viewer');const pending=(await request(endpoint,{cookie:owner.cookie})).body.invitations.find(i=>i.status==='pending');await request(endpoint+'/'+pending.id+'/revoke',{cookie:owner.cookie,method:'POST',body:{}});assert.equal((await request('/api/v1/invitations/accept',{cookie:seat.cookie,method:'POST',body:{token:third}})).status,404);
+});
+
+test('profile name, password changes and session controls remain bound to the authenticated user',async()=>{
+ const user=await signup('profile-controls'),other=await signup('profile-other');
+ for(const body of [{name:''},{name:'x'.repeat(121)},{name:'New name',role:'owner'},{email:'changed@example.test'}])assert.equal((await request('/api/auth/update-user',{method:'POST',cookie:user.cookie,body})).status,400);
+ const login=()=>request('/api/auth/sign-in/email',{method:'POST',body:{email:user.email,password:'a-strong-test-password-2026'}});
+ const second=await login();assert.equal(second.status,200);
+ assert.equal((await request('/api/auth/update-user',{method:'POST',cookie:user.cookie,body:{name:'Updated profile'}})).status,200);
+ assert.equal((await request('/api/auth/get-session',{cookie:user.cookie})).body.user.name,'Updated profile');
+ assert.notEqual((await request('/api/auth/get-session',{cookie:other.cookie})).body.user.name,'Updated profile');
+ const sessions=await request('/api/auth/list-sessions',{cookie:user.cookie});assert.equal(sessions.status,200);assert.ok(sessions.body.length>=2);assert.ok(sessions.body.every(s=>s.userId===user.id));
+ const foreign=(await request('/api/auth/list-sessions',{cookie:other.cookie})).body[0];
+ await request('/api/auth/revoke-session',{cookie:user.cookie,method:'POST',body:{token:foreign.token}});assert.ok((await request('/api/auth/get-session',{cookie:other.cookie})).body?.user);
+ assert.equal((await request('/api/auth/revoke-other-sessions',{cookie:user.cookie,method:'POST',body:{}})).status,200);
+ assert.equal((await request('/api/auth/get-session',{cookie:second.cookie})).body,null);
+ const wrong=await request('/api/auth/change-password',{cookie:user.cookie,method:'POST',body:{currentPassword:'incorrect-password',newPassword:'new-profile-password-2026',revokeOtherSessions:true}});assert.equal(wrong.status,400);
+ // Separate the password-rotation phase from the already-tested login rate window.
+ await admin.query('DELETE FROM auth."rateLimit"');
+ const third=await login();assert.equal(third.status,200);
+ const changed=await request('/api/auth/change-password',{cookie:user.cookie,method:'POST',body:{currentPassword:'a-strong-test-password-2026',newPassword:'new-profile-password-2026',revokeOtherSessions:true}});assert.equal(changed.status,200);assert.ok(changed.cookie);
+ assert.equal((await request('/api/auth/get-session',{cookie:third.cookie})).body,null);
+ assert.equal((await login()).status,401);
+ const replacement=await request('/api/auth/sign-in/email',{method:'POST',body:{email:user.email,password:'new-profile-password-2026'}});assert.equal(replacement.status,200);
+ assert.equal((await request('/api/auth/update-user',{method:'POST',cookie:replacement.cookie,origin:'https://other.example',body:{name:'forged'}})).status,403);
+ assert.equal((await request('/api/auth/list-sessions')).status,401);
+});
+
+test('delegated business admins manage scoped teammates without account or sibling escalation',async()=>{
+ const fixtureUser=async label=>{await admin.query('DELETE FROM auth."rateLimit"');return signup(label);};
+ const owner=await fixtureUser('delegate-owner'),manager=await fixtureUser('delegate-manager'),member=await fixtureUser('delegate-member'),late=await fixtureUser('delegate-late'),org=await createOrg(owner,'Delegated team');
+ const create=async name=>(await request(`/api/v1/workspaces/${org.id}/brands`,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{name}})).body;
+ const a=await create('Managed business'),b=await create('Other business');
+ await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org.id,manager.id]);
+ await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'admin'),($1,$4,$3,'viewer')",[org.id,a.id,manager.id,b.id]);
+ const root=`/api/v1/businesses/${a.id}/team`,send=(email,role='editor',business_ids=[a.id],cookie=manager.cookie)=>request(root+'/invitations',{method:'POST',cookie,key:randomUUID(),body:{email,role,business_ids}});
+ const view=await request(root,{cookie:manager.cookie});assert.equal(view.body.can_manage,true);assert.equal(view.body.can_assign_admin,false);assert.equal(view.body.can_manage_account,false);
+ assert.equal((await request(`/api/v1/businesses/${b.id}/team`,{cookie:manager.cookie})).body.can_manage,false);
+ assert.equal((await send(member.email,'admin')).status,403);
+ assert.equal((await send(member.email,'editor',[a.id,b.id])).status,403);
+ assert.equal((await request(`/api/v1/workspaces/${org.id}/invitations`,{method:'POST',cookie:manager.cookie,key:randomUUID(),body:{email:member.email,role:'editor',business_ids:[a.id]}})).status,403);
+ const replayKey=randomUUID(),inviteBody={email:member.email,role:'editor',business_ids:[a.id]};
+ const invitation=await request(root+'/invitations',{method:'POST',cookie:manager.cookie,key:replayKey,body:inviteBody});assert.equal(invitation.status,201,JSON.stringify(invitation.body));
+ const replay=await request(root+'/invitations',{method:'POST',cookie:manager.cookie,key:replayKey,body:inviteBody});assert.equal(replay.status,201);assert.equal(replay.body.id,invitation.body.id);
+ assert.equal((await request(root+'/invitations',{method:'POST',cookie:manager.cookie,key:replayKey,body:{...inviteBody,role:'viewer'}})).status,409);
+ await new TenantDatabase(runtime.database.pool).transaction(manager.id,org.id,false,async db=>{
+  assert.equal((await db.query('SELECT * FROM app.idempotency')).rowCount,0);
+  assert.equal((await db.query('SELECT * FROM app.business_invitation_requests')).rowCount,1);
+ },a.id);
+ await drainMail();const tokenFor=email=>new URLSearchParams(messageLink(smtp.messages.findLast(m=>m.to.value[0].address===email&&m.subject==='Your Desvio client invitation')).hash.slice(1)).get('token');
+ assert.equal((await request('/api/v1/invitations/accept',{method:'POST',cookie:member.cookie,body:{token:tokenFor(member.email)}})).status,201);
+ assert.equal((await request(root+'/members/'+member.id,{method:'PATCH',cookie:manager.cookie,body:{role:'reviewer',active:true}})).status,200);
+ for(const target of [owner.id,manager.id])assert.equal((await request(root+'/members/'+target,{method:'PATCH',cookie:manager.cookie,body:{role:'viewer',active:false}})).status,403);
+ assert.equal((await request(root+'/members/'+member.id,{method:'PATCH',cookie:manager.cookie,body:{role:'admin',active:true}})).status,403);
+ assert.equal((await request(root+'/members/'+member.id,{method:'PATCH',cookie:manager.cookie,body:{role:'viewer',active:false}})).status,200);
+ assert.equal((await request(root+'/members/'+member.id,{method:'PATCH',cookie:manager.cookie,body:{role:'analyst',active:true}})).status,200);
+ const ownerMulti=await send(late.email,'viewer',[a.id,b.id],owner.cookie);assert.equal(ownerMulti.status,201,JSON.stringify(ownerMulti.body));
+ assert.equal((await request(root+'/invitations/'+ownerMulti.body.id+'/revoke',{method:'POST',cookie:owner.cookie,body:{}})).status,201);
+ await admin.query("UPDATE app.business_memberships SET role='admin' WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3",[org.id,b.id,manager.id]);
+ const delegatedMulti=await send(late.email,'reviewer',[a.id,b.id]);assert.equal(delegatedMulti.status,201,JSON.stringify(delegatedMulti.body));
+ assert.equal((await request(root+'/invitations/'+delegatedMulti.body.id+'/revoke',{method:'POST',cookie:manager.cookie,body:{}})).status,201);
+ await admin.query("UPDATE app.business_memberships SET role='viewer' WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3",[org.id,b.id,manager.id]);
+ const sibling=await request(`/api/v1/businesses/${b.id}/team/invitations`,{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{email:late.email,role:'viewer'}});assert.equal(sibling.status,201);
+ assert.ok(!(await request(root,{cookie:manager.cookie})).body.invitations.some(i=>i.id===sibling.body.id));
+ assert.equal((await request(root+'/invitations/'+sibling.body.id+'/revoke',{method:'POST',cookie:manager.cookie,body:{}})).status,404);
+ const revoke=await send(late.email);assert.equal(revoke.status,201);assert.equal((await request(root+'/invitations/'+revoke.body.id+'/revoke',{method:'POST',cookie:manager.cookie,body:{}})).status,201);
+ const selfInvite=await send(manager.email,'viewer');assert.equal(selfInvite.status,201);await drainMail();
+ assert.equal((await request('/api/v1/invitations/accept',{method:'POST',cookie:manager.cookie,body:{token:tokenFor(manager.email)}})).status,409);
+ const pending=await send(late.email);assert.equal(pending.status,201);await drainMail();const token=tokenFor(late.email);
+ await admin.query("UPDATE app.business_memberships SET role='viewer' WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3",[org.id,a.id,manager.id]);
+ assert.equal((await request('/api/v1/invitations/accept',{method:'POST',cookie:late.cookie,body:{token}})).status,404);
+ assert.equal((await send(late.email)).status,403);
+ assert.equal((await request(root+'/members/'+member.id,{method:'PATCH',cookie:manager.cookie,body:{role:'editor',active:true}})).status,403);
+ const direct=new TenantDatabase(runtime.database.pool);
+ await assert.rejects(direct.transaction(manager.id,org.id,true,db=>db.query('SELECT app.change_business_member($1,$2,$3,$4)',[b.id,member.id,'editor',true])));
+ assert.equal((await admin.query('SELECT role FROM app.business_memberships WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3',[org.id,a.id,member.id])).rows[0].role,'analyst');
+});
+
+test('authenticator enrollment, pending sign-in, one-use recovery and disabling use real identity provider',async()=>{
+ const {createOTP}=await import('@better-auth/utils/otp'),{base32}=await import('@better-auth/utils/base32');
+ const user=await signup('mfa-'+randomUUID()),password='a-strong-test-password-2026';
+ // Isolate provider behavior from the separate HTTP throttling window.
+ const post=async(path,body,cookie=user.cookie)=>{await admin.query('DELETE FROM auth."rateLimit"');return request('/api/auth/two-factor/'+path,{method:'POST',cookie,body});};
+ assert.equal((await post('enable',{password:'incorrect-password',method:'totp'})).status,400);
+ const enabled=await post('enable',{password,method:'totp'});assert.equal(enabled.status,200);assert.equal(enabled.body.method,'totp');assert.equal(enabled.body.backupCodes.length,10);
+ const encoded=new URL(enabled.body.totpURI).searchParams.get('secret'),secret=new TextDecoder().decode(base32.decode(encoded)),otp=createOTP(secret);
+ assert.equal((await request('/api/auth/get-session',{cookie:user.cookie})).body.user.twoFactorEnabled,false);
+ const raw=(await admin.query('SELECT secret,"backupCodes" FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0];assert.notEqual(raw.secret,secret);assert.ok(!raw.backupCodes.includes(enabled.body.backupCodes[0]));
+ assert.equal((await post('verify-totp',{code:'invalid'})).status,401);
+ const verified=await post('verify-totp',{code:await otp.totp()});assert.equal(verified.status,200);user.cookie=verified.cookie;
+ assert.equal((await request('/api/auth/get-session',{cookie:user.cookie})).body.user.twoFactorEnabled,true);
+ const challenge=()=>request('/api/auth/sign-in/email',{method:'POST',body:{email:user.email,password}});
+ let pending=await challenge();assert.equal(pending.body.twoFactorRedirect,true);assert.ok(pending.body.twoFactorMethods.includes('totp'));
+ assert.equal((await request('/api/auth/get-session',{cookie:pending.cookie})).body,null);assert.equal((await request('/api/v1/workspaces',{cookie:pending.cookie})).status,401);
+ assert.equal((await post('verify-totp',{code:'invalid'},pending.cookie)).status,401);
+ let login=await post('verify-totp',{code:await otp.totp()},pending.cookie);assert.equal(login.status,200);assert.equal((await request('/api/auth/get-session',{cookie:login.cookie})).body.user.id,user.id);
+ pending=await challenge();login=await post('verify-backup-code',{code:enabled.body.backupCodes[0]},pending.cookie);assert.equal(login.status,200);assert.equal((await request('/api/auth/get-session',{cookie:login.cookie})).body.user.id,user.id);
+ pending=await challenge();assert.equal((await post('verify-backup-code',{code:enabled.body.backupCodes[0]},pending.cookie)).status,401);assert.equal((await request('/api/auth/get-session',{cookie:pending.cookie})).body,null);
+ const replaced=await post('generate-backup-codes',{password},login.cookie);assert.equal(replaced.status,200);assert.equal(replaced.body.backupCodes.length,10);
+ assert.equal((await post('verify-backup-code',{code:enabled.body.backupCodes[1]},pending.cookie)).status,401);
+ // Account-level lockout survives HTTP limiter resets and spans factor types.
+ let failures=(await admin.query('SELECT "failedVerificationCount" AS n FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0].n;
+ for(;failures<5;failures++)assert.equal((await post('verify-totp',{code:'invalid'},pending.cookie)).status,401);
+ assert.equal((await post('verify-totp',{code:await otp.totp()},pending.cookie)).status,429);
+ const locked=(await admin.query('SELECT "lockedUntil" FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0];assert.ok(new Date(locked.lockedUntil).getTime()>Date.now()+14*60*1000);
+ assert.equal((await request('/api/auth/get-session',{cookie:pending.cookie})).body,null);
+ // Advance only fixture expiry; exhausted challenges require a fresh password sign-in.
+ await admin.query(`UPDATE auth."twoFactor" SET "lockedUntil"=now()-interval '1 second' WHERE "userId"=$1`,[user.id]);
+ pending=await challenge();
+ assert.equal((await post('verify-totp',{code:await otp.totp()},pending.cookie)).status,200);
+ assert.equal((await admin.query('SELECT "failedVerificationCount" AS n FROM auth."twoFactor" WHERE "userId"=$1',[user.id])).rows[0].n,0);
+ assert.equal((await post('disable',{password:'incorrect-password'},login.cookie)).status,400);
+ const disabled=await post('disable',{password},login.cookie);assert.equal(disabled.status,200);
+ assert.equal((await challenge()).body.twoFactorRedirect,undefined);
+ const appPool=new Pool({connectionString:config.appDatabaseUrl});try{await assert.rejects(appPool.query('SELECT * FROM auth."twoFactor"'),e=>e.code==='42501');}finally{await appPool.end();}
+});
+
+test('dev without email accepts an existing verified password account but denies public signup and unverified login',async()=>{
+ const label='dev-'+randomUUID(),user=await signup(label);
+ const pendingEmail='pending-'+randomUUID()+'@example.test';
+ assert.equal((await request('/api/auth/sign-up/email',{method:'POST',body:{name:'Pending',email:pendingEmail,password:'a-strong-test-password-2026'}})).status,200);
+ const isolated=await createApplication({...config,smtp:undefined});
+ try{
+  await isolated.app.listen(0,'127.0.0.1');const address=await isolated.app.getUrl();
+  const post=(path,body)=>fetch(address+path,{method:'POST',headers:{origin:config.origin,'content-type':'application/json'},body:JSON.stringify(body)});
+  const signupResponse=await post('/api/auth/sign-up/email',{name:'Denied',email:'disabled-'+randomUUID()+'@example.test',password:'a-strong-test-password-2026'});assert.equal(signupResponse.status,400);
+  const unverified=await post('/api/auth/sign-in/email',{email:pendingEmail,password:'a-strong-test-password-2026'});assert.equal(unverified.status,403);
+  const login=await post('/api/auth/sign-in/email',{email:user.email,password:'a-strong-test-password-2026'});assert.equal(login.status,200);const cookie=login.headers.getSetCookie().map(c=>c.split(';')[0]).join('; ');assert.ok(cookie);
+  const session=await fetch(address+'/api/v1/workspaces',{headers:{cookie}});assert.equal(session.status,200);
+  assert.equal((await fetch(address+'/api/v1/workspaces')).status,401);
+  assert.equal(await isolated.mailWorker.runOnce(),null);
+ }finally{await isolated.close();}
+});

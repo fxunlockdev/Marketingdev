@@ -7,6 +7,9 @@ import base64
 import hashlib
 import json
 import math
+import platform
+import re
+import textwrap
 from pathlib import Path
 import resource
 import signal
@@ -16,8 +19,11 @@ import tempfile
 
 MAX_BYTES = 64 * 1024 * 1024
 MAX_REQUEST = ((MAX_BYTES + 2) // 3) * 4 + 4096
-VERSION = "desvio-video-normalize-v1/ffmpeg-7.1.5"
-LIB = "/opt/video-deps/usr/lib/aarch64-linux-gnu"
+VERSION = "desvio-video-render-v2/ffmpeg-7.1.5"
+_LIBRARY = {"aarch64": "aarch64-linux-gnu", "x86_64": "x86_64-linux-gnu"}.get(platform.machine())
+if _LIBRARY is None:
+    raise RuntimeError("Unsupported isolated video architecture")
+LIB = "/opt/video-deps/usr/lib/" + _LIBRARY
 ENV = {"PATH": "/usr/bin:/bin", "HOME": "/tmp", "LANG": "C.UTF-8",
        "LD_LIBRARY_PATH": ":".join([LIB, LIB+"/pulseaudio", LIB+"/blas", LIB+"/lapack"])}
 INPUT_OPTIONS = ["-protocol_whitelist", "file", "-format_whitelist", "mov", "-f", "mov",
@@ -100,8 +106,47 @@ def probe(path, expected):
     return {"width": width, "height": height, "duration_ms": round(video_duration*1000), "audio": bool(audio), "codec": v["codec_name"]}
 
 
+def validate_overlays(overlays, duration):
+    if not isinstance(overlays, list) or len(overlays) > 3:
+        reject("VIDEO_OVERLAY_INVALID")
+    for overlay in overlays:
+        if not isinstance(overlay, dict) or set(overlay) != {"text", "start_ms", "end_ms", "position", "foreground", "background"}:
+            reject("VIDEO_OVERLAY_INVALID")
+        if (not isinstance(overlay["text"], str) or not overlay["text"].strip() or len(overlay["text"]) > 90
+            or any(ord(c) < 32 or ord(c) == 127 for c in overlay["text"])
+            or overlay["position"] not in {"top", "bottom"}
+            or not all(isinstance(overlay[k], str) and re.fullmatch(r"#[0-9a-fA-F]{6}", overlay[k]) for k in ["foreground", "background"])
+            or not all(type(overlay[k]) is int for k in ["start_ms", "end_ms"])
+            or not 0 <= overlay["start_ms"] <= overlay["end_ms"]-1000 <= duration*1000-1000):
+            reject("VIDEO_OVERLAY_INVALID")
+    for i, a in enumerate(overlays):
+        for b in overlays[i+1:]:
+            if a["position"] == b["position"] and a["start_ms"] < b["end_ms"] and b["start_ms"] < a["end_ms"]:
+                reject("VIDEO_OVERLAY_INVALID")
+    return overlays
+
+
+def overlay_filters(overlays, root, width, height):
+    # User text is a literal UTF-8 file, never part of a filter expression.
+    # Font, file paths and all expressions are code-owned; colors/times validated.
+    font = "/opt/video-deps/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
+    size = max(12, round(min(width, height)/28))
+    margin = max(8, round(min(width, height)*0.05))
+    columns = min(36, max(8, int((width-4*margin)/(size*0.7))))
+    filters = []
+    for i, overlay in enumerate(overlays):
+        text = "\n".join(textwrap.wrap(overlay["text"], columns, break_long_words=True, break_on_hyphens=False))
+        if len(text.splitlines()) > 4 or len(text.splitlines())*size*1.4+2*margin > height/2:
+            reject("VIDEO_OVERLAY_LAYOUT_LIMIT")
+        path = root/f"overlay-{i}.txt"
+        path.write_text(text, encoding="utf-8")
+        y = str(margin) if overlay["position"] == "top" else f"h-text_h-{margin}"
+        filters.append(f"drawtext=fontfile={font}:textfile={path}:expansion=none:fontsize={size}:fontcolor=0x{overlay['foreground'][1:]}:box=1:boxcolor=0x{overlay['background'][1:]}:boxborderw={max(3,margin//2)}:x=(w-text_w)/2:y={y}:enable='gte(t,{overlay['start_ms']/1000})*lt(t,{overlay['end_ms']/1000})'")
+    return filters
+
+
 def run(value):
-    if not isinstance(value, dict) or set(value) != {"version", "input_base64", "input_sha256", "expected_duration_seconds"} or value["version"] != 1 or type(value["expected_duration_seconds"]) is not int or not 3 <= value["expected_duration_seconds"] <= 15 or not isinstance(value["input_base64"], str) or len(value["input_base64"]) > MAX_REQUEST-4096:
+    if not isinstance(value, dict) or set(value) not in ({"version", "input_base64", "input_sha256", "expected_duration_seconds"}, {"version", "input_base64", "input_sha256", "expected_duration_seconds", "overlays"}) or value["version"] != 1 or type(value["expected_duration_seconds"]) is not int or not 3 <= value["expected_duration_seconds"] <= 15 or not isinstance(value["input_base64"], str) or len(value["input_base64"]) > MAX_REQUEST-4096:
         reject("VIDEO_MEDIA_INPUT_INVALID")
     try:
         source = base64.b64decode(value["input_base64"], validate=True)
@@ -114,6 +159,7 @@ def run(value):
     if source[4:8] != b"ftyp":
         reject("VIDEO_MEDIA_CONTAINER_INVALID")
     expected = value["expected_duration_seconds"]
+    overlays = validate_overlays(value.get("overlays", []), expected)
     with tempfile.TemporaryDirectory(prefix="desvio-video-") as folder:
         root = Path(folder)
         original, canonical, thumb = root/"source.mp4", root/"canonical.mp4", root/"poster.png"
@@ -121,9 +167,10 @@ def run(value):
         metadata = probe(original, expected)
         ratio = min(1, 1920/max(metadata["width"], metadata["height"]), 1080/min(metadata["width"], metadata["height"]))
         width, height = [max(2, int(n*ratio)//2*2) for n in [metadata["width"], metadata["height"]]]
+        filters = [f"scale={width}:{height}:flags=lanczos", "setsar=1", *overlay_filters(overlays, root, width, height)]
         command("ffmpeg", ["-hide_banner", "-loglevel", "error", "-nostdin", "-xerror", "-max_error_rate", "0", "-max_alloc", "67108864", "-filter_threads", "1",
             *INPUT_OPTIONS, "-i", str(original), "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",
-            "-vf", f"scale={width}:{height}:flags=lanczos,setsar=1", "-r", "30", "-c:v", "libx264", "-threads", "2", "-preset", "fast", "-crf", "20",
+            "-vf", ",".join(filters), "-r", "30", "-c:v", "libx264", "-threads", "2", "-preset", "fast", "-crf", "20",
             "-pix_fmt", "yuv420p", "-profile:v", "high", "-level:v", "4.1", "-c:a", "aac", "-ac", "2", "-ar", "48000", "-b:a", "128k",
             "-max_muxing_queue_size", "128", "-movflags", "+faststart", "-f", "mp4", str(canonical)])
         saved = probe(canonical, expected)
@@ -137,7 +184,7 @@ def run(value):
         if not 24 <= canonical.stat().st_size <= MAX_BYTES or not 24 <= thumb.stat().st_size <= 2*1024*1024:
             reject("VIDEO_MEDIA_OUTPUT_LIMIT")
         clip, poster = canonical.read_bytes(), thumb.read_bytes()
-        return {"type": "result", "version": VERSION, "input_sha256": value["input_sha256"], "metadata": saved,
+        return {"type": "result", "version": VERSION, "overlays": overlays, "input_sha256": value["input_sha256"], "metadata": saved,
                 "video": {"mime": "video/mp4", "sha256": hashlib.sha256(clip).hexdigest(), "base64": base64.b64encode(clip).decode()},
                 "poster": {"mime": "image/png", "sha256": hashlib.sha256(poster).hexdigest(), "base64": base64.b64encode(poster).decode()}}
 

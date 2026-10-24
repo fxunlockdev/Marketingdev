@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-24T03:59:26.299690+00:00",
+  "passed": true,
+  "checks": [
+    {
+      "log": "work/social-web-final-3.log",
+      "sha256": "9bd6dcf87eb3b778b2e9aed52e67c0319bcd571df7315414730bb6565465e1ce",
+      "passed": 6,
+      "failed": 0
+    },
+    {
+      "log": "work/recovery-publication.log",
+      "sha256": "1f4c7b6cc1cf190898a5c1f48eb3979fe04dcbfbf88a98d40a1c597ad3ef5ee8",
+      "passed": 17,
+      "failed": 0
+    },
+    {
+      "log": "work/recovery-publishing-web.log",
+      "sha256": "c75e32a9cfebc7e3bb33af24c56057402d5f8b9ef2d45e0c733af2b3eca68652",
+      "passed": 9,
+      "failed": 0
+    }
+  ],
+  "live_calls": false,
+  "scope": "Local authenticated browser and publication recovery tests with actual Postgres/Temporal/storage and explicitly MOCK provider transports. Does not establish deployed OAuth or publication acceptance."
+}

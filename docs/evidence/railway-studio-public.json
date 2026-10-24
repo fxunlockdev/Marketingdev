@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-10-24T03:16:08.330Z",
+  "passed": true,
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "deployment_id": "40b6c699-0bc0-4cd8-a112-2647a88b5bee",
+  "form_boundary_contrast": 3.51,
+  "anonymous_denied": true,
+  "health": true,
+  "sign_in_accessibility": true,
+  "widths": [
+    1440,
+    390,
+    320
+  ],
+  "scope": "Public sign-in and final form-border styling. Authenticated Overview/Canvas journey is recorded separately against the preceding deployment; only form border color changed."
+}

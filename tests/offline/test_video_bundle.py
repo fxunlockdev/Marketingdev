@@ -23,3 +23,15 @@ class VideoBundleGuard(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'new directory'):
                 module.prepare(cache,output)
             self.assertEqual(sentinel.read_text(),'preserve')
+
+    def test_supported_architectures_have_exact_pins_and_same_ffmpeg_contract(self):
+        for arch in ['arm64','amd64']:
+            pins=json.loads((ROOT/f'apps/video/debian-{arch}-packages.json').read_text())
+            self.assertEqual(len(pins),len({p['Package'] for p in pins}))
+            self.assertEqual(next(p['Version'] for p in pins if p['Package']=='ffmpeg'),'7:7.1.5-0+deb13u1')
+            for pin in pins:
+                self.assertIn(pin['Architecture'],[arch,'all'])
+                self.assertRegex(pin['sha256'],r'^[a-f0-9]{64}$')
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError,'Unsupported runtime architecture'):
+                module.prepare(Path(folder),Path(folder)/'output','unexpected')

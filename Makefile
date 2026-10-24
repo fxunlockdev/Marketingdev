@@ -60,3 +60,51 @@ verify-video-runtime:
 
 verify-video-storage:
 	$(PYTHON) -m scripts.verify video-storage
+
+.PHONY: verify-video-canvas
+verify-video-canvas:
+	$(PYTHON) -m scripts.verify video-canvas
+
+.PHONY: verify-team
+verify-team:
+	$(PYTHON) -m scripts.verify team
+
+.PHONY: verify-planning
+verify-planning:
+	$(PYTHON) -m scripts.verify planning
+
+.PHONY: verify-container-images
+verify-container-images:
+	$(PYTHON) -m scripts.verify container-images
+
+.PHONY: verify-product-photos
+verify-product-photos:
+	$(PYTHON) -m scripts.verify product-photos
+
+.PHONY: verify-canvas-photos
+verify-canvas-photos:
+	$(PYTHON) -m scripts.verify canvas-photos
+
+.PHONY: verify-canvas-calendar
+verify-canvas-calendar:
+	$(PYTHON) -m scripts.verify canvas-calendar
+
+.PHONY: verify-review-reopen
+verify-review-reopen:
+	$(PYTHON) -m scripts.verify review-reopen
+
+.PHONY: verify-operator
+verify-operator:
+	$(PYTHON) -m scripts.verify operator
+
+.PHONY: verify-native-amd64
+verify-native-amd64:
+	$(PYTHON) -m scripts.verify native-amd64
+
+.PHONY: verify-worker-host
+verify-worker-host:
+	$(PYTHON) -m scripts.verify worker-host
+
+.PHONY: verify-creative-amd64
+verify-creative-amd64:
+	$(PYTHON) -m scripts.verify creative-amd64

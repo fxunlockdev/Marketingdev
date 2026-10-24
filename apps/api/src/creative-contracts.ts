@@ -1,3 +1,4 @@
+import type {LearningContext} from './learning-context.js';
 import { CREATIVE_SKILLS } from "./creative-skill-pins.js";
 export class CreativeError extends Error {
   constructor(readonly code: string) {
@@ -19,6 +20,7 @@ export type CreativeInput = {
     id: string;
     sha256: string;
     facts: { id: string; field: string; value: string }[];
+    learning?:LearningContext;
   };
   prompt: string;
   format: "static" | "ad";
@@ -30,7 +32,9 @@ export type CreativeInput = {
     cta: string;
   };
 };
+export type ProviderContext={provider:'gemini';parts:unknown[]};
 export type PlannerMessage = {
+  provider_context?:ProviderContext;
   role: "user" | "assistant" | "system" | "tool";
   content: string;
   tool_calls?: { id: string; name: string; args: Record<string, unknown> }[];
@@ -43,6 +47,7 @@ export type PlannerRequest = {
   tools: any[];
 };
 export type PlannerResponse = {
+  provider_context?:ProviderContext;
   content: string;
   tool_calls: { id: string; name: string; args: Record<string, unknown> }[];
   response_id?: string;
@@ -59,6 +64,7 @@ export type SkillResult = {
 };
 export const selectedSkills = (format: CreativeInput["format"]) =>
   [
+    "brand-engine",
     "image",
     "product-marketing",
     "social",

@@ -1,3 +1,12 @@
+import {CarouselJobs} from './carousel-jobs.js';
+import {InsightJobs} from './insight-jobs.js';
+import {GeminiPlanner} from './gemini-planner.js';
+import {VideoJobs} from './video-jobs.js';
+import {VideoReferences} from './video-references.js';
+import {VideoProviderJobs} from './video-provider-jobs.js';
+import {VideoRenderer} from './video-renderer.js';
+import {VideoDownload} from './video-download.js';
+import {HiggsfieldClient,HIGGSFIELD_MODELS} from './higgsfield-client.js';
 import {PublicationJobs} from './publication-jobs.js';
 import {SocialOAuthJobs} from './social-oauth-jobs.js';
 import {SocialJobs,SocialReadRetry} from './social-jobs.js';
@@ -31,15 +40,30 @@ const connection=await NativeConnection.connect({address:config.jobs.address}),c
 const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new WebsiteParser(config.documentImage),new BrandAnalyzer(process.env.OPENAI_API_KEY),undefined,new VisualCrawler(config.documentImage));
-const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
-const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
-const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled);
+const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
+const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
+const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
+const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled,config.videoRenderImage);
 const social=new SocialJobs(jobs,config.social);
 const socialOAuth=new SocialOAuthJobs(jobs,config.social,config.oauthEncryptionKey);
 const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
+const carousel=new CarouselJobs(jobs,creative,exporter);
+const video=config.video?new VideoJobs(jobs,new VideoReferences(undefined,jobs,config.video.encryptionKey,config.renderImage!,config.video.mode),creative,
+ new VideoProviderJobs(jobs,new HiggsfieldClient({mode:config.video.mode,credentials:config.video.credentials,models:[HIGGSFIELD_MODELS.image],referenceOrigins:[new URL(config.storage.endpoint).origin]}),config.video.encryptionKey),
+ new VideoDownload(config.video.outputOrigins,undefined,config.video.outputPolicy),new VideoRenderer(config.video.image)):undefined;
 const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue,config.provisionTaskQueue);
+async function carouselActivity<T>(action:()=>Promise<T>):Promise<T>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await action();}catch{throw ApplicationFailure.retryable('Carousel processing temporarily unavailable','CarouselUnavailable');}finally{clearInterval(timer);}}
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),
   maxConcurrentActivityTaskExecutions:2,activities:{
+    planCarousel:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await carousel.plan(scope);}catch{throw ApplicationFailure.retryable('Carousel planning temporarily unavailable','CarouselUnavailable');}finally{clearInterval(heartbeat);}},
+    prepareCarouselExport:(scope:JobScope,position:number)=>carouselActivity(()=>carousel.prepareExport(scope,position)),
+    checkCarouselExport:(scope:JobScope,position:number)=>carouselActivity(()=>carousel.checkExport(scope,position)),
+    completeCarousel:(scope:JobScope)=>carouselActivity(()=>carousel.complete(scope)),
+    failCarousel:(scope:JobScope)=>carouselActivity(()=>carousel.fail(scope)),
+    stepVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.nonRetryable('Video generation is not configured','VideoUnavailable');const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await video.step(scope);}catch{throw ApplicationFailure.retryable('Video processing temporarily unavailable','VideoUnavailable');}finally{clearInterval(heartbeat);}},
+    failVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.retryable('Video recovery awaits configured worker','VideoUnavailable');return video.exhausted(scope);},
+    generateInsights:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await insights.run(scope);}catch{throw ApplicationFailure.retryable('Analysis temporarily unavailable','InsightsUnavailable');}finally{clearInterval(heartbeat);}},
+    failInsights:async(scope:JobScope)=>insights.fail(scope),
     publishSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.run(scope);}catch(e){throw ApplicationFailure.create({message:'Publication processing unavailable',type:'PublicationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     reconcileSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.reconcile(scope);}catch(e){throw ApplicationFailure.create({message:'Publication check unavailable',type:'PublicationCheckUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     failPublication:async(scope:JobScope)=>publication.fail(scope),

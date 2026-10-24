@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-10-24T04:44:02.803298+00:00",
+  "passed": true,
+  "source_sha256": "b5458751225838d0a2f39c95ca37f2bd0a90014127799d2569d417938c2ef7ca",
+  "command": [
+    "node",
+    "scripts/foundation-test.mjs",
+    "--social-web"
+  ],
+  "tests": 7,
+  "log_sha256": "1fc873dc4ea494a3a9be32523b60278ec1301b0fa55f34448a23d5c2a770bf08",
+  "scope": "Actual local Next/Nest/PostgreSQL/Temporal/isolated provisioner browser journeys, including saved candidate recovery without duplicate creation. Postiz HTTP and consent explicitly MOCK. No deployed or live provider claim.",
+  "paid_or_live_social_calls": false
+}

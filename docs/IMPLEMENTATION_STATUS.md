@@ -1,5 +1,7 @@
 # Desvio V5 implementation status
 
+**Historical baseline:** the implementation table below records the early V5 build and is not current deployment status. For the current module-by-module state, outstanding work and self-test readiness, use [MODULE_TRACKER.md](MODULE_TRACKER.md), [BUILD_STATE.md](BUILD_STATE.md) and their linked machine-generated evidence. Video and owner-workspace provider defaults are now deployed through migration 057; the early pending/deployment statements below must not be used to infer current readiness.
+
 Owner correction, 21 October 2026: one account, up to three businesses under a configurable entitlement; business-focused navigation and the supplied warm editorial design. Keep the existing platform architecture. Three short onboarding steps, with the final goals screen pre-filled by AI from scraped/uploaded evidence and confirmed facts. Users review recommendations and answer only genuine gaps. **Source-grounded AI prefill and multimodal website analysis adapters are implemented locally, with mocked-provider tests.** Actual model output quality is not live verified. Missing credentials or evidence produce an explicitly identified fallback.
 
 ## Architecture retained

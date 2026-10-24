@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-23T12:01:24.648Z",
+  "passed": true,
+  "user_id": "ec162c5f-b855-4d14-bc33-22e24c389299",
+  "password_login": true,
+  "business_access": true,
+  "verification_basis": "owner-authorized dev provisioning; no email delivery claimed",
+  "scope": "Owner-authorized account provisioning and private API password/session/business access; public browser acceptance pending.",
+  "email_sha256": "a570b3ae53a6d29232f7de610cbebb9c59f72b03146a5f51e595ace77b69c138"
+}

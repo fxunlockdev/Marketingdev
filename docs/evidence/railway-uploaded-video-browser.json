@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-24T08:44:50.527Z",
+  "passed": true,
+  "web_deployment": "4b459dfc-320e-4d4d-b1df-daba54d598f0",
+  "owner_login": true,
+  "retained_shell": true,
+  "anonymous_businesses_denied": true,
+  "scope": "Actual deployed owner login and read-only navigation. Request budget and creative runner have local integration/browser evidence; no genuine OAuth, publication or paid model call."
+}

@@ -1,3 +1,4 @@
+import {postMetrics} from './post-analytics.js';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 export const POSTIZ_CONTRACT_COMMIT='651876e24317c2d8e717262cf98267ec6f699180';
@@ -58,35 +59,109 @@ export class PostizClient {
  async identity(){const value=await this.request('public/v1/me');const identity=this.checked(value,v=>{const org=record(record(v).organization);return {id:remoteId(org.id),name:str(org.name,500)};});if(identity.id!==this.#remoteOrg)throw new PostizError('POSTIZ_TENANT_MISMATCH');return identity;}
  private async verify(){try{await this.identity();}catch(e){if(e instanceof PostizError)throw e;throw new PostizError('POSTIZ_IDENTITY_UNVERIFIED');}}
  private integrations(value:any):PostizIntegration[]{return this.checked(value,v=>{if(!Array.isArray(v)||v.length>500)return fail();const seen=new Set<string>();return v.map(raw=>{const r=record(raw),id=remoteId(r.id);if(seen.has(id))return fail();seen.add(id);return {id,name:str(r.name,300),provider:str(r.identifier,100),disabled:bool(r.disabled),profile:optionalURL(r.profile),picture:optionalURL(r.picture)};});});}
+ async removeIntegration(id:string){id=remoteId(id);await this.verify();const value=await this.request('public/v1/integrations/'+encodeURIComponent(id),'DELETE');return this.checked(value,v=>{if(remoteId(record(v).id)!==id)return fail();return {id,publishingStopped:false as const};},true);}
  async listIntegrations(){await this.verify();return this.integrations(await this.request('public/v1/integrations'));}
- // First OAuth flow is LinkedIn member. Page/account selection remains a separate
- // verified workflow; no arbitrary provider URL is accepted here.
- async beginLinkedIn(){await this.verify();const value=await this.request('public/v1/social/linkedin','GET',undefined,undefined,true);return this.checked(value,v=>{
-  const url=new URL(str(record(v).url,8000));if(url.origin!=='https://www.linkedin.com'||url.pathname!=='/oauth/v2/authorization'||url.username||url.password||url.hash)return fail();
-  const state=url.searchParams.getAll('state'),redirect=url.searchParams.getAll('redirect_uri');
-  if(state.length!==1||!/^[a-zA-Z0-9_-]{6,256}$/.test(state[0])||redirect.length!==1||redirect[0]!==`${this.#callback.origin}/integrations/social/linkedin`||url.searchParams.get('response_type')!=='code'||!url.searchParams.get('client_id'))return fail();
-  return {url:url.href,state:state[0]};
- },true);}
- async completeLinkedIn(state:string,code:string,timezone:string){
-  if(!/^[a-zA-Z0-9_-]{6,256}$/.test(state)||!code||code.length>8000||/[\x00-\x1f]/.test(code)||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840)throw new PostizError('POSTIZ_CALLBACK_INVALID');
-  await this.verify();const value=await this.request('integrations/social-connect/linkedin','POST',JSON.stringify({state,code,timezone}),'application/json');
-  return this.checked(value,v=>{const r=record(v);if(r.organizationId!==this.#remoteOrg||r.providerIdentifier!=='linkedin'||r.inBetweenSteps===true||r.isBetweenSteps===true||r.pages&&(!Array.isArray(r.pages)||r.pages.length))return fail();return {id:remoteId(r.id),internalId:remoteId(r.internalId),name:str(r.name,300)};},true);
+ // Only audited single-step providers; page selection is a separate workflow.
+ async beginLinkedIn(internalId?:string){return this.beginAuthorization('linkedin',internalId);}
+ async completeLinkedIn(state:string,code:string,timezone:string){return this.completeAuthorization('linkedin',state,code,timezone);}
+ async beginAuthorization(provider:string,internalId?:string){
+  const target=this.oauthProvider(provider);
+  const path='public/v1/social/'+provider+(internalId===undefined?'':'?'+new URLSearchParams({refresh:remoteId(internalId)}));await this.verify();const value=await this.request(path,'GET',undefined,undefined,true);return this.checked(value,v=>{
+   const url=new URL(str(record(v).url,8000));if(url.origin!==target.origin||url.pathname!==target.path||url.username||url.password||url.hash)return fail();
+   const state=url.searchParams.getAll('state'),redirect=url.searchParams.getAll('redirect_uri');
+   if(state.length!==1||!/^[a-zA-Z0-9_-]{6,256}$/.test(state[0])||redirect.length!==1||redirect[0]!==`${this.#callback.origin}/integrations/social/${provider}`||url.searchParams.getAll('response_type').length!==1||url.searchParams.get('response_type')!=='code'||url.searchParams.getAll('client_id').length!==1||!url.searchParams.get('client_id'))return fail();
+   return {url:url.href,state:state[0]};
+  },true);
  }
- private media(value:any){return this.checked(value,v=>{const r=record(v),url=new URL(str(r.path,2048));if(!this.#origins.has(url.origin)||url.username||url.password||url.hash||!url.pathname.toLowerCase().endsWith('.png'))return fail();return {id:remoteId(r.id),path:url.href};},true);}
+ private oauthProvider(provider:string){
+  if(provider==='linkedin')return {origin:'https://www.linkedin.com',path:'/oauth/v2/authorization'};
+  if(provider==='instagram-standalone')return {origin:'https://www.instagram.com',path:'/oauth/authorize'};
+  throw new PostizError('POSTIZ_PROVIDER_UNSUPPORTED');
+ }
+ async completeAuthorization(provider:string,state:string,code:string,timezone:string){
+  this.oauthProvider(provider);
+  if(!/^[a-zA-Z0-9_-]{6,256}$/.test(state)||!code||code.length>8000||/[\x00-\x1f\x7f]/.test(code)||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840)throw new PostizError('POSTIZ_CALLBACK_INVALID');
+  await this.verify();const value=await this.request('integrations/social-connect/'+provider,'POST',JSON.stringify({state,code,timezone}),'application/json');
+  return this.checked(value,v=>{const r=record(v);if(r.organizationId!==this.#remoteOrg||r.providerIdentifier!==provider||r.inBetweenSteps===true||r.isBetweenSteps===true||r.pages&&(!Array.isArray(r.pages)||r.pages.length))return fail();return {id:remoteId(r.id),internalId:remoteId(r.internalId),name:str(r.name,300)};},true);
+ }
+ private media(value:any,extension='png'){return this.checked(value,v=>{const r=record(v),url=new URL(str(r.path,2048));if(!this.#origins.has(url.origin)||url.username||url.password||url.hash||!url.pathname.toLowerCase().endsWith('.'+extension))return fail();return {id:remoteId(r.id),path:url.href};},true);}
  async uploadPNG(bytes:Buffer,expectedSHA:string){
   if(bytes.length<24||bytes.length>20*1024*1024||! /^[a-f0-9]{64}$/.test(expectedSHA)||sha(bytes)!==expectedSHA)throw new PostizError('POSTIZ_MEDIA_INVALID');
   try{const m=await sharp(bytes,{limitInputPixels:1536*1536}).metadata();if(m.format!=='png'||!m.width||!m.height||![[1024,1024],[1536,1024],[1024,1536]].some(([w,h])=>m.width===w&&m.height===h))throw new Error();}catch{throw new PostizError('POSTIZ_MEDIA_INVALID');}
   await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'image/png'}),`desvio-${expectedSHA}.png`);
   return this.media(await this.request('public/v1/upload','POST',form));
  }
- async submitLinkedIn(input:{integrationId:string;caption:string;media:{id:string;path:string};scheduledAt:string}){
-  let id:string,date:string,media:{id:string;path:string};
-  try{id=remoteId(input.integrationId);date=iso(input.scheduledAt);media=this.media(input.media);if(typeof input.caption!=='string'||input.caption.length>3000)throw new Error();}catch{throw new PostizError('POSTIZ_POST_INVALID');}
-  const integrations=await this.listIntegrations(),target=integrations.find(i=>i.id===id);
-  if(!target||target.provider!=='linkedin'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
-  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:[media]}],settings:{__type:'linkedin',post_as_images_carousel:false}}]};
+ // Accept an already rendered and approved JPEG; never transform media during upload.
+ async uploadJPEG(bytes:Buffer,expectedSHA:string){
+  if(!Buffer.isBuffer(bytes)||bytes.length<24||bytes.length>8*1024*1024||! /^[a-f0-9]{64}$/.test(expectedSHA)||sha(bytes)!==expectedSHA)throw new PostizError('POSTIZ_MEDIA_INVALID');
+  try{
+   const decoder=sharp(bytes,{limitInputPixels:1536*1536}),m=await decoder.metadata();
+   // Deliberately bounded Desvio export envelope, not a claim of all Meta-supported sizes.
+   if(m.format!=='jpeg'||!m.width||!m.height||m.width<320||m.width>1440||m.width/m.height<0.8||m.width/m.height>1.91||m.pages&&m.pages!==1)throw new Error();
+   await decoder.raw().toBuffer();
+  }catch{throw new PostizError('POSTIZ_MEDIA_INVALID');}
+  await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'image/jpeg'}),`desvio-${expectedSHA}.jpg`);
+  return this.media(await this.request('public/v1/upload','POST',form),'jpg');
+ }
+ async submitInstagramImages(input:{integrationId:string;caption:string;media:{id:string;path:string}[];scheduledAt:string}){
+  let id:string,date:string,media:{id:string;path:string}[];
+  try{
+   id=remoteId(input.integrationId);date=iso(input.scheduledAt);
+   if(!Array.isArray(input.media)||input.media.length<1||input.media.length>10)throw new Error();
+   media=input.media.map(m=>this.media(m,'jpg'));
+   if(new Set(media.map(m=>m.id)).size!==media.length||new Set(media.map(m=>m.path)).size!==media.length||typeof input.caption!=='string'||!input.caption.trim()||[...input.caption].length>2200||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(input.caption))throw new Error();
+  }catch{throw new PostizError('POSTIZ_POST_INVALID');}
+  const target=(await this.listIntegrations()).find(i=>i.id===id);
+  if(!target||target.provider!=='instagram-standalone'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:media}],settings:{__type:'instagram-standalone',post_type:'post',is_trial_reel:false}}]};
   const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
   return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
+ }
+ // Caller supplies the hash-bound canonical output of the isolated video renderer.
+ async uploadMP4(bytes:Buffer,expectedSHA:string){
+  if(!Buffer.isBuffer(bytes)||bytes.length<24||bytes.length>64*1024*1024||bytes.subarray(4,8).toString()!=='ftyp'||!/^[a-f0-9]{64}$/.test(expectedSHA)||sha(bytes)!==expectedSHA)throw new PostizError('POSTIZ_MEDIA_INVALID');
+  await this.verify();const form=new FormData();form.set('adjust','false');form.set('file',new Blob([Uint8Array.from(bytes)],{type:'video/mp4'}),`desvio-${expectedSHA}.mp4`);
+  return this.media(await this.request('public/v1/upload','POST',form),'mp4');
+ }
+ async submitLinkedIn(input:{integrationId:string;caption:string;media:{id:string;path:string}|{id:string;path:string}[];mediaType?:'image'|'video'|'carousel';scheduledAt:string}){
+  let id:string,date:string,media:{id:string;path:string}[];
+  try{id=remoteId(input.integrationId);date=iso(input.scheduledAt);if(input.mediaType!==undefined&&! ['image','video','carousel'].includes(input.mediaType))throw new Error();if(input.mediaType==='carousel'){if(!Array.isArray(input.media)||input.media.length<2||input.media.length>10)throw new Error();media=input.media.map(m=>this.media(m));if(new Set(media.map(m=>m.id)).size!==media.length||new Set(media.map(m=>m.path)).size!==media.length)throw new Error();}else{if(Array.isArray(input.media))throw new Error();media=[this.media(input.media,input.mediaType==='video'?'mp4':'png')];}if(typeof input.caption!=='string'||input.caption.length>3000)throw new Error();}catch{throw new PostizError('POSTIZ_POST_INVALID');}
+  const integrations=await this.listIntegrations(),target=integrations.find(i=>i.id===id);
+  if(!target||target.provider!=='linkedin'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:media}],settings:{__type:'linkedin',post_as_images_carousel:false}}]};
+  const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
+  return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
+ }
+ // Instagram standalone's pinned provider treats one MP4 + post_type=post as a Reel.
+ // Only the caller's already-approved canonical video may reach this transport.
+ async submitInstagramReel(input:{integrationId:string;caption:string;media:{id:string;path:string};scheduledAt:string}){
+  let id:string,date:string,media:{id:string;path:string};
+  try{
+   id=remoteId(input.integrationId);date=iso(input.scheduledAt);media=this.media(input.media,'mp4');
+   if(typeof input.caption!=='string'||!input.caption.trim()||[...input.caption].length>2200||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(input.caption))throw new Error();
+  }catch{throw new PostizError('POSTIZ_POST_INVALID');}
+  const target=(await this.listIntegrations()).find(i=>i.id===id);
+  if(!target||target.provider!=='instagram-standalone'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:[media]}],settings:{__type:'instagram-standalone',post_type:'post',is_trial_reel:false}}]};
+  const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
+  return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
+ }
+ // Upstream soft-deletes the post group and swallows Temporal termination errors.
+ // An accepted response cannot prove publishing stopped or remove a live social post.
+ async requestScheduledPostRemoval(input:{postId:string;integrationId:string;scheduledAt:string;caption:string}){
+  let id:string,channel:string,date:string;
+  try{id=remoteId(input.postId);channel=remoteId(input.integrationId);date=iso(input.scheduledAt);if(typeof input.caption!=='string'||input.caption.length>3000||Date.parse(date)<Date.now()+60000)throw new Error();}catch{throw new PostizError('POSTIZ_REMOVAL_INPUT_INVALID');}
+  const at=Date.parse(date),posts=await this.listPosts(new Date(at-60000).toISOString(),new Date(at+60000).toISOString());
+  const matches=posts.filter(p=>p.id===id);
+  if(matches.length!==1||matches[0].integrationId!==channel||matches[0].provider!=='linkedin'||matches[0].state!=='queued'||matches[0].releaseId!==null||matches[0].releaseURL!==null||matches[0].publishDate!==date||matches[0].content!==input.caption)throw new PostizError('POSTIZ_REMOVAL_TARGET_UNCONFIRMED');
+  if(Date.parse(date)<Date.now()+60000)throw new PostizError('POSTIZ_REMOVAL_TOO_CLOSE');
+  await this.verify();
+  const value=await this.request('public/v1/posts/'+encodeURIComponent(id),'DELETE');
+  return this.checked(value,v=>{const r=record(v);if(r.error!==undefined||remoteId(r.id)!==id)return fail();return {postId:id,status:'removal_requested' as const,publishingStopped:false as const};},true);
+ }
+ async postAnalytics(postId:string,days=30){
+  remoteId(postId);if(!Number.isInteger(days)||days<1||days>90)throw new PostizError('POSTIZ_DATE_RANGE_INVALID');
+  await this.verify();return postMetrics(await this.request(`public/v1/analytics/post/${encodeURIComponent(postId)}?date=${days}`));
  }
  async listPosts(start:string,end:string):Promise<PostizPost[]>{
   let from:string,to:string;try{from=iso(start);to=iso(end);if(Date.parse(to)<Date.parse(from)||Date.parse(to)-Date.parse(from)>31*86400000)throw new Error();}catch{throw new PostizError('POSTIZ_DATE_RANGE_INVALID');}

@@ -10,7 +10,9 @@
 
 ## Higgsfield
 
-`@higgsfield/client@0.2.6`, import `@higgsfield/client/v2`. createHiggsfieldClient accepts credentials key:secret or apiKey/apiSecret. Wire header: Authorization: Key id:secret. subscribe(endpoint,{input,withPolling:false}) returns remote request fields; maxRetries:0 must be explicit. Inputs are sent directly, not nested in params. SDK has no public getStatus/cancel method.
+Current REST adapter update (2026-10-24): the official quick start at https://open.higgsfield.ai/quick-start accepts a complete opaque API key unchanged. Desvio’s direct REST adapter accepts this and legacy pairs; the server adds `Authorization: Key `. Local contracts pass; no live credential validation claimed.
+
+Historical pinned SDK audit: `@higgsfield/client@0.2.6`, import `@higgsfield/client/v2`. createHiggsfieldClient accepts credentials key:secret or apiKey/apiSecret. Wire header: Authorization: Key id:secret. subscribe(endpoint,{input,withPolling:false}) returns remote request fields; maxRetries:0 must be explicit. Inputs are sent directly, not nested in params. SDK has no public getStatus/cancel method.
 
 Use authenticated [GET /requests/{request_id}/status](https://docs.higgsfield.ai/docs/api-reference/requests/get-request-status) in durable polls. Validate request IDs and host before attaching credentials. SDK status type omits documented canceled state, so validate actual HTTP output independently.
 

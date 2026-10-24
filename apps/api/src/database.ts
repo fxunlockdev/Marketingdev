@@ -17,16 +17,16 @@ export class TenantDatabase {
   }
 
   async transaction<T>(userId: string, orgId: string | undefined, write: boolean,
-    action: (db: PoolClient) => Promise<T>, brandId?: string): Promise<T> {
+    action: (db: PoolClient) => Promise<T>, brandId?: string, reviewOnly=false): Promise<T> {
     const db = await this.pool.connect();
     try {
       await db.query('BEGIN');
       await db.query(`SELECT set_config('app.user_id', $1, true), set_config('app.org_id', $2, true),
-        set_config('app.brand_id', $3, true)`, [userId, orgId ?? '', brandId ?? '']);
+        set_config('app.brand_id', $3, true),set_config('app.operation',$4,true)`, [userId, orgId ?? '', brandId ?? '',reviewOnly?'review':'ordinary']);
       if (orgId) {
         const { rows } = await db.query(`SELECT role FROM app.memberships WHERE organization_id = $1 AND user_id = $2 AND active`, [orgId, userId]);
         if (!rows.length) throw new NotFoundException('Account not found');
-        if(brandId){const allowed=(await db.query('SELECT app.business_access($1,$2,$3) AS allowed',[orgId,brandId,write])).rows[0].allowed;if(!allowed)throw write?new ForbiddenException('You cannot change this business'):new NotFoundException('Business not found');}
+        if(brandId){const allowed=(await db.query('SELECT (app.business_access($1,$2,$3) OR ($3 AND $4 AND app.review_access($1,$2))) AS allowed',[orgId,brandId,write,reviewOnly])).rows[0].allowed;if(!allowed)throw write?new ForbiddenException('You cannot change this business'):new NotFoundException('Business not found');}
         if (write && rows[0].role === 'viewer') throw new ForbiddenException('This workspace is read-only for you');
       }
       const value = await action(db);

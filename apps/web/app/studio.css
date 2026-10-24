@@ -1,0 +1,70 @@
+/* Desvio studio: warm, tactile surfaces and purposeful, interruptible motion.
+   Guidance: jakubkrehel/skills @ 4c66b1f, better-ui + better-layout. */
+:root{--paper:#eee9df;--white:#faf7f1;--ink:#242220;--muted:#696257;--line:#ddd6cb;--blue:#955022;--blue-wash:#f4e5d6;--studio-orange:#cd7439;--studio-ease:cubic-bezier(.2,0,0,1)}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--paper);-webkit-font-smoothing:antialiased}
+h1,h2,h3,.wordmark,.overview-metric strong{font-family:Arial,Helvetica,sans-serif}
+h1{font-weight:500;letter-spacing:-1.8px;font-size:clamp(30px,3.1vw,46px);line-height:1.12;text-wrap:balance}
+h2{font-weight:500;letter-spacing:-.7px}h3{font-weight:500;letter-spacing:-.3px}
+.wordmark{font-weight:650;font-size:27px;letter-spacing:-1.1px;gap:12px}
+.wordmark .brand-mark{display:inline-flex;width:35px;height:35px;align-items:center;justify-content:center;border-radius:12px;background:var(--ink);color:var(--studio-orange);font-size:0;box-shadow:0 2px 3px #24222012}
+.wordmark .brand-mark:after{content:"";width:12px;height:12px;border-radius:50%;background:var(--studio-orange)}
+.wordmark-dot{display:none}
+.v5-sidebar{background:#f3eee5;border-color:#dfd9cf;padding:28px 16px;overscroll-behavior:contain}
+.v5-sidebar>.wordmark{margin-bottom:20px}
+.v5-sidebar nav a{font-weight:400;font-size:14px;border:1px solid transparent;border-radius:14px;color:#625d54;gap:12px;padding:11px 14px;transition:background-color 120ms,color 120ms}
+.v5-sidebar nav a[aria-current]{background:var(--white);color:var(--ink);box-shadow:0 1px 2px #24222015,0 0 0 1px #24222009}
+.nav-group{font-size:11px;letter-spacing:.3px;text-transform:none;font-weight:500;color:var(--muted);margin:24px 14px 10px}
+.v5-account{border-top:1px solid var(--line);margin-top:28px;padding-top:20px}
+.v5-topbar{background:#f0ebe2;border-color:var(--line);height:auto;min-height:80px;padding-block:16px}
+.v5-topbar select{border-radius:50px;background:var(--white);border-color:#c6bfb3;padding-inline:18px}
+.v5-main{padding-top:36px}
+.v5-page-title .eyebrow{font-size:10px;letter-spacing:1.7px;color:var(--muted)}
+.v5-panel,.v5-business-card,.v5-add-card{border:1px solid #e2dcd2;border-radius:24px;background:var(--white);box-shadow:0 2px 2px #24222008}
+button,.button{transition:background-color 120ms,color 120ms,transform 150ms ease-out;min-height:42px}
+.primary{background:var(--ink);border-color:var(--ink);border-radius:14px}
+.profile-link,.build-label{background:var(--white)}
+.build-label{border-color:#d4c5b1;color:#79502c;text-transform:none;letter-spacing:0;font-weight:500}
+input,select,textarea{border-color:#8f8679;background:#fffcf7}
+.studio-flow{position:relative;margin:14px 0 32px;padding:24px 0 0;background-image:radial-gradient(#aaa08a30 .8px,transparent .8px);background-size:22px 22px}
+.studio-flow-heading{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:38px}
+.studio-flow-heading .eyebrow{font-weight:500;letter-spacing:0;font-size:12px;color:var(--muted)}
+.studio-flow-heading a{font-size:12px;color:var(--ink);text-underline-offset:4px}
+.studio-flow-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(210px,.9fr) minmax(0,1fr);gap:34px;align-items:center;padding:0 12px 40px}
+.studio-stage{display:flex;flex-direction:column;align-items:flex-start;color:var(--ink);text-decoration:none;gap:20px;min-width:0}
+.studio-step{font-size:9px;font-weight:600;letter-spacing:1.5px;color:var(--muted)}
+.studio-stage>strong{font-size:clamp(34px,4.3vw,66px);line-height:.99;font-weight:400;letter-spacing:-3px}
+.studio-stage-detail{font-size:13px;line-height:1.5;max-width:200px;color:var(--muted)}
+.studio-stage-last{padding-inline-start:8px}
+.studio-core{display:flex;align-items:center;flex-direction:column;text-align:center;text-decoration:none;color:var(--ink);background:var(--white);border:1px solid #fff9;border-radius:40px;padding:28px 18px 22px;gap:20px;box-shadow:0 0 0 14px #d5cfc344,0 18px 30px #3a33251a;position:relative}
+.studio-emblem{display:grid;place-items:center;width:66px;height:66px;border-radius:22px;background:var(--ink);box-shadow:0 7px 12px #24222018}
+.studio-emblem i{display:block;width:22px;height:22px;border-radius:50%;background:var(--studio-orange);box-shadow:0 0 0 8px #cd74392e;transition:transform 300ms var(--studio-ease)}
+.studio-core-title{font-size:26px;line-height:1.15;letter-spacing:-.8px;font-weight:500}
+.studio-core>span:not([class]){font-size:12px;line-height:1.6;color:var(--muted)}
+.studio-pill{display:inline-flex;align-items:center;justify-content:space-between;gap:18px;border-radius:40px;border:1px solid #ded7cc;background:var(--white);padding:11px 15px;font-size:12px;box-shadow:0 2px 2px #2422200c}
+.studio-pill-dark{background:var(--ink);color:var(--white);border-color:var(--ink);box-shadow:none}
+.studio-flow-foot{display:flex;align-items:center;gap:12px;padding:20px 24px;border:1px solid #e1d9cd;border-radius:20px;background:var(--white);font-size:13px}
+.studio-flow-foot a{margin-inline-start:auto;color:var(--blue);text-underline-offset:3px}
+.studio-dot{width:9px;height:9px;border-radius:50%;background:var(--studio-orange);flex-shrink:0}
+.overview-metrics{gap:12px}.overview-metric{padding:22px;gap:14px;position:relative;transition:background-color 150ms,transform 200ms var(--studio-ease)}
+.overview-metric>span:first-child{font-size:12px;color:var(--muted)}.overview-metric strong{font-size:38px;letter-spacing:-1.5px;font-variant-numeric:tabular-nums}.overview-metric .hint{font-size:11px}
+.overview-next a{padding:20px 0;gap:8px}.overview-next strong{font-weight:500}.overview-next span{font-size:13px}
+@media(hover:hover){.v5-sidebar nav a:hover:not([aria-current]){background:#eae3d7}.studio-stage:hover .studio-pill{background:#f2e8db}.studio-core:hover .studio-pill-dark{background:#3c3530}.overview-metric:hover{background:#fffaf2}}
+@media(prefers-reduced-motion:no-preference){
+ button:not(:disabled):active,.button:active{transform:scale(.96)}
+ .studio-flow-heading{animation:studio-enter 300ms ease-out both}
+ .studio-stage{animation:studio-enter 300ms ease-out 100ms both}
+ .studio-core{animation:studio-enter 300ms ease-out 200ms both;transition:transform 300ms var(--studio-ease)}
+ .studio-stage-last{animation-delay:300ms}.studio-flow-foot{animation:studio-enter 300ms ease-out 400ms both}
+ @media(hover:hover){.studio-core:hover{transform:translateY(-4px)}.studio-core:hover .studio-emblem i{transform:scale(1.12)}.overview-metric:hover{transform:translateY(-2px)}}
+ @keyframes studio-enter{from{opacity:0;transform:translateY(12px);filter:blur(4px)}to{opacity:1;transform:translateY(0);filter:blur(0)}}
+}
+@media(prefers-reduced-motion:reduce){button,.button,.studio-emblem i,.overview-metric{transition:background-color 120ms,opacity 120ms}}
+@media(max-width:1100px){.studio-flow-grid{gap:24px;padding-inline:0}.studio-stage>strong{font-size:42px;letter-spacing:-2px}.studio-core{padding-inline:12px}.studio-pill{gap:10px;padding-inline:12px}}
+@media(max-width:700px){.studio-flow-heading{align-items:flex-start;flex-direction:column;gap:12px;margin-bottom:28px}.studio-flow-grid{grid-template-columns:1fr;gap:26px;padding-inline:8px}.studio-core{margin:0 12px;padding:24px}.studio-stage{gap:12px}.studio-stage>strong{font-size:40px}.studio-stage>strong br{display:none}.studio-stage>strong br:after{content:' '}.studio-stage-last{padding-inline-start:0}.studio-stage-detail{max-width:none}.studio-flow-foot{flex-wrap:wrap;padding:18px;line-height:1.5}.studio-flow-foot a{margin-inline-start:21px}.v5-main{padding-inline:20px}.v5-sidebar{padding:16px}.v5-sidebar>.wordmark{margin-bottom:0}.v5-account{margin-top:0}.overview-metric{padding:18px}.studio-step{font-size:10px}}
+
+/* First entry reserves the real shell geometry. Navigation keeps the mounted shell. */
+.shell-placeholder {display:block;width:70%;height:2.5rem;border-radius:12px;background:var(--line,#e6e0d6);opacity:.45;margin-block:1rem;}
+.shell-nav-placeholder {display:flex;align-items:center;gap:12px;padding:12px 14px;color:var(--muted,#766f65);}
+.shell-content-placeholder {height:240px;border-radius:28px;background:var(--line,#e6e0d6);opacity:.35;margin-block:24px;}
+.shell-content-placeholder.short {height:100px;width:75%;}
+@media(prefers-reduced-motion:no-preference){.workspace-opening .shell-content-placeholder{animation:shell-breathe 1.6s ease-in-out infinite alternate;}@keyframes shell-breathe{to{opacity:.55;}}}

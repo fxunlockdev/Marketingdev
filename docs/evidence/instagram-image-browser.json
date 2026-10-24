@@ -1,0 +1,11 @@
+{
+  "recorded_at": "2026-10-24T06:42:08.489Z",
+  "status": "MOCKED",
+  "deployed": false,
+  "live_provider_calls": false,
+  "tests_passed": 11,
+  "log_sha256": "e1bf18c35d413c044ebdbb498b3a82ecc4626f6aff6997fb74aae984ef13b9e7",
+  "sources": {
+    "tests/browser/publishing.test.mjs": "0f152a36d730f91208190f5940f53b6ce040d180874f40985b3d506f8cbca1de"
+  }
+}

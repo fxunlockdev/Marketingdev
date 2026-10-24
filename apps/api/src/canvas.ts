@@ -1,3 +1,5 @@
+import {approvedLearning} from './learning-context.js';
+import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
 import {
   BadRequestException,
@@ -36,6 +38,7 @@ export class Canvas {
     id: string,
     write: boolean,
     action: (db: any, b: any) => Promise<T>,
+    reviewOnly=false,
   ) {
     const b = await this.businesses.resolve(user, id);
     return this.businesses.database.transaction(
@@ -43,8 +46,22 @@ export class Canvas {
       b.organization_id,
       write,
       (db) => action(db, b),
-      id,
+      id,reviewOnly,
     );
+  }
+  allowances(user:string,id:string){
+    return this.scope(user,id,false,async(db,b)=>{
+      // Only permission metadata is exposed. Neither credentials nor a provider-health claim.
+      const rows=(await db.query(`
+        SELECT 'creative_openai' AS capability,enabled,expires_at,expires_at<=now() AS expired FROM app.creative_grants WHERE organization_id=$1 AND brand_id=$2
+        UNION ALL SELECT 'creative_gemini',enabled,expires_at,expires_at<=now() FROM app.gemini_creative_grants WHERE organization_id=$1 AND brand_id=$2
+        UNION ALL SELECT 'planning_'||provider,enabled,expires_at,expires_at<=now() FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2
+        UNION ALL SELECT 'video',enabled,expires_at,expires_at<=now() FROM app.video_grants WHERE organization_id=$1 AND brand_id=$2`,[b.organization_id,id])).rows;
+      return {scope:'allowances_only',allowances:['creative_openai','creative_gemini','planning_openai','planning_gemini','video'].map(capability=>{
+        const row=rows.find((r:any)=>r.capability===capability);
+        return {capability,state:!row?'missing':!row.enabled?'disabled':row.expired?'expired':'active',expires_at:row?.expires_at??null};
+      })};
+    });
   }
   references(user:string,id:string){
     return this.scope(user,id,false,async(db,b)=>({references:(await db.query(`SELECT ${referenceColumns} FROM app.brand_references r ${referenceJoins} WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.revoked_at IS NULL ORDER BY r.approved_at,r.id`,[b.organization_id,id])).rows.map(({object_key,...r}:any)=>r)}));
@@ -140,10 +157,11 @@ export class Canvas {
         ).rows,
         runs: (
           await db.query(
-            "SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.project_id,r.parent_version_id,r.output_version_id,r.channel,r.size,r.format FROM app.jobs j JOIN app.creative_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC LIMIT 100",
+            "SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.project_id,r.parent_version_id,r.output_version_id,r.channel,r.size,r.format,r.text_provider,r.selected_text_model FROM app.jobs j JOIN app.creative_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC LIMIT 100",
             [b.organization_id, id, threadId],
           )
         ).rows,
+        planning_runs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,r.output_plan_id,r.scheduled_at,r.input->'preferences'->>'starts_on' AS starts_on FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id,threadId])).rows,
         projects: (
           await db.query(
             "SELECT id,title,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 ORDER BY created_at DESC LIMIT 100",
@@ -169,9 +187,12 @@ export class Canvas {
         "size",
         "parent_version_id",
         "reference_ids",
+        "text_provider",
+        "max_cost_micros",
       ]),
       prompt = plain(v.prompt, 4000),
-      k = key(requestKey);
+      k = key(requestKey),
+      textProvider=creativeTextProvider(v.text_provider);
     if (
       !["static", "ad"].includes(String(v.format)) ||
       !["linkedin", "instagram"].includes(String(v.channel)) ||
@@ -180,6 +201,7 @@ export class Canvas {
       throw new BadRequestException(
         "Choose a supported static image format, channel and size",
       );
+    if(v.max_cost_micros!==undefined&&(!Number.isSafeInteger(v.max_cost_micros)||Number(v.max_cost_micros)<1||Number(v.max_cost_micros)>1000000000))throw new BadRequestException("Use a positive whole-number request budget in microdollars");
     if(v.reference_ids!==undefined&&(!Array.isArray(v.reference_ids)||v.reference_ids.length>3))throw new BadRequestException("Choose up to three approved references");
     const referenceIds=(v.reference_ids??[]).map((r:unknown)=>uuid(String(r)));
     if(new Set(referenceIds).size!==referenceIds.length)throw new BadRequestException("Choose each reference once");
@@ -195,6 +217,8 @@ export class Canvas {
           channel: v.channel,
           size: v.size,
           parent,
+          ...(textProvider==='gemini'?{text_provider:textProvider}:{}),
+          ...(v.max_cost_micros!==undefined?{max_cost_micros:v.max_cost_micros}:{}),
           ...(referenceIds.length?{reference_ids:referenceIds}:{}),
         }),
       );
@@ -227,7 +251,7 @@ export class Canvas {
       if (
         (
           await db.query(
-            "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND status IN ('queued','running','retrying','unknown') LIMIT 1",
+            "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('creative.generate','carousel.generate') AND status IN ('queued','running','retrying','unknown') LIMIT 1",
             [b.organization_id, id],
           )
         ).rowCount
@@ -288,13 +312,14 @@ export class Canvas {
         );
       }
       if(referenceIds.length&&(await db.query('SELECT id FROM app.brand_references WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[]) AND revoked_at IS NULL',[b.organization_id,id,referenceIds])).rowCount!==referenceIds.length)throw new ConflictException('A reference is unavailable or no longer approved');
+      const selectedTextModel=await creativeTextModel(db,b.organization_id,id,textProvider);
       const job = randomUUID();
       await db.query(
         "INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",
         [job, b.organization_id, id, user],
       );
       await db.query(
-        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model,memory_context,max_cost_micros) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
         [
           job,
           b.organization_id,
@@ -309,6 +334,7 @@ export class Canvas {
           v.size,
           k,
           sha,
+          textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),v.max_cost_micros??null,
         ],
       );
       for(const [position,referenceId] of referenceIds.entries())await db.query('INSERT INTO app.creative_references(organization_id,brand_id,job_id,reference_id,position) VALUES($1,$2,$3,$4,$5)',[b.organization_id,id,job,referenceId,position]);
@@ -505,7 +531,7 @@ export class Canvas {
         revision: Number(v.revision) + 1,
       };
     };
-    return scoped?action(scoped.db,scoped.b):this.scope(user,id,true,action);
+    return scoped?action(scoped.db,scoped.b):this.scope(user,id,true,action,v.decision!=='in_review');
   }
   media(user: string, id: string, mediaId: string) {
     mediaId = uuid(mediaId);

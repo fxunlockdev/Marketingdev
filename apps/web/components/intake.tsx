@@ -20,6 +20,24 @@ const messages: Record<string, string> = {
     "We could not confirm the model response. This request will not be repeated automatically.",
   AI_SUBMISSION_REQUIRES_REVIEW:
     "This model request needs an operator check before it can be safely repeated.",
+  WEBSITE_ENCODING_UNSUPPORTED:
+    "The website returned a compression format we could not read. Try Read website again; if it fails again, share the error details below.",
+  WEBSITE_COMPRESSION_INVALID:
+    "The website returned an incomplete or damaged compressed page. Try Read website again.",
+  WEBSITE_PAGE_TOO_LARGE:
+    "This page exceeds our safe processing size. Try a smaller public page, such as your About or product page.",
+  WEBSITE_FETCH_TIMEOUT:
+    "The website took too long to respond. Try Read website again shortly.",
+  WEBSITE_DNS_TIMEOUT:
+    "The website address took too long to resolve. Check the address and try again shortly.",
+  WEBSITE_FETCH_FAILED:
+    "We could not establish a secure connection to the website. Check that it opens publicly, then try again.",
+  WEBSITE_ROBOTS_UNAVAILABLE:
+    "We could not check this website’s crawler permissions. Try again shortly; analysis cannot proceed until that check succeeds.",
+  WEBSITE_HTTP_ERROR:
+    "The website refused the request or returned a server error. Check that the page is public and does not require login.",
+  WEBSITE_NOT_HTML:
+    "This address did not return a web page. Use a public website page or upload your document below.",
   WEBSITE_ROBOTS_DISALLOWED:
     "This website asks crawlers not to read this page. You can upload brand documents instead.",
   WEBSITE_ADDRESS_BLOCKED:
@@ -50,12 +68,13 @@ export function BrandIntake({
     requestKind = useRef("");
   latest.current = onComplete;
   const path = `/api/v1/businesses/${business.id}/intake`,
-    writable = business.role !== "viewer",
+    writable = ['owner','admin','editor'].includes(business.role),
     watch = !state || state.jobs.some(active);
   useEffect(() => {
     let live = true,
       inflight = false;
     async function poll() {
+      if(document.hidden)return;
       if (inflight) return;
       inflight = true;
       try {
@@ -159,14 +178,24 @@ export function BrandIntake({
           : "Add your brand documents or a few facts, then let AI prepare your direction."}
       </p>
       <Notice error={error} />
+      {recent?.error_code && !pending && recent.status !== "succeeded" && (
+        <div role="alert">
+          <strong>{recent.kind === "website.extract" ? "Website reading failed" : "Brand analysis failed"}</strong>
+          <p>{messages[recent.error_code] ?? "We could not complete this step. Your saved work is safe. Share the error details below so we can investigate before you retry."}</p>
+          <details>
+            <summary>Error details</summary>
+            <p>Code: {/^[A-Z][A-Z0-9_]{0,99}$/.test(recent.error_code) ? recent.error_code : "ANALYSIS_FAILED"}</p>
+            <p>Reference: {recent.id}</p>
+          </details>
+        </div>
+      )}
       <p role="status">
         {pending
           ? "Reading your evidence and preparing your brand…"
           : recent?.status === "succeeded"
             ? "Your latest analysis is saved. Review the evidence below."
             : recent?.error_code
-              ? (messages[recent.error_code] ??
-                "This analysis could not finish. Your saved work is safe; you can use documents or manual facts.")
+              ? "Your saved work is safe."
               : business.website
                 ? "Preparing to read your website…"
                 : "Ready when your evidence is added."}
@@ -212,18 +241,18 @@ export function BrandIntake({
           {state.visuals.map((v: any) => (
             <article key={v.id} id={"visual-" + v.id} className="v5-panel">
               <h3>
-                {v.document_page ? `Document page ${v.document_page}` : v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
-                {v.document_page ? "Uploaded guideline" : v.observations.title || "Website reference"}
+                {v.viewport === "upload" ? "Product photo" : v.document_page ? `Document page ${v.document_page}` : v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
+                {v.viewport === "upload" ? "Private upload" : v.document_page ? "Uploaded guideline" : v.observations.title || "Website reference"}
               </h3>
-              {!v.document_page && <a href={v.website_url} target="_blank" rel="noopener noreferrer">
+              {!v.document_page && v.viewport!=="upload" && <a href={v.website_url} target="_blank" rel="noopener noreferrer">
                 Open source page
               </a>}
               <p>
                 {v.width} × {v.height} pixels
                 {v.coverage.truncated ? " · height capped" : ""}.{" "}
-                {!v.document_page && <>{v.coverage.resourceFailures.length} resources could not be captured.</>}
+                {!v.document_page && v.viewport!=="upload" && <>{v.coverage.resourceFailures.length} resources could not be captured.</>}
               </p>
-              {!v.document_page && <><p>
+              {!v.document_page && v.viewport!=="upload" && <><p>
                 Observed fonts:{" "}
                 {[
                   ...new Set(
@@ -246,11 +275,12 @@ export function BrandIntake({
               </p></>}
               <PrivateVisual businessId={business.id} visualId={v.id}
                 label={`View ${v.document_page ? `document page ${v.document_page}` : `${v.viewport} capture`}`}
-                alt={v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}/>
+                alt={v.viewport === "upload" ? "Uploaded product photo" : v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}/>
             </article>
           ))}
         </details>
       )}
+      <button type="button" disabled={busy} onClick={()=>{setError(undefined);void api(path).then(setState).catch(setError);}}>Refresh image sources</button>
       {!!state?.visuals?.length && <BrandReferences businessId={business.id} writable={writable} sources={state.visuals}/>}
       {visualAnalysis && (
         <details>

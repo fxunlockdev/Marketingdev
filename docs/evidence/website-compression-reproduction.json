@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-10-24T08:56:32.499Z",
+  "passed": true,
+  "site": "https://www.lodhagroup.com/",
+  "result": {
+    "pages": [
+      "https://www.lodhagroup.com/"
+    ],
+    "skipped": [],
+    "coverage": "server_html_only",
+    "pageLimit": 5,
+    "requests": 2
+  },
+  "pages": [
+    {
+      "url": "https://www.lodhagroup.com/",
+      "characters": 111262,
+      "has_title": true
+    }
+  ],
+  "scope": "Actual public HTTP crawl with patched SafeWeb, robots checks and bounded decompression. No model calls; renderer and full AI analysis not exercised."
+}

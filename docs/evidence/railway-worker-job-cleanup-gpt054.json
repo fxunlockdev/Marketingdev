@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-10-24T07:20:37.554Z",
+  "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+  "passed": true,
+  "run_id": "2b055357-8387-463d-afea-6b2c6483124b",
+  "objects_removed": 3,
+  "fixture_rows_removed": true,
+  "workflow_status": "COMPLETED",
+  "workflow_history_retained": true,
+  "recovery_test": false,
+  "scope": "Exact acceptance fixture cleanup only; Temporal history retained under normal retention.",
+  "live_model_or_social_calls": false
+}

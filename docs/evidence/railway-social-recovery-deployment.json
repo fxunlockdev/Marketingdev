@@ -1,0 +1,31 @@
+{
+  "checked_at": "2026-10-24T04:18:30.565662+00:00",
+  "environment": "dev",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "api_deployment": {
+    "id": "31a66e24-33b7-4223-a820-cb0c9d66c0d2",
+    "status": "SUCCESS"
+  },
+  "web_deployment": {
+    "id": "924f2bd6-c281-4e2a-a709-92dbf9d2f6f6",
+    "status": "SUCCESS"
+  },
+  "worker_activation": {
+    "checked_at": "2026-10-24T04:16:33.594Z",
+    "status": "activated",
+    "preview_sha256": "0bfd40db4c58ce6b019785b07dfd9ea1a4a74040e5ce3681c50d00e222b21ab1",
+    "backup_container": "desvio-worker-rollback-583bbf6c-9960-4465-b5cf-f9ac3181d9ef",
+    "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
+  },
+  "scope": "Exact deployment statuses observed from Railway; infrastructure acceptance is separate from live provider acceptance.",
+  "live_calls": false,
+  "source_commit": "e0bf721",
+  "provisioner": {
+    "checked_at": "2026-10-24T04:17:10.650Z",
+    "passed": true,
+    "image": "sha256:3363e29ed1a64af85dbeb219e74eaaa73d97d1809dd1225bcd3a66878978cdaf",
+    "backup_container": "desvio-provisioner-rollback-20261024-patched",
+    "paid_calls": false,
+    "scope": "Dedicated provisioner replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+  }
+}

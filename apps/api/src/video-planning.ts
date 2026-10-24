@@ -1,6 +1,8 @@
+import {validLearning} from './learning-context.js';
 import {CreativeError,type CreativeInput,type SkillResult} from './creative-contracts.js';
 import {CREATIVE_SKILLS} from './creative-skill-pins.js';
 export const VIDEO_SKILLS={
+ "brand-engine":CREATIVE_SKILLS["brand-engine"],
  video:{skill_sha256:'0a35e32dda553707996bf383c00ecf971d05127d35d5d814577457c23a3ab591',tree_sha256:'76696e47ce406b06143b50a08d75effa0a5dfd109f12beb86fd5e3d1b68900f1'},
  'ad-creative':CREATIVE_SKILLS['ad-creative'],'product-marketing':CREATIVE_SKILLS['product-marketing'],social:CREATIVE_SKILLS.social,
 };
@@ -17,7 +19,7 @@ const time=(v:any)=>Number.isSafeInteger(v)&&v>=0;
 export function validateVideoInput(v:any):asserts v is VideoPlanningInput {
  const fail=()=>{throw new CreativeError('VIDEO_PLAN_INPUT_INVALID');};
  if(!fields(v,['task','brand','prompt','channel','duration_seconds','reference'])||v.task!=='video'||!plain(v.prompt,4000)||!['linkedin','instagram'].includes(v.channel)||!Number.isInteger(v.duration_seconds)||v.duration_seconds<3||v.duration_seconds>15)fail();
- if(!fields(v.brand,['id','sha256','facts'])||!plain(v.brand.id,100)||!sha(v.brand.sha256)||!Array.isArray(v.brand.facts)||!v.brand.facts.length||v.brand.facts.length>200||v.brand.facts.some((f:any)=>!fields(f,['id','field','value'])||!plain(f.id,100)||!plain(f.field,100)||!plain(f.value,4000))||new Set(v.brand.facts.map((f:any)=>f.id)).size!==v.brand.facts.length)fail();
+ if(!fields(v.brand,['id','sha256','facts',...(v.brand?.learning===undefined?[]:['learning'])])||(v.brand.learning!==undefined&&!validLearning(v.brand.learning))||!plain(v.brand.id,100)||!sha(v.brand.sha256)||!Array.isArray(v.brand.facts)||!v.brand.facts.length||v.brand.facts.length>200||v.brand.facts.some((f:any)=>!fields(f,['id','field','value'])||!plain(f.id,100)||!plain(f.field,100)||!plain(f.value,4000))||new Set(v.brand.facts.map((f:any)=>f.id)).size!==v.brand.facts.length)fail();
  const r=v.reference;
  if(!fields(r,['kind','sha256','width','height','duration_seconds','caption'])||!['image','video'].includes(r.kind)||!sha(r.sha256)||![r.width,r.height].every(n=>Number.isInteger(n)&&n>=64&&n<=4096)||!plain(r.caption,3000,true)||(r.kind==='image'?r.duration_seconds!==null:typeof r.duration_seconds!=='number'||!Number.isFinite(r.duration_seconds)||r.duration_seconds<1||r.duration_seconds>30))fail();
  if(Buffer.byteLength(JSON.stringify(v))>350000)fail();
@@ -40,6 +42,7 @@ export function validateVideoBrief(value:any,input:VideoPlanningInput):VideoBrie
  for(let i=0;i<value.overlays.length;i++)for(let j=i+1;j<value.overlays.length;j++){
   const a=value.overlays[i],b=value.overlays[j];if(a.position===b.position&&a.start_ms<b.end_ms&&b.start_ms<a.end_ms)fail();
  }
+ if((value.video_prompt+'\nScript:\n'+value.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n')).length>10000)fail();
  return value;
 }
 export function validateVideoPlanningResult(value:any,input:VideoPlanningInput):VideoPlanningResult {

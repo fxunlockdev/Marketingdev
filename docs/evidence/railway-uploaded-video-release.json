@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-10-24T08:19:52.282796+00:00",
+  "source_commit": "ba8c0760b4d20714281d55e60ded84bdcb052fb6",
+  "api_deployment": "81c9b334-0fce-4b92-b029-6ba38db8f5a1",
+  "api_status": "SUCCESS",
+  "web_deployment": "4b459dfc-320e-4d4d-b1df-daba54d598f0",
+  "web_status": "SUCCESS",
+  "worker_image": "sha256:3e4f7ed622597cb057672c3857728cac7d13e3f9f4eab03da1b57aabff0917a4",
+  "migration": 56,
+  "private_job_and_cleanup_passed": true,
+  "owner_login_and_navigation_passed": true,
+  "provider_keys_present": {
+    "OPENAI_API_KEY": true,
+    "GEMINI_API_KEY": true,
+    "HIGGSFIELD_CREDENTIALS": true
+  },
+  "video_enabled": false,
+  "publishing_enabled": false,
+  "paid_provider_calls": false,
+  "full_customer_flow_live_verified": false,
+  "scope": "Actual dev deployment, runtime configuration, isolated provisioner registration, owner login and private media job acceptance. Business provider defaults and video activation remain pending; provider generation was tested locally with MOCK transports.",
+  "security_passed": true,
+  "security_source_unchanged": true
+}

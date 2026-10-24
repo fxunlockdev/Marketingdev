@@ -1,4 +1,4 @@
-"""Offline ARM64 test bundle from exact APT-verified Debian archive pins.
+"""Offline architecture-specific runtime bundle from exact APT-verified Debian archive pins.
 
 No package scripts execute. Download acquisition is operator/build tooling, not
 part of a customer request. Existing output is refused, never silently replaced.
@@ -14,12 +14,17 @@ import tarfile
 
 ROOT = Path(__file__).resolve().parent.parent
 
-def prepare(cache, output):
-    pins = json.loads((ROOT/'apps/video/debian-arm64-packages.json').read_text())
+def prepare(cache, output, architecture="arm64"):
+    if architecture not in {"arm64", "amd64"}:
+        raise ValueError("Unsupported runtime architecture")
+    library = "aarch64-linux-gnu" if architecture == "arm64" else "x86_64-linux-gnu"
+    pins = json.loads((ROOT/f'apps/video/debian-{architecture}-packages.json').read_text())
     if output.exists():
         raise ValueError('Output must be a new directory')
     # Verify every archive before extracting any member.
     for pin in pins:
+        if pin['Architecture'] not in {architecture, 'all'}:
+            raise ValueError('Archive architecture mismatch')
         name = pin['filename']
         if Path(name).name != name or not name.endswith('.deb'):
             raise ValueError('Invalid archive path')
@@ -35,7 +40,7 @@ def prepare(cache, output):
         with tarfile.open(fileobj=io.BytesIO(data)) as archive:
             for item in archive:
                 name = item.name.removeprefix('./')
-                if not (name in ['usr/bin/ffmpeg', 'usr/bin/ffprobe'] or name.startswith(('usr/lib/aarch64-linux-gnu/', 'usr/share/fonts/truetype/', 'usr/share/doc/'))):
+                if not (name in ['usr/bin/ffmpeg', 'usr/bin/ffprobe'] or name.startswith((f'usr/lib/{library}/', 'usr/share/fonts/truetype/', 'usr/share/doc/'))):
                     continue
                 if '..' in name.split('/') or name.startswith('/'):
                     raise ValueError('Archive path escape')
@@ -62,7 +67,7 @@ def prepare(cache, output):
         if target.exists() or target.is_symlink():
             target.unlink()
         target.symlink_to(posixpath.relpath(resolved, posixpath.dirname(name)))
-    print('Verified and extracted', len(pins), 'pinned Debian archives without package scripts; ARM64 test bundle only')
+    print('Verified and extracted', len(pins), 'pinned Debian archives without package scripts;', architecture)
 
 if __name__ == '__main__':
-    prepare(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve())
+    prepare(Path(sys.argv[1]).resolve(), Path(sys.argv[2]).resolve(), sys.argv[3] if len(sys.argv)>3 else "arm64")

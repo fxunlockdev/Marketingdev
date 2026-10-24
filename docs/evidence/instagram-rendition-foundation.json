@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-24T06:28:40.408630+00:00",
+  "passed": true,
+  "tests": 14,
+  "scope": "Real local PostgreSQL forced RLS, isolated renderer and private storage. Separate PNG/JPEG identity, request replay, exact-format approval and tenant denial. No live provider operations or deployment.",
+  "source_sha256": {
+    "database/migrations/052_channel_image_renditions.sql": "f8c38965a08a4793aa6eb93b8de8244b30574b74f6cbf4935a965ca4b60fcf0d",
+    "apps/api/src/creative-exports.ts": "b49fa90b67c51936ff6cf097a088033ef24ccbd137dfd475402f75a90c83aed6",
+    "apps/api/src/export-jobs.ts": "7ce5710f838f90665cb47ae5116d52d0de02bb29c2c1423081b952f3578408d7",
+    "apps/api/src/carousels.ts": "7ecec2d3d36cb46c9b7596319da38ab566e2dfab6e412743535b49cd5b928505",
+    "apps/api/src/video-references.ts": "3c01533dafb3adc37daec94fa1833784efe918eea215780b534d65fe5e22c973",
+    "tests/foundation/exports.test.mjs": "466ab333bb3769e45220b9be07c32713a25f945e6635c53f7a775f0607322b44"
+  },
+  "log_sha256": "d025bc5ecccc0e428c630b2c62875af0478ccda611b108fe01891ab7ca56ba1e"
+}

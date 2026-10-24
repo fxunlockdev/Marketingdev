@@ -1,0 +1,52 @@
+{
+  "suite": "container-images",
+  "scope": "Actual Linux amd64 Docker builds, non-root/read-only native API dependencies and standalone web Chromium sign-in render. Packaging only; no connected cloud application or live providers.",
+  "checked_at": "2026-10-23T04:27:57.980450+00:00",
+  "source_sha256": "5130f461e3ff948cdba9be10abbba1356b352ec85c663e3720bde9e5c3566877",
+  "source_sha256_start": "5130f461e3ff948cdba9be10abbba1356b352ec85c663e3720bde9e5c3566877",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "docker",
+        "build",
+        "--platform",
+        "linux/amd64",
+        "-f",
+        "infra/api.Dockerfile",
+        "-t",
+        "desvio-api:dev-amd64",
+        "."
+      ],
+      "exit_code": 0,
+      "output": "Sending build context to Docker daemon  1.587MB\n\nStep 1/16 : FROM node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb AS build\n ---> 2d49d876e962\nStep 2/16 : WORKDIR /opt/desvio\n ---> Using cache\n ---> 872a438c9623\nStep 3/16 : COPY package.json package-lock.json tsconfig.json ./\n ---> Using cache\n ---> 006f872b35ff\nStep 4/16 : RUN npm ci --ignore-scripts\n ---> Using cache\n ---> a77aa580d0b5\nStep 5/16 : COPY apps/api/src ./apps/api/src\n ---> Using cache\n ---> c41a6dd4185b\nStep 6/16 : RUN npm run build && npm prune --omit=dev --ignore-scripts\n ---> Using cache\n ---> 73a5c3abf46e\nStep 7/16 : FROM node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb\n ---> 2d49d876e962\nStep 8/16 : WORKDIR /opt/desvio\n ---> Using cache\n ---> 872a438c9623\nStep 9/16 : ENV NODE_ENV=production LISTEN_HOST=::\n ---> Using cache\n ---> 4d150e531a17\nStep 10/16 : COPY --from=build --chown=node:node /opt/desvio/node_modules ./node_modules\n ---> Using cache\n ---> 7179652d0391\nStep 11/16 : COPY --from=build --chown=node:node /opt/desvio/dist ./dist\n ---> Using cache\n ---> db2b3fed3bd9\nStep 12/16 : COPY --chown=node:node package.json ./\n ---> Using cache\n ---> 0a581086e7c5\nStep 13/16 : COPY --chown=node:node scripts/bootstrap-database.mjs scripts/migrate.mjs ./scripts/\n ---> Using cache\n ---> 3388383fc5c8\nStep 14/16 : COPY --chown=node:node database/migrations ./database/migrations\n ---> Using cache\n ---> fee9f9627522\nStep 15/16 : USER node\n ---> Using cache\n ---> add4eb0a15fd\nStep 16/16 : CMD [\"node\",\"dist/main.js\"]\n ---> Using cache\n ---> bc15af42a19c\nSuccessfully built bc15af42a19c\nSuccessfully tagged desvio-api:dev-amd64\nDEPRECATED: The legacy builder is deprecated and will be removed in a future release.\n            Install the buildx component to build images with BuildKit:\n            https://docs.docker.com/go/buildx/\n\n"
+    },
+    {
+      "command": [
+        "docker",
+        "build",
+        "--platform",
+        "linux/amd64",
+        "-f",
+        "infra/web.Dockerfile",
+        "--build-arg",
+        "API_ORIGIN=http://api.railway.internal:3100",
+        "-t",
+        "desvio-web:dev-amd64",
+        "."
+      ],
+      "exit_code": 0,
+      "output": "Sending build context to Docker daemon  1.587MB\n\nStep 1/16 : FROM node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb AS build\n ---> 2d49d876e962\nStep 2/16 : WORKDIR /opt/desvio\n ---> Using cache\n ---> 872a438c9623\nStep 3/16 : COPY package.json package-lock.json tsconfig.json ./\n ---> Using cache\n ---> 006f872b35ff\nStep 4/16 : RUN npm ci --ignore-scripts\n ---> Using cache\n ---> a77aa580d0b5\nStep 5/16 : ENV NEXT_TELEMETRY_DISABLED=1\n ---> Using cache\n ---> 2e0ec0d3e58e\nStep 6/16 : COPY apps/web ./apps/web\n ---> Using cache\n ---> 1caedb55eff7\nStep 7/16 : COPY apps/api/src ./apps/api/src\n ---> Using cache\n ---> a7b2b3367b7a\nStep 8/16 : COPY scripts/build-web.mjs scripts/start-web.mjs ./scripts/\n ---> Using cache\n ---> 39b883ee3a6a\nStep 9/16 : ARG API_ORIGIN\n ---> Using cache\n ---> f93163666fd8\nStep 10/16 : RUN node scripts/build-web.mjs\n ---> Using cache\n ---> 8a388b49a050\nStep 11/16 : FROM node:26.5.0-bookworm-slim@sha256:2d49d876e96237d76de412761cf05dbfe5aee325cc4406a4d41d5824c5bb8beb\n ---> 2d49d876e962\nStep 12/16 : WORKDIR /opt/desvio\n ---> Using cache\n ---> 872a438c9623\nStep 13/16 : ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1\n ---> Using cache\n ---> 8f24269769ef\nStep 14/16 : COPY --from=build --chown=node:node /opt/desvio/apps/web/.next/standalone ./\n ---> Using cache\n ---> 9966d7a08ca3\nStep 15/16 : USER node\n ---> Using cache\n ---> 1252ade1cd86\nStep 16/16 : CMD [\"node\",\"start-web.mjs\"]\n ---> Using cache\n ---> 0928edfb8704\nSuccessfully built 0928edfb8704\nSuccessfully tagged desvio-web:dev-amd64\nDEPRECATED: The legacy builder is deprecated and will be removed in a future release.\n            Install the buildx component to build images with BuildKit:\n            https://docs.docker.com/go/buildx/\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/container-images-test.mjs"
+      ],
+      "exit_code": 0,
+      "output": "{\"images\":[{\"tag\":\"desvio-api:dev-amd64\",\"id\":\"sha256:bc15af42a19c76b65e675fac982617582b0c7ffc880cfa66dab9e0f857c7717d\",\"architecture\":\"amd64\"},{\"tag\":\"desvio-web:dev-amd64\",\"id\":\"sha256:0928edfb8704f7a0d18b9908500557322bdd0bca5b5a0aeb0f28ed759dc4cff9\",\"architecture\":\"amd64\"}],\"api_native_probe\":{\"arch\":\"x64\",\"uid\":1000,\"png\":90,\"worker\":\"function\",\"api\":\"function\"},\"web_health\":\"web-process-only\",\"web_signin_rendered\":true,\"read_only_nonroot\":true,\"live_calls\":false,\"scope\":\"Linux amd64 packaging/native dependencies/standalone browser smoke only; no connected API, cloud or provider acceptance\"}\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false
+}

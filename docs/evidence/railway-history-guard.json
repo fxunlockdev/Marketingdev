@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-10-24T04:35:23.309Z",
+  "passed": true,
+  "deployment_id": "15ec6a27-9c36-4c37-b19a-299700bc752d",
+  "canceled_back_retains_draft": true,
+  "confirmed_back_navigates": true,
+  "forward_restores_saved_value": true,
+  "profile_writes": 0,
+  "retained_shell": true,
+  "scope": "Actual dev owner login and temporary unsaved UI edits only. No saved profile, provider or social operation."
+}

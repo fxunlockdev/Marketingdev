@@ -1,0 +1,90 @@
+# Staging provider permissions
+
+## Owner test sequence
+
+The dev app is https://desvio-dev-web-dev.up.railway.app. Add model credentials in Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12` → **dev** → **desvio-dev-worker-settings** → **Variables**. Start with `OPENAI_API_KEY` for onboarding, planning and image creation/editing. New static/carousel creative planning, monthly content planning and video storylines/prompts use OpenAI GPT only. Static imagery continues through GPT Image; approved video requests use Higgsfield. `GEMINI_API_KEY` does not enable these creative flows or provide fallback. Historical Gemini records and unrelated supported workflows remain separate. Higgsfield setup is described below. Never add these to the web service.
+
+1. Sign in and create a business. Add a website or brand files. Manual facts and brand approval can be tested without model keys.
+2. Save the server key, then run the guided setup's **activate saved Railway settings** option. The settings service is configuration storage: saving a key there does not update the running worker by itself.
+3. Use **configure business allowance** for onboarding, creative and planning. Enter eligible model IDs, verified rates, your chosen spending caps (or explicit `unlimited`) and expiry. For visual onboarding, include the verified image-token ceiling. These are distinct capability caps, not a shared total budget.
+4. In onboarding, run brand analysis, review/correct the extracted facts and confirm the brand profile. In Canvas, generate a plan or image, edit the saved creative, and approve the resulting exact version in Review Inbox. An edit invalidates the previous approval.
+5. For video, complete the explicit Higgsfield/video settings and allowance below. Approve the video prompt before paid generation, then approve the finished asset separately. Static images do not need video-style prompt preapproval.
+
+This is the setup path for owner testing, not proof that live model calls have passed. Social OAuth/publishing stays separately gated; Supplying a Meta app alone does not verify a social connection or publication. No paid request or social post is made by the setup wizard.
+
+## Guided local setup
+
+Run `npm run setup:dev` from this repository in an interactive terminal. Choose activation to preview/apply saved Railway settings, or allowance setup to select an existing business and enter one capability’s model, verified prices, lifetime USD cap and expiry. No JSON editing is required. Each capability has its own cap; these are not a shared total, and prior usage counts toward the lifetime limit. Video draft text and paid video rendering need their respective separate allowances.
+
+The wizard never asks for keys: keep those in Railway server variables. It makes no model calls or social posts. It shows the existing exact preview and requires `ACTIVATE` or `AUTHORIZE` before applying. Canceling makes no runtime/allowance changes. The saved private manifest retains its change ID for reconciliation after interrupted applies; use the existing preview/apply command with that same file rather than creating another change. Publishing authorization stays in the explicit account-bound operator tool. This is local operator guidance, not a customer/admin web UI or live provider verification.
+
+## Railway dev command
+
+From the repository, use `node infra/worker-control/configure-providers.mjs --list` to discover exact business/channel IDs. The command is pinned to the existing Desvio dev project/environment and reads the current private sandbox and trusted image inventory. It retrieves the database credential internally through the authenticated Railway CLI, sends it only over stdin to a temporary restricted container, and never installs it on the worker or API. No provider calls occur. An empty business list means the owner must first add a business in Desvio.
+
+Prepare the manifest below using authorized model IDs, rates and spending limits. Preview with `node infra/worker-control/configure-providers.mjs /private/path/grants.json`, then apply only that reviewed preview using `node infra/worker-control/configure-providers.mjs /private/path/grants.json --apply PREVIEW_SHA256`. The same existing migration-check, tenant, atomicity, audit and stale-preview safeguards run inside the temporary container. On a transport failure, reconcile by rerunning the same manifest/change ID: a committed change reports `already_applied`; do not create a new change ID to blindly retry.
+
+This eliminates manually copying the administrator database connection. It does not deploy provider settings, enable video/API flags, verify pricing or create a social connection. The credentials-only worker settings and controlled worker rollout remain separate. Never enable grants before the owner's spending authorization. The operator setup UI remains unfinished.
+
+## Direct administrator command
+
+Use the one-shot administrator tool after database bootstrap. Never put the migration credential in API, web, worker or customer environments. Provider keys belong in server secret configuration, not this manifest or command arguments. This tool makes no provider calls and does not verify model eligibility or pricing.
+
+Set `APP_MODE=staging`, `DESVIO_DATABASE_NAME` to the exact database name and `MIGRATION_DATABASE_URL` through the administrator's secret environment. Run `node scripts/configure-providers.mjs --list` to list business and channel IDs without credentials. Only test/development/staging modes are accepted, and every applied migration checksum must match the checkout.
+
+Create a private JSON manifest with version 1, a fresh UUID `change_id`, exact `organization_id` and `business_id`, a meaningful `operator_reference`, and a `grants` array. Every grant requires `kind`, boolean `enabled`, and future UTC `expires_at` within 31 days. Use the owner's explicitly authorized budget and exact eligible model IDs; do not copy example prices or enable a grant merely because a key exists.
+
+| Kind | Required additional fields |
+| --- | --- |
+| onboarding | model, budget_micros, input_micros_per_token, output_micros_per_token; max_tokens_per_image for visual evidence |
+| creative | text_model, image_model, quality (low/medium/high), budget_micros, input_micros_per_token, output_micros_per_token, max_image_request_micros |
+| gemini_creative | text_model, budget_micros, input_micros_per_token, output_micros_per_token |
+| planning / insights | provider (openai/gemini), model, budget_micros, input_micros_per_token, output_micros_per_token |
+| video | models, budget_micros, max_create_micros, max_edit_micros |
+| publishing | channel_id, remote_account_id, daily_limit |
+
+Micros represent millionths of a US dollar. Budgets are lifetime caps against existing ledgers, not a balance reset. Per-call maxima must not exceed the budget. Video models are limited to the two already implemented contracts: `kling-video/v3.0/std/image-to-video` and `kling-video/o3/video-edit`. Publishing currently requires the exact verified, available LinkedIn account binding; additional providers remain unavailable. This permission never substitutes for final creative approval.
+
+Preview: `node scripts/configure-providers.mjs /private/path/grants.json`. Review the prior allowance alongside the normalized proposed business/model/cost scope and returned `preview_sha256`. Lifetime cap changes do not reset existing reservations. Apply that exact preview using `node scripts/configure-providers.mjs /private/path/grants.json --apply PREVIEW_SHA256`. Any selected grant or account-binding change invalidates the preview. A successful batch is atomic and audited. Replaying the same change ID does not reapply it; changed content needs a new ID and preview. Disable a capability using a new change ID with `enabled:false`; publishing revocation expires its grant immediately. Already submitted provider operations must still reconcile and are not canceled by changing permissions.
+
+The tool accepts no secret fields, does not return Postiz credentials, and is denied to runtime roles. Customer generation remains gated by separately provisioned server keys, funds, permissions, approved video prompts and the existing application rules. No LIVE_VERIFIED or LAUNCH_READY status is generated by configuration. Verify local behavior with `make verify-operator`; live validation still requires the owner's explicit caps and allowlists.
+
+## Video settings and read-only worker check
+
+Copy the complete Higgsfield dashboard API key unchanged into `HIGGSFIELD_CREDENTIALS`. Current single-token keys and legacy `key:secret` credentials are accepted; do not add an `Authorization`/`Key` prefix or assemble a secret. The server adds the header prefix. This follows the current [official quick start](https://open.higgsfield.ai/quick-start). The compatibility change must be deployed before activating a single-token key.
+
+In Railway dev → **desvio-dev-worker-settings**, video activation now accepts explicit `VIDEO_ENABLED=true`, `VIDEO_ENCRYPTION_KEY` (32 random bytes encoded as 64 hex characters), and `HIGGSFIELD_OUTPUT_ORIGINS` (comma-separated exact HTTPS origins verified for the provider account), alongside `HIGGSFIELD_CREDENTIALS` and either `OPENAI_API_KEY` or `GEMINI_API_KEY`. There are no guessed default output origins. Missing/false VIDEO_ENABLED keeps video off even when credentials exist. Infrastructure and social enable flags in this settings service remain ignored.
+
+Run `npm run build`, then `node infra/worker-control/start-dev.mjs --check`. This only inspects exact installed images and the current worker configuration; it does not start/replace a container or make provider calls. It reports `configuration_matches`, `replacement_required` or `worker_absent`, running state and credential presence without returning values. Evidence is written to `docs/evidence/railway-worker-readiness.json`. A configuration match is not authenticated provider or queue health proof.
+
+A changed setting still requires a controlled worker replacement; the normal start command refuses to overwrite a differently configured worker. The API must separately have matching video flags/runtime pins, and the business needs an authorized expiring allowance. Use the coordinated activation command below. Never enable spending simply to make a readiness report green.
+
+## Coordinated dev activation
+
+`node infra/worker-control/activate-dev.mjs` previews the exact existing worker identity, desired configuration fingerprint, API video/social/renderer settings and current healthy API deployment. Apply only the reviewed output using `node infra/worker-control/activate-dev.mjs --apply PREVIEW_SHA256`. A changed key, flag, image, worker identity or API deployment invalidates that preview. No spending allowances or social flags are created by activation.
+
+The operator lock spans the transition. Pending/running/retrying jobs prevent a change. The command rechecks the preview after preflight, temporarily disables already-enabled video/social API features, preserves the old worker under a unique rollback name when replacement is necessary, verifies worker registration, then redeploys and verifies the exact returned API deployment. An unchanged configuration causes no restart. Renderer pins are synchronized even while video remains disabled. Normalized absent API settings restore as explicit false/empty defaults on rollback; administrator/provider credentials never enter the plan or journal.
+
+On failure, rollback restores the previous worker and effective API settings. If recovery is uncertain, the lock is retained and `work/provider-activation-journal.json` records `reconcile_required`; inspect the exact named containers/deployment before recovery. Do not delete the lock and blindly retry. Worker replacement/recovery is covered by injected failure tests; this command’s real Railway acceptance so far covers API renderer-pin synchronization with the existing worker unchanged. Provider-enabled replacement and live generation remain unverified.
+
+The installed Railway CLI 5.5.0 returns the exact redeployment ID in JSON, verified against its [official source](https://raw.githubusercontent.com/railwayapp/cli/v5.5.0/src/commands/redeploy.rs). The command waits for that ID to become SUCCESS and refuses unexpected concurrent deployments. Evidence: `railway-provider-activation.json`, `railway-provider-activation-api.json` and the deployed owner browser check.
+
+## Dedicated dev provisioning worker
+
+After dedicated Postiz dev infrastructure is configured, `node infra/worker-control/start-dev-provisioner.mjs` creates/starts the isolated provisioner from the exact trusted image. It refuses mismatched existing containers and does not enable customer provisioning, publishing, or model spending. Run `node infra/worker-control/check-provisioner.mjs` to verify both queue pollers and the restricted database role. These commands never expose the signing secret to the customer API or model worker. A registered poller is not proof of real Postiz enterprise or OAuth acceptance.
+
+## Verified dev social infrastructure (2026-10-24)
+
+Postiz, its isolated provisioner and Desvio social/provisioning flags are deployed and checked. The worker loader requires actual private Postiz/provisioner health and matching API/worker OAuth encryption keys before activation. Private state selects social settings explicitly; enterprise signing/database secrets are not forwarded to the normal worker. Publishing remains disabled. Two synthetic enterprise identities, adapter cross-binding denial, and actual uploaded PNG delivery through the web route passed. OAuth and actual posting remain unverified. Adding provider keys still requires coordinated worker activation and explicit per-business grants described above; self-service operator setup remains unfinished.
+
+## OAuth app readiness
+
+`POSTIZ_OAUTH_ENABLED` is an explicit API switch, separate from Postiz provisioning and encryption-key presence. It defaults to false; an encryption key alone must not advertise a usable social authorization flow. Set it true only after the audited LinkedIn app credentials (`LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`) are configured on the private Postiz service with the exact callback `https://desvio-dev-web-dev.up.railway.app/integrations/social/linkedin`, and that service has redeployed successfully. API startup rejects activation without Postiz enabled and a valid OAuth encryption key. Coordinated activation preserves this explicit switch while social is enabled and temporarily disables it during worker replacement. This does not verify app permissions or authorize publishing. Instagram standalone OAuth, Reel and single-JPEG paths have local mock-provider coverage; Meta app configuration and live acceptance remain pending.
+
+### Visual onboarding allowance
+
+Screenshot/document-image analysis requires a positive `max_tokens_per_image` on the onboarding allowance, based on the selected model’s verified image-token ceiling. The guided setup now asks for this value. Zero disables visual analysis; it does not silently fall back to text when saved visual evidence exists. The exact image count multiplied by this ceiling participates in the existing reservation and business budget check. The optional manifest field accepts whole numbers from 0 through 1,000,000. Omitting it preserves an existing allowance’s value (or database default zero on first creation), so older manifest replays retain their content/hash. No price or token ceiling is guessed.
+
+### Explicit uncapped allowance
+
+Migration 055 adds an explicit uncapped lifetime allowance: the operator manifest sets `budget_micros: null`, or selects `unlimited` in guided setup. Omission remains invalid. Existing grants retain their caps; this does not automatically authorize other businesses or change enabled flags, expiry, model eligibility, per-request estimates, recurring-loop limits, tenant checks, idempotency, prompt review, or social consent. Usage reservations continue to be recorded. Provider account limits still apply. The owner requested uncapped self-testing on 24 October; no paid assistant-run tests are authorized by that preference. Apply only to the owner’s chosen test business.

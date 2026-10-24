@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-10-24T07:41:38.344417+00:00",
+  "passed": true,
+  "status": "ADAPTER_READY",
+  "tests": {
+    "work/uncapped-contracts-final.log": 149,
+    "work/uncapped-operator.log": 11
+  },
+  "security_evidence": "docs/evidence/security.json",
+  "security_source_sha256": "ec3ea90c6fadc1adbed84a6337b6b69d25d914205cd0104f05e518d450d08e81",
+  "log_sha256": {
+    "work/uncapped-contracts-final.log": "e043f7d6f3d9ff3f0317e63481e6a5647599721118ab81d1b439ad35d1fe9c4b",
+    "work/uncapped-operator.log": "6f67540b767145db9baaf152d6fc3d17f448f28a61ac94085c6ce4c1602e4d1e"
+  },
+  "scope": "Explicit per-business uncapped allowance, continuing usage accounting, no duplicate provider replay, administrator-only grants, guided setup and frozen-source full security suite. No owner business grant or paid provider call; rollout tracked separately."
+}
