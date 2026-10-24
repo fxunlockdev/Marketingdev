@@ -13,7 +13,14 @@ export class SocialConnections {
   const account=(await db.query('SELECT revision,enabled,identity_verified_at FROM app.postiz_accounts WHERE brand_id=$1',[id])).rows[0];
   const channels=(await db.query('SELECT id,provider,name,profile,(internal_id IS NOT NULL AND provider=\'linkedin\') AS can_reconnect,publishing_held,observed_state,token_health,last_seen_at,last_checked_at FROM app.social_channels ORDER BY provider,name,id')).rows;
   const jobs=(await db.query("SELECT id,status,error_code,cancel_requested,created_at,updated_at FROM app.jobs WHERE kind='social.sync' ORDER BY created_at DESC LIMIT 20")).rows;
-  const provisioning=(await db.query('SELECT p.job_id AS id,p.phase,j.status,j.error_code,j.cancel_requested FROM app.social_provisioning p JOIN app.jobs j ON j.id=p.job_id ORDER BY p.created_at DESC LIMIT 1')).rows[0]??null;
+  const provisioning=(await db.query(`SELECT COALESCE(r.job_id,p.job_id) AS id,p.job_id AS source_id,
+   CASE WHEN r.job_id IS NULL THEN p.phase WHEN j.status IN ('running','retrying') THEN 'verifying' WHEN j.status='failed' THEN 'unknown' ELSE j.status END AS phase,
+   j.status,j.error_code,j.cancel_requested,
+   (p.phase='unknown' AND p.candidate_saved AND j.status IN ('failed','rejected','canceled')) AS can_recheck
+   FROM app.social_provisioning p
+   LEFT JOIN LATERAL (SELECT job_id FROM app.social_provision_checks WHERE source_job_id=p.job_id ORDER BY created_at DESC LIMIT 1) r ON true
+   JOIN app.jobs j ON j.id=COALESCE(r.job_id,p.job_id) ORDER BY p.created_at DESC LIMIT 1`)).rows[0]??null;
+  if(provisioning)provisioning.can_recheck=provisioning.can_recheck&&can_manage&&this.enabled&&this.features.provisioning&&!account;
   return {can_manage,authorization,setup_available:this.enabled&&this.features.provisioning&&this.features.authorization&&!account,authorization_available:this.enabled&&this.features.authorization&&!!account?.enabled&&!!account.identity_verified_at,setup_status:!this.enabled?'unavailable':account?.enabled&&account.identity_verified_at?'ready':account?'disabled':'not_prepared',provisioning,configured:this.enabled&&!!account?.enabled&&!!account?.identity_verified_at,channels,jobs};
  });}
  refresh(user:string,id:string,key:unknown){if(typeof key!=='string'||! /^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('Include a valid request key');return this.scope(user,id,true,async(db,b)=>{

@@ -120,6 +120,7 @@ class PublicationController {
 class SocialController {
  constructor(@Inject(SocialConnections) private readonly service:SocialConnections,@Inject(SocialOAuth) private readonly oauth:SocialOAuth,@Inject(SocialProvisioning) private readonly provision:SocialProvisioning){}
  @Post('prepare') prepare(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.provision.prepare(req.actorId,id,key);}
+ @Post('provisioning/:job/recheck') recheckSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string,@Headers('idempotency-key') key:string){return this.provision.recheck(req.actorId,id,job,key);}
  @Post('provisioning/:job/cancel') cancelSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.provision.cancel(req.actorId,id,job);}
  @Post('oauth/linkedin') start(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.oauth.start(req.actorId,req.sessionId,id,key,body);}
  @Get('oauth/:attempt') authorization(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.read(req.actorId,req.sessionId,id,attempt);}

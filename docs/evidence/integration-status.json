@@ -2,11 +2,11 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "e0bf72153decbff18ed092edc92b2151266bbb15",
-  "checked_at": "2026-10-24T04:23:44.041036+00:00",
+  "code_commit": "8226788e4c719aa754aad4382637486e23204852",
+  "checked_at": "2026-10-24T04:50:23.039878+00:00",
   "integrations": {
     "crawl4ai": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -24,7 +24,7 @@
       "blocked_reason": "Real local Docling/native rendering/English textless-page OCR, private page storage, Temporal/RLS, approved document visual provenance and account quota tests. The model sees actual page pixels through the official adapter with explicitly MOCK responses. Mixed-content OCR, broader document fidelity, full business roles, deployed sandbox and live model quality/provider journeys remain incomplete."
     },
     "deepagents": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -34,7 +34,7 @@
       "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "openai_images": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -86,7 +86,7 @@
       "blocked_reason": "Transport, untrusted download and durable provider substage have separate local test scope. Connecting the separately tested skill/media components into the full tenant generation/edit workflow, approved reference leases, baked media image and overlay composition, private versions/approval, customer UI and cost-capped live acceptance remain incomplete. No video customer route is enabled."
     },
     "creative_editor": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -221,7 +221,7 @@
       "blocked_reason": "Actual local Garage/ClamAV/Temporal tests only. Production IAM/CORS/TLS, retention, cleanup, UI, intake sandbox and deployed/provider workflows remain incomplete."
     },
     "customer_workspace_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/browser.json",
@@ -246,7 +246,7 @@
       "blocked_reason": "Real local Docling/native rendering/English textless-page OCR, private page storage, Temporal/RLS, approved document visual provenance and account quota tests. The model sees actual page pixels through the official adapter with explicitly MOCK responses. Mixed-content OCR, broader document fidelity, full business roles, deployed sandbox and live model quality/provider journeys remain incomplete."
     },
     "v5_business_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -255,7 +255,7 @@
       "blocked_reason": "Business navigation, scoped records, source review and saved goals/prefill fixtures are tested locally. Actual AI output quality, strategy/plan and creative/social workflows remain incomplete; unavailable controls are labeled honestly."
     },
     "website_visual_evidence": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -265,7 +265,7 @@
       "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."
     },
     "ai_brand_onboarding": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -317,7 +317,7 @@
       "blocked_reason": "Actual isolated original video/ad-creative/product-marketing/social skill planning with MOCK model; bounded brief/fact/timing contracts. Actual ARM64 FFmpeg is packaged into an exact image from verified Debian archives and called through the Node adapter without runtime/dependency bind mounts. Synthetic MP4 decoding, normalization, timed caption/CTA overlays, output validation and replay are tested. This is not a cloud/AMD64-deployed runtime, private saved customer video, parent workflow, customer feature, provider output quality or live acceptance."
     },
     "canvas_runtime": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -327,7 +327,7 @@
       "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "creative_review": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -373,7 +373,7 @@
       "blocked_reason": "Bounded 2\u201312-cycle planning, explicit total spending consent, persisted future dispatch, refreshed approved context, immutable execution snapshots, aggregate reservations, uncertain-call holds and Canvas stop controls are tested locally with MOCK models. No image/video generation or publication is authorized by a loop. Deployed scheduling, live calls and long-running acceptance remain unverified."
     },
     "planning_review_ui": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -383,7 +383,7 @@
       "blocked_reason": "Real local browser calendar/channel filtering, 30-day skill-driven plan, slot creative creation/revision, private preview, saved feedback, local-time rescheduling and confirmed bulk approval. MOCK OpenAI only. Full V5 formats, connected identities, exports/bulk submission, deployed runtime and live quality remain incomplete."
     },
     "canonical_creative_exports": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",
@@ -461,7 +461,7 @@
       "blocked_reason": "Actual disposable PostgreSQL role/migration bootstrap, rollback/replay/credential-drift rejection, cloud-address API startup and real generated standalone Next/browser/proxy/shutdown smoke tested on the host. Pinned Node registry manifests and Dockerfiles are prepared, not container-build/deployed proof. Railway dev creation, Linux image acceptance, private sandbox workers, operator setup, cloud security and live providers remain incomplete."
     },
     "creative_reference_selection": {
-      "state": "ADAPTER_READY",
+      "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
         "docs/evidence/security.json",

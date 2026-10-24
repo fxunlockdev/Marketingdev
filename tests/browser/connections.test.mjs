@@ -14,7 +14,7 @@ import {createApplication} from '../../dist/app.js';
 import {port} from '../../scripts/storage-test-services.mjs';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),children=[],errors=[],remote=new Map(),accounts=new Map(),states=new Map();
 const encryptionKey=randomBytes(32).toString('hex'),oauthKey=randomBytes(32).toString('hex'),signingSecret=randomBytes(32).toString('hex'),password='desvio-connections-browser-password';
-let app,base,provider,providerBase,browser,alice,bob,viewer,userA,userB,viewerUser,brandA,brandB,brandC,foreignBrand,webLog='',workerLog='',creates=0,exchanges=0,lastExchange,failCreate=false,failList=false,delayList=false;
+let app,base,provider,providerBase,browser,alice,bob,viewer,userA,userB,viewerUser,brandA,brandB,brandC,foreignBrand,webLog='',workerLog='',creates=0,exchanges=0,lastExchange,failCreate=false,failIdentity=false,failList=false,delayList=false;
 const json=(res,value,status=200)=>{res.writeHead(status,{'content-type':'application/json'});res.end(JSON.stringify(value));};
 function command(args,env,onOutput){const child=spawn(process.execPath,args,{env:{...process.env,NEXT_TELEMETRY_DISABLED:'1',...env},stdio:['ignore','pipe','pipe']});children.push(child);child.stdout.on('data',b=>onOutput?.(b.toString()));child.stderr.on('data',b=>onOutput?.(b.toString()));return child;}
 async function request(path,body,user=alice,key){const r=await user.request.fetch(base+path,{method:body===undefined?'GET':'POST',headers:{origin:base,...(body!==undefined?{'content-type':'application/json'}:{}),...(key?{'idempotency-key':key}:{})},data:body});return {status:r.status(),body:await r.json()};}
@@ -29,7 +29,7 @@ before(async()=>{
  provider=createServer(async(req,res)=>{let raw='';for await(const part of req)raw+=part;const org=remote.get(req.headers.authorization);
   if(req.url==='/api/enterprise/create-user'){creates++;if(failCreate){req.socket.destroy();return;}const p=JSON.parse(Buffer.from(JSON.parse(raw).params.split('.')[1],'base64url')),id='web-remote-'+randomUUID(),apiKey='MOCK_POSTIZ_KEY_'+randomBytes(24).toString('hex');remote.set(apiKey,{id,name:'Desvio business###'+p.id});accounts.set(id,[]);return json(res,{id,apiKey});}
   if(!org)return json(res,{},401);
-  if(req.url==='/api/public/v1/me')return json(res,{organization:org});
+  if(req.url==='/api/public/v1/me')return json(res,{organization:failIdentity?{...org,name:'MOCK identity mismatch'}:org});
   if(req.url.split('?')[0]==='/api/public/v1/social/linkedin'){const state='UPSTREAM_'+randomBytes(12).toString('hex');states.set(state,org.id);if(new URL(req.url,'http://mock').searchParams.has('refresh'))reconnectTargets.set(state,accounts.get(org.id)[0]);return json(res,{url:'https://www.linkedin.com/oauth/v2/authorization?'+new URLSearchParams({state,response_type:'code',client_id:'MOCK',redirect_uri:base+'/integrations/social/linkedin'})});}
   if(req.url==='/api/integrations/social-connect/linkedin'){exchanges++;const p=JSON.parse(raw);lastExchange=p;assert.equal(states.get(p.state),org.id);states.delete(p.state);const prior=reconnectTargets.get(p.state),id=prior?.id??'web-account-'+randomUUID(),name='Avery at Northstar';if(!prior)accounts.get(org.id).push({id,name,identifier:'linkedin',disabled:false,profile:'https://www.linkedin.com/in/mock',picture:null});return json(res,{id,name,organizationId:org.id,providerIdentifier:'linkedin',internalId:'MOCK_PERSON'});}
   if(req.method==='DELETE'&&req.url.startsWith('/api/public/v1/integrations/')){const id=req.url.split('/').at(-1);accounts.set(org.id,accounts.get(org.id).filter(x=>x.id!==id));return json(res,{id});}
@@ -98,4 +98,16 @@ test('account card reconnects the same identity, confirms destructive removal an
  await card.getByRole('button',{name:'Disconnect Avery at Northstar',exact:true}).click();await card.getByRole('button',{name:'Confirm disconnect and remove history'}).click();
  await expect(alice.getByText(/Removal requested. Publishing is paused/)).toBeVisible();
  await expect(alice.getByRole('button',{name:'Disconnect Avery at Northstar',exact:true})).toHaveCount(0,{timeout:30000});await expect(alice.getByText(/Publishing is paused. Reconnect after removal/)).toBeVisible();
+});
+
+
+test('saved setup recovery verifies the existing account from the UI without creating a duplicate',async()=>{
+ await bob.goto(connections(foreignBrand));failIdentity=true;
+ try{await bob.getByRole('button',{name:'Connect LinkedIn',exact:true}).click();await expect(bob.getByRole('button',{name:'Recheck account setup'})).toBeVisible({timeout:30000});}
+ finally{failIdentity=false;}
+ const count=creates;await bob.getByRole('button',{name:'Recheck account setup'}).click();
+ await expect(bob.getByRole('button',{name:'Connect LinkedIn',exact:true})).toBeVisible({timeout:30000});
+ assert.equal(creates,count);const state=await request(`/api/v1/businesses/${foreignBrand.id}/connections`,undefined,bob);
+ assert.equal(state.body.configured,true);assert.equal(state.body.provisioning.can_recheck,false);
+ assert.equal((await new AxeBuilder({page:bob}).analyze()).violations.length,0);
 });
