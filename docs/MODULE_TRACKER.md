@@ -2,7 +2,7 @@
 
 Updated 24 October 2026. Guided local setup now wraps tested Railway activation and business allowance preview/apply; the operator web UI and live provider acceptance still remain. Billing is excluded by owner request. “Implemented” below describes code and local acceptance, not LIVE_VERIFIED or production readiness. Provider calls in local tests use explicit mocks. Owner has shown saved provider credentials and will perform live tests; worker activation, allowances and video settings remain separate.
 
-Local update: owner confirmed GPT-first; Claude deferred. Brand Engine is checksum-pinned alongside the original 52 skills. Static foundation (16), export/video (14), contracts (144) and web build pass; updated planning/browser regression and coordinated deployment remain.
+Local update: owner confirmed GPT-first; Claude deferred. Brand Engine is checksum-pinned alongside the original 52 skills. Static foundation (16), export/video (14), contracts (145), GPT-only planning (18), Canvas browser (11) and web build pass; coordinated deployment remains.
 
 Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
 
@@ -13,7 +13,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | Shared foundation | Password sessions, default three businesses, business scope/RLS, private media, durable queue/worker, restricted service roles | Full local security suite passes; comprehensive deployed tenant flows, operational hardening and release gate |
 | Overview | Business switcher and persisted publishing/approval/activity counts; saved results and reviewed recommendations | Real provider-derived metrics/learning and deployed customer journey |
 | Brands & onboarding | Website/document ingestion, visual evidence, proposed brand facts, correction and approved Brand Brain; optional business stage and 90-day growth target added locally (054; 19 planning foundation tests and 141 contracts pass, not deployed) | Deployed manual onboarding/fact approval passed; real AI-prefill acceptance, deployed crawler/document coverage and quality evaluation; no paid test performed |
-| Content Plan | Configurable days/posts, OpenAI/Gemini planning, calendar edits, recurring planning with limits and approval, Canvas linkage | Provider activation and actual model output/loop acceptance |
+| Content Plan | Configurable days/posts, GPT-only new planning, calendar edits, recurring planning with limits and approval, Canvas linkage | Provider activation and actual model output/loop acceptance |
 | Review Inbox | Channel-based review, feedback, exact image/video/carousel versions, approval invalidation after edits | Broader deployed customer flow and real generated-media acceptance |
 | Canvas | Brand-guided planning, static image creation/editing, editable projects, video storyline/script/prompt approval before generation, video editing/rendering, carousels and ZIP download | Provider keys, business allowances and video runtime activation; real image create/edit and video create/edit acceptance |
 | Publishing & Analytics | Approved static/video/carousel → ordered upload → one LinkedIn submission → status reconciliation; uncertainty holds; saved metrics and format filters | Consented publishing; other channels; remote cancellation/rescheduling and unresolved-outcome operations |

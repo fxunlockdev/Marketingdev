@@ -203,7 +203,7 @@ before(async () => {
           );
           if(input.task==='video')return modelResponse({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]});
           if(input.task==='carousel'){const plan=carouselPlan(input.slide_count);for(const slide of plan.slides){slide.fact_ids=[input.brand.facts[0].id];slide.headline=`Story ${slide.position}`;slide.body='';slide.cta='';}return modelResponse(plan);}
-          if(input.task==='content_plan')return modelResponse(generatedPlan(input));
+          if(input.task==='content_plan'){const settings=input.planning_mode==='natural'?{duration_days:7,post_count:7,video_count:2}:null;return modelResponse(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input));}
           planned++;
           const brief = {
             headline:

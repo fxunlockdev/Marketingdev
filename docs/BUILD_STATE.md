@@ -1,3 +1,7 @@
+## Export/video and Canvas regressions repaired; coordinated rollout started
+
+All 14 export/video, 16 static creative, 18 GPT-only planning, 145 contract and 11 Canvas browser tests pass. The export failure was a duplicate test-local variable; the browser weekly-plan fixture now returns the GPT natural-planning settings contract. Video-reference expiry is bounded safely across database/worker clock skew. Providers remain MOCK; no paid calls. Evidence: gpt-brand-engine-local.json. New amd64 worker, skills and renderer images built and bundled; transfer and coordinated dev deployment in progress, not yet confirmed deployed.
+
 ## Dev database 054 applied; video-reference clock boundary repaired
 
 Railway bootstrap 155dc106-a93f-414f-8331-2d9b9e6ab115 reached SUCCESS, replayed checksums and verified all six runtime-role logins through migration 054. Temporary service subsequently verified REMOVED and all seven administrator/runtime-password variables cleared. Evidence: railway-dev-migration054.json. Running API/web/worker still remain on the previous release; database migration alone does not make new features deployed.
