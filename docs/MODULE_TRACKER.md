@@ -23,7 +23,7 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 
 ## Pending release — capped creative acceptance
 
-Migration 049 adds an immutable per-request generation ceiling. The opt-in staging runner now covers create → provider edit → editable save → human approval with private resumable journals and no automatic publication. All 11 Canvas browser journeys (MOCK providers), 96 contracts and offline checks pass; interrupted-response replay creates exactly two generation jobs. Full security retry is pending. This change is not deployed and does not replace the full live release gate.
+Migration 049 adds an immutable per-request generation ceiling. The opt-in staging runner now covers create → provider edit → editable save → human approval with private resumable journals and no automatic publication. All 11 Canvas browser journeys (MOCK providers), 96 contracts and offline checks pass; interrupted-response replay creates exactly two generation jobs. Full security retry passed: 180 foundation cases, 29 account tests, six boundaries and both dependency audits. This change is not deployed and does not replace the full live release gate.
 
 ## Current release evidence — 24 October 2026
 
