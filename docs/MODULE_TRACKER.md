@@ -4,7 +4,7 @@ Updated 24 October 2026. Guided local setup now wraps tested Railway activation 
 
 Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
 
-Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 047. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
+Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 048. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
 
 | Module | Implemented and tested scope | Remaining before full acceptance |
 | --- | --- | --- |
@@ -16,12 +16,17 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | Canvas | Brand-guided planning, static image creation/editing, editable projects, video storyline/script/prompt approval before generation, video editing/rendering, carousels and ZIP download | Provider keys, business allowances and video runtime activation; real image create/edit and video create/edit acceptance |
 | Publishing & Analytics | Approved static/video/carousel → ordered upload → one LinkedIn submission → status reconciliation; uncertainty holds; saved metrics and format filters | Consented publishing; other channels; remote cancellation/rescheduling and unresolved-outcome operations |
 | Memory | Business-specific approved knowledge, evidence-linked performance hypotheses, human review, retirement and experiment reports | Actual model/performance acceptance and broader learning quality evaluation |
-| Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth; identity-bound reconnect and durable disconnect/recovery deployed through migration 047; saved-account verification recovery additionally passes seven connection browser journeys and the expanded 179-case foundation suite; migration 048 deployment pending | Postiz/provisioner deployment, actual enterprise identity and media delivery passed; actual consent and additional channels. Meta app alone is not proof those paths are complete |
+| Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth; identity-bound reconnect and durable disconnect/recovery deployed through migration 047; saved-account verification recovery additionally passes seven connection browser journeys and the expanded 179-case foundation suite; migration 048 and matching API/web/provisioner are deployed with actual dev queue/private-media checks | Postiz/provisioner deployment, actual enterprise identity and media delivery passed; actual consent and additional channels. Meta app alone is not proof those paths are complete |
 | Team | Business-specific roles, invitations, escalation prevention and last-owner protection | Resend delivery for invitations; deployed multi-user acceptance |
 | Profile | Name/password changes, session controls, authenticator/recovery flows; actual dev synthetic password/session/MFA/recovery acceptance passed | Resend reset/delivery flows and broader operational security hardening |
 | Billing | Excluded | Not part of this goal's current scope |
 
 ## Current release evidence — 24 October 2026
+
+Latest source `2bc63ec`: full browser **42/42**, foundation **179/179**, account **29/29**, six security boundaries, dependency audits, offline and contract checks pass. Migration 048 and API/web/both workers are deployed. Actual owner login, retained navigation, private media upload → durable queue → malware scan → readback, replay and cross-business denial passed, with exact test cleanup. See `railway-recheck-release.json`, `browser.json`, `security.json` and `BUILD_STATE.md`.
+
+Release remains blocked by the trusted live acceptance runner and actual provider/tenant acceptance. The M0 hard-coded live gate is still present and must be replaced with real, budget-guarded execution evidence. Missing-credential provisioning outcomes, remote publication cancellation/rescheduling, other social channels and operator setup web UI remain open; do not call these “100%”. Billing remains excluded.
+
 
 - API `31a66e24-33b7-4223-a820-cb0c9d66c0d2` and web `15ec6a27-9c36-4c37-b19a-299700bc752d`: SUCCESS observed in Railway.
 - Trusted worker `sha256:3363e29ed1a64af85dbeb219e74eaaa73d97d1809dd1225bcd3a66878978cdaf`: native dependency/isolation checks and coordinated activation passed. The separate provisioning worker is updated to this image too.

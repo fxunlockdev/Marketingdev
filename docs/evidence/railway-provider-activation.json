@@ -1,39 +1,7 @@
 {
-  "checked_at": "2026-10-24T04:47:27.274Z",
-  "status": "preview",
-  "version": 1,
-  "worker": {
-    "before": {
-      "id": "6760adec622e1c59fbf581f60f9e8465d395144c8175dbee0e7c30380dbba8be",
-      "image": "sha256:3363e29ed1a64af85dbeb219e74eaaa73d97d1809dd1225bcd3a66878978cdaf",
-      "configuration": "9fd724d5fc8d8d61426c4953166bc6db99e33973a4137cb4d1ea0ad76a7881b3"
-    },
-    "image": "sha256:d88c66c16e939ab49b477e536df6c63fd2ff5ad0feb23908624b502e358f1585",
-    "configuration": "69c4d654b2b4db2ff353313ad2c534de59919e8525344b658f8c7862a92b3fa3",
-    "replace": true
-  },
-  "api": {
-    "before": {
-      "POSTIZ_OAUTH_ENABLED": "false",
-      "VIDEO_ENABLED": "false",
-      "POSTIZ_ENABLED": "true",
-      "POSTIZ_PROVISIONING_ENABLED": "true",
-      "POSTIZ_PUBLISHING_ENABLED": "false",
-      "VIDEO_RUNTIME_IMAGE": "sha256:5c67acaa9ce07138248e8dae28d4f432475b31877a78e38da4a548324c36fbf7",
-      "RENDER_RUNTIME_IMAGE": "sha256:58db638e690bffcf383415df6295f69ee4b0329b3a691cc462b2e8f4b154796d"
-    },
-    "after": {
-      "POSTIZ_OAUTH_ENABLED": "false",
-      "VIDEO_ENABLED": "false",
-      "POSTIZ_ENABLED": "true",
-      "POSTIZ_PROVISIONING_ENABLED": "true",
-      "POSTIZ_PUBLISHING_ENABLED": "false",
-      "VIDEO_RUNTIME_IMAGE": "sha256:5c67acaa9ce07138248e8dae28d4f432475b31877a78e38da4a548324c36fbf7",
-      "RENDER_RUNTIME_IMAGE": "sha256:58db638e690bffcf383415df6295f69ee4b0329b3a691cc462b2e8f4b154796d"
-    },
-    "deploymentId": "31a66e24-33b7-4223-a820-cb0c9d66c0d2",
-    "update": false
-  },
-  "preview_sha256": "15c0b3f9af1f6e79766fe4c0a03baeb6161e63a0f3d34c78830258ed3017fd11",
+  "checked_at": "2026-10-24T05:02:27.625Z",
+  "status": "activated",
+  "preview_sha256": "7a724516453930d90a9ee4a286dd17091c696f78239cbe8a71f4ce483244f933",
+  "backup_container": "desvio-worker-rollback-3a9d9f8d-f927-405f-a5c4-aee7411e5f1b",
   "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
 }
