@@ -255,3 +255,10 @@ test('Higgsfield explicit identical-key replay preserves request identity; chang
   await assert.rejects(submit(client, changed), error('HIGGSFIELD_PARAMETERS_REJECTED', 'rejected'));
   assert.equal(generations, 1); assert.equal(s.calls.length, 3);
 });
+
+test('complete single-token credential is sent unchanged with one Key authorization prefix',async t=>{
+ const token='MOCK-single-copied-token',s=await server(t,(_c,r)=>json(r,{request_id:id,status:'queued'}));
+ const client=new HiggsfieldClient({...config,credentials:token,testBaseURL:s.origin}),intent=image(),prepared=client.prepare(intent);
+ await client.submit(intent,prepared.sha256);assert.equal(s.calls.length,1);assert.equal(s.calls[0].headers.authorization,'Key '+token);
+ assert.ok(!JSON.stringify(client).includes(token));
+});

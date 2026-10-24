@@ -1,0 +1,12 @@
+{
+  "recorded_at": "2026-10-24T06:42:08.487Z",
+  "status": "MOCKED",
+  "deployed": false,
+  "live_provider_calls": false,
+  "tests_passed": 31,
+  "log_sha256": "52a2fb30f4b88abcda451f69601b5a88e9be9149a9ad1af849ea438a9a90b83f",
+  "sources": {
+    "apps/api/src/higgsfield-client.ts": "45e4d148f5e7874438e151f9ac4106733fdd6821030cd37b14ab4c06b9ada021",
+    "infra/worker-control/provider-settings.mjs": "f03ccba47abc812349c3bead4746d9aa847033a4dbe5a7181ef5a536754d4fa3"
+  }
+}

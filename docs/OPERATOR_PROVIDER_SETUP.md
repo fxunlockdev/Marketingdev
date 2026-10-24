@@ -51,6 +51,8 @@ The tool accepts no secret fields, does not return Postiz credentials, and is de
 
 ## Video settings and read-only worker check
 
+Copy the complete Higgsfield dashboard API key unchanged into `HIGGSFIELD_CREDENTIALS`. Current single-token keys and legacy `key:secret` credentials are accepted; do not add an `Authorization`/`Key` prefix or assemble a secret. The server adds the header prefix. This follows the current [official quick start](https://open.higgsfield.ai/quick-start). The compatibility change must be deployed before activating a single-token key.
+
 In Railway dev → **desvio-dev-worker-settings**, video activation now accepts explicit `VIDEO_ENABLED=true`, `VIDEO_ENCRYPTION_KEY` (32 random bytes encoded as 64 hex characters), and `HIGGSFIELD_OUTPUT_ORIGINS` (comma-separated exact HTTPS origins verified for the provider account), alongside `HIGGSFIELD_CREDENTIALS` and either `OPENAI_API_KEY` or `GEMINI_API_KEY`. There are no guessed default output origins. Missing/false VIDEO_ENABLED keeps video off even when credentials exist. Infrastructure and social enable flags in this settings service remain ignored.
 
 Run `npm run build`, then `node infra/worker-control/start-dev.mjs --check`. This only inspects exact installed images and the current worker configuration; it does not start/replace a container or make provider calls. It reports `configuration_matches`, `replacement_required` or `worker_absent`, running state and credential presence without returning values. Evidence is written to `docs/evidence/railway-worker-readiness.json`. A configuration match is not authenticated provider or queue health proof.

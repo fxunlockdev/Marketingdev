@@ -23,7 +23,7 @@ Feedback creates another prompt-gated request in the same project. Old versions 
 
 API and worker: `VIDEO_ENABLED=true`. API also needs the existing pinned `RENDER_RUNTIME_IMAGE` to validate approved image provenance. It does not need Higgsfield credentials or worker database access.
 
-Worker: `VIDEO_RUNTIME_IMAGE` (exact local digest), `VIDEO_ENCRYPTION_KEY` (independent 32 random bytes encoded as hex), `HIGGSFIELD_CREDENTIALS` (`key:secret` per the existing verified adapter), and `HIGGSFIELD_OUTPUT_ORIGINS` (explicit comma-separated HTTPS origins). Existing static/skill images, private storage, Temporal and OpenAI configuration remain required. Expiring business-specific text/video grants and caps are still required; enabling a flag does not authorize unbounded spend. The operator setup interface remains unfinished.
+Worker: `VIDEO_RUNTIME_IMAGE` (exact local digest), `VIDEO_ENCRYPTION_KEY` (independent 32 random bytes encoded as hex), `HIGGSFIELD_CREDENTIALS` (complete copied API key; current single-token and legacy `key:secret` formats accepted by the direct REST adapter), and `HIGGSFIELD_OUTPUT_ORIGINS` (explicit comma-separated HTTPS origins). Existing static/skill images, private storage, Temporal and OpenAI configuration remain required. Expiring business-specific text/video grants and caps are still required; enabling a flag does not authorize unbounded spend. The operator setup interface remains unfinished.
 
 ## Verification
 

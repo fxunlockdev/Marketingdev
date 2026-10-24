@@ -15,9 +15,16 @@ test('video activation requires complete explicit settings and never forwards un
 });
 test('video setup rejects malformed keys, implicit flags and unsafe or ambiguous download origins',()=>{
  const input={VIDEO_ENABLED:'true',OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key',VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_OUTPUT_ORIGINS:'https://video.example.org'};
- for(const changes of [{VIDEO_ENABLED:'yes'},{VIDEO_ENABLED:true},{HIGGSFIELD_CREDENTIALS:'secret-without-pair'},{VIDEO_ENCRYPTION_KEY:'short'},...['http://video.example.org','https://127.0.0.1','https://video.example.org/path','https://user:secret@video.example.org','https://*.example.org','https://video.example.org,https://video.example.org','https://video.example.org, https://other.example.org'].map(HIGGSFIELD_OUTPUT_ORIGINS=>({HIGGSFIELD_OUTPUT_ORIGINS}))])assert.throws(()=>providerRuntimeSettings({...input,...changes}),{message:'INVALID_VIDEO_SETTINGS'});
+ for(const changes of [{VIDEO_ENABLED:'yes'},{VIDEO_ENABLED:true},{HIGGSFIELD_CREDENTIALS:'Key prefix-is-not-part-of-the-value'},{VIDEO_ENCRYPTION_KEY:'short'},...['http://video.example.org','https://127.0.0.1','https://video.example.org/path','https://user:secret@video.example.org','https://*.example.org','https://video.example.org,https://video.example.org','https://video.example.org, https://other.example.org'].map(HIGGSFIELD_OUTPUT_ORIGINS=>({HIGGSFIELD_OUTPUT_ORIGINS}))])assert.throws(()=>providerRuntimeSettings({...input,...changes}),{message:'INVALID_VIDEO_SETTINGS'});
 });
 test('empty settings leave unpaid deployment usable; malformed secrets fail without disclosure', () => {
   assert.deepEqual(providerSettings({OPENAI_API_KEY:''}),{});
   for (const value of ['secret\nvalue',' secret','secret\0',123,'x'.repeat(8193)]) assert.throws(()=>providerSettings({OPENAI_API_KEY:value}),{message:'INVALID_PROVIDER_SETTINGS'});
+});
+
+test('complete copied Higgsfield token is preserved unchanged and never implicitly enables video',()=>{
+ const key='MOCK-single-copied-token';
+ assert.equal(providerRuntimeSettings({HIGGSFIELD_CREDENTIALS:key}).VIDEO_ENABLED,'false');
+ const active=providerRuntimeSettings({VIDEO_ENABLED:'true',OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:key,VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_OUTPUT_ORIGINS:'https://video.example.org'});
+ assert.equal(active.HIGGSFIELD_CREDENTIALS,key);
 });

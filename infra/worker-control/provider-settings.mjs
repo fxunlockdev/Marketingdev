@@ -1,3 +1,4 @@
+import {validHiggsfieldCredential} from '../../dist/higgsfield-client.js';
 import {VideoDownload} from '../../dist/video-download.js';
 // Railway settings are operator input, never authority to replace infrastructure credentials.
 const keys = ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'HIGGSFIELD_CREDENTIALS'];
@@ -22,7 +23,7 @@ export function providerRuntimeSettings(input){
  if(enabled==='false')return {...credentials,VIDEO_ENABLED:'false'};
  try{
   if(!credentials.OPENAI_API_KEY&&!credentials.GEMINI_API_KEY)throw Error();
-  if(typeof credentials.HIGGSFIELD_CREDENTIALS!=='string'||credentials.HIGGSFIELD_CREDENTIALS.length>2048||! /^[\x21-\x39\x3b-\x7e]+:[\x21-\x39\x3b-\x7e]+$/.test(credentials.HIGGSFIELD_CREDENTIALS))throw Error();
+  if(!validHiggsfieldCredential(credentials.HIGGSFIELD_CREDENTIALS))throw Error();
   if(!/^[a-f0-9]{64}$/i.test(input.VIDEO_ENCRYPTION_KEY??''))throw Error();
   if(typeof input.HIGGSFIELD_OUTPUT_ORIGINS!=='string'||input.HIGGSFIELD_OUTPUT_ORIGINS.length>4096)throw Error();
   const origins=input.HIGGSFIELD_OUTPUT_ORIGINS.split(',');

@@ -61,6 +61,9 @@ const retryAfter = (value: string | null): number | undefined => {
  * The pinned JS SDK cannot expose per-instance redirect/response-byte limits or
  * explicit status/cancel. See ADR 0020 for the audited API transport decision.
  */
+export function validHiggsfieldCredential(value:unknown):value is string {
+ return typeof value==='string'&&value.length<=2048&&/^[\x21-\x39\x3b-\x7e]+(?::[\x21-\x39\x3b-\x7e]+)?$/.test(value);
+}
 export class HiggsfieldClient {
   #credentials: string;
   #base: URL;
@@ -70,8 +73,7 @@ export class HiggsfieldClient {
   constructor(config: HiggsfieldConfig, private readonly transport: typeof fetch = fetch) {
     try {
       if (!['test', 'development', 'staging'].includes(config.mode) ||
-          typeof config.credentials !== 'string' || config.credentials.length > 2048 ||
-          !/^[\x21-\x39\x3b-\x7e]+:[\x21-\x39\x3b-\x7e]+$/.test(config.credentials)) fail();
+          !validHiggsfieldCredential(config.credentials)) fail();
       this.#credentials = config.credentials;
       this.#base = new URL('https://api.higgsfield.ai');
       if (config.testBaseURL !== undefined) {
