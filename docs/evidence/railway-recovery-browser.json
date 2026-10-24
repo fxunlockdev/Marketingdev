@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-24T04:16:47.698Z",
+  "passed": true,
+  "deployment_id": "924f2bd6-c281-4e2a-a709-92dbf9d2f6f6",
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "retained_shell": true,
+  "repeated_workspace_requests": 0,
+  "full_page_reload": false,
+  "scope": "Actual deployed owner login and read-only navigation. No customer data edited, provider generation or social mutation."
+}

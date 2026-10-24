@@ -4,7 +4,7 @@ Updated 24 October 2026. Guided local setup now wraps tested Railway activation 
 
 Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
 
-Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 046. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
+Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 047. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
 
 | Module | Implemented and tested scope | Remaining before full acceptance |
 | --- | --- | --- |
@@ -16,46 +16,35 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | Canvas | Brand-guided planning, static image creation/editing, editable projects, video storyline/script/prompt approval before generation, video editing/rendering, carousels and ZIP download | Provider keys, business allowances and video runtime activation; real image create/edit and video create/edit acceptance |
 | Publishing & Analytics | Approved static/video/carousel → ordered upload → one LinkedIn submission → status reconciliation; uncertainty holds; saved metrics and format filters | Consented publishing; other channels; remote cancellation/rescheduling and unresolved-outcome operations |
 | Memory | Business-specific approved knowledge, evidence-linked performance hypotheses, human review, retirement and experiment reports | Actual model/performance acceptance and broader learning quality evaluation |
-| Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth workflow tested with mocks | Postiz/provisioner deployment, actual enterprise identity and media delivery passed; actual consent, full reconnect/disconnect lifecycle and additional channels. Meta app alone is not proof those paths are complete |
+| Connections | Tenant-isolated Postiz binding/provisioning and LinkedIn member OAuth; identity-bound reconnect and durable disconnect/recovery deployed through migration 047; six browser and 30 foundation cases pass | Postiz/provisioner deployment, actual enterprise identity and media delivery passed; actual consent and additional channels. Meta app alone is not proof those paths are complete |
 | Team | Business-specific roles, invitations, escalation prevention and last-owner protection | Resend delivery for invitations; deployed multi-user acceptance |
 | Profile | Name/password changes, session controls, authenticator/recovery flows; actual dev synthetic password/session/MFA/recovery acceptance passed | Resend reset/delivery flows and broader operational security hardening |
 | Billing | Excluded | Not part of this goal's current scope |
 
-## Current evidence
+## Current release evidence — 24 October 2026
 
-- `docs/evidence/railway-dev-migration046.json`: actual checksum-verified migration and runtime role login checks; temporary bootstrap removed.
-- `docs/evidence/railway-dev-owner-browser.json`: actual public dev owner sign-in/session/business screen.
-- `docs/evidence/railway-worker-rollout.json` and `railway-worker-job-carousel046.json`: exact deployed worker, queue/role registration, actual storage/scan job, replay and foreign-scope denial. Synthetic fixture cleanup recorded separately.
-- `docs/evidence/carousel-publication-backend.json`: 17 real local publication/security/recovery cases with MOCK Postiz.
-- `docs/evidence/carousel-publishing-browser.json`: nine local image/video/carousel publishing browser journeys with MOCK Postiz; accessibility/mobile checks.
-- `docs/evidence/contracts.json`: 91 passing provider/input/media contracts at the recorded source snapshot.
-- `docs/evidence/security.json`: passed at unchanged source on 23 October, with 29 account cases, 169 foundation cases, six Python boundary cases and both production dependency audits. Scanner readiness now allows bounded slower emulated startup and preserves failure diagnostics. All 37 full browser journeys also pass at this same source.
+- API `31a66e24-33b7-4223-a820-cb0c9d66c0d2` and web `924f2bd6-c281-4e2a-a709-92dbf9d2f6f6`: SUCCESS observed in Railway.
+- Trusted worker `sha256:3363e29ed1a64af85dbeb219e74eaaa73d97d1809dd1225bcd3a66878978cdaf`: native dependency/isolation checks and coordinated activation passed. The separate provisioning worker is updated to this image too.
+- Migration 047 is checksum-verified; temporary migration service credentials were removed.
+- Patched full security run: 29 account tests, 176 foundation tests, six Python boundary tests, API build and both production dependency audits pass. Root production audit reports zero vulnerabilities after pinning patched body-parser/multer versions.
+- Six connection browser, nine publishing browser and 17 publishing backend cases passed with MOCK provider transports. The complete browser suite also passed all 40 journeys after the dependency patch (`browser.json`); this does not establish real OAuth or model acceptance.
+- Actual dev owner login/navigation: retained shell, zero repeated workspace bootstrap calls, no full-page reload. Evidence: `railway-recovery-browser.json`.
+- Actual dev storage/worker scan/readback, replay and cross-business denial passed; fixtures were cleaned. See `railway-worker-job-patched047.json` and its cleanup record.
+- Offline and 93 target-selected provider/input contracts pass. Integration status is machine-generated; the release gate remains blocked until its outstanding acceptance requirements are met.
 
-## Immediate sequence
+## Remaining product work
 
-1. Complete: full browser (37 journeys), security (29 account + 169 foundation + six boundary cases), offline and contracts pass at the prior recorded source. The newer operator-only change has focused acceptance. Release remains blocked on comprehensive product/deployed-provider/live acceptance.
-2. Implemented: Railway list/preview/apply for model/spending allowances, with four contracts and eight real local database cases passing plus actual read-only dev acceptance. Explicit video settings and read-only worker readiness are now implemented (eight configuration/readiness contracts + eight database cases). Coordinated activation now has 15 contracts + eight database cases and actual API renderer-pin/redeployment acceptance. Continue operator UI/recovery usability and core Postiz setup; provider-enabled worker replacement remains unverified. Keys are added to Railway dev → desvio-dev-worker-settings; a key alone does not apply allowances or restart the worker.
-3. Complete core connection/publishing activation, refresh release evidence, and deploy changes. Additional channels and advanced analytics follow the usable core release.
-4. Owner adds credentials and authorized test accounts/budgets, then live generation/editing/publishing acceptance can establish LIVE_VERIFIED status. No paid tests or posts will run merely because a key exists.
+1. Browser Back/Forward unsaved-edit protection, operator setup web UI and safe unresolved-outcome recovery controls. The guided local setup already configures saved Railway settings and per-business allowances without hand-written integrations.
+2. Durable cancellation/rescheduling after a post has reached Postiz. Existing cancellation is limited to requests before submission; uncertainty never means cancellation succeeded.
+3. Meta and other social connectors beyond LinkedIn member. A Meta app alone does not complete these integrations.
+4. Comprehensive deployed provider acceptance, load/operational hardening and production release evidence. Advanced analytics/learning quality remains unverified with real data.
 
-### 2026-10-24 deployment plumbing evidence
+## Owner configuration and live acceptance
 
-Private Postiz application deployment is SUCCESS; backend/orchestrator health and two actual enterprise identities passed. Desvio adapter rejects crossed organization bindings. Dedicated provisioner queue/database-role checks pass. Public web media route is deployed and actual Postiz upload → Desvio hash/HEAD/range delivery passed. Coordinated social/provisioning activation passed, including worker registration and exact healthy API redeployment. Owner browser sign-in passed. Publishing/video remain disabled. No OAuth account, model spending or live generation/publication acceptance is implied.
+Owner will add server keys and run paid tests. Keys go in Railway **dev → desvio-dev-worker-settings → Variables**. Saved settings require coordinated worker activation and explicit business/model allowances; video also needs its approved model/output configuration. See `OPERATOR_PROVIDER_SETUP.md` for the exact guided sequence. A key by itself does not enable spending.
 
-- `railway-provisioning-job.json`: actual scoped business submission → durable outbox/Temporal → isolated provisioner → real Postiz identity → encrypted binding passed, including replay and foreign-scope denial. This is service-level deployed acceptance, not a browser OAuth/publication claim.
+Real generation/editing, authorized social consent/publishing and real analytics must pass before LIVE_VERIFIED. Resend remains required for public signup, password-reset email and team invitation delivery. Private owner password login is available. No paid provider or real social call was made during this release.
 
-- OAuth readiness is now separate from encryption/provisioning: the customer flow remains unavailable until explicit social app activation. Ten configuration tests and 27 local database/queue tests passed, including rejection without creating a job when OAuth is disabled. Remote OAuth remains unverified.
+## Cost constraint
 
-- Scheduled-removal transport is implemented and passes MOCK contracts. It reports only an unconfirmed removal request. Durable remote cancellation, UI controls, race handling and actual social acceptance remain incomplete.
-
-- Fixed visual onboarding setup: `max_tokens_per_image` can now be explicitly configured through the guided/atomic operator path. Previously the tool could not enable screenshot analysis. 28 configuration and nine database tests pass; no live allowance or model call was enabled.
-
-- Public dev manual onboarding → reviewed facts → saved goals → approved Memory passed, including reload and foreign-session denial. Synthetic fixture cleanup passed. Real AI-prefill/generation remains unverified; see the owner test sequence in `OPERATOR_PROVIDER_SETUP.md`.
-
-- Current full browser regression: 37/37 passed with MOCK providers; current contracts: 91/91 passed; offline checks passed. Full security retry passed (29 account, 172 foundation, six boundary tests and both dependency audits) after the initial local Temporal startup failure during a concurrent run. No new LIVE_VERIFIED status.
-
-- Canvas now exposes actual scoped allowance permission state (missing/disabled/expired/active) and expiry without credentials or a provider-readiness claim. A duplicate React key introduced with the panel was fixed before web deployment; ten focused Canvas browser journeys and ten operator database cases pass. API `5c75d8ee-f0ae-44d6-8c07-d594a711e4ef` and web `a185f516-13a2-4639-9d09-bc1e865baebf` are SUCCESS; deployed synthetic allowance readback/mobile/anonymous denial passed. Live generation still needs owner keys, activation and authorized allowances.
-
-- Shared studio design and business Overview are deployed with the requested cream/orange direction and reduced-motion-safe interactions. Actual public dev Overview/Canvas navigation, accessibility and widths down to 320px passed. This is design/navigation acceptance, not live provider acceptance. Profile password/session/authenticator/recovery checks also passed on dev; disposable fixtures were removed.
-
-- Studio regression: 37/38 initial full browser journeys; fixed animation-settling timing in the remaining accessibility assertion, then 9/9 publishing browser journeys passed. Contracts (91) and offline checks pass. See `studio-browser.json`; model and social transports remain MOCK in local acceptance.
+Keep existing Railway services and capacity. Reduce duplicate requests, hidden/idle polling and unnecessary deployments/transfers. The security worker patch reused existing media images and transferred 294 MB instead of the earlier 1.7 GB bundle. No infrastructure was removed to lower cost.

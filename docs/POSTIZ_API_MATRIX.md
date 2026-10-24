@@ -48,3 +48,10 @@ Rechecked pinned `651876e24317c2d8e717262cf98267ec6f699180`, `libraries/nestjs-l
 ## Scheduled removal transport (24 October)
 
 `PostizClient.requestScheduledPostRemoval` uses the audited DELETE endpoint only after matching a single queued LinkedIn post by tenant identity, remote post/channel ID, caption and exact schedule, with no release identity/URL and at least one minute remaining. It rejects missing/duplicate/changed/published targets and reports `removal_requested` with `publishingStopped:false`, never canceled. A mismatched acknowledgment, upstream error or dropped response stays unknown with no automatic retry. Fifteen Postiz MOCK HTTP contracts pass, including these cases. No live DELETE was executed. This is transport preparation only: durable request/reconciliation state, customer controls and race acceptance remain unfinished.
+
+
+### Source recheck, 2026-10-24: channel recovery
+
+At pinned commit `651876e24317c2d8e717262cf98267ec6f699180`, `public.integrations.controller.ts` exposes `DELETE /api/public/v1/integrations/:id`. It removes associated post groups and then soft-deletes the organization-scoped channel. Removal/Temporal termination errors can be swallowed. Desvio therefore holds local publishing before dispatch, blocks unresolved local publications, sends at most once, and reconciles by listing integrations. An absent channel is not proof of stopped in-flight publishing or revoked social permissions.
+
+The public `GET /api/public/v1/social/linkedin?refresh=...` stores a provider internal account identity. The callback compares the authenticated identity with that value before same-provider reconnect. It is not the integration row ID. Desvio persists the callback's verified `internalId` server-side and checks both identities on reconnect. Existing imported channels without that evidence cannot offer targeted reconnect. Customer responses expose only a capability flag, never this internal identity or tokens.
