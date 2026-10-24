@@ -4,7 +4,7 @@ Updated 24 October 2026. Guided local setup now wraps tested Railway activation 
 
 Priority: usable dev onboarding → generation/editing → exact-version review → consented publishing. Advanced analytics and additional social channels are follow-up patches under the owner’s usable-release instruction. Historical session details remain in BUILD_STATE and Git history.
 
-Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 048. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
+Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the current private worker are verified; database is through migration 049. Actual owner sign-in, queue registration, antivirus scanning, private storage readback and tenant denial passed in dev.
 
 | Module | Implemented and tested scope | Remaining before full acceptance |
 | --- | --- | --- |
@@ -21,11 +21,11 @@ Dev: https://desvio-dev-web-dev.up.railway.app. API/web deployments and the curr
 | Profile | Name/password changes, session controls, authenticator/recovery flows; actual dev synthetic password/session/MFA/recovery acceptance passed | Resend reset/delivery flows and broader operational security hardening |
 | Billing | Excluded | Not part of this goal's current scope |
 
-## Pending release — capped creative acceptance
+## Current release — capped creative acceptance
 
-Migration 049 adds an immutable per-request generation ceiling. The opt-in staging runner now covers create → provider edit → editable save → human approval with private resumable journals and no automatic publication. All 11 Canvas browser journeys (MOCK providers), 96 contracts and offline checks pass; interrupted-response replay creates exactly two generation jobs. Full security retry passed: 180 foundation cases, 29 account tests, six boundaries and both dependency audits. This change is not deployed and does not replace the full live release gate.
+Migration 049 adds an immutable per-request generation ceiling. The opt-in staging runner now covers create → provider edit → editable save → human approval with private resumable journals and no automatic publication. All 11 Canvas browser journeys (MOCK providers), 96 contracts and offline checks pass; interrupted-response replay creates exactly two generation jobs. Full security retry passed: 180 foundation cases, 29 account tests, six boundaries and both dependency audits. Migration 049, API `3f92aa3b-fd10-4631-bda2-63c82ee8392a` and both workers are now deployed. Actual login, retained navigation, private file/queue/scan/readback and tenant denial passed. This does not replace the full live release gate.
 
-## Current release evidence — 24 October 2026
+## Previous release evidence — 24 October 2026
 
 Latest source `2bc63ec`: full browser **42/42**, foundation **179/179**, account **29/29**, six security boundaries, dependency audits, offline and contract checks pass. Migration 048 and API/web/both workers are deployed. Actual owner login, retained navigation, private media upload → durable queue → malware scan → readback, replay and cross-business denial passed, with exact test cleanup. See `railway-recheck-release.json`, `browser.json`, `security.json` and `BUILD_STATE.md`.
 
