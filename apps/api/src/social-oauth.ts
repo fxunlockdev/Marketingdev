@@ -1,3 +1,4 @@
+import {localMinute} from './local-calendar.js';
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
 import {SocialConnections} from './social-connections.js';
@@ -24,13 +25,14 @@ export class SocialOAuth {
  });}
  callback(user:string,session:string,brand:string,id:string,body:any){id=uuid(id);if(!body||typeof body!=='object'||Array.isArray(body)||Object.keys(body).some(k=>!['state','code','denied','timezone'].includes(k)))throw new BadRequestException('Invalid authorization response');
   const {state,code,denied,timezone}=body;
-  if(typeof state!=='string'||! /^[a-f0-9-]{36}\.[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/.test(state)||state.split('.')[0]!==brand.toLowerCase()||state.split('.')[1]!==id.toLowerCase()||typeof denied!=='boolean'||typeof timezone!=='string'||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840||(!denied&&(typeof code!=='string'||!code||code.length>8000||/[\x00-\x1f\x7f]/.test(code)))||(denied&&code!==undefined))throw new BadRequestException('Invalid authorization response');
+  if(typeof state!=='string'||! /^[a-f0-9-]{36}\.[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/.test(state)||state.split('.')[0]!==brand.toLowerCase()||state.split('.')[1]!==id.toLowerCase()||typeof denied!=='boolean'||timezone!==undefined&&(typeof timezone!=='string'||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840)||(!denied&&(typeof code!=='string'||!code||code.length>8000||/[\x00-\x1f\x7f]/.test(code)))||(denied&&code!==undefined))throw new BadRequestException('Invalid authorization response');
   return this.scoped(user,session,brand,async(db,b)=>{
    const account=await this.account(db),r=(await db.query('SELECT id,phase,state_hash,account_revision,expires_at FROM app.social_authorizations WHERE id=$1',[id])).rows[0];if(!r||hash(state)!==r.state_hash)throw new NotFoundException('Connection attempt not found');
-   const fingerprint=hash(canonicalJSON({state,code:denied?null:code,denied,timezone})),prior=(await db.query('SELECT job_id,request_hash FROM app.social_callbacks WHERE authorization_id=$1',[id])).rows[0];if(prior){if(prior.request_hash!==fingerprint)throw new ConflictException('This authorization response was already used');return {id:prior.job_id};}
+   const fingerprint=hash(canonicalJSON({state,code:denied?null:code,denied,timezone:timezone??null})),prior=(await db.query('SELECT job_id,request_hash FROM app.social_callbacks WHERE authorization_id=$1',[id])).rows[0];if(prior){if(prior.request_hash!==fingerprint)throw new ConflictException('This authorization response was already used');return {id:prior.job_id};}
    if(account.revision!==r.account_revision||r.phase!=='awaiting_consent'||new Date(r.expires_at).getTime()<=Date.now())throw new ConflictException('This connection link expired or settings changed. Start again');
+   const zone=(await db.query('SELECT timezone FROM app.business_onboarding WHERE brand_id=$1',[brand])).rows[0]?.timezone??'UTC',minute=Math.floor(Date.now()/60000)*60000,offset=timezone??String((minute-Date.parse(localMinute(minute,zone)+'Z'))/60000);
    const job=randomUUID();await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'social.connect')",[job,b.organization_id,brand,user]);
-   await db.query('INSERT INTO app.social_callbacks(job_id,organization_id,brand_id,authorization_id,state_hash,request_hash,encrypted_code,denied,timezone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[job,b.organization_id,brand,id,hash(state),fingerprint,denied?null:this.#secrets!.seal(`${b.organization_id}:${brand.toLowerCase()}:${id}`,'code',code),denied,timezone]);
+   await db.query('INSERT INTO app.social_callbacks(job_id,organization_id,brand_id,authorization_id,state_hash,request_hash,encrypted_code,denied,timezone) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[job,b.organization_id,brand,id,hash(state),fingerprint,denied?null:this.#secrets!.seal(`${b.organization_id}:${brand.toLowerCase()}:${id}`,'code',code),denied,offset]);
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'social.connect')",[job,b.organization_id,brand]);return {id:job};
   });
  }

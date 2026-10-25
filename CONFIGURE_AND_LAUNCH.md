@@ -41,3 +41,7 @@ The desired end state is **no more feature programming after configuration**. Al
 ## Acceptance phrase for Codex
 
 > Build the full working app, not a mockup. Ship adapters, workers, durable data, a configured Postiz deployment, tests, evidence, setup UX, observability and failure recovery. A functionality claim is complete only after a real provider/service call in staging proves it. The final operator should configure external accounts, credentials, deployment, DNS/OAuth permissions and legally required approvals—not implement missing code.
+
+## Implemented Connections return configuration (development checkpoint)
+
+The web service now requires `APP_ORIGIN` (exact public HTTPS origin) and `API_ORIGIN` (private API origin) for `/integrations/social/linkedin`. Preserve the public Host at ingress; redirect destinations come only from configured APP_ORIGIN. Redact OAuth callback query strings in access logs/traces before deployed acceptance. Do not configure model, Postiz enterprise signing or social-provider secrets on the web service. See [ADR 0016](docs/adr/0016-customer-connections.md) for the implemented scope, existing private worker configuration and focused verification. This is not evidence that Railway ingress or real consent has passed.
