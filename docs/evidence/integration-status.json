@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "f02741e22bb6e02854d1d00df776ec723cd9ebe0",
-  "checked_at": "2026-10-22T05:07:46.974416+00:00",
+  "code_commit": "b1d969d3efdf7557b7602d0e3cafb4b114cb1fa2",
+  "checked_at": "2026-10-22T05:21:05.294941+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -258,6 +258,14 @@
         "docs/evidence/social.json"
       ],
       "blocked_reason": "Actual local auth sessions, forced PostgreSQL RLS and Temporal prove LinkedIn start/callback with 256-bit state, encrypted code, expiry, single-session ownership, one-time exchange, revoked access and uncertain-outcome recovery. Upstream HTTP is explicitly MOCK. No provider login/consent or deployed callback UI has been tested. Provisioning, customer UI, account selection/reconnect/revoke and live acceptance remain incomplete."
+    },
+    "social_account_provisioning": {
+      "state": "ADAPTER_READY",
+      "live_test": false,
+      "evidence": [
+        "docs/evidence/social.json"
+      ],
+      "blocked_reason": "Actual local auth/RLS/Temporal and separate provisioning role prove idempotent setup enqueue, encrypted candidate capture, remote identity/name verification, retryable read-only confirmation, binding recovery and cross-business denial. Enterprise Postiz HTTP is MOCK. No real provisioning/deployment proof. Operator resolution of unknown/lost responses, customer UI, credential lifecycle and live acceptance remain incomplete."
     }
   },
   "security": {
