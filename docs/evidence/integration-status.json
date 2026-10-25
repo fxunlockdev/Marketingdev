@@ -2,8 +2,8 @@
   "schema_version": 1,
   "generated_by": "python -m scripts.verify",
   "environment": "offline_dev",
-  "code_commit": "e83258a2074a9b3327e961a0033d9e12d232a7af",
-  "checked_at": "2026-10-22T05:40:57.103840+00:00",
+  "code_commit": "6d0e66accf16e18f3cd26c77d372d4c008586c4e",
+  "checked_at": "2026-10-22T06:00:24.019255+00:00",
   "integrations": {
     "crawl4ai": {
       "state": "NOT_IMPLEMENTED",
@@ -47,6 +47,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
         "docs/evidence/social.json",
         "docs/evidence/offline.json",
@@ -67,22 +68,19 @@
       "blocked_reason": "Actual isolated Deep Agents with pinned owner skills, read-only brand context, real local Temporal/S3/RLS, Fabric text edits/PNG export and immutable approval tested. OpenAI planning/image create/edit transports are MOCK. No paid image quality proof, deployed sandbox, publishing, visual reference approval, video/carousel, complete credit reconciliation or production launch evidence."
     },
     "postiz_publish": {
-      "state": "NOT_IMPLEMENTED",
+      "state": "ADAPTER_READY",
       "live_test": false,
       "evidence": [
-        "docs/evidence/connections.json",
         "docs/evidence/social.json",
-        "docs/evidence/offline.json",
-        "docs/evidence/browser.json",
-        "docs/evidence/contracts.json",
-        "docs/evidence/security.json"
+        "docs/evidence/publishing.json"
       ],
-      "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."
+      "blocked_reason": "Actual local session/RLS, exact approved Fabric-rendered PNG/private S3, dispatcher and Temporal publication/reconciliation use an explicitly MOCK Postiz HTTP server. Explicit destination consent, expiring staging allowlists, immutable snapshots/history and unknown-write holds tested. No actual social publication, deployed/runtime equivalence or launch proof. Customer publishing UI, remote cancellation/rescheduling, operator recovery, other channels/formats, analytics and live acceptance remain incomplete."
     },
     "performance_learning": {
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
         "docs/evidence/social.json",
         "docs/evidence/offline.json",
@@ -96,6 +94,7 @@
       "state": "NOT_IMPLEMENTED",
       "live_test": false,
       "evidence": [
+        "docs/evidence/publishing.json",
         "docs/evidence/connections.json",
         "docs/evidence/social.json",
         "docs/evidence/offline.json",
