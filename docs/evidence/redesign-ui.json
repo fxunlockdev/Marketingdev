@@ -1,0 +1,213 @@
+{
+  "scope": "UI redesign from user-supplied Desvio App.dc.html; no provider/backend changes",
+  "reference": "UI redesign request.zip / Desvio App.dc.html",
+  "validation": {
+    "production_build": "passed",
+    "typescript": "passed",
+    "focused_contracts": {
+      "passed": 29,
+      "failed": 0
+    },
+    "layout": {
+      "screens": [
+        {
+          "name": "home",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Your content, at a glance."
+          ]
+        },
+        {
+          "name": "home",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Your content, at a glance."
+          ]
+        },
+        {
+          "name": "campaigns",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Campaigns"
+          ]
+        },
+        {
+          "name": "campaigns",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Campaigns"
+          ]
+        },
+        {
+          "name": "calendar",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Calendar"
+          ]
+        },
+        {
+          "name": "calendar",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Calendar"
+          ]
+        },
+        {
+          "name": "brand",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Brand Kit"
+          ]
+        },
+        {
+          "name": "brand",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Brand Kit"
+          ]
+        },
+        {
+          "name": "preferences",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Content Preferences"
+          ]
+        },
+        {
+          "name": "preferences",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Content Preferences"
+          ]
+        },
+        {
+          "name": "connections",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Integrations"
+          ]
+        },
+        {
+          "name": "connections",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Integrations"
+          ]
+        },
+        {
+          "name": "approvals",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Approvals"
+          ]
+        },
+        {
+          "name": "approvals",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Approvals"
+          ]
+        },
+        {
+          "name": "insights",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Insights"
+          ]
+        },
+        {
+          "name": "insights",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Insights"
+          ]
+        }
+      ],
+      "errors": [],
+      "blocked": [],
+      "checked_at": "2026-10-28T20:20:20.319Z"
+    },
+    "saved_media": {
+      "screens": [
+        {
+          "name": "home",
+          "width": 1440,
+          "overflow": false,
+          "title": [
+            "Your content, at a glance."
+          ]
+        },
+        {
+          "name": "home",
+          "width": 390,
+          "overflow": false,
+          "title": [
+            "Your content, at a glance."
+          ]
+        }
+      ],
+      "media": [
+        {
+          "grantHost": "t3.storageapi.dev",
+          "relative": false
+        },
+        {
+          "grantHost": "t3.storageapi.dev",
+          "relative": false
+        },
+        {
+          "grantHost": "t3.storageapi.dev",
+          "relative": false
+        },
+        {
+          "grantHost": "t3.storageapi.dev",
+          "relative": false
+        },
+        {
+          "status": 200,
+          "type": "image/png"
+        },
+        {
+          "status": 200,
+          "type": "image/png"
+        },
+        {
+          "status": 200,
+          "type": "image/png"
+        },
+        {
+          "status": 200,
+          "type": "image/png"
+        }
+      ],
+      "apiErrors": [],
+      "errors": [],
+      "blocked": [],
+      "checked_at": "2026-10-28T20:23:51.147Z",
+      "scope": "Local UI with authenticated read-only API bridge; browser CSP bypass only for production signed media host absent from local environment"
+    },
+    "new_post": "Isolated real React component with mocked network: uploads pending/success/error, reference and context payload checks at desktop/mobile passed"
+  },
+  "limitations": [
+    "Redesign has not been deployed in this task.",
+    "Browser media check uses CSP bypass in test context only because the local server lacks the production storage-host allowlist. Application security headers unchanged.",
+    "No paid image/video generation or social publishing was performed for this UI change.",
+    "Existing runtime/provider availability is unchanged."
+  ]
+}

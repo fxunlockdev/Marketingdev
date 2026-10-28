@@ -17,9 +17,9 @@ export function CampaignsScreen({business}:{business:{id:string;name:string}}){
   const day=new Date(plan.starts_on+'T12:00:00Z').getUTCDay(),week=addDays(plan.starts_on,-((day+6)%7));
   groups.set(week,[...(groups.get(week)??[]),plan]);
  }
- return <><div className="heading-row"><div className="v5-page-title"><p className="eyebrow">{business.name}</p><h1>Campaigns</h1><p>Your saved plans, grouped by the week they start.</p></div><div className="actions"><CampaignNewPost businessId={business.id} autoOpen={query.get('post')==='new'}/><CreateNew businessId={business.id}/></div></div>
- <Notice error={error}/>{error&&<button onClick={()=>setRetry(n=>n+1)}>Try again</button>}
+ return <section className="campaigns-screen"><div className="heading-row"><div className="v5-page-title"><p className="eyebrow">{business.name}</p><h1>Campaigns</h1><p>Your saved plans, grouped by the week they start.</p></div><div className="actions"><CampaignNewPost businessId={business.id} autoOpen={query.get('post')==='new'}/><CreateNew businessId={business.id}/></div></div>
+ <Notice error={error}/>{error!==undefined&&<button onClick={()=>setRetry(n=>n+1)}>Try again</button>}
  {!plans&&!error?<Loading/>:plans?.length?<div>{[...groups].map(([week,items])=><section className="overview-campaigns" key={week} aria-label={`Week of ${week}`}><h2>Week of {date(week)}</h2><ul className="overview-campaign-list">{items.map(plan=><li key={plan.id}><AppLink href={`/b/${business.id}/campaign-review?plan=${plan.id}`}><div><h3>{plan.title}</h3><p>{date(plan.starts_on)} – {date(addDays(plan.starts_on,plan.duration_days-1))}</p></div><span>Open campaign</span><span aria-hidden="true">→</span></AppLink></li>)}</ul></section>)}</div>:plans&&<section className="overview-content-empty"><h2>Your first campaign starts here</h2><p>Choose what you want to promote and when. Your saved campaign will appear here.</p><AppLink href={`/b/${business.id}/campaign-new`}>Plan a campaign →</AppLink></section>}
- </>;
+ </section>;
 }
 function date(day:string){return new Intl.DateTimeFormat(undefined,{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'}).format(new Date(day+'T12:00:00Z'));}

@@ -1,4 +1,5 @@
 "use client";
+import "./campaign-redesign.css";
 import {useEffect,useRef,useState} from 'react';
 import {CampaignMixPicker,defaultMix,MIX_CHOICES} from './campaign-mix-picker';
 import {normalizeContentMix,contentMixCounts,type ContentMixItem} from '../../api/src/generation-plan';

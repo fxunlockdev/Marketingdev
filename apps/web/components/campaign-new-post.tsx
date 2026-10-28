@@ -7,6 +7,7 @@ import {SavedReferencePreviews} from './brand-references';
 import {CampaignPostReferences} from './campaign-post-references';
 import {localCandidates,localMinute,addDays} from '../../api/src/local-calendar';
 import './campaign-post.css';
+import './campaign-redesign.css';
 export const POST_FORMATS=[['static','Still image'],['carousel','Carousel Post'],['video','Feed Video Post'],['reel','Short-form Video'],['story','Story'],['blog','Blog']] as const;
 export function CampaignNewPost({businessId,initialPlan,autoOpen=false}:{businessId:string;initialPlan?:string;autoOpen?:boolean}){
  const dialog=useRef<HTMLDialogElement>(null),router=useRouter(),key=useRef(crypto.randomUUID());

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./v5.css";
 import "./studio.css";
+import "./redesign.css";
 export const metadata: Metadata = {
   title: "Desvio · Your businesses, beautifully connected",
   description: "Your businesses, brand knowledge and creative work in one place.",
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body>
+      <body className="desvio-redesign">
         <a className="skip" href="#main">
           Skip to content
         </a>

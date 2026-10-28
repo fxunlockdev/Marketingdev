@@ -14,6 +14,7 @@ import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor, type Design } from "./creative-editor";
 import "./content-workspace-refinement.css";
+import "./calendar-connections-redesign.css";
 import {VideoReview} from './video-canvas';
 import {CreativeExportPanel} from './creative-export';
 import { useUnsavedChanges } from "./unsaved";

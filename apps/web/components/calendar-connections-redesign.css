@@ -1,0 +1,74 @@
+/* Scoped translation of the supplied Desvio reference. State and actions stay live. */
+.desvio-redesign .content-workspace.calendar-workspace,.desvio-redesign .content-workspace.approval-workspace{gap:16px;color:#17171a;min-width:0}
+.desvio-redesign .content-workspace .plan-main{background:#fff;border:0;border-radius:28px;padding:20px;box-shadow:none;min-width:0}
+.desvio-redesign .content-workspace .plan-toolbar{gap:10px;align-items:end;border:0;padding:0 0 18px}
+.desvio-redesign .content-workspace .plan-toolbar button,.desvio-redesign .content-workspace .calendar-filters>summary,.desvio-redesign .content-workspace .daily-post-pager button{border:0;border-radius:999px;background:#f4f3f8;color:#17171a;min-height:40px;padding:10px 15px;font-size:13px;font-weight:600;box-shadow:none}
+.desvio-redesign .content-workspace .plan-toolbar button.primary{background:#17171a;color:#fff}
+.desvio-redesign .content-workspace .plan-toolbar input,.desvio-redesign .content-workspace .plan-toolbar select{border:1px solid transparent;background:#f4f3f8;border-radius:14px;min-height:40px;font-size:13px;color:#17171a}
+.desvio-redesign .content-workspace .plan-toolbar .field{font-size:12px;color:#55556a;gap:6px}
+.desvio-redesign .content-workspace .plan-toolbar button:hover:not(:disabled),.desvio-redesign .content-workspace .daily-post-pager button:hover:not(:disabled){background:#eceaf5;color:#3a2fc2}
+.desvio-redesign .content-workspace .plan-toolbar button.primary:hover:not(:disabled){background:#6a5cff;color:#fff}
+.desvio-redesign .content-workspace .calendar-filter-fields{background:#fff;border:1px solid #eeedf3;border-radius:20px;padding:16px;box-shadow:0 8px 24px #17171a0d}
+.desvio-redesign .content-workspace .plan-channels button.active,.desvio-redesign .content-workspace .plan-channels button[aria-pressed="true"]{background:#6a5cff;color:#fff}
+.desvio-redesign .content-workspace .plan-date-strip{gap:8px;padding:4px 0 16px}
+.desvio-redesign .content-workspace .plan-date-strip button{border:0;border-radius:18px;background:#f4f3f8;color:#55556a;min-height:86px}
+.desvio-redesign .content-workspace .plan-date-strip button.active,.desvio-redesign .content-workspace .plan-date-strip button[aria-pressed="true"]{background:#6a5cff;color:#fff}
+.desvio-redesign .content-workspace .plan-results,.desvio-redesign .content-workspace .calendar-board-hint{font-size:12px;color:#6e6e78}
+.desvio-redesign .content-workspace .plan-grid{gap:8px}
+.desvio-redesign .content-workspace .plan-day{background:#f8f7fc;border:0;border-radius:18px;padding:10px;min-width:0}
+.desvio-redesign .content-workspace .plan-day>h2{font-size:13px;color:#55556a;font-weight:600;margin:4px 2px 14px;font-variant-numeric:tabular-nums}
+.desvio-redesign .content-workspace .plan-card{background:#fff;color:#17171a;border:0;border-radius:16px;padding:8px;box-shadow:0 1px 2px #17171a0f;text-align:left;justify-items:stretch;align-items:start;grid-template-columns:minmax(0,1fr);justify-content:stretch}
+.desvio-redesign .content-workspace .plan-card:hover{background:#fff;box-shadow:0 4px 12px #17171a12}
+.desvio-redesign .content-workspace .plan-card .post-thumbnail{width:100%;border-radius:11px}
+.desvio-redesign .content-workspace .plan-card .calendar-card-heading{width:100%;font-size:12px;color:#6e6e78}
+.desvio-redesign .content-workspace .plan-card>strong{font-size:14px;line-height:1.4}
+.desvio-redesign .content-workspace .plan-card .calendar-card-channel{font-size:12px;color:#6e6e78}
+.desvio-redesign .content-workspace .plan-state{border-radius:999px;font-size:11px;padding:4px 9px;justify-self:start}
+.desvio-redesign .content-workspace .plan-post-list>li,.desvio-redesign .content-workspace .daily-post{border:1px solid #eeedf3;border-radius:22px;box-shadow:none}
+.desvio-redesign .content-workspace .plan-list-card{background:#fff;color:#17171a;align-items:stretch}
+.desvio-redesign .content-workspace .plan-list-card:hover{background:#f8f7fc}
+.desvio-redesign .content-workspace .plan-empty{border:0;background:#f8f7fc;border-radius:22px;margin:10px 0;padding:48px 24px}
+.desvio-redesign .content-workspace .plan-empty h3,.desvio-redesign .content-workspace.approval-workspace>.section-heading h1{font-family:'Desvio Serif','DM Serif Display',Georgia,serif;font-weight:400;text-wrap:balance;color:#17171a}
+.desvio-redesign .content-workspace.approval-workspace>.section-heading h1{font-size:44px;line-height:1.1}
+.desvio-redesign .content-workspace.approval-workspace>.section-heading p{font-size:15px;color:#55556a}
+.desvio-redesign .content-workspace #plan-generator{border:0;border-radius:28px;background:#dcd6ff;padding:24px}
+.desvio-redesign .content-workspace button:focus-visible,.desvio-redesign .content-workspace summary:focus-visible,.desvio-redesign .connections-redesign button:focus-visible,.desvio-redesign .connections-redesign a:focus-visible{outline:2px solid #6a5cff;outline-offset:3px}
+.desvio-redesign .postforme-social.connections-redesign{max-width:none;color:#17171a;display:grid;gap:24px}
+.desvio-redesign .connections-redesign .social-heading{margin:0;align-items:end;gap:20px}
+.desvio-redesign .connections-redesign .social-heading h1{font-family:'Desvio Serif','DM Serif Display',Georgia,serif;font-size:48px;font-weight:400;line-height:1.1;text-wrap:balance}
+.desvio-redesign .connections-redesign .social-heading p{color:#55556a;font-size:15px;line-height:1.5;margin:10px 0 0}
+.desvio-redesign .connections-redesign button,.desvio-redesign .connections-redesign .button{border:0;border-radius:999px;background:#17171a;color:#fff;min-height:42px;padding:10px 18px;font-size:14px;font-weight:600;box-shadow:none}
+.desvio-redesign .connections-redesign button:hover:not(:disabled),.desvio-redesign .connections-redesign .button:hover{background:#6a5cff;color:#fff}
+.desvio-redesign .connections-redesign .social-heading>button{background:#fff;color:#17171a;flex-shrink:0}
+.desvio-redesign .connections-redesign .social-section-title{margin:0 0 14px;gap:12px}
+.desvio-redesign .connections-redesign .social-section-title h2{font-size:17px;font-weight:600}
+.desvio-redesign .connections-redesign .social-section-title>span{font-size:12px;color:#6e6e78}
+.desvio-redesign .connections-redesign .social-network-grid{gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
+.desvio-redesign .connections-redesign .social-network-card{border:0;border-radius:28px;padding:24px;min-height:260px;background:#fff;gap:12px}
+.desvio-redesign .connections-redesign .social-network-card .social-mark{width:56px;height:56px;border-radius:18px;margin-bottom:8px}
+.desvio-redesign .connections-redesign .social-network-card h3{font-family:'Desvio Serif','DM Serif Display',Georgia,serif;font-weight:400;font-size:30px;line-height:1.15;margin:0}
+.desvio-redesign .connections-redesign .social-network-card p{font-size:14px;color:#55556a;line-height:1.5;margin:0 0 12px}
+.desvio-redesign .connections-redesign .social-network-card>button{width:auto;align-self:flex-start;margin-top:auto;gap:16px}
+.desvio-redesign .connections-redesign .social-setup,.desvio-redesign .connections-redesign .social-handoff{border:0;border-radius:24px;padding:24px;background:#dcd6ff;margin:0;min-width:0}
+.desvio-redesign .connections-redesign .social-setup p,.desvio-redesign .connections-redesign .social-handoff p{color:#3a3a44;line-height:1.6}
+.desvio-redesign .connections-redesign .social-account-list{border:0;border-radius:28px;background:#fff;overflow:hidden}
+.desvio-redesign .connections-redesign .social-account{padding:24px;border-color:#eeedf3;gap:14px}
+.desvio-redesign .connections-redesign .social-account-info{min-width:0;overflow-wrap:anywhere}
+.desvio-redesign .connections-redesign .social-account>button{background:#f4f3f8;color:#17171a}
+.desvio-redesign .connections-redesign .social-disconnect{border-radius:18px;background:#f8f7fc;padding:16px}
+.desvio-redesign .connections-redesign .social-notice{border-radius:18px;padding:16px;background:#f1efff;color:#3a2fc2;margin:0}
+.desvio-redesign .connections-redesign .social-footnote{font-size:13px;color:#6e6e78;margin:0}
+@media(max-width:800px){.desvio-redesign .connections-redesign .social-network-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.desvio-redesign .connections-redesign .social-heading{align-items:start;flex-wrap:wrap}}
+@media(max-width:600px){
+ .desvio-redesign .content-workspace .plan-main{padding:14px;border-radius:24px}
+ .desvio-redesign .content-workspace .plan-toolbar{gap:8px}
+ .desvio-redesign .content-workspace .plan-toolbar .field{flex:1 1 120px;min-width:0}
+ .desvio-redesign .content-workspace .plan-post-list{grid-template-columns:minmax(0,1fr)}
+ .desvio-redesign .content-workspace.approval-workspace>.section-heading h1,.desvio-redesign .connections-redesign .social-heading h1{font-size:36px}
+ .desvio-redesign .connections-redesign .social-network-grid{grid-template-columns:minmax(0,1fr)}
+ .desvio-redesign .connections-redesign .social-network-card{min-height:230px;padding:22px}
+ .desvio-redesign .connections-redesign .social-account,.desvio-redesign .connections-redesign .social-setup,.desvio-redesign .connections-redesign .social-handoff{padding:20px}
+ .desvio-redesign .connections-redesign .social-section-title{flex-wrap:wrap}
+}
+
+.desvio-redesign .postforme-social.connections-redesign{background:transparent;border:0;border-radius:0;padding:0}
