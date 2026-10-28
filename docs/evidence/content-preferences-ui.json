@@ -1,0 +1,24 @@
+{
+  "status": "local_verified_not_deployed",
+  "feature": "Dedicated Content Preferences",
+  "validation": {
+    "web_build": "passed",
+    "customer_browser_tests": {
+      "passed": 22,
+      "failed": 0
+    },
+    "preference_checks": [
+      "save and reload",
+      "stale revision rejected with draft preserved",
+      "explicit reload recovers latest saved revision",
+      "390px layout without overflow",
+      "WCAG A/AA automated scan"
+    ]
+  },
+  "backend": "Existing tenant-scoped onboarding preferences; planning.ts reads these values into new planning requests",
+  "limitations": [
+    "Preference channels currently Instagram and LinkedIn only",
+    "Full Blaze preference set and all-channel adapters remain unfinished",
+    "No paid-provider calls or deployment performed"
+  ]
+}

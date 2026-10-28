@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-10-28T14:43:05.925Z",
+  "passed": true,
+  "checks": [
+    "home",
+    "campaigns",
+    "image-editor",
+    "editor-cancel-no-save",
+    "calendar",
+    "approvals",
+    "canvas",
+    "media",
+    "integrations",
+    "preferences",
+    "learnings-knowledge",
+    "learnings-performance",
+    "learnings-sources",
+    "insights-performance"
+  ],
+  "saved_image_decoded": true,
+  "editor_canceled_without_save": true,
+  "page_errors": 0,
+  "server_errors": 0,
+  "product_mutations": 0,
+  "paid_calls": 0,
+  "scope": "Actual deployed authenticated read-only UI smoke; no generation, publishing, connection changes or billing."
+}

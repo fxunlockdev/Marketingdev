@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-10-26T11:24:55.857Z",
+  "source_version": "c14884f1-c6e1-4740-a40a-6f9ba070f4ac",
+  "failed_job": "c3dc9656-d981-43eb-a01d-7d879694c427",
+  "old_image": "sha256:97791e768b717299f53d95a4bfc5c55a650b8344e19a21355533d1d9c8fa87cb",
+  "new_image": "sha256:60d6e8ad5728739ba78c6ddf70a93975097eedbf0c42f63b8df89f069c6bf0d4",
+  "runtime": "amd64 image locally emulated on arm64",
+  "limits": {
+    "memory": "512m",
+    "pids": 48,
+    "cpu": 1,
+    "network": "none"
+  },
+  "input_bytes": 2242549,
+  "old_failure": "V8 heap exhausted near256MB while parsing a multi-megabyte data URL through JSDOM",
+  "fix": "Decode validated PNG bytes with canvas.loadImage(Buffer) and construct FabricImage directly",
+  "output": {
+    "format": "jpeg",
+    "width": 1080,
+    "height": 1080,
+    "bytes": 445256,
+    "sha256": "66e01436afaeb07ba52db993373e423deb0306fb8271cf2cf2d520aee2cb9734"
+  },
+  "regression": {
+    "file": "tests/runtime/static-renderer.test.mjs",
+    "passed": 1,
+    "failed": 0,
+    "formats": [
+      "png",
+      "instagram-jpeg"
+    ],
+    "input": "synthetic PNG >2MiB"
+  },
+  "scope": "Actual image rendered locally without regeneration or paid provider calls. Hosted rollout/retry not yet verified."
+}

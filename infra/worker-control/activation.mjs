@@ -1,7 +1,7 @@
 import {createHash,randomUUID} from 'node:crypto';
 import {workerReadiness} from './readiness.mjs';
 const canonical=x=>x===null||typeof x!=='object'?JSON.stringify(x):Array.isArray(x)?'['+x.map(canonical).join(',')+']':'{'+Object.keys(x).sort().map(k=>JSON.stringify(k)+':'+canonical(x[k])).join(',')+'}';
-export const API_ACTIVATION_FLAGS=['VIDEO_ENABLED','POSTIZ_ENABLED','POSTIZ_PROVISIONING_ENABLED','POSTIZ_PUBLISHING_ENABLED','POSTIZ_OAUTH_ENABLED'];
+export const API_ACTIVATION_FLAGS=['VIDEO_ENABLED','HIGGSFIELD_IMAGES_ENABLED','POSTIZ_ENABLED','POSTIZ_PROVISIONING_ENABLED','POSTIZ_PUBLISHING_ENABLED','POSTIZ_OAUTH_ENABLED'];
 export const API_ACTIVATION_KEYS=[...API_ACTIVATION_FLAGS,'VIDEO_RUNTIME_IMAGE','RENDER_RUNTIME_IMAGE'];
 export const apiSettingDefault=key=>API_ACTIVATION_FLAGS.includes(key)?'false':'';
 const disabled=values=>({...values,...Object.fromEntries(API_ACTIVATION_FLAGS.map(k=>[k,'false']))});
@@ -13,7 +13,8 @@ export function activationPlan({spec,observed,api}){
  const social=spec.values.POSTIZ_ENABLED??'false',publishing=spec.values.POSTIZ_PUBLISHING_ENABLED??'false';
  if(!['true','false'].includes(social)||!['true','false'].includes(publishing)||publishing==='true'&&social!=='true')fail('ACTIVATION_SOCIAL_FLAGS_INVALID');
  const oauth=api.variables.POSTIZ_OAUTH_ENABLED??'false';if(!['true','false'].includes(oauth))fail('ACTIVATION_SOCIAL_FLAGS_INVALID');
- const after={POSTIZ_OAUTH_ENABLED:social==='true'?oauth:'false',VIDEO_ENABLED:spec.values.VIDEO_ENABLED,POSTIZ_ENABLED:social,POSTIZ_PROVISIONING_ENABLED:social,POSTIZ_PUBLISHING_ENABLED:publishing,VIDEO_RUNTIME_IMAGE:spec.values.VIDEO_RUNTIME_IMAGE,RENDER_RUNTIME_IMAGE:spec.values.RENDER_RUNTIME_IMAGE};
+ const images=spec.values.HIGGSFIELD_IMAGES_ENABLED??'false';if(!['true','false'].includes(images))fail('ACTIVATION_IMAGE_FLAG_INVALID');
+ const after={HIGGSFIELD_IMAGES_ENABLED:images,POSTIZ_OAUTH_ENABLED:social==='true'?oauth:'false',VIDEO_ENABLED:spec.values.VIDEO_ENABLED,POSTIZ_ENABLED:social,POSTIZ_PROVISIONING_ENABLED:social,POSTIZ_PUBLISHING_ENABLED:publishing,VIDEO_RUNTIME_IMAGE:spec.values.VIDEO_RUNTIME_IMAGE,RENDER_RUNTIME_IMAGE:spec.values.RENDER_RUNTIME_IMAGE};
  const before=Object.fromEntries(Object.keys(after).map(k=>[k,api.variables[k]??apiSettingDefault(k)]));
  const plan={version:1,worker:{before:{id:observed.worker.id,image:observed.worker.image,configuration:observed.worker.configuration},image:spec.image,configuration:spec.configurationHash,replace:readiness.status==='replacement_required'},api:{before,after,deploymentId:api.deploymentId,update:canonical(before)!==canonical(after)}};
  return {...plan,preview_sha256:createHash('sha256').update(canonical(plan)).digest('hex')};

@@ -65,3 +65,56 @@ Desvio now exposes an administrator-only recheck operation for a terminal unknow
 Same pinned commit. `libraries/nestjs-libraries/src/integrations/social/instagram.standalone.provider.ts:28` identifies `instagram-standalone`, sets `isBetweenSteps=false`, and uses `INSTAGRAM_APP_ID`/`INSTAGRAM_APP_SECRET`. `generateAuthUrl` at line 108 returns `https://www.instagram.com/oauth/authorize` with exact Desvio `/integrations/social/instagram-standalone` redirect. The four requested scopes are instagram_business_basic, instagram_business_content_publish, instagram_business_manage_comments and instagram_business_manage_insights. This is distinct from Facebook-backed `instagram`; do not interchange their credentials or selectors.
 
 The public controller `apps/backend/src/public-api/routes/v1/public.integrations.controller.ts:344` accepts an allowed provider name; `apps/backend/src/api/routes/no.auth.integrations.controller.ts:43` handles its code exchange and checks reconnect's internal account identity before saving. Desvio's backend authorization extension checks exact consent origin/path, callback origin/provider, response type, state, client ID uniqueness, returned organization/provider and subsequent integration listing. Migration 050 binds reconnect RLS to the stored provider. Local MOCK transport, persisted flow and all eight customer connection browser journeys pass. The extension is not deployed. No Meta approval, live consent, refresh behavior, media compatibility or Instagram publication is certified by this audit.
+
+### Remote cancellation acceptance limit (24 October recheck)
+
+Pinned `postiz-audit` source public controller DELETE `/posts/:id` resolves the scoped post then deletes its group. `libraries/nestjs-libraries/src/database/prisma/posts/posts.service.ts:885` first deletes the repository record, then attempts Temporal workflow termination and catches both enumeration and termination errors. `{id}` and subsequent absence from GET posts therefore cannot establish that an in-flight publication has stopped. Desvio currently supports cancellation before submission only. A remote cancellation implementation must retain an unresolved state unless independently verified; rescheduling cannot submit a replacement while the old publication may still execute. No endpoint was called and no social post was modified during this audit.
+
+### Facebook Page selection gap (2026-10-25, source inspection only)
+
+The pinned checkout's `no.auth.integrations.controller.ts:279` fetches page choices for a two-step provider and returns them with the intermediate integration. `POST /integrations/public/provider/:id/connect` resolves the organization from the stored OAuth state. `integration.service.ts:416` verifies the organization-scoped integration is in-between steps, fetches the selected Page with its stored token, updates its identity/token and clears `inBetweenSteps`.
+
+Desvio currently rejects that result in `PostizClient.completeAuthorization`, which deliberately accepts only completed Instagram/LinkedIn connections. Facebook support therefore needs a durable `awaiting_page_selection` state with sanitized choices, session/organization binding, expiry, idempotent Page submission and post-selection identity verification before publishing is enabled. Reconnect must preserve the selected Page identity. This is a concrete implementation gap, not something resolved solely by owner Meta-app configuration. No Facebook authorization or publication is claimed by this audit.
+
+
+### Facebook typed adapter (local, 2026-10-25)
+
+The adapter now has a separate Facebook code exchange and explicit Page-selection operation. The exchange checks the remote organization, provider and intermediate state, and returns only Page IDs/names. The upstream Page list can contain `access_token` and token-bearing photo URLs; these are deliberately discarded. Selection accepts only one of the supplied persisted choices, checks the actual credential organization and matching Facebook integration before POST, and reports acceptance rather than publication. Ambiguous mutation outcomes remain unknown and are never automatically replayed. Existing single-step callbacks refuse Facebook without consuming its code.
+
+All 25 Postiz transport contract tests passed against local HTTP fixtures, including three new Facebook groups. This is ADAPTER_READY only. The customer service still rejects Facebook: durable session-bound choice storage, expiry, UI, callback routing, reconnect and publishing remain to be implemented. The public integration listing does not expose internal Page identity or `inBetweenSteps`; it cannot alone prove selected-Page identity after an ambiguous selection result. No live Meta request was made.
+
+
+### Facebook durable selection (local, 2026-10-25)
+
+Migration 065 adds safe Page choices and immutable selection records. The callback destroys the saved code after exchange and waits for the initiating session to choose an available Page. The API enforces administrator access, business/session scope, authorization expiry and account revision. A repeated identical selection returns the same job; a different selection conflicts. The durable workflow resumes without exchanging the code again, and an interrupted selection becomes unknown rather than sending another mutation. Selection acknowledgement plus the scoped integration listing is required before saving the local channel; this does not certify publication.
+
+The complete local social foundation suite passes 37 tests, including actual Temporal waiting/resumption, expiry, role/session revocation, wrong-login denial, concurrent repeated choice and lost response. Transport is mocked, not live Meta. The customer picker and Facebook-specific callback are currently under browser verification. Targeted Facebook reconnect and publishing remain unsupported. The refresh import still needs explicit handling of upstream intermediate Facebook entries, since public listing does not expose that state.
+
+
+The local customer flow now passes all nine connection browser journeys (including existing LinkedIn/Instagram cases). The Facebook return is handled server-side, Page choices survive reload, no Page is preselected, and the explicit selection resumes the saved workflow exactly once. The picker passes axe with zero violations. `work/browser/facebook-page-picker.png` was visually inspected. This is local/mock-transport evidence only; not deployed or live verified.
+
+
+### Facebook refresh observations (local, 2026-10-25)
+
+Migration 066 adds a secret-free, worker-scoped observation of Page-selection acknowledgements. A public integration list alone cannot promote Facebook to available. Pending or uncertain exchanges remain unconfirmed, and a new exchange temporarily holds prior Facebook channels until its scope is known. The synchronization worker can read these safe observations but cannot modify another job's acknowledgement. Existing publication eligibility already requires `observed_state='available'`.
+
+The social foundation suite passes 37 tests with refresh during selection, refresh after acknowledgement, unconfirmed imports and runtime-role denial. Browser verification of refresh inside the Page-picker journey is running. An unresolved older mutation still requires reconciliation; a later successful selection must not silently erase that uncertainty. Facebook publishing and targeted reconnect remain separate unfinished work. Nothing in this change is live Meta verification or deployed release evidence.
+
+
+Final recheck: all 38 social foundation tests and all nine connection browser journeys pass. The additional foundation regression proves that an unresolved mutation cannot be hidden by a later acknowledgement, and synchronization cannot rewrite another job's observations. The browser test refreshes before Page selection and verifies the unconfirmed state. It also prepares a connection while a different browser page is foreground. Active polling now continues in background tabs, resumes on visibility changes, and discards stale read responses. Logs: `work/facebook-unresolved-foundation.log`, `work/facebook-observations-browser-recheck.log`. All checks use mocked external transport. No deployment or live Meta claim.
+
+
+### Page-choice recovery (local implementation, verification in progress)
+
+Migration 067 distinguishes an abandoned Page choice from an uncertain Page mutation. A canceled or expired choice that never entered submission can be superseded by a later acknowledged selection. An older verified connection cannot be resurrected by refresh alone. The recorded exchange-return time prevents an old choice's later cleanup from invalidating a newer successful selection; uncertain in-flight requests still hold availability.
+
+A session-bound cancellation endpoint only accepts an awaiting choice with no saved selection. It records cancellation on the existing job; the worker clears the choice and completes cancellation. Selection and cancellation serialize under the same business lock. After a choice has been accepted for processing, cancellation is rejected rather than pretending the external operation was stopped. The recovery test initially had one stale mutation-count assertion after adding the deliberate recovery submission; that expectation was corrected and the expanded foundation suite is running.
+
+
+Recovery verification completed locally: 39/39 social foundation checks and 10/10 connection browser journeys passed. The browser exercises Cancel from the Page picker, verifies no Page mutation was sent, starts another connection and explicitly selects a Page successfully. Evidence: `work/facebook-cancel-foundation.log` and `work/facebook-cancel-browser.log`. No live provider calls or deployment occurred.
+
+### Facebook Page publishing transport (local, 2026-10-25)
+
+Audited checkout `651876e24317c2d8e717262cf98267ec6f699180`, `facebook.dto.ts` and `FacebookProvider.postNonStory`. Added typed `submitFacebook`: one PNG, one canonical MP4, or 2–10 PNGs in a Page feed post, with `settings.__type=facebook` and `post_type=post`. The adapter verifies the remote tenant and destination provider, enforces the application’s 3,000-character caption limit, checks media origins/types and rejects duplicate carousel media. Responses mean acceptance only. Ambiguous responses do not trigger retries.
+
+All 28 Postiz transport tests pass, including three new Facebook groups. No live Meta calls or posts were made. This is **ADAPTER_READY** only: content/planning/creative channel schemas, final approval compatibility, durable publication routing, operator publication grants and customer destination UI still restrict this flow. Those must be completed and tested before exposing Facebook publication. Stories and targeted Facebook reconnect remain separate gaps.

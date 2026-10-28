@@ -1,0 +1,31 @@
+{
+  "status": "deployed",
+  "scope": [
+    "Bounded automatic retry for transient campaign status, plan and post reads",
+    "No generation resubmission during read recovery",
+    "Cancel follow-up reads and timers when leaving campaign review"
+  ],
+  "validation": {
+    "web_typecheck": "passed",
+    "browser_tests": {
+      "passed": 1,
+      "failed": 0,
+      "log": "work/campaign-reconnect-browser.log",
+      "paid_providers": "mocked",
+      "coverage": [
+        "Injected 503 followed by automatic recovery",
+        "Saved planning request count unchanged",
+        "Image previews and focused post review",
+        "Mobile overflow and WCAG A/AA",
+        "Existing custom campaign generation and persistence flow"
+      ]
+    }
+  },
+  "limitations": [
+    "Not full Blaze parity",
+    "No live paid generation or social publishing tested"
+  ],
+  "web_deployment": "c0c662cb-5488-4a1e-a425-ef2bc904f080",
+  "web_deployment_status": "SUCCESS",
+  "public_health_http_status": 200
+}

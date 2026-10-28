@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-10-25T15:37:21Z",
+  "environment": "development",
+  "web_deployment_id": "d98e5bd2-7d50-4f86-9359-16f3fd1b2edf",
+  "web_status": "SUCCESS",
+  "worker_image": "sha256:939738eddca19ca4ca1af8ec1daff56e54059b5025bdf3f9673318fb90aeb2a6",
+  "worker_registration_verified": true,
+  "browser_test": "dedicated campaign review: 1 passed, 0 failed; mocked paid provider",
+  "paid_calls_this_rollout": false,
+  "limitations": ["Full Blaze parity incomplete", "Five customer images not generated", "Live publishing acceptance remains outstanding", "Subsequent local reference-selection and navigation corrections are not in this deployment"]
+}

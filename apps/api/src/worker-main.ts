@@ -1,3 +1,9 @@
+import {HiggsfieldReplacementJobs} from './higgsfield-replacement-jobs.js';
+import {HiggsfieldImageClient} from './higgsfield-image-client.js';
+import {ImageReplacementVault} from './image-replacement-vault.js';
+import {WebsiteRenderer} from './website-renderer.js';
+import {RenderedWebsiteResearch} from './rendered-website-research.js';
+import {WebsitePhotos} from './website-photos.js';
 import {CarouselJobs} from './carousel-jobs.js';
 import {InsightJobs} from './insight-jobs.js';
 import {GeminiPlanner} from './gemini-planner.js';
@@ -23,9 +29,9 @@ import {Pool} from 'pg';
 import {fileURLToPath} from 'node:url';
 import {workerConfigFromEnv} from './config.js';
 import {AssetJobs,JobDispatcher,assertJobRole,type JobScope} from './jobs.js';
-import {VisualCrawler} from './visual-crawler.js';
+import {OpenAIWebsiteResearch} from './openai-website-research.js';
 import {IntakeJobs} from './intake-jobs.js';
-import {WebsiteParser} from './website-parser.js';
+
 import {BrandAnalyzer} from './brand-analysis.js';
 import {DocumentJobs} from './document-jobs.js';
 import {DocumentParser} from './document-parser.js';
@@ -39,7 +45,8 @@ await assertJobRole(pool,'desvio_worker');await assertJobRole(dispatchPool,'desv
 const connection=await NativeConnection.connect({address:config.jobs.address}),clientConnection=await Connection.connect({address:config.jobs.address});
 const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
-const intake=new IntakeJobs(jobs,new WebsiteParser(config.documentImage),new BrandAnalyzer(process.env.OPENAI_API_KEY),undefined,new VisualCrawler(config.documentImage));
+const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)));
+const imageReplacements=config.higgsfieldImages?new HiggsfieldReplacementJobs(jobs,new HiggsfieldImageClient(config.higgsfieldImages),new ImageReplacementVault(config.higgsfieldImages.encryptionKey)):undefined;
 const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
@@ -75,8 +82,8 @@ const worker=await Worker.create({connection,namespace:config.jobs.namespace,tas
     failExport:async(scope:JobScope)=>exporter.fail(scope),
     generatePlan:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await planning.run(scope);}catch{throw ApplicationFailure.retryable("Planning temporarily unavailable","PlanningUnavailable");}finally{clearInterval(heartbeat);}},
     failPlan:async(scope:JobScope)=>planning.fail(scope),
-    generateCreative:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await creative.run(scope);}catch{throw ApplicationFailure.retryable("Creative processing temporarily unavailable","CreativeUnavailable");}finally{clearInterval(heartbeat);}},
-    failCreative:async(scope:JobScope)=>creative.fail(scope),
+    generateCreative:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return imageReplacements&&await imageReplacements.handles(scope)?await imageReplacements.step(scope):await creative.run(scope);}catch{throw ApplicationFailure.retryable("Creative processing temporarily unavailable","CreativeUnavailable");}finally{clearInterval(heartbeat);}},
+    failCreative:async(scope:JobScope)=>imageReplacements&&await imageReplacements.handles(scope)?imageReplacements.fail(scope):creative.fail(scope),
     processIntake:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await intake.run(scope);}catch{throw ApplicationFailure.retryable("Intake temporarily unavailable","IntakeUnavailable");}finally{clearInterval(heartbeat);}},
     failIntake:async(scope:JobScope)=>intake.fail(scope),
     extract:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await documents.extract(scope);}catch{throw ApplicationFailure.retryable('Document processing is temporarily unavailable','DocumentProcessingUnavailable');}finally{clearInterval(heartbeat);}},

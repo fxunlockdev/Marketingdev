@@ -1,0 +1,36 @@
+{
+  "checked_at": "2026-10-25T14:11:11.944Z",
+  "passed": true,
+  "scope": "Live public website text retrieval; no model call or approved profile claim",
+  "paid_calls": 0,
+  "pages": [
+    {
+      "url": "https://runwalrealty.com/",
+      "sha256": "9365b06f84b2d58b70aca338ba32009e45c3fc55011089359591d7eb820b89d5",
+      "chunks": 67,
+      "characters": 7885,
+      "coverage": "server_html_only"
+    },
+    {
+      "url": "https://runwalrealty.com/about/company-overview/",
+      "sha256": "680260065dde5a393ca1e5e8c0ee83c8cdfe1824b8ff97a8e149fbd37eca8d8c",
+      "chunks": 46,
+      "characters": 8322,
+      "coverage": "server_html_only"
+    },
+    {
+      "url": "https://runwalrealty.com/about/our-journey/",
+      "sha256": "4aab1c8e94f60c3298cbf13658b3478403936ab64d1ba8ab207ee90f482b9339",
+      "chunks": 30,
+      "characters": 5004,
+      "coverage": "server_html_only"
+    },
+    {
+      "url": "https://runwalrealty.com/about/csr/",
+      "sha256": "b26490f2bfa15be56dc2346372696780e1d567c1a8cdebed067b2c86f85b3065",
+      "chunks": 21,
+      "characters": 3935,
+      "coverage": "server_html_only"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 // Real, disposable local services. No cloud credentials or externally supplied endpoint.
 import {execFileSync} from 'node:child_process';
 import {randomBytes,randomUUID,createHash} from 'node:crypto';
-import {mkdtemp,writeFile,rm,readFile,mkdir,chmod} from 'node:fs/promises';
+import {mkdtemp,writeFile,rm,readFile,mkdir,chmod,rename} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {createServer,createConnection} from 'node:net';
 import {setTimeout} from 'node:timers/promises';
@@ -17,8 +17,8 @@ async function runtime(){
   const dir=resolve('work/runtime');await mkdir(dir,{recursive:true});
   const archive=resolve(dir,`temporal-1.9.1-${platform}.tgz`),binary=resolve(dir,`temporal-1.9.1-${platform}`);
   let bytes;try{bytes=await readFile(archive);}catch{const response=await fetch(`https://github.com/temporalio/cli/releases/download/v1.9.1/temporal_cli_1.9.1_${process.platform}_${process.arch==='x64'?'amd64':'arm64'}.tar.gz`,{signal:AbortSignal.timeout(60000)});if(!response.ok)throw new Error('Unable to download pinned test server');bytes=Buffer.from(await response.arrayBuffer());}
-  if(createHash('sha256').update(bytes).digest('hex')!==hash)throw new Error('Temporal test archive checksum mismatch');await writeFile(archive,bytes,{mode:0o600});
-  const temp=await mkdtemp(resolve(dir,'extract-'));try{execFileSync('tar',['-xzf',archive,'-C',temp,'temporal']);await writeFile(binary,await readFile(resolve(temp,'temporal')),{mode:0o700});await chmod(binary,0o700);}finally{await rm(temp,{recursive:true,force:true});}
+  if(createHash('sha256').update(bytes).digest('hex')!==hash)throw new Error('Temporal test archive checksum mismatch');const archiveTemp=archive+'.'+randomUUID();await writeFile(archiveTemp,bytes,{mode:0o600});await rename(archiveTemp,archive);
+  const temp=await mkdtemp(resolve(dir,'extract-'));try{execFileSync('tar',['-xzf',archive,'-C',temp,'temporal']);const executable=resolve(temp,'temporal');await chmod(executable,0o700);await rename(executable,binary);}finally{await rm(temp,{recursive:true,force:true});}
   return binary;
 }
 export async function startAssetServices(){
@@ -32,8 +32,12 @@ export async function startAssetServices(){
     let ready=false;for(let i=0;i<60;i++){try{await client.send(new HeadBucketCommand({Bucket:storage.bucket}),{abortSignal:AbortSignal.timeout(1000)});ready=true;break;}catch{await setTimeout(250);}}client.destroy();if(!ready)throw new Error('Local private object store did not start');
     const scanner={host:'127.0.0.1',port:await port()},clamConfig=resolve(dir,'clamd.conf');
     await writeFile(clamConfig,'Foreground yes\nTCPSocket 3310\nTCPAddr 0.0.0.0\nDatabaseDirectory /var/lib/clamav\nStreamMaxLength 20M\nMaxFileSize 20M\nMaxScanSize 40M\nMaxRecursion 8\nMaxFiles 1000\nMaxThreads 2\nConcurrentDatabaseReload no\nAlertExceedsMax yes\n',{mode:0o644});
-    const cn=`desvio-scanner-${randomUUID()}`;docker('run','-d','--name',cn,'--label','desvio.purpose=isolated-test','--platform','linux/amd64','-p',`127.0.0.1:${scanner.port}:3310`,'-v',`${clamConfig}:/etc/clamav/desvio.conf:ro`,'--entrypoint','clamd',CLAM,'--config-file=/etc/clamav/desvio.conf');containers.push(cn);
-    ready=false;for(let i=0;i<360;i++){try{await new Promise((res,rej)=>{const s=createConnection(scanner);s.setTimeout(1000,()=>{s.destroy();rej(new Error('timeout'));});s.on('connect',()=>s.write('zPING\0'));s.on('error',rej);s.on('end',()=>rej(new Error('scanner closed')));s.on('data',b=>{s.destroy();b.toString().startsWith('PONG')?res():rej(new Error('ping'));});});ready=true;break;}catch{await setTimeout(500);}}if(!ready){let diagnostic='unavailable';try{const info=JSON.parse(docker('inspect',cn))[0];diagnostic=JSON.stringify({status:info.State.Status,exit_code:info.State.ExitCode,oom_killed:info.State.OOMKilled});console.error('Isolated scanner readiness:',diagnostic);console.error(docker('logs','--tail','30',cn));}catch{}throw new Error('Local full-signature scanner did not start: '+diagnostic);}
+    // The engine image is pinned, but its bundled signatures age. Refresh real
+    // signatures before readiness; never weaken the production freshness check.
+    const cn=`desvio-scanner-${randomUUID()}`;docker('run','-d','--name',cn,'--label','desvio.purpose=isolated-test','--platform','linux/amd64','-p',`127.0.0.1:${scanner.port}:3310`,'-v',`${clamConfig}:/etc/clamav/desvio.conf:ro`,'--entrypoint','sh',CLAM,'-c','freshclam --stdout --log=/tmp/freshclam.log && exec clamd --config-file=/etc/clamav/desvio.conf');containers.push(cn);
+    // Full-signature validation under amd64 emulation can exceed three minutes.
+    // Allow startup time; readiness still requires a genuine scanner PONG.
+    ready=false;let nextStateCheck=0;for(const deadline=Date.now()+600000;Date.now()<deadline;){if(Date.now()>=nextStateCheck){nextStateCheck=Date.now()+5000;const state=JSON.parse(docker('inspect','--format','{{json .State}}',cn));if(state.Status==='exited'||state.Status==='dead'){console.error('Isolated scanner terminated:',JSON.stringify({status:state.Status,exit_code:state.ExitCode,oom_killed:state.OOMKilled}));console.error(docker('logs','--tail','15',cn));throw new Error('Local full-signature scanner exited before readiness');}}try{await new Promise((res,rej)=>{const s=createConnection(scanner);s.setTimeout(1000,()=>{s.destroy();rej(new Error('timeout'));});s.on('connect',()=>s.write('zPING\0'));s.on('error',rej);s.on('end',()=>rej(new Error('scanner closed')));s.on('data',b=>{s.destroy();b.toString().startsWith('PONG')?res():rej(new Error('ping'));});});ready=true;break;}catch{await setTimeout(500);}}if(!ready){let diagnostic='unavailable';try{const info=JSON.parse(docker('inspect',cn))[0];diagnostic=JSON.stringify({status:info.State.Status,exit_code:info.State.ExitCode,oom_killed:info.State.OOMKilled});console.error('Isolated scanner readiness:',diagnostic);console.error(docker('logs','--tail','30',cn));}catch{}throw new Error('Local full-signature scanner did not start: '+diagnostic);}
     const address=`127.0.0.1:${await port()}`;
     temporal=await TestWorkflowEnvironment.createLocal({server:{executable:{type:'existing-path',path:await runtime()},dbFilename:resolve(dir,'temporal.db'),namespace:'desvio-test',ip:'127.0.0.1',port:Number(address.split(':')[1]),ui:false,log:{level:'error',format:'json'}}});
     console.log('Actual local Garage 2.4.1, ClamAV 1.5.4 and Temporal CLI 1.9.1 services ready; no paid providers');

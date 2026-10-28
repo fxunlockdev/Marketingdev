@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-10-25T13:55:44.388Z",
+  "passed": true,
+  "checks": [
+    {
+      "file": "work/campaign-font-contracts.log",
+      "passed": 6,
+      "sha256": "8968cc468e44b0cd57eea829f0432347ba87d81d61630af518424aa0fa37a2c5"
+    },
+    {
+      "file": "work/campaign-font-creative.log",
+      "passed": 17,
+      "sha256": "682e521bacf513003eed78f9a4148ffbf089dce8c8ba726293a8dbac1ce4b5e0"
+    },
+    {
+      "file": "work/campaign-font-browser.log",
+      "passed": 5,
+      "sha256": "25af05a5fa7386237d27af8d97fe3c49a026db90bd6c9ed4c17b67bf6efed830"
+    }
+  ],
+  "scope": "Saved campaign choice to actual editable font, replay and browser save/reload/download; AI services mocked, database/storage/renderer real",
+  "live_paid_calls": 0
+}

@@ -1,0 +1,66 @@
+{
+  "checked_at": "2026-10-25T13:17:02.075Z",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "service_id": "45ae520d-f681-424b-8758-6cee8789b2cf",
+  "deployment_id": "ed7e978c-272e-4ba3-82aa-e71265458992",
+  "deployment_status": "REMOVED",
+  "source_commit": "d19d188dde5240f4427e9625228f64338897fd5b",
+  "migrations": [
+    {
+      "file": "064_planned_post_references.sql",
+      "sha256": "230f74f7b8d2970f74305fa3a171876e55ba7cb1a84d4fab3493e6ecd97116e2"
+    },
+    {
+      "file": "065_facebook_page_selection.sql",
+      "sha256": "538f91ae752f247aa46c14ec6d455dee007d87810fee535bdc7633caac6cf17c"
+    },
+    {
+      "file": "066_facebook_connection_observations.sql",
+      "sha256": "24c2600e15f19a95387a54f6e98455e545a13cd24c05b893a32f1e478052c777"
+    },
+    {
+      "file": "067_facebook_selection_recovery.sql",
+      "sha256": "69cb1b585d2252303a314684a0a8e96532f9feb8ab25f3195e890648f02a12f1"
+    },
+    {
+      "file": "068_shared_monthly_generation_budget.sql",
+      "sha256": "c6a01e077e86b76ec6edfc06f6f78e3e4273b11f1c3c19cc46232b45bb202e65"
+    },
+    {
+      "file": "069_generation_usage_read.sql",
+      "sha256": "2f45a6f4744db6908bbb1a0106dcb820d91f746a7a7c93d6730cf3d019f3efaf"
+    },
+    {
+      "file": "070_generated_plan_slot_capacity.sql",
+      "sha256": "46b28afc89fce562206b2184152bc6222ba2e2805ba4d25d6882bf90613c4705"
+    },
+    {
+      "file": "071_campaign_image_batches.sql",
+      "sha256": "cb6acb8c732280644982f62b59728b2bcb4845d86d01a8ec28235c5ceb2cb8f0"
+    },
+    {
+      "file": "072_website_photos.sql",
+      "sha256": "e5ccbf4fec7027641bc70153a005dec6997cc600f8cad4e5bd550e4f9579cc23"
+    },
+    {
+      "file": "073_facebook_publication.sql",
+      "sha256": "59c9ef49a8417824f351719987c52d4ace2539888014136721f65676aad5281f"
+    }
+  ],
+  "bootstrap_output": {
+    "status": "configured",
+    "replayed": true,
+    "roles": [
+      "desvio_app",
+      "desvio_auth",
+      "desvio_mail",
+      "desvio_worker",
+      "desvio_dispatcher",
+      "desvio_provisioner"
+    ]
+  },
+  "active_secret_variables_cleared": true,
+  "scope": "Actual dedicated dev migrations through 073, checksum replay and all six runtime-role login checks. API/web and customer/provider acceptance remain pending.",
+  "live_model_or_social_calls": false
+}

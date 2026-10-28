@@ -53,3 +53,17 @@ test('social activation preserves publication opt-in and disables active APIs be
  assert.equal(sets[0].POSTIZ_OAUTH_ENABLED,'false');assert.equal(sets.at(-1).POSTIZ_OAUTH_ENABLED,'true');assert.equal(sets[0].POSTIZ_ENABLED,'false');assert.equal(sets[0].POSTIZ_PROVISIONING_ENABLED,'false');assert.equal(sets.at(-1).POSTIZ_ENABLED,'true');assert.equal(sets.at(-1).POSTIZ_PUBLISHING_ENABLED,'false');assert.ok(a.calls.indexOf('set')<a.calls.indexOf('swap'));
  s.spec.values.POSTIZ_ENABLED='false';s.spec.values.POSTIZ_PUBLISHING_ENABLED='true';assert.throws(()=>activationPlan(s),/SOCIAL_FLAGS_INVALID/);
 });
+
+test('image replacement activation remains disabled by default and validates explicit enablement',()=>{
+ const s=snapshot();assert.equal(activationPlan(s).api.after.HIGGSFIELD_IMAGES_ENABLED,'false');
+ s.spec.values.HIGGSFIELD_IMAGES_ENABLED='true';assert.equal(activationPlan(s).api.after.HIGGSFIELD_IMAGES_ENABLED,'true');
+ s.spec.values.HIGGSFIELD_IMAGES_ENABLED='yes';assert.throws(()=>activationPlan(s),/ACTIVATION_IMAGE_FLAG_INVALID/);
+});
+
+test('pause deployment timeout never swaps worker and restores API before unlock',async()=>{
+ const s=snapshot(),p=activationPlan(s),a=adapter(s);let first=true;
+ a.io.setAPI=async v=>{a.calls.push('api:'+v.VIDEO_ENABLED);if(first){first=false;throw Error('ACTIVATION_API_DEPLOYMENT_UNCONFIRMED');}};
+ await assert.rejects(activate(p,p.preview_sha256,a.io),/DEPLOYMENT_UNCONFIRMED/);
+ assert.ok(!a.calls.includes('swap'));assert.ok(!a.calls.includes('restore'));
+ assert.deepEqual(a.calls.slice(-4),['api:true','verify-api','rolled_back','unlock']);
+});

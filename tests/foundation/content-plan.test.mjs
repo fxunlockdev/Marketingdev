@@ -245,3 +245,119 @@ test('calendar export reads all filtered saved posts with authenticated business
  assert.equal((await api(path(`content-plan/export?${query({plan_id:created.body.id,format:'csv'})}`,sibling))).body.count,0);
  assert.equal((await api(path(`content-plan/export?${query({format:'html'})}`))).status,400);
 });
+
+test('archive preserves previous versions, isolates brands and restores canceled posts only as drafts',async()=>{
+ version=(await admin.query('SELECT v.id,v.sha256 FROM app.creative_projects p JOIN app.creative_versions v ON v.id=p.latest_version_id WHERE p.id=$1',[project])).rows[0];
+ let [s]=await create();
+ const original=s.creative_version_id;
+ const next=await canvas.save(alice.id,brand.id,project,{parent_id:version.id,design,caption:'Archive fixture replacement'});
+ s=await plans.edit(alice.id,brand.id,s.id,{revision:s.revision,creative_version_id:next.id});
+ version={id:next.id,sha256:s.creative_sha256};
+ s=await plans.review(alice.id,brand.id,s.id,reviewBody(s,'pending_review'));
+ s=await plans.review(alice.id,brand.id,s.id,reviewBody(s,'approved'));
+ s=await plans.review(alice.id,brand.id,s.id,reviewBody(s,'cancelled'));
+ const archived=await api(path('content-archive'));assert.equal(archived.status,200,JSON.stringify(archived.body));
+ const entries=archived.body.entries.filter(e=>e.id===s.id);
+ assert.equal(entries.filter(e=>e.kind==='archived').length,1);
+ assert.equal(entries.filter(e=>e.kind==='previous_version'&&e.creative_version_id===original).length,1);
+ assert.deepEqual(entries.find(e=>e.kind==='archived').design,design);
+ assert.equal((await plans.list(alice.id,brand.id,{...range,plan_id:s.plan_id})).total,0);
+ assert.equal((await api(path('content-archive'),{user:bob})).status,404);
+ assert.equal((await api(path('content-archive'),{user:null})).status,401);
+ assert.equal((await api(path('content-archive',sibling))).body.entries.length,0);
+ assert.equal((await api(path('content-archive?page=0'))).status,400);
+ const restore=path(`content-slots/${s.id}/restore`),body={revision:s.revision};
+ assert.equal((await api(restore,{user:viewer,method:'POST',body})).status,403);
+ assert.equal((await api(path(`content-slots/${s.id}/restore`,sibling),{method:'POST',body})).status,404);
+ assert.equal((await api(restore,{method:'POST',body:{revision:s.revision-1}})).status,409);
+ const restored=await api(restore,{user:editor,method:'POST',body});assert.equal(restored.status,201,JSON.stringify(restored.body));
+ assert.equal(restored.body.state,'draft_ready');assert.equal(restored.body.approved_by,null);assert.equal(restored.body.approved_at,null);
+ assert.equal((await api(restore,{method:'POST',body})).status,409);
+ assert.ok(!(await plans.archive(alice.id,brand.id,{})).entries.some(e=>e.id===s.id&&e.kind==='archived'));
+ assert.equal((await plans.list(alice.id,brand.id,{...range,plan_id:s.plan_id})).total,1);
+ assert.equal((await plans.history(alice.id,brand.id,s.id)).events.at(-1).feedback,'Restored from archive as a draft');
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.publication_requests WHERE slot_id=$1',[s.id])).rows[0].n,0);
+ const [empty]=await create([slot('instagram',null)]),removed=await plans.review(alice.id,brand.id,empty.id,reviewBody(empty,'cancelled'));
+ assert.equal((await plans.restore(alice.id,brand.id,empty.id,{revision:removed.revision})).state,'content_needed');
+});
+
+test('generation email opt-in is tenant scoped, idempotent, durable and revoked with access',async()=>{
+ const {GenerationNotifications}=await import('../../dist/generation-notifications.js');
+ const {MailQueue,MailWorker}=await import('../../dist/mail.js');
+ const queue=new MailQueue(config.origin,config.mailEncryptionKey),notifications=new GenerationNotifications(plans,queue);
+ const [s]=await create([slot('instagram',null)]),job=randomUUID(),thread=(await admin.query('SELECT thread_id FROM app.creative_projects WHERE id=$1',[project])).rows[0].thread_id;
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.generate','running')",[job,org.id,brand.id,alice.id]);
+ await admin.query("INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,prompt,format,channel,size,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,'TEST NOTIFICATION','static','instagram','1024x1024',$7,'fixture')",[job,org.id,brand.id,thread,project,brainId,randomUUID()]);
+ await admin.query("INSERT INTO app.content_slot_generations(job_id,organization_id,brand_id,slot_id,source_revision,feedback,request_key,request_hash,requested_by) VALUES($1,$2,$3,$4,1,'',$5,'fixture',$6)",[job,org.id,brand.id,s.id,randomUUID(),alice.id]);
+ const email=(await admin.query('SELECT email FROM auth."user" WHERE id=$1',[alice.id])).rows[0].email;
+ await assert.rejects(notifications.subscribe(bob.id,email,brand.id,s.plan_id,{job_ids:[job]}));
+ await assert.rejects(notifications.subscribe(viewer.id,email,brand.id,s.plan_id,{job_ids:[job]}));
+ await assert.rejects(notifications.subscribe(alice.id,email,sibling.id,s.plan_id,{job_ids:[job]}));
+ const [a,b]=await Promise.all([notifications.subscribe(alice.id,email,brand.id,s.plan_id,{job_ids:[job]}),notifications.subscribe(alice.id,email,brand.id,s.plan_id,{job_ids:[job]})]);assert.equal(a.id,b.id);
+ const httpRead=await api(path(`content-plans/${s.plan_id}/notifications`));assert.equal(httpRead.status,200);assert.deepEqual(httpRead.body.notifications[0].job_ids,[job]);
+ const forged=await api(path(`content-plans/${s.plan_id}/notifications`),{method:'POST',body:{job_ids:[job],email:'someone-else@example.test'}});assert.equal(forged.status,400);
+ assert.equal((await api(path(`content-plans/${s.plan_id}/notifications`),{user:bob})).status,404);
+ const saved=(await admin.query('SELECT * FROM delivery.outbox WHERE id=(SELECT mail_id FROM app.generation_notifications WHERE id=$1)',[a.id])).rows[0];
+ assert.equal(saved.status,'waiting_generation');assert.ok(!saved.encrypted_payload.includes(Buffer.from(email)));assert.equal(queue.decrypt(saved).to,email);
+ const mailDb=new Pool({connectionString:config.mailDatabaseUrl}),worker=new MailWorker(mailDb,queue,config);let sent=0;
+ // Local SMTP test double only; no mail leaves this test process.
+ worker.transport={sendMail:async()=>{sent++;return {accepted:[email],rejected:[]};},close(){}};
+ try{
+  await admin.query("UPDATE delivery.outbox SET status='canceled',encrypted_payload=NULL WHERE kind<>'generation'");
+  assert.equal(await worker.runOnce(),null);assert.equal(sent,0);
+  await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[job]);
+  const result=await worker.runOnce();assert.equal(result.id,saved.id);assert.equal(result.status,'accepted');assert.equal(sent,1);assert.equal(await worker.runOnce(),null);
+  const second=await notifications.subscribe(editor.id,`${editor.id}@example.test`,brand.id,s.plan_id,{job_ids:[job]});
+  await admin.query('UPDATE app.memberships SET active=false WHERE organization_id=$1 AND user_id=$2',[org.id,editor.id]);
+  assert.equal(await worker.runOnce(),null);assert.equal(sent,1);
+  assert.equal((await admin.query('SELECT status FROM delivery.outbox WHERE id=(SELECT mail_id FROM app.generation_notifications WHERE id=$1)',[second.id])).rows[0].status,'canceled');
+  await admin.query('UPDATE app.memberships SET active=true WHERE organization_id=$1 AND user_id=$2',[org.id,editor.id]);
+  const extraJob=randomUUID();await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.generate','running')",[extraJob,org.id,brand.id,editor.id]);
+  await admin.query("INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,prompt,format,channel,size,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,'TEST CANCEL','static','instagram','1024x1024',$7,'fixture')",[extraJob,org.id,brand.id,thread,project,brainId,randomUUID()]);
+  await admin.query("INSERT INTO app.content_slot_generations(job_id,organization_id,brand_id,slot_id,source_revision,feedback,request_key,request_hash,requested_by) VALUES($1,$2,$3,$4,1,'',$5,'fixture',$6)",[extraJob,org.id,brand.id,s.id,randomUUID(),editor.id]);
+  const cancelable=await notifications.subscribe(editor.id,`${editor.id}@example.test`,brand.id,s.plan_id,{job_ids:[extraJob]});
+  await admin.query("UPDATE app.memberships SET role='viewer' WHERE organization_id=$1 AND user_id=$2",[org.id,editor.id]);
+  assert.equal((await notifications.cancel(editor.id,brand.id,s.plan_id,cancelable.id)).status,'canceled');
+  await admin.query("UPDATE app.memberships SET role='editor' WHERE organization_id=$1 AND user_id=$2",[org.id,editor.id]);
+  const standalone=await notifications.subscribe(alice.id,email,brand.id,null,{job_ids:[extraJob]});
+  assert.equal((await notifications.read(alice.id,brand.id,null)).notifications[0].id,standalone.id);
+  const standaloneMail=(await admin.query('SELECT * FROM delivery.outbox WHERE id=(SELECT mail_id FROM app.generation_notifications WHERE id=$1)',[standalone.id])).rows[0];
+  const standaloneURL=new URL(queue.decrypt(standaloneMail).url);assert.equal(standaloneURL.pathname,`/b/${brand.id}/canvas`);assert.equal(standaloneURL.searchParams.get('thread'),thread);
+  assert.equal((await api(path('generation-notifications'))).status,200);
+  assert.equal((await api(path('generation-notifications'),{user:bob})).status,404);
+  await notifications.cancel(alice.id,brand.id,null,standalone.id);
+  // Persisted video fixtures verify notification joins/RLS; no paid video call.
+  const asset=randomUUID(),assetJob=randomUUID(),visual=randomUUID(),reference=randomUUID(),videoJob=randomUUID(),videoProject=randomUUID(),videoSlot=randomUUID();
+  await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'fixture.png','image/png',1,$5,$6,$7,'ready')",[asset,org.id,brand.id,alice.id,'1'.repeat(64),`fixture/q/${asset}`,`fixture/c/${asset}`]);
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status,asset_id) VALUES($1,$2,$3,$4,'asset.validate','succeeded',$5)",[assetJob,org.id,brand.id,alice.id,asset]);
+  await admin.query("INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$7,1,100,100)",[visual,org.id,brand.id,asset,assetJob,`fixture/v/${visual}`,'1'.repeat(64)]);
+  await admin.query("INSERT INTO app.brand_references(id,organization_id,brand_id,uploaded_visual_id,label,approved_by) VALUES($1,$2,$3,$4,'TEST REFERENCE',$5)",[reference,org.id,brand.id,visual,alice.id]);
+  await admin.query("INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by) VALUES($1,$2,$3,$4,'instagram','2026-11-05T08:00:00Z','video','TEST VIDEO','','','',$5)",[videoSlot,org.id,brand.id,s.plan_id,alice.id]);
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.video','running')",[videoJob,org.id,brand.id,alice.id]);
+  await admin.query("INSERT INTO app.video_references(job_id,organization_id,brand_id,brand_reference_id,source_sha256,export_sha256,consented_by) VALUES($1,$2,$3,$4,$5,$5,$6)",[videoJob,org.id,brand.id,reference,'1'.repeat(64),alice.id]);
+  await admin.query("INSERT INTO app.video_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,'TEST VIDEO',$5)",[videoProject,org.id,brand.id,thread,alice.id]);
+  await admin.query("INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision) VALUES($1,$2,$3,$4,$5,'TEST VIDEO','instagram',5,$6,'fixture',$7,1)",[videoJob,org.id,brand.id,videoProject,brainId,randomUUID(),videoSlot]);
+  const videoNotification=await notifications.subscribe(alice.id,email,brand.id,s.plan_id,{job_ids:[videoJob]});
+  const standaloneVideo=await notifications.subscribe(alice.id,email,brand.id,null,{job_ids:[videoJob]});
+  await notifications.cancel(alice.id,brand.id,null,standaloneVideo.id);
+  assert.equal(await worker.runOnce(),null);
+  await admin.query("UPDATE app.jobs SET status='failed' WHERE id=$1",[videoJob]);
+  const videoMail=await worker.runOnce();assert.equal(videoMail.status,'accepted');assert.equal(sent,2);
+  assert.equal((await notifications.read(alice.id,brand.id,s.plan_id)).notifications.find(n=>n.id===videoNotification.id).status,'accepted');
+
+ }finally{worker.close();await mailDb.end();}
+});
+
+test('explicit campaign specifications persist and changing aspect detaches artwork for a new review',async()=>{
+ const creativeSpec={placement:'feed',aspect:'square',slide_count:null};
+ const [saved]=await create([{...slot(),creative_spec:creativeSpec}]);
+ assert.deepEqual(saved.creative_spec,creativeSpec);
+ const updated=await plans.edit(alice.id,brand.id,saved.id,{revision:saved.revision,creative_spec:{placement:'story',aspect:'vertical',slide_count:null}}).catch(error=>error);
+ assert.ok(updated instanceof Error,'LinkedIn stories must be rejected');
+ const changed=await plans.edit(alice.id,brand.id,saved.id,{revision:saved.revision,creative_spec:{placement:'feed',aspect:'portrait',slide_count:null}});
+ assert.equal(changed.revision,saved.revision+1);assert.equal(changed.creative_version_id,null);assert.equal(changed.state,'content_needed');assert.equal(changed.approved_by,null);
+ const events=await plans.history(alice.id,brand.id,saved.id);assert.deepEqual(events.events.at(-1).snapshot.creative_spec,changed.creative_spec);
+ await assert.rejects(plans.edit(alice.id,brand.id,saved.id,{revision:changed.revision,creative_spec:null}),/compatible/);
+ await assert.rejects(plans.edit(alice.id,brand.id,saved.id,{revision:changed.revision,creative_version_id:version.id}),/dimensions/);
+ await assert.rejects(plans.edit(bob.id,brand.id,saved.id,{revision:changed.revision,creative_spec:creativeSpec}));
+});

@@ -24,8 +24,13 @@ const definitions={
  publishing:{table:'publication_grants',fields:['channel_id','remote_account_id','daily_limit'],key:'channel_id'},
 };
 export function configurationManifest(input,now=Date.now()){
- const v=object(input,['version','change_id','organization_id','business_id','operator_reference','grants','scope']);
+ const v=object(input,['version','change_id','organization_id','business_id','operator_reference','grants','scope','monthly_price_usd','enabled']);
  if(v.version!==1||typeof v.operator_reference!=='string'||!v.operator_reference.trim()||v.operator_reference.length>500||/[\x00-\x1f\x7f]/.test(v.operator_reference))deny('CONFIGURATION_INVALID_MANIFEST');
+ if(v.scope==='generation_plan'){
+  if(v.business_id!==undefined||v.grants!==undefined||![500,800,1000].includes(v.monthly_price_usd)||typeof v.enabled!=='boolean')deny('CONFIGURATION_INVALID_GENERATION_PLAN');
+  return {version:1,change_id:uuid(v.change_id),organization_id:uuid(v.organization_id),operator_reference:v.operator_reference,scope:'generation_plan',monthly_price_usd:v.monthly_price_usd,enabled:v.enabled};
+ }
+ if(v.monthly_price_usd!==undefined||v.enabled!==undefined)deny('CONFIGURATION_INVALID_SCOPE');
  if(!Array.isArray(v.grants)||!v.grants.length||v.grants.length>12)deny('CONFIGURATION_INVALID_GRANTS');
  if(v.scope!==undefined&&v.scope!=='workspace_defaults')deny('CONFIGURATION_INVALID_SCOPE');
  if(v.scope==='workspace_defaults'&&(v.business_id!==undefined||v.grants.some(g=>g.kind==='publishing')))deny('CONFIGURATION_DEFAULT_SCOPE_DENIED');
@@ -83,6 +88,7 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
   await db.query('BEGIN');await db.query("SET LOCAL lock_timeout='15s'; SET LOCAL statement_timeout='30s'");
   await verifyTarget(db,{mode,expectedDatabase});
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`members:${manifest.organization_id}`]);
+  if(manifest.scope==='generation_plan')return await configureGenerationPlan(db,manifest,manifestHash,approval);
   if(manifest.scope==='workspace_defaults')return await configureDefaults(db,manifest,manifestHash,approval);
   const business=(await db.query('SELECT id,name FROM app.brands WHERE organization_id=$1 AND id=$2',[manifest.organization_id,manifest.business_id])).rows[0];
   if(!business)deny('CONFIGURATION_BUSINESS_MISMATCH');
@@ -94,8 +100,8 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
    const existing=(await db.query(`SELECT * FROM app.${d.table} WHERE organization_id=$1 AND brand_id=$2${d.key?` AND ${d.key}=$3`:''}`,args)).rows[0]??null;
    let account=null;
    if(g.kind==='publishing'){
-    account=(await db.query('SELECT c.id,c.name,c.remote_id,c.provider,c.observed_state,c.account_revision,a.revision,a.enabled,a.identity_verified_at FROM app.social_channels c JOIN app.postiz_accounts a ON a.organization_id=c.organization_id AND a.brand_id=c.brand_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND c.id=$3',args)).rows[0];
-    if(!account||account.remote_id!==g.remote_account_id||account.provider!=='linkedin'||g.enabled&&(!account.enabled||!account.identity_verified_at||account.account_revision!==account.revision||account.observed_state!=='available'))deny('CONFIGURATION_ACCOUNT_MISMATCH');
+    account=(await db.query('SELECT c.id,c.name,c.remote_id,c.provider,c.observed_state,c.publishing_held,c.account_revision,a.revision,a.enabled,a.identity_verified_at FROM app.social_channels c JOIN app.postiz_accounts a ON a.organization_id=c.organization_id AND a.brand_id=c.brand_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND c.id=$3',args)).rows[0];
+    if(!account||account.remote_id!==g.remote_account_id||!['linkedin','instagram-standalone','facebook'].includes(account.provider)||g.enabled&&(account.publishing_held||!account.enabled||!account.identity_verified_at||account.account_revision!==account.revision||account.observed_state!=='available'))deny('CONFIGURATION_ACCOUNT_MISMATCH');
    }
    snapshots.push({kind:g.kind,key:d.key?g[d.key]:null,existing,account});
   }
@@ -116,6 +122,22 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
   await db.query('INSERT INTO app.operator_configuration_changes(change_id,organization_id,brand_id,manifest_sha256,preview_sha256,operator_reference,configuration) VALUES($1,$2,$3,$4,$5,$6,$7)',[manifest.change_id,manifest.organization_id,manifest.business_id,manifestHash,previewHash,manifest.operator_reference,JSON.stringify({manifest,before:snapshots})]);
   await db.query('COMMIT');return {status:'applied',change_id:manifest.change_id,preview_sha256:previewHash,grants:manifest.grants.length};
  }catch(e){await db.query('ROLLBACK').catch(()=>{});if(e instanceof ConfigurationError)throw e;throw new ConfigurationError('CONFIGURATION_FAILED_ROLLED_BACK');}finally{db.release();}
+}
+
+async function configureGenerationPlan(db,manifest,manifestHash,approval){
+ const workspace=(await db.query('SELECT id,name FROM app.organizations WHERE id=$1',[manifest.organization_id])).rows[0];
+ if(!workspace)deny('CONFIGURATION_WORKSPACE_MISMATCH');
+ const prior=(await db.query('SELECT manifest_sha256,preview_sha256 FROM app.operator_configuration_changes WHERE change_id=$1',[manifest.change_id])).rows[0];
+ if(prior){if(prior.manifest_sha256!==manifestHash)deny('CONFIGURATION_CHANGE_ID_REUSED');if(approval&&approval!==prior.preview_sha256)deny('CONFIGURATION_APPROVAL_MISMATCH');await db.query('COMMIT');return {status:'already_applied',change_id:manifest.change_id,preview_sha256:prior.preview_sha256};}
+ const previous=(await db.query('SELECT * FROM app.generation_plans WHERE organization_id=$1 FOR UPDATE',[manifest.organization_id])).rows[0]??null;
+ const usage=(await db.query("SELECT month_start,reserved_micros FROM app.monthly_generation_usage WHERE organization_id=$1 AND month_start=date_trunc('month',now() AT TIME ZONE 'UTC')::date FOR UPDATE",[manifest.organization_id])).rows[0]??null;
+ const previewHash=digest({manifest,previous,usage});
+ const limit=manifest.enabled?manifest.monthly_price_usd*200000:0;
+ if(!approval){await db.query('ROLLBACK');return {status:'preview',preview_sha256:previewHash,workspace,manifest,previous,usage,provider_budget_micros:limit,remaining_micros:Math.max(0,limit-Number(usage?.reserved_micros??0)),scope:'Account-wide UTC monthly reservation limit. Existing usage is retained, including failed or unknown calls. No payment collection or provider authorization is performed.'};}
+ if(approval!==previewHash)deny('CONFIGURATION_PREVIEW_STALE');
+ await db.query('INSERT INTO app.generation_plans(organization_id,monthly_price_usd,enabled) VALUES($1,$2,$3) ON CONFLICT(organization_id) DO UPDATE SET monthly_price_usd=EXCLUDED.monthly_price_usd,enabled=EXCLUDED.enabled',[manifest.organization_id,manifest.monthly_price_usd,manifest.enabled]);
+ await db.query('INSERT INTO app.operator_configuration_changes(change_id,organization_id,brand_id,manifest_sha256,preview_sha256,operator_reference,configuration) VALUES($1,$2,NULL,$3,$4,$5,$6)',[manifest.change_id,manifest.organization_id,manifestHash,previewHash,manifest.operator_reference,JSON.stringify({manifest,before:previous,usage})]);
+ await db.query('COMMIT');return {status:'applied',change_id:manifest.change_id,preview_sha256:previewHash,provider_budget_micros:limit};
 }
 
 async function configureDefaults(db,manifest,manifestHash,approval){

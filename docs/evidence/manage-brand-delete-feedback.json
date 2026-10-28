@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-24T12:10:17.918Z",
+  "passed": true,
+  "empty_confirmation_shows_error": true,
+  "input_focused": true,
+  "correct_confirmation_submits": true,
+  "api_errors_visible": true,
+  "real_deletions": 0,
+  "paid_calls": 0
+}

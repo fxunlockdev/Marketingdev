@@ -6,6 +6,37 @@ import {BrandReferences} from "./brand-references";
 import { PrivateVisual } from "./private-visual";
 const active = (j: any) => ["queued", "running", "retrying"].includes(j.status);
 const messages: Record<string, string> = {
+  MONTHLY_GENERATION_BUDGET_EXHAUSTED: "You’ve used this month’s generation allowance. Your work is saved.",
+  AI_RESEARCH_NO_SOURCES: "We couldn’t find enough cited information on your website. Add brand documents or details to continue.",
+  AI_RESEARCH_SUBMISSION_UNKNOWN: "We couldn’t confirm the research response. We won’t repeat a potentially charged request automatically. Your business is saved.",
+  AI_RESEARCH_LEGACY_CAPTURE: "This request belongs to the previous website service. Start a new research request after the existing request has been resolved.",
+  AI_PROVIDER_AUTH_FAILED: "The OpenAI key was rejected. Update the server API key, then try again.",
+  AI_PROVIDER_ACCESS_DENIED: "The OpenAI project does not have access to website research. Check its model and tool permissions.",
+  AI_MODEL_UNAVAILABLE: "The configured research model is unavailable to this OpenAI project. Check model access before retrying.",
+  AI_PROVIDER_QUOTA_EXHAUSTED: "Your OpenAI API account has no available credit or has reached its spending limit. Update billing, then try again.",
+  AI_PROVIDER_RATE_LIMITED: "OpenAI is temporarily limiting requests. Wait a moment, then try again. Your business is saved.",
+  AI_RESEARCH_REQUEST_REJECTED: "OpenAI could not accept the website research request. Your business is saved; the request configuration needs checking.",
+  AI_PROVIDER_REJECTED: "OpenAI declined this request. Check the account’s API access, billing and limits before trying again.",
+  WEBSITE_PREREQUISITE_TIMEOUT:
+    "Website capture did not finish in time, so AI analysis has not started. Check the capture status before retrying.",
+  WEBSITE_PREREQUISITE_FAILED:
+    "Brand analysis did not start because website capture failed or was canceled. Review the website error and retry capture when ready.",
+  AI_OUTPUT_INVALID:
+    "Your website was captured, but AI returned details we could not verify. Your sources are saved. Choose Prepare AI brand & goals to try the analysis again; you do not need to reread the website.",
+  AI_RESPONSE_INCOMPLETE:
+    "Your website was captured, but AI stopped before finishing your brand profile. Your sources are saved. Try Prepare AI brand & goals again.",
+  MAXUN_NOT_CONFIGURED:
+    "Website capture is not configured yet. Your business is saved; please contact the workspace owner.",
+  MAXUN_AUTH_FAILED:
+    "The website capture service could not authenticate. The workspace owner needs to check its saved credential.",
+  MAXUN_ACCESS_DENIED:
+    "Maxun declined this capture. The workspace owner needs to check the account’s plan and API permissions before retrying.",
+  MAXUN_CREDITS_EXHAUSTED:
+    "The website capture service has no available credits. Your business is saved; the workspace owner needs to replenish them.",
+  MAXUN_SUBMISSION_UNKNOWN:
+    "We could not confirm whether website capture started. We will not submit a duplicate request. Please share the reference below for recovery.",
+  MAXUN_RATE_LIMITED:
+    "The website capture service is busy. Please try again shortly.",
   AI_NOT_CONFIGURED:
     "AI setup is still needed. Your website evidence is saved; you can review it or add facts below.",
   AI_STAGING_APPROVAL_REQUIRED:
@@ -50,6 +81,10 @@ const messages: Record<string, string> = {
 export function BrandIntake({
   business,
   onComplete,
+  onboarding = false,
+  onState,
+  onManual,
+  profileReady=true,
 }: {
   business: {
     id: string;
@@ -58,6 +93,10 @@ export function BrandIntake({
     revision: number;
   };
   onComplete: () => void;
+  onboarding?: boolean;
+  onState?: (state:any) => void;
+  onManual?: () => void;
+  profileReady?:boolean;
 }) {
   const [state, setState] = useState<any>(),
     [error, setError] = useState<unknown>(),
@@ -67,6 +106,8 @@ export function BrandIntake({
     requestKey = useRef(""),
     requestKind = useRef("");
   latest.current = onComplete;
+  const stateListener=useRef(onState);stateListener.current=onState;
+  useEffect(()=>{if(state)stateListener.current?.(state);},[state]);
   const path = `/api/v1/businesses/${business.id}/intake`,
     writable = ['owner','admin','editor'].includes(business.role),
     watch = !state || state.jobs.some(active);
@@ -92,7 +133,7 @@ export function BrandIntake({
         ) {
           await api(
             path,
-            { kind: "website.extract" },
+            { kind: "website.extract", autoAnalyze: true },
             "POST",
             `initial-website-${business.id}-${business.revision}`,
           );
@@ -100,6 +141,8 @@ export function BrandIntake({
         } else if (
           writable &&
           website?.status === "succeeded" &&
+          !website.auto_analysis_job_id &&
+          !website.recovery_of &&
           !next.jobs.some(active) &&
           !next.jobs.some(
             (j: any) =>
@@ -135,16 +178,17 @@ export function BrandIntake({
       if (timer) clearInterval(timer);
     };
   }, [business.id, business.website, business.revision, writable, path, watch]);
-  async function start(kind: string) {
+  async function start(kind: string, recoverJobId?:string) {
+    const requestType=recoverJobId?`${kind}:recover:${recoverJobId}`:kind;
     setBusy(true);
     setError(undefined);
     // Keep the same key after a lost response; a confirmed response permits a new explicit request.
-    if (!requestKey.current || requestKind.current !== kind) {
+    if (!requestKey.current || requestKind.current !== requestType) {
       requestKey.current = crypto.randomUUID();
-      requestKind.current = kind;
+      requestKind.current = requestType;
     }
     try {
-      await api(path, { kind }, "POST", requestKey.current);
+      await api(path, { kind, ...(recoverJobId ? {recoverJobId} : kind === "website.extract" ? {autoAnalyze: true} : {}) }, "POST", requestKey.current);
       requestKey.current = "";
       setState(await api(path));
     } catch (e) {
@@ -153,8 +197,12 @@ export function BrandIntake({
       setBusy(false);
     }
   }
-  const pending = state?.jobs.some(active),
-    recent = state?.jobs[0],
+  const recoverable=state?.jobs.find((j:any)=>j.can_recover);
+  const pending = state?.jobs.find((j:any) => active(j) && j.kind === "website.extract") ?? state?.jobs.find(active),
+    newest = state?.jobs[0],
+    recent = newest?.error_code?.startsWith('WEBSITE_PREREQUISITE_')
+      ? state.jobs.find((j:any)=>j.kind==='website.extract'&&j.auto_analysis_job_id===newest.id) ?? newest
+      : newest,
     visualAnalysis = state?.jobs.find(
       (j: any) =>
         j.kind === "brand.analyze" &&
@@ -169,15 +217,50 @@ export function BrandIntake({
           j.status === "succeeded" &&
           j.updated_at > visualAnalysis.updated_at,
       ));
-  return (
+  const capture=state?.jobs.find((j:any)=>j.kind==='website.extract');
+  const analysis=state?.jobs.find((j:any)=>j.kind==='brand.analyze');
+  const pageCount=capture?.result?.pages?.length ?? 0;
+  const discoveries:{label:string;value:string}[]=[];
+  if(business.website){try{discoveries.push({label:'Your website',value:new URL(business.website).hostname});}catch{/* Invalid URLs are handled by the API. */}}
+  if(capture?.status==='succeeded')discoveries.push({label:capture.result?.method==='web_research'?'Sources found':'Website captured',value:pageCount?`${pageCount} cited pages ready for your brand profile`:'Website research saved'});
+  if(state?.visuals?.length)discoveries.push({label:'Visual references',value:`${state.visuals.length} images saved for your brand profile`});
+  if(analysis?.status==='running')discoveries.push({label:'Understanding your business',value:''});
+  if(analysis?.status==='succeeded')discoveries.push({label:'Brand profile prepared',value:'Your suggested details are ready for review.'});
+  if(onboarding && (business.website||state?.jobs.some((j:any)=>j.kind==='brand.analyze'))){
+    const analyzed=state?.jobs.find((j:any)=>j.kind==='brand.analyze')?.status==='succeeded';
+
+    if(analyzed&&!pending&&!profileReady)return <section className="brand-preparing"><h2>We need a little more about your business</h2><p>Your website was read, but we couldn’t identify enough reliable brand details to prepare your profile.</p><Notice error={error}/><div className="actions"><button disabled={busy} onClick={()=>void start('brand.analyze')}>Try analysis again</button><button onClick={onManual}>Add the missing details</button></div></section>;
+    if(analyzed&&!pending&&recoverable)return <div className="onboarding-image-recovery"><p>Your website images need to be restored.</p><Notice error={error}/><button disabled={busy} onClick={()=>void start('website.extract',recoverable.id)}>Restore website images</button></div>;
+    if(!analyzed||pending){
+    const failed=!pending&&recent?.error_code;
+    return <section className="brand-preparing" data-failed={!!failed} aria-busy={!!pending||busy}>
+      <div className="brand-preparing-orbit" aria-hidden="true"><span>d<span>·</span></span><i className="brand-orbit-satellite" /></div>
+      <h2>{failed?'Let’s finish your brand setup':'Getting to know your business'}</h2>
+      <p role="status">{failed?(messages[recent.error_code]??'We couldn’t finish this step. Your business is saved.'):pending?.kind==='brand.analyze'?'Preparing your brand profile and first recommendations.':'Researching your website and gathering reliable business information.'}</p>
+      {!failed&&<ol className="capture-progress"><li data-complete={state?.jobs.some((j:any)=>j.kind==='website.extract'&&j.status==='succeeded')}>Research your website</li><li data-complete={!!analyzed}>Build your brand profile</li><li>Ready for your review</li></ol>}
+      {!!discoveries.length&&<ul className="brand-discoveries" aria-label="What we’ve found" aria-live="polite" aria-relevant="additions text">{discoveries.map(item=><li key={item.label}><span aria-hidden="true">{item.label==='Understanding your business'?'·':'✓'}</span><div><strong>{item.label}</strong>{item.value&&<p>{item.value}</p>}</div></li>)}</ul>}
+      <Notice error={error}/>
+      {!!error&&!failed&&<button onClick={()=>{setError(undefined);void api(path).then(setState).catch(setError);}}>Check progress</button>}
+      {failed&&<><div className="actions">{recoverable?<button disabled={busy} onClick={()=>void start('website.extract',recoverable.id)}>Check saved capture</button>:<button disabled={busy} onClick={()=>void start(recent.kind==='brand.analyze'?'brand.analyze':'website.extract')}>Try again</button>}<button onClick={onManual}>Use documents or add details</button></div><details><summary>Error details</summary><p>{recent.error_code} · {recent.id}</p></details></>}
+      {!failed&&<p className="hint">You can leave this page. We’ll keep working and save your progress.</p>}
+    </section>;
+    }
+  }
+  const panel = (
     <section className="v5-panel" aria-busy={busy || !!pending}>
       <h2>Let Desvio get to know your business.</h2>
       <p>
         {business.website
-          ? "We study your website’s content and visual design, then prepare brand facts and suggested goals for your review."
+          ? "We research your website, then prepare a simple brand profile and suggested goals for your review."
           : "Add your brand documents or a few facts, then let AI prepare your direction."}
       </p>
       <Notice error={error} />
+      {writable && recoverable && !pending && (
+        <div>
+          <p>Check the existing capture without starting another paid crawl. This can restore missing screenshots. Your saved brand details remain unchanged; running AI analysis again is a separate action.</p>
+          <button type="button" disabled={busy} onClick={()=>void start("website.extract",recoverable.id)}>Check existing capture</button>
+        </div>
+      )}
       {recent?.error_code && !pending && recent.status !== "succeeded" && (
         <div role="alert">
           <strong>{recent.kind === "website.extract" ? "Website reading failed" : "Brand analysis failed"}</strong>
@@ -191,15 +274,17 @@ export function BrandIntake({
       )}
       <p role="status">
         {pending
-          ? "Reading your evidence and preparing your brand…"
+          ? pending.kind === "website.extract" ? "Reading your website and capturing its visual design…" : "Filling your brand details and suggested goals from the captured evidence…"
           : recent?.status === "succeeded"
-            ? "Your latest analysis is saved. Review the evidence below."
+            ? recent.kind === "brand.analyze" ? "Your brand details are ready below. Edit anything you need, then confirm." : "Website captured. Preparing your brand details next…"
             : recent?.error_code
               ? "Your saved work is safe."
               : business.website
                 ? "Preparing to read your website…"
                 : "Ready when your evidence is added."}
       </p>
+      <details>
+        <summary>View sources and website captures</summary>
       {state?.jobs
         .filter((j: any) => j.kind === "website.extract" && j.result)
         .slice(0, 1)
@@ -209,8 +294,8 @@ export function BrandIntake({
               Website coverage · {j.result.pages?.length ?? 0} pages
             </summary>
             <p>
-              {j.result.coverage === "rendered_desktop_mobile"
-                ? "Desktop and mobile pages rendered. Visual references are observations for your review, not approved brand rules."
+              {["rendered_desktop_mobile","rendered_provider"].includes(j.result.coverage)
+                ? "Website pages and visual references captured for your review. These become brand rules only after you confirm them."
                 : "Visual capture is incomplete. Available text is saved; some design references still need review."}
             </p>
             <ul>
@@ -241,18 +326,18 @@ export function BrandIntake({
           {state.visuals.map((v: any) => (
             <article key={v.id} id={"visual-" + v.id} className="v5-panel">
               <h3>
-                {v.viewport === "upload" ? "Product photo" : v.document_page ? `Document page ${v.document_page}` : v.viewport === "desktop" ? "Desktop" : "Mobile"} ·{" "}
-                {v.viewport === "upload" ? "Private upload" : v.document_page ? "Uploaded guideline" : v.observations.title || "Website reference"}
+                {v.viewport === "photo" ? "Website photo" : v.viewport === "upload" ? "Product photo" : v.document_page ? `Document page ${v.document_page}` : v.viewport === "desktop" ? "Desktop" : v.viewport === "fullpage" ? "Full page" : v.viewport === "visible" ? "Visible page" : "Mobile"} ·{" "}
+                {v.viewport === "upload" ? "Private upload" : v.document_page ? "Uploaded guideline" : v.observations?.title || v.observations?.label || "Website reference"}
               </h3>
               {!v.document_page && v.viewport!=="upload" && <a href={v.website_url} target="_blank" rel="noopener noreferrer">
                 Open source page
               </a>}
               <p>
                 {v.width} × {v.height} pixels
-                {v.coverage.truncated ? " · height capped" : ""}.{" "}
-                {!v.document_page && v.viewport!=="upload" && <>{v.coverage.resourceFailures.length} resources could not be captured.</>}
+                {v.coverage?.truncated ? " · height capped" : ""}.{" "}
+                {!v.document_page && v.viewport!=="upload" && v.viewport!=="photo" && Array.isArray(v.coverage?.resourceFailures) && <>{v.coverage.resourceFailures.length} resources could not be captured.</>}
               </p>
-              {!v.document_page && v.viewport!=="upload" && <><p>
+              {!v.document_page && v.viewport!=="upload" && v.viewport!=="photo" && <>{Array.isArray(v.observations?.typography) && <p>
                 Observed fonts:{" "}
                 {[
                   ...new Set(
@@ -261,8 +346,8 @@ export function BrandIntake({
                 ]
                   .slice(0, 5)
                   .join(", ")}
-              </p>
-              <p>
+              </p>}
+              {Array.isArray(v.observations?.images) && <p>
                 Image references:{" "}
                 {v.observations.images.filter((i: any) => i.loaded).length}{" "}
                 loaded;{" "}
@@ -272,16 +357,17 @@ export function BrandIntake({
                   ).length
                 }{" "}
                 logo candidates.
-              </p></>}
+              </p>}</>}
               <PrivateVisual businessId={business.id} visualId={v.id}
                 label={`View ${v.document_page ? `document page ${v.document_page}` : `${v.viewport} capture`}`}
-                alt={v.viewport === "upload" ? "Uploaded product photo" : v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}/>
+                alt={v.viewport === "photo" ? "Website photo" : v.viewport === "upload" ? "Uploaded product photo" : v.document_page ? `Uploaded guideline page ${v.document_page}` : `${v.viewport} capture of ${v.website_url}`}/>
             </article>
           ))}
         </details>
       )}
       <button type="button" disabled={busy} onClick={()=>{setError(undefined);void api(path).then(setState).catch(setError);}}>Refresh image sources</button>
       {!!state?.visuals?.length && <BrandReferences businessId={business.id} writable={writable} sources={state.visuals}/>}
+      </details>
       {visualAnalysis && (
         <details>
           <summary>Visual style & creative inspiration</summary>
@@ -386,4 +472,5 @@ export function BrandIntake({
       )}
     </section>
   );
+  return onboarding ? <details className="onboarding-source-details"><summary>Sources & advanced options</summary>{panel}</details> : panel;
 }

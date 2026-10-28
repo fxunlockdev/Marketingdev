@@ -1,0 +1,29 @@
+{
+  "status": "deployed",
+  "deployment_id": "3b5f2533-e632-432c-baba-81a1b28bc5a8",
+  "verified": [
+    "dedicated campaign review",
+    "main navigation order",
+    "focused saved-image review",
+    "mobile overflow and WCAG A/AA",
+    "close returns keyboard focus to calendar",
+    "selected post URL cleanup",
+    "saved video topic edits survive reload"
+  ],
+  "tests": {
+    "carousel": "2 passed, mocked provider",
+    "focused_review": "1 passed, mocked provider",
+    "web_types": "passed"
+  },
+  "screenshots": [
+    "work/browser/focused-post-review-desktop.png",
+    "work/browser/focused-post-review-mobile.png"
+  ],
+  "limits": [
+    "Intermittent generation wait timeout occurred in an earlier run and did not reproduce; root cause unresolved.",
+    "No new paid generation or social publishing tested.",
+    "Full Blaze journey parity not complete."
+  ],
+  "deployment_status": "SUCCESS",
+  "public_sign_in_status": 200
+}

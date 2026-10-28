@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {validateWorkerInventory} from '../../infra/worker-control/image-inventory.mjs';
+const base=()=>({images:['trusted_worker','documents','skills','static_renderer','video_renderer'].map(role=>({role,image_id:'sha256:'+'a'.repeat(64)}))});
+test('image inventory accepts legacy five and optional exact website renderer',()=>{assert.equal(validateWorkerInventory(base()).length,5);const next=base();next.images.push({role:'website_renderer',image_id:'sha256:'+'b'.repeat(64)});assert.equal(validateWorkerInventory(next).length,6);});
+test('image inventory rejects unknown, duplicate, missing and mutable renderer entries',()=>{for(const entry of [{role:'website_renderer',image_id:'latest'},{role:'foreign',image_id:'sha256:'+'a'.repeat(64)},{role:'trusted_worker',image_id:'sha256:'+'a'.repeat(64)}]){const value=base();value.images.push(entry);assert.throws(()=>validateWorkerInventory(value));}const missing=base();missing.images.pop();assert.throws(()=>validateWorkerInventory(missing));});

@@ -3,7 +3,7 @@ import nodemailer from 'nodemailer';
 import type { Pool, PoolClient } from 'pg';
 import type { Config } from './config.js';
 
-type Kind = 'verify' | 'reset' | 'invite';
+type Kind = 'verify' | 'reset' | 'invite' | 'generation';
 type Payload = { to: string; url: string; workspace?: string };
 type Queryable = Pool | PoolClient;
 export function mailbox(value: unknown): string {
@@ -19,17 +19,18 @@ const aad = (id: string,kind: Kind,org?: string | null) => Buffer.from(`desvio-m
 export class MailQueue {
   private readonly key: Buffer;
   constructor(readonly origin: string,key: string,readonly enabled=true) { this.key=keyFromHex(key); }
-  async enqueue(db: Queryable,kind: Kind,payload: Payload,expiresAt: Date,org?: string,actor?: string) {
+  async enqueue(db: Queryable,kind: Kind,payload: Payload,expiresAt: Date,org?: string,actor?: string,waitingForGeneration=false) {
     if(!this.enabled)throw new Error('Email delivery is disabled');
     mailbox(payload.to);
+    if(waitingForGeneration && kind!=='generation')throw new Error('Only generation email can wait for jobs');
     if(new URL(payload.url).origin!==this.origin) throw new Error('Email links must use the configured app origin');
     const id=randomUUID(),iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',this.key,iv);
     cipher.setAAD(aad(id,kind,org));
     const ciphertext=Buffer.concat([cipher.update(JSON.stringify(payload)),cipher.final()]);
     const encrypted=Buffer.concat([Buffer.from([1]),iv,cipher.getAuthTag(),ciphertext]);
     const dedupe=createHash('sha256').update(JSON.stringify({kind,org,to:payload.to,url:payload.url})).digest('hex');
-    const {rows}=await db.query(`INSERT INTO delivery.outbox(id,kind,organization_id,actor_id,dedupe_key,encrypted_payload,expires_at)
-      VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(dedupe_key) DO NOTHING RETURNING id`,[id,kind,org??null,actor??null,dedupe,encrypted,expiresAt]);
+    const {rows}=await db.query(`INSERT INTO delivery.outbox(id,kind,organization_id,actor_id,dedupe_key,encrypted_payload,expires_at,status)
+      VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(dedupe_key) DO NOTHING RETURNING id`,[id,kind,org??null,actor??null,dedupe,encrypted,expiresAt,waitingForGeneration?'waiting_generation':'pending']);
     if(rows[0]) return rows[0].id as string;
     const prior=await db.query('SELECT id FROM delivery.outbox WHERE dedupe_key=$1',[dedupe]);
     if(!prior.rows[0]) throw new Error('Email queue conflict');
@@ -66,10 +67,18 @@ export class MailWorker {
   }
   async runOnce(): Promise<{id:string;status:string}|null> {
     const smtp=this.config.smtp;if(!smtp||!this.transport)return null;
+    await this.db.query(`UPDATE delivery.outbox o SET status='canceled',encrypted_payload=NULL WHERE o.kind='generation' AND o.status IN ('waiting_generation','pending','retry')
+      AND EXISTS(SELECT 1 FROM app.generation_notifications n WHERE n.mail_id=o.id AND NOT app.notification_recipient_active(n.organization_id,n.brand_id,n.actor_id))`);
+    // Resume durable notification watches even after API restarts. Fixed job snapshots
+    // prevent later campaign requests from changing what the user subscribed to.
+    await this.db.query(`UPDATE delivery.outbox o SET status='pending' WHERE o.kind='generation' AND o.status='waiting_generation' AND o.expires_at>now()
+      AND EXISTS(SELECT 1 FROM app.generation_notifications n WHERE n.mail_id=o.id
+        AND NOT EXISTS(SELECT 1 FROM unnest(n.job_ids) ids(id) LEFT JOIN app.jobs j ON j.id=ids.id AND j.organization_id=n.organization_id AND j.brand_id=n.brand_id
+          WHERE j.id IS NULL OR j.status NOT IN ('succeeded','failed','rejected','canceled')))`);
     // A killed worker may have submitted DATA. Never automatically send those rows again.
     await this.db.query(`UPDATE delivery.outbox SET status='unknown',error_code='WORKER_LOST',lease_id=NULL,leased_until=NULL
       WHERE status='processing' AND leased_until<now()`);
-    await this.db.query(`UPDATE delivery.outbox SET status='expired',encrypted_payload=NULL WHERE status IN ('pending','retry','unknown') AND expires_at<=now()`);
+    await this.db.query(`UPDATE delivery.outbox SET status='expired',encrypted_payload=NULL WHERE status IN ('waiting_generation','pending','retry','unknown') AND expires_at<=now()`);
     const lease=randomUUID();
     const {rows:[row]}=await this.db.query(`UPDATE delivery.outbox SET status='processing',attempts=attempts+1,lease_id=$1,leased_until=now()+interval '2 minutes'
       WHERE id=(SELECT id FROM delivery.outbox WHERE status IN ('pending','retry') AND available_at<=now() AND expires_at>now()
@@ -77,12 +86,12 @@ export class MailWorker {
     if(!row) return null;
     let payload: Payload;
     try {payload=this.queue.decrypt(row);} catch {await this.finish(row.id,lease,'failed','INVALID_ENCRYPTED_PAYLOAD');return{id:row.id,status:'failed'};}
-    const subject=row.kind==='verify'?'Verify your Desvio email':row.kind==='reset'?'Reset your Desvio password':'Your Desvio client invitation';
-    const heading=row.kind==='invite'?`You have been invited to ${payload.workspace ?? 'a client workspace'}.`:
+    const subject=row.kind==='generation'?'Your Desvio content generation update':row.kind==='verify'?'Verify your Desvio email':row.kind==='reset'?'Reset your Desvio password':'Your Desvio client invitation';
+    const heading=row.kind==='generation'?'Your content generation has finished. Open your saved work to review the designs and any items that need attention.':row.kind==='invite'?`You have been invited to ${payload.workspace ?? 'a client workspace'}.`:
       row.kind==='verify'?'Verify your email to continue with Desvio.':'Use this link to choose a new password.';
     try {
       const result=await this.transport.sendMail({from:{name:'Desvio',address:smtp.from},to:payload.to,subject,
-        text:`${heading}\n\n${payload.url}\n\nThis link expires. If you did not request this message, you can ignore it.`,
+        text:`${heading}\n\n${payload.url}\n\n${row.kind==='generation'?'Sign in to review your content. This update does not approve or publish any posts.':'This link expires. If you did not request this message, you can ignore it.'}`,
         textEncoding:'base64',messageId:`<${row.id}@${smtp.from.split('@')[1]}>`});
       if(result.accepted.length!==1 || result.rejected.length) {
         await this.finish(row.id,lease,'failed','RECIPIENT_REJECTED');return{id:row.id,status:'failed'};

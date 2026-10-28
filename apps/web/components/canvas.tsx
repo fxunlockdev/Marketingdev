@@ -1,4 +1,7 @@
 "use client";
+import chatStyles from "./canvas-chat.module.css";
+import {GeneratedReplacement} from "./generated-replacement";
+import {GenerationNotification} from './generation-notification';
 import {
   useCallback,
   useEffect,
@@ -6,11 +9,13 @@ import {
   useState,
   type FormEvent,
 } from "react";
-import {GenerationAllowances} from './generation-allowances';
+import {canvasIntent,directedPrompt,type Creativity} from './creative-direction';
+import {localMinute} from '../../api/src/local-calendar';
 import {CanvasCarousels} from './carousels';
 import {CanvasPlanner} from './canvas-planner';
-import {CanvasVideos,CanvasVideoContext,VideoRequest} from './video-canvas';
+import {CanvasVideos,CanvasVideoContext} from './video-canvas';
 import {BrandReferences} from "./brand-references";
+import {StockPicker} from "./stock-picker";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor, type Design } from "./creative-editor";
@@ -59,6 +64,8 @@ type Project = {
     id: string;
     title: string;
     latest_version_id: string;
+    archived_at?: string | null;
+    archive_revision: number;
     thread_id: string;
   };
   versions: Version[];
@@ -88,6 +95,7 @@ const label = (s: string) =>
   })[s] ?? s;
 function problem(code: string | null) {
   if (!code) return "";
+  if(code==="MONTHLY_GENERATION_BUDGET_EXHAUSTED")return "You’ve used this month’s generation allowance. Your work is saved.";
   if (/CONFIG|GRANT|RUNTIME|STAGING_APPROVAL/.test(code))
     return "Image generation is not configured for this business yet. Your request has been saved.";
   if (/BUDGET/.test(code))
@@ -104,6 +112,7 @@ function problem(code: string | null) {
 export function CanvasScreen({ business }: { business: Business }) {
   const root = `/api/v1/businesses/${business.id}`,
     [threads, setThreads] = useState<Thread[]>(),
+    [assetsOpen,setAssetsOpen]=useState(false),
     [initialized,setInitialized]=useState(false),
     [threadId, setThreadId] = useState(""),
     [conversation, setConversation] = useState<Conversation>(),
@@ -112,7 +121,13 @@ export function CanvasScreen({ business }: { business: Business }) {
     [prompt, setPrompt] = useState(""),
     [referenceIds,setReferenceIds]=useState<string[]>([]),
     [channel, setChannel] = useState("instagram"),
-    [textProvider,setTextProvider]=useState("openai"),
+    [creativity,setCreativity]=useState<Creativity>("normal"),
+    [intent,setIntent]=useState("auto"),
+    [carouselCount,setCarouselCount]=useState(3),
+    [videoDuration,setVideoDuration]=useState(5),
+    [hasCarousels,setHasCarousels]=useState(false),
+    [openCarousels,setOpenCarousels]=useState(false),
+    [planStart,setPlanStart]=useState(""),
     [format, setFormat] = useState("static"),
     [size, setSize] = useState("1024x1024"),
     [busy, setBusy] = useState(false),
@@ -137,7 +152,7 @@ export function CanvasScreen({ business }: { business: Business }) {
           setThreadId(
             list.some((t) => t.id === requested)
               ? requested!
-              : (list[0]?.id ?? ""),
+              : "",
           );
           setInitialized(true);
         }
@@ -147,6 +162,12 @@ export function CanvasScreen({ business }: { business: Business }) {
       active = false;
     };
   }, [refreshThreads]);
+  useEffect(() => {
+    if(!initialized)return;
+    const url=new URL(location.href);
+    if(threadId)url.searchParams.set('thread',threadId);else url.searchParams.delete('thread');
+    if(url.href!==location.href)history.replaceState(history.state,'',url);
+  },[initialized,threadId]);
   useEffect(() => {
     if (!threadId) {
       setConversation(undefined);
@@ -193,6 +214,7 @@ export function CanvasScreen({ business }: { business: Business }) {
     )
       return false;
     setVideoReference(null);
+    setIntent("auto");
     setPlanningThread("");
     setThreadId(id);
     setConversation(undefined);
@@ -210,12 +232,27 @@ export function CanvasScreen({ business }: { business: Business }) {
   const held = conversation?.runs.some(
     (r) => running(r) || r.status === "unknown",
   );
+  const requestType=edit?'image':intent==='auto'?canvasIntent(prompt):intent;
+  useEffect(()=>{let active=true;void Promise.all([api(root+'/carousel-generations'),api(root+'/carousels')]).then(([v,c])=>{if(active)setHasCarousels(v.runs.length>0||c.carousels.length>0);}).catch(()=>{});return()=>{active=false;};},[root]);
   async function send(event: FormEvent) {
     event.preventDefault();
     if (busy || dirty) return;
     setBusy(true);
     setError(undefined);
     try {
+      const direction=directedPrompt(prompt,creativity);
+      if(requestType==='plan'){
+        const prefs=await api(root+'/onboarding');
+        const result=await api(root+'/content-plan/generate',{canvas_thread_id:threadId||null,provider:'openai',brief:direction,planning_mode:'natural',starts_on:planStart||localMinute(Date.now(),prefs.timezone).slice(0,10),...(conversation?.planning_runs.find(r=>r.output_plan_id)?{reference_plan_id:conversation.planning_runs.find(r=>r.output_plan_id)!.output_plan_id}:{})},'POST',submitKey.current);
+        if(result.thread_id){setThreadId(result.thread_id);setPlanningThread(result.thread_id);}
+        await refreshThreads();
+      }else if(requestType==='carousel'){
+        const result=await api(root+'/carousel-generations',{prompt:direction,slide_count:carouselCount,channel,size,text_provider:'openai',reference_ids:referenceIds,...(conversation?.planning_runs.find(r=>r.output_plan_id)?{campaign_plan_id:conversation.planning_runs.find(r=>r.output_plan_id)!.output_plan_id}:{})},'POST',submitKey.current);
+        setHasCarousels(true);setOpenCarousels(true);
+        const saved=await api(root+'/carousel-generations');const run=saved.runs.find((r:any)=>r.id===result.id);if(run)setThreadId(run.thread_id);
+        await refreshThreads();window.dispatchEvent(new Event('desvio-carousel-refresh'));
+      }else{
+      if(requestType==='video'&&!videoReference)throw new Error('Choose a photo in Brand image references, then select “Use for video”.');
       let id = threadId;
       if (!id) {
         const t = await api(
@@ -228,15 +265,22 @@ export function CanvasScreen({ business }: { business: Business }) {
         setThreadId(id);
         await refreshThreads();
       }
-      await api(
+      if(requestType==='video'){
+        const slotId=new URLSearchParams(location.search).get('slot');
+        const slot=slotId?(await api(root+'/content-slots/'+slotId)).slot:null;
+        if(slot&&slot.format!=='video')throw new Error('Open a video post to create its video.');
+        await api(root+`/canvas/threads/${id}/videos`,{prompt:direction,channel:slot?.channel??channel,text_provider:'openai',duration_seconds:videoDuration,...(slot?{slot_id:slot.id,slot_revision:slot.revision,...(slot.creative_spec?{creative_spec:slot.creative_spec}:{})}:{}),reference:{brand_reference_id:videoReference!.brand_reference_id,source_sha256:videoReference!.source_sha256,confirmed:true}},'POST',submitKey.current);
+        window.dispatchEvent(new Event('desvio-video-refresh'));
+      }else await api(
         root + `/canvas/threads/${id}/messages`,
         {
-          prompt,
-          text_provider:textProvider,
+          prompt:direction,
+          text_provider:"openai",
           channel: edit?.run.channel ?? channel,
           format: edit?.run.format ?? format,
+          ...(edit?.version.skill_manifest?.creative_spec?{creative_spec:edit.version.skill_manifest.creative_spec}:{}),
           size: edit
-            ? `${edit.version.design.width}x${edit.version.design.height}`
+            ? (edit.version.skill_manifest?.creative_spec?.aspect==='vertical'?'1024x1536':`${edit.version.design.width}x${edit.version.design.height}`)
             : size,
           parent_version_id: edit?.version.id ?? null,
           ...(referenceIds.length?{reference_ids:referenceIds}:{}),
@@ -244,6 +288,7 @@ export function CanvasScreen({ business }: { business: Business }) {
         "POST",
         submitKey.current,
       );
+      }
       submitKey.current = crypto.randomUUID();
       setPrompt("");
       setReferenceIds([]);
@@ -256,15 +301,11 @@ export function CanvasScreen({ business }: { business: Business }) {
     }
   }
   return (
-    <>
-      <div className="v5-page-title">
-        <span className="eyebrow">{business.name} · CREATIVE STUDIO</span>
-        <h1>Canvas</h1>
-        <p>
-          Describe your idea. Refine the image, edit the words, and approve the
-          version you love.
-        </p>
-      </div>
+    <div className={`canvas-chat-workspace ${chatStyles.workspace} ${!conversation?.messages.length&&!projectId?chatStyles.empty:""}`}>
+      <header className={chatStyles.header}><h1>Canvas</h1><span>{business.name}</span>          <button disabled={!initialized || !write || busy} onClick={() => choose("")}>
+            + New conversation
+          </button>
+</header>
       {!business.has_approved_brand && (
         <div className="availability-card">
           Confirm your brand profile first so each creative starts from approved
@@ -273,14 +314,10 @@ export function CanvasScreen({ business }: { business: Business }) {
         </div>
       )}
       <Notice error={error} />
-      <GenerationAllowances key={`allowances:${business.id}`} businessId={business.id}/>
       <CanvasVideoContext businessId={business.id}/>
-      <CanvasCarousels key={business.id} businessId={business.id} onOpenSlide={(thread,project)=>{if(thread===threadId&&project!==projectId&&(dirty||prompt||planningDirty||videoDirty)&&!confirm("Leave your unsaved edits and draft message?"))return;if(choose(thread))setProjectId(project);}}/>
+
       <div className="studio-layout">
-        <aside className="studio-conversations" aria-label="Conversations">
-          <button disabled={!initialized || !write || busy} onClick={() => choose("")}>
-            + New conversation
-          </button>
+        <details className={chatStyles.conversations}><summary>Conversations</summary><aside className="studio-conversations" aria-label="Conversations">
           {!threads ? (
             <Loading />
           ) : threads.length === 0 ? (
@@ -294,186 +331,15 @@ export function CanvasScreen({ business }: { business: Business }) {
                     aria-current={t.id === threadId ? "true" : undefined}
                     onClick={() => choose(t.id)}
                   >
-                    {t.title}
+                    {t.title.length>70 ? t.title.slice(0,67).trimEnd()+"…" : t.title}
                   </button>
                 </li>
               ))}
             </ul>
           )}
-        </aside>
-        <section className="studio-chat" aria-label="Creative conversation">
-          <h2>
-            {conversation?.thread.title ?? "What would you like to create?"}
-          </h2>
-          {!conversation?.messages.length && (
-            <p className="studio-intro">
-              Start with an idea for {business.name}. Describe the occasion, the
-              mood, and what you want people to do.
-            </p>
-          )}
-          <ol
-            className="studio-messages"
-            tabIndex={0}
-            aria-label="Conversation messages"
-          >
-            {conversation?.messages.map((m) => (
-              <li key={m.id} className={`studio-message ${m.role}`}>
-                <strong>{m.role === "user" ? "You" : "Desvio"}</strong>
-                <p>{m.content}</p>
-              </li>
-            ))}
-          </ol>
-          {!!conversation?.runs.length && (
-            <div className="studio-runs" aria-label="Generation requests">
-              {conversation.runs.slice(0, 5).map((r) => (
-                <div key={r.id} className="studio-run">
-                  <span role={running(r) ? "status" : undefined}>
-                    {label(r.status)}
-                    {r.cancel_requested && running(r)
-                      ? " · cancellation requested"
-                      : ""}
-                  </span>
-                  {r.error_code && r.status !== "canceled" && <p>{problem(r.error_code)}</p>}
-                  {running(r) && write && !r.cancel_requested && (
-                    <button
-                      disabled={busy}
-                      onClick={async () => {
-                        try {
-                          await api(root + `/creative-jobs/${r.id}/cancel`, {});
-                          setRevision((n) => n + 1);
-                        } catch (e) {
-                          setError(e);
-                        }
-                      }}
-                    >
-                      Cancel request
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {!!conversation?.planning_runs.length&&<section aria-label="Conversation plans">{conversation.planning_runs.map(r=><p key={r.id}>{r.output_plan_id?<a href={`/b/${business.id}/content-plan?start=${r.starts_on}`}>Open calendar · {r.starts_on}</a>:r.cancel_requested?'Planning canceled':r.status==='queued'&&Date.parse(r.scheduled_at)>Date.now()?`Planning scheduled for ${r.starts_on}`:r.status==='unknown'?'Planning needs reconciliation before another request.':`Planning ${r.status}`}</p>)}</section>}
-          {initialized&&<CanvasPlanner key={`planner:${business.id}:${threadId}`} business={business} threadId={threadId} onDirty={setPlanningDirty} initiallyOpen={planningThread===threadId&&!!threadId} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>}
-          <BrandReferences key={`references:${business.id}`} businessId={business.id} writable={write} uploadWorkspace={{id:business.organization_id,name:business.name,role:business.role}} onVideo={reference=>{if(videoDirty&&!confirm("Replace the selected photo and discard its unsaved video idea?"))return;setVideoReference(reference);}} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!initialized||!write||busy||held}/>
-          <form className="studio-composer" onSubmit={send}>
-            <fieldset
-              disabled={!initialized || !write || busy || held || !business.has_approved_brand}
-            >
-              <legend>{edit ? "Revise this image" : "Create an image"}</legend>
-              {edit && (
-                <p>
-                  Editing the selected saved version.{" "}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEdit(null);
-                      submitKey.current = crypto.randomUUID();
-                    }}
-                  >
-                    Start a new image instead
-                  </button>
-                </p>
-              )}
-              <Field
-                label={
-                  edit ? "Describe your changes" : "Describe your creative"
-                }
-              >
-                {(id) => (
-                  <textarea
-                    id={id}
-                    required
-                    maxLength={4000}
-                    value={prompt}
-                    onChange={(e) => {
-                      setPrompt(e.target.value);
-                      submitKey.current = crypto.randomUUID();
-                    }}
-                    placeholder="A welcoming launch post, with a warm photo and a clear invitation…"
-                  />
-                )}
-              </Field>
-              <Field label="Creative planning model">{id=><select id={id} value={textProvider} onChange={e=>{setTextProvider(e.target.value);submitKey.current=crypto.randomUUID();}}><option value="openai">OpenAI GPT</option></select>}</Field>
-              <p className="muted">Your selected model writes the creative brief. OpenAI generates and edits the image.</p>
-              {!edit && (
-                <div className="studio-options">
-                  <Field label="Channel">
-                    {(id) => (
-                      <select
-                        id={id}
-                        value={channel}
-                        onChange={(e) => {
-                          setChannel(e.target.value);
-                          submitKey.current = crypto.randomUUID();
-                        }}
-                      >
-                        <option value="instagram">Instagram</option>
-                        <option value="linkedin">LinkedIn</option>
-                      </select>
-                    )}
-                  </Field>
-                  <Field label="Creative type">
-                    {(id) => (
-                      <select
-                        id={id}
-                        value={format}
-                        onChange={(e) => {
-                          setFormat(e.target.value);
-                          submitKey.current = crypto.randomUUID();
-                        }}
-                      >
-                        <option value="static">Social image</option>
-                        <option value="ad">Ad creative</option>
-                      </select>
-                    )}
-                  </Field>
-                  <Field label="Image shape">
-                    {(id) => (
-                      <select
-                        id={id}
-                        value={size}
-                        onChange={(e) => {
-                          setSize(e.target.value);
-                          submitKey.current = crypto.randomUUID();
-                        }}
-                      >
-                        <option value="1024x1024">Square</option>
-                        <option value="1024x1536">Portrait</option>
-                        <option value="1536x1024">Landscape</option>
-                      </select>
-                    )}
-                  </Field>
-                </div>
-              )}
-              <button
-                className="primary"
-                disabled={!prompt.trim() || dirty}
-                type="submit"
-              >
-                {busy
-                  ? "Saving request…"
-                  : edit
-                    ? "Generate revision"
-                    : "Generate image"}
-              </button>
-            </fieldset>
-            {dirty && (
-              <p className="hint">
-                Save your creative edits before generating another version.
-              </p>
-            )}
-            {!write && (
-              <p className="hint">You have view access to this business.</p>
-            )}
-            <p className="hint">
-              Generation uses your configured allowance. Approval and publishing
-              are separate. To make a video, start from an approved final image below.
-            </p>
-          </form>
-        </section>
-      </div>
-      {videoReference&&<section aria-label="Product photo video"><h2>Video from {videoReference.label}</h2><VideoRequest key={videoReference.brand_reference_id} business={business} threadId={threadId} ensureThread={videoThread} onDirty={setVideoDirty} reference={{brand_reference_id:videoReference.brand_reference_id,source_sha256:videoReference.source_sha256}} initiallyOpen/></section>}
+        </aside></details>
+        <div className="studio-main">
+      {(hasCarousels||openCarousels)&&<div className="canvas-saved-work"><CanvasCarousels initiallyOpen={openCarousels} key={`${business.id}:${revision}`} businessId={business.id} onOpenSlide={(thread,project)=>{if(thread===threadId&&project!==projectId&&(dirty||prompt||planningDirty||videoDirty)&&!confirm("Leave your unsaved edits and draft message?"))return;if(choose(thread))setProjectId(project);}}/></div>}
       {threadId&&<CanvasVideos key={business.id+threadId} business={business} threadId={threadId}/>}
       {conversation?.projects.some((p) => p.latest_version_id) && (
         <section className="studio-projects">
@@ -496,7 +362,7 @@ export function CanvasScreen({ business }: { business: Business }) {
                     .filter((p) => p.latest_version_id)
                     .map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.title}
+                        {p.title.split(/\s+Creative direction:/)[0]}
                       </option>
                     ))}
                 </select>
@@ -534,7 +400,177 @@ export function CanvasScreen({ business }: { business: Business }) {
           )}
         </section>
       )}
-    </>
+        <section className="studio-chat" aria-label="Creative conversation">
+          <h2>
+            {conversation?.planning_runs.length ? "Your campaign" : conversation?.thread.title ? (conversation.thread.title.length>70 ? conversation.thread.title.slice(0,67).trimEnd()+"…" : conversation.thread.title) : "Ready when you are."}
+          </h2>
+          {!!conversation?.messages.length&&<details className="conversation-history" open={!conversation?.planning_runs.length && !conversation?.projects.some(p=>p.latest_version_id)}><summary>Conversation & planning notes</summary><ol
+            className="studio-messages"
+            tabIndex={0}
+            aria-label="Conversation messages"
+          >
+            {conversation?.messages.map((m) => (
+              <li key={m.id} className={`studio-message ${m.role}`}>
+                <strong>{m.role === "user" ? "You" : "Desvio"}</strong>
+                <p>{m.role==='user'?m.content.split("\n\nCreative direction:")[0]:m.content}</p>
+              </li>
+            ))}
+          </ol></details>}
+          {!!conversation?.runs.length && (
+            <div className="studio-runs" aria-label="Generation requests">
+              {conversation.runs.slice(0, 5).map((r,index) => (
+                <div key={r.id} className="studio-run">
+                  <span role={running(r) ? "status" : undefined}>
+                    {label(r.status)}
+                    {r.cancel_requested && running(r)
+                      ? " · cancellation requested"
+                      : ""}
+                  </span>
+                  {r.error_code && r.status !== "canceled" && <p>{problem(r.error_code)}</p>}
+                  {write&&index===0&&<GenerationNotification businessId={business.id} jobIds={[r.id]}/>}
+                  {running(r) && write && !r.cancel_requested && (
+                    <button
+                      disabled={busy}
+                      onClick={async () => {
+                        try {
+                          await api(root + `/creative-jobs/${r.id}/cancel`, {});
+                          setRevision((n) => n + 1);
+                        } catch (e) {
+                          setError(e);
+                        }
+                      }}
+                    >
+                      Cancel request
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+          {!!conversation?.planning_runs.length&&<section aria-label="Conversation plans">{conversation.planning_runs.map(r=><p key={r.id}>{r.output_plan_id?<a href={`/b/${business.id}/content-plan?start=${r.starts_on}`}>Open calendar · {r.starts_on}</a>:r.cancel_requested?'Planning canceled':r.status==='queued'&&Date.parse(r.scheduled_at)>Date.now()?`Planning scheduled for ${r.starts_on}`:r.status==='unknown'?'Planning needs reconciliation before another request.':`Planning ${r.status}`}</p>)}</section>}
+          {initialized&&<CanvasPlanner key={`planner:${business.id}:${threadId}:${revision}`} business={business} threadId={typeof window!=="undefined"&&new URLSearchParams(location.search).has("firstPlan")?undefined:threadId} onDirty={setPlanningDirty} chatOnly initiallyOpen={(typeof window!=="undefined"&&new URLSearchParams(location.search).has("firstPlan"))||(planningThread===threadId&&!!threadId)||!!conversation?.planning_runs.length} disabled={busy||dirty} onSubmitted={id=>{setPlanningThread(id);setThreadId(id);setRevision(n=>n+1);void refreshThreads().catch(setError);}}/>}
+          <div id="canvas-assets" hidden={!assetsOpen} className={chatStyles.assets}>
+          <BrandReferences key={`references:${business.id}`} businessId={business.id} writable={write} uploadWorkspace={{id:business.organization_id,name:business.name,role:business.role}} onVideo={reference=>{if(videoDirty&&!confirm("Replace the selected photo and discard its unsaved video idea?"))return;setVideoReference(reference);setIntent("video");submitKey.current=crypto.randomUUID();}} selection={referenceIds} onSelectionChange={ids=>{setReferenceIds(ids);submitKey.current=crypto.randomUUID();}} disabled={!initialized||!write||busy||held}/>
+          </div>
+          <form className="studio-composer" onSubmit={send}>
+            <fieldset
+              disabled={!initialized || !write || busy || held || !business.has_approved_brand}
+            >
+              <legend className={chatStyles.srOnly}>{edit ? "Revise this image" : "Message Desvio"}</legend>
+              {edit && (
+                <p>
+                  Editing the selected saved version.{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEdit(null);
+                      submitKey.current = crypto.randomUUID();
+                    }}
+                  >
+                    Start a new image instead
+                  </button>
+                </p>
+              )}
+              <div className={chatStyles.prompt}><Field
+                label={
+                  edit ? "Describe your changes" : "Describe your creative"
+                }
+              >
+                {(id) => (
+                  <textarea
+                    id={id}
+                    required
+                    rows={1}
+                    maxLength={1600}
+                    value={prompt}
+                    onChange={(e) => {
+                      setPrompt(e.target.value);
+                      submitKey.current = crypto.randomUUID();
+                    }}
+                    placeholder="Ask Desvio to create something…"
+                  />
+                )}
+              </Field></div>
+              <div className={chatStyles.toolbar}><button type="button" className={chatStyles.add} aria-label="Add assets" aria-controls="canvas-assets" aria-expanded={assetsOpen} onClick={()=>setAssetsOpen(value=>!value)}>+</button>
+              <div className="studio-options">
+              <Field label="Creativity">{id=><select id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);submitKey.current=crypto.randomUUID();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></select>}</Field>
+
+              </div>
+              <button className={`primary ${chatStyles.send}`} disabled={!prompt.trim()||dirty} type="submit" aria-label={busy?"Saving request…":edit?"Generate revision":"Send"}><span aria-hidden="true">↑</span></button></div>
+              <details className={chatStyles.more} open={requestType!=="image"}><summary>Options</summary>
+              {!edit&&<Field label="Create">{id=><select id={id} value={intent} onChange={e=>{setIntent(e.target.value);submitKey.current=crypto.randomUUID();}}><option value="auto">Auto</option><option value="image">Image</option><option value="plan">Content plan</option><option value="carousel">Carousel</option><option value="video">Video</option></select>}</Field>}
+              {!edit&&<p className="composer-intent">{requestType==='plan'?'Planning your content':requestType==='video'?'Drafting a video script for your review':requestType==='carousel'?'Creating a carousel':'Creating an image'}</p>}
+              {requestType==='plan'&&<Field label="Plan starts on (optional)">{id=><input id={id} type="date" value={planStart} onChange={e=>{setPlanStart(e.target.value);submitKey.current=crypto.randomUUID();}}/>}</Field>}
+              {requestType==='carousel'&&<Field label="Slides">{id=><input id={id} type="number" min={2} max={10} value={carouselCount} onChange={e=>{setCarouselCount(Number(e.target.value));submitKey.current=crypto.randomUUID();}}/>}</Field>}
+              {requestType==='video'&&<><Field label="Video length (seconds)">{id=><input id={id} type="number" min={3} max={15} value={videoDuration} onChange={e=>{setVideoDuration(Number(e.target.value));submitKey.current=crypto.randomUUID();}}/>}</Field><p>{videoReference?`Using ${videoReference.label}`:'Choose an uploaded photo above to start.'}</p></>}
+              {!edit && requestType!=="plan" && (
+                <div className="composer-settings"><div className="studio-options">
+                  <Field label="Channel">
+                    {(id) => (
+                      <select
+                        id={id}
+                        value={channel}
+                        onChange={(e) => {
+                          setChannel(e.target.value);
+                          submitKey.current = crypto.randomUUID();
+                        }}
+                      >
+                        <option value="instagram">Instagram</option>
+                        <option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option>
+                      </select>
+                    )}
+                  </Field>
+                  <Field label="Creative type">
+                    {(id) => (
+                      <select
+                        id={id}
+                        value={format}
+                        onChange={(e) => {
+                          setFormat(e.target.value);
+                          submitKey.current = crypto.randomUUID();
+                        }}
+                      >
+                        <option value="static">Social image</option>
+                        <option value="ad">Ad creative</option>
+                      </select>
+                    )}
+                  </Field>
+                  <Field label="Image shape">
+                    {(id) => (
+                      <select
+                        id={id}
+                        value={size}
+                        onChange={(e) => {
+                          setSize(e.target.value);
+                          submitKey.current = crypto.randomUUID();
+                        }}
+                      >
+                        <option value="1024x1024">Square</option>
+                        <option value="1024x1536">Portrait</option>
+                        <option value="1536x1024">Landscape</option>
+                      </select>
+                    )}
+                  </Field>
+                </div><button type="button" onClick={()=>{setHasCarousels(true);setOpenCarousels(true);}}>Combine saved images into a carousel</button></div>
+              )}
+              </details>
+            </fieldset>
+            {dirty && (
+              <p className="hint">
+                Save your creative edits before generating another version.
+              </p>
+            )}
+            {!write && (
+              <p className="hint">You have view access to this business.</p>
+            )}
+
+          </form>
+          {!conversation?.messages.length&&<div className={chatStyles.suggestions} aria-label="Creative suggestions">{["Create an image for my next launch","Plan a week of content","Turn a product photo into a video"].map(idea=><button key={idea} type="button" disabled={busy||!initialized||!write} onClick={()=>{setPrompt(idea);submitKey.current=crypto.randomUUID();document.querySelector<HTMLTextAreaElement>(".studio-composer textarea")?.focus();}}>{idea}<span aria-hidden="true">↗</span></button>)}</div>}
+        </section>
+        </div>
+      </div>
+
+    </div>
   );
 }
 export function CreativeProject({
@@ -567,8 +603,8 @@ export function CreativeProject({
       JSON.stringify({ design, caption }) !==
         JSON.stringify({ design: version.design, caption: version.caption }),
     latest = version?.id === data?.project.latest_version_id,
-    write = ['owner','admin','editor'].includes(business.role),
-    reviewer = ["owner", "admin", "reviewer"].includes(business.role);
+    write = ['owner','admin','editor'].includes(business.role) && !data?.project.archived_at,
+    reviewer = ["owner", "admin", "reviewer"].includes(business.role) && !data?.project.archived_at;
   dirtyRef.current = dirty;
   useUnsavedChanges(dirty || !!feedback || busy);
   const onDirtyRef = useRef(onDirty);
@@ -655,6 +691,16 @@ export function CreativeProject({
       setBusy(false);
     }
   }
+  async function changeArchive() {
+    if (!data || dirty || busy) return;
+    setBusy(true);setError(undefined);
+    try {
+      const archived=!!data.project.archived_at;
+      await api(root+`/creative-projects/${projectId}/${archived?'restore':'archive'}`,{revision:data.project.archive_revision});
+      await load(selected);
+      setNotice(archived?'Creative restored. Nothing has been scheduled or published.':'Creative archived. All saved versions are retained.');
+    } catch(e){setError(e);}finally{setBusy(false);}
+  }
   const exportReady = useCallback(
     (fn: (() => void) | null) => setDownload(() => fn),
     [],
@@ -668,6 +714,7 @@ export function CreativeProject({
     );
   return (
     <article className="creative-project">
+      {data.project.archived_at && <p role="status">Archived creative · restore it to make changes.</p>}
       <div className="creative-toolbar">
         <Field label="Saved version">
           {(id) => (
@@ -706,6 +753,7 @@ export function CreativeProject({
           Download PNG
         </button>
       </div>
+      {["owner","admin","editor"].includes(business.role) && <button disabled={busy||dirty} onClick={changeArchive}>{data.project.archived_at?"Restore creative":"Archive creative"}</button>}
       <Notice error={error} />
       {notice && <p role="status">{notice}</p>}
       {!latest && (
@@ -723,6 +771,8 @@ export function CreativeProject({
         readOnly={!write || !latest || busy}
         onExportReady={exportReady}
       />
+      {write&&latest&&<GeneratedReplacement key={`generated:${business.id}:${projectId}:${version.id}`} businessId={business.id} projectId={projectId} parentId={version.id} disabled={dirty||busy} onReady={async id=>{await load(id);setNotice('Your new photo is ready to review.');}}/>}
+      {write&&latest&&<StockPicker key={`${business.id}:${projectId}:${version.id}`} businessId={business.id} purpose="replacement" disabled={dirty||busy} onSelected={async referenceId=>{setBusy(true);try{const saved=await api(root+`/stock/projects/${projectId}/replace`,{parent_id:version.id,reference_id:referenceId});await load(saved.id);setNotice('Photo replaced in a new draft. Review the result before using it in a post.');}finally{setBusy(false);}}}/>}
       <Field label="Post caption">
         {(id) => (
           <textarea
@@ -838,7 +888,7 @@ export function CreativeProject({
             </div>
           ))}
       </section>
-      <CreativeExportPanel threadId={data.project.thread_id} key={business.id+version.id} business={business} versionId={version.id} sourceSHA={version.sha256} context={{type:'canvas',id:version.id,revision:version.review_revision,state:version.status}} disabled={dirty||busy||!latest} onApproved={async()=>{await load(selected);setFeedback('');setNotice('This saved version is approved. It has not been published.');}}/>
+      <CreativeExportPanel threadId={data.project.thread_id} key={business.id+version.id} business={business} versionId={version.id} sourceSHA={version.sha256} context={{type:'canvas',id:version.id,revision:version.review_revision,state:version.status}} disabled={dirty||busy||!latest||!!data.project.archived_at} onApproved={async()=>{await load(selected);setFeedback('');setNotice('This saved version is approved. It has not been published.');}}/>
     </article>
   );
 }

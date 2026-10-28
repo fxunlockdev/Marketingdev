@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-10-24T09:38:33.149Z",
+  "environment": "disposable-local",
+  "provider": "MOCK",
+  "paid_calls": false,
+  "storage_suite": {
+    "tests": 10,
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+  },
+  "contracts": {
+    "passed": 171,
+    "failed": 0
+  },
+  "deployed": false,
+  "live_verified": false,
+  "source_hashes": {
+    "apps/api/src/maxun-intake.ts": "f4139abb265ced215f679844d984c41b2df5f42b29d0f597de7b0d0f62684da7",
+    "apps/api/src/intake-jobs.ts": "f151c1f09fac4372385f2c23aadafde3e52bc3396886a4d56a93bc49297359ab",
+    "apps/api/src/maxun-workflow.ts": "edca41077961107a945e91f8bd91c0568367ae38ae7bd3ff3e442cca83a9670b",
+    "apps/api/src/maxun-journal.ts": "2c8ea86b57d3b2fdddb3ff9c37530bddb1790d283a82f4f55f6c85a0da1f2dfb",
+    "apps/api/src/maxun-evidence.ts": "3509a71d306766db8fcc43573f8bb4f54f1f6a5116cb1816536bac1840e105e3",
+    "apps/api/src/maxun-screenshots.ts": "500d0a62bcb607e57768b839fa2d7d2b5a98164145641a286dbbf09bb5240b4c",
+    "database/migrations/058_maxun_capture_checkpoints.sql": "3098e84dca333befc22ccbf4a8a98917db85c1d1159ce7ca005ea81f134add89"
+  }
+}

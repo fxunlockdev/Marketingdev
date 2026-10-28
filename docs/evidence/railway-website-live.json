@@ -1,0 +1,16 @@
+{
+  "passed": false,
+  "url": "https://runwalrealty.com/",
+  "image": "sha256:687221641656625a232b9acf85e75755155f7adc00e69eef27694433c257a354",
+  "isolated_browser_verified": true,
+  "paid_calls": 0,
+  "database_mutations": 0,
+  "error": "AI_RESEARCH_NO_SOURCES",
+  "broker_requests": 42,
+  "capture_diagnostics": [],
+  "denied_resources": {
+    "WEBSITE_FETCH_TIMEOUT": 1
+  },
+  "checked_at": "2026-10-26T13:46:22.541Z",
+  "scope": "Public website capture only; no paid AI, database mutation or tenant intake completion"
+}

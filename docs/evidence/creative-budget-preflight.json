@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-25T14:27:44.048946+00:00",
+  "scope": "Reject request caps that cannot cover upcoming image before paid planning",
+  "source_sha256": "4e784eb8a294921efbfd25e2ae50e11f2106363dab1e91515c2e0400e2e1a5d8",
+  "build": "passed",
+  "foundation": {
+    "passed": 17,
+    "failed": 0,
+    "log": "work/creative-budget-preflight-tests.log",
+    "providers": "mock OpenAI; real database/private storage/isolated skill and render runtimes"
+  },
+  "assertions": [
+    "Insufficient request budget makes zero planner and image calls",
+    "No ledger reservation for rejected preflight",
+    "Affordable capped request generates successfully",
+    "Completed request replay does not resubmit",
+    "Request cap remains immutable under app and worker roles"
+  ],
+  "paid_calls": 0,
+  "deployed": false,
+  "limitations": [
+    "Reservation-based estimate, not actual provider usage reconciliation",
+    "Does not guarantee future allowance against concurrent jobs",
+    "Live paid generation acceptance remains outstanding"
+  ]
+}

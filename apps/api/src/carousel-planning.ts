@@ -3,14 +3,14 @@ import {CREATIVE_SKILLS} from './creative-skill-pins.js';
 import {validLearning} from './learning-context.js';
 export const CAROUSEL_SKILLS={
  "brand-engine":CREATIVE_SKILLS["brand-engine"],image:CREATIVE_SKILLS.image,social:CREATIVE_SKILLS.social,'product-marketing':CREATIVE_SKILLS['product-marketing'],copywriting:{skill_sha256:'13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567',tree_sha256:'e03f9c1f236b8e8a6ecd15afb29eb21aad2fd8ea18d044ce31c9f76d9976f626'}} as const;
-export type CarouselInput={task:'carousel';brand:CreativeInput['brand'];prompt:string;channel:'linkedin'|'instagram';slide_count:number};
+export type CarouselInput={task:'carousel';brand:CreativeInput['brand'];prompt:string;channel:'linkedin'|'instagram'|'facebook';slide_count:number};
 export type CarouselPlan={title:string;caption:string;visual_direction:string;palette:string[];warnings:string[];slides:{position:number;headline:string;body:string;cta:string;image_prompt:string;alt_text:string;fact_ids:string[]}[]};
 export type CarouselResult=Omit<SkillResult,'brief'>&{plan:CarouselPlan};
 const exact=(v:any,fields:string[])=>v&&typeof v==='object'&&!Array.isArray(v)&&Object.keys(v).sort().join(',')===fields.sort().join(',');
 const text=(v:any,max:number,empty=false)=>typeof v==='string'&&(empty||v.trim().length>0)&&v.length<=max&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
 export function validateCarouselInput(input:any):asserts input is CarouselInput{
  const fail=():never=>{throw new CreativeError('CAROUSEL_INPUT_INVALID');};
- if(!exact(input,['task','brand','prompt','channel','slide_count'])||input.task!=='carousel'||!text(input.prompt,4000)||!['linkedin','instagram'].includes(input.channel)||!Number.isInteger(input.slide_count)||input.slide_count<2||input.slide_count>10)fail();
+ if(!exact(input,['task','brand','prompt','channel','slide_count'])||input.task!=='carousel'||!text(input.prompt,4000)||!['linkedin','instagram','facebook'].includes(input.channel)||!Number.isInteger(input.slide_count)||input.slide_count<2||input.slide_count>10)fail();
  const b=input.brand;if(!b||!exact(b,['id','sha256','facts',...(b.learning!==undefined?['learning']:[])])||!text(b.id,120)||typeof b.sha256!=='string'||!/^[a-f0-9]{64}$/.test(b.sha256)||!Array.isArray(b.facts)||!b.facts.length||b.facts.length>200||b.facts.some((f:any)=>!exact(f,['id','field','value'])||!text(f.id,120)||!text(f.field,160)||!text(f.value,6000))||new Set(b.facts.map((f:any)=>f.id)).size!==b.facts.length||(b.learning!==undefined&&!validLearning(b.learning))||Buffer.byteLength(JSON.stringify(input))>250000)fail();
 }
 export function carouselSlideBrief(plan:CarouselPlan,index:number):CreativeBrief{

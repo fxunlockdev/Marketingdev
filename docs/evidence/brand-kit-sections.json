@@ -1,0 +1,39 @@
+{
+  "status": "deployed",
+  "scope": [
+    "Media-first Brand Kit with Media Library, Brand Style, Brand Voice, Brand Profile and Source Materials",
+    "Section-specific persisted brand editing with reload navigation",
+    "Private source-image tiles and compact approved-image gallery",
+    "Image approval and revocation reuse existing tenant-scoped backend"
+  ],
+  "validation": {
+    "web_typecheck": "passed",
+    "browser_tests": {
+      "passed": 4,
+      "failed": 0,
+      "log": "work/brand-kit-sections-browser.log",
+      "paid_providers": "not_called",
+      "coverage": [
+        "Signup and verified local email",
+        "Manual brand research fallback and saved corrections",
+        "Private upload, scanner, byte-identical download and crop",
+        "Persisted brand corrections and unsaved-approval guard",
+        "Section isolation and reload",
+        "Automatic private image previews, revoke and reapprove through gallery",
+        "Mobile overflow and WCAG A/AA"
+      ]
+    },
+    "screenshots": [
+      "work/browser/brand-kit-media-desktop.png",
+      "work/browser/brand-kit-media-mobile.png"
+    ]
+  },
+  "limitations": [
+    "Not complete Blaze parity",
+    "Visual Style still uses existing saved brand directions; full photo-style and font-pairing management remains",
+    "No live paid generation or publishing tested"
+  ],
+  "web_deployment": "e5630542-43bc-4b2f-9922-c13dd2389c2e",
+  "web_deployment_status": "SUCCESS",
+  "public_health_http_status": 200
+}

@@ -35,7 +35,11 @@ export class Intake {
         ).rows,
         jobs: (
           await db.query(
-            `SELECT j.id,j.kind,j.status,j.error_code,j.created_at,j.updated_at,r.website_url,r.result FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 ORDER BY j.created_at DESC LIMIT 20`,
+            `SELECT j.id,j.kind,j.status,j.error_code,j.created_at,j.updated_at,r.website_url,r.result,
+            (SELECT source_job_id FROM app.intake_recoveries WHERE job_id=j.id) AS recovery_of,
+            (j.kind='website.extract' AND (j.status='unknown' OR (j.status='succeeded' AND jsonb_array_length(COALESCE(r.result->'visualErrors','[]'::jsonb))>0)) AND NOT j.cancel_requested AND NOT EXISTS(SELECT 1 FROM app.intake_recoveries rr JOIN app.jobs done ON done.id=rr.job_id WHERE rr.source_job_id=COALESCE((SELECT source_job_id FROM app.intake_recoveries WHERE job_id=j.id),j.id) AND done.status='succeeded') AND EXISTS(SELECT 1 FROM app.website_capture_calls c
+              WHERE c.job_id=COALESCE((SELECT source_job_id FROM app.intake_recoveries WHERE job_id=j.id),j.id)
+              AND (c.checkpoint->>'phase'='polling' OR (c.checkpoint->>'phase'='submitting' AND c.checkpoint ? 'submittedAt')))) AS can_recover,(SELECT d.analysis_job_id FROM app.intake_dependencies d WHERE d.capture_job_id=j.id) AS auto_analysis_job_id FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 ORDER BY j.created_at DESC,j.updated_at DESC,j.id DESC LIMIT 20`,
             [b.organization_id, id],
           )
         ).rows,
@@ -82,15 +86,21 @@ export class Intake {
   }
   async submit(user: string, id: string, input: unknown, key: unknown) {
     const b = await this.businesses.resolve(user, id),
-      v = object(input, ["kind"]);
+      v = object(input, ["kind", "autoAnalyze", "recoverJobId"]);
     if (!["website.extract", "brand.analyze"].includes(String(v.kind)))
       throw new BadRequestException(
         "Choose website extraction or brand analysis",
       );
+    if (v.autoAnalyze !== undefined && (typeof v.autoAnalyze !== "boolean" || v.kind !== "website.extract"))
+      throw new BadRequestException("Automatic analysis is only available for website capture");
+    const automatic = v.autoAnalyze === true;
+    const recovery=v.recoverJobId===undefined?null:uuid(String(v.recoverJobId));
+    if(recovery&&automatic)throw new BadRequestException("Capture recovery does not start paid AI analysis; prepare the brand after recovery");
+    if(recovery&&v.kind!=="website.extract")throw new BadRequestException("Only website captures can be recovered");
     if (typeof key !== "string" || !/^[A-Za-z0-9_.:-]{8,128}$/.test(key))
       throw new BadRequestException("An Idempotency-Key is required");
     let url: string | null = null;
-    if (v.kind === "website.extract") {
+    if (v.kind === "website.extract" && !recovery) {
       try {
         url = websiteURL(b.website ?? "").href;
       } catch (e) {
@@ -99,7 +109,7 @@ export class Intake {
         );
       }
     }
-    const requestHash = hash(canonicalJSON({ kind: v.kind, url }));
+    const requestHash = hash(canonicalJSON({ kind: v.kind, url, ...(automatic ? { autoAnalyze: true } : {}),...(recovery?{recoverJobId:recovery}:{}) }));
     return this.businesses.database.transaction(
       user,
       b.organization_id,
@@ -121,6 +131,20 @@ export class Intake {
             );
           return { id: prior.id, status: prior.status };
         }
+        let sourceId:string|null=null;
+        if(recovery){
+          const source=(await db.query(`SELECT j.id,r.website_url,c.checkpoint FROM app.jobs selected
+            LEFT JOIN app.intake_recoveries link ON link.job_id=selected.id
+            JOIN app.jobs j ON j.id=COALESCE(link.source_job_id,selected.id)
+            JOIN app.intake_requests r ON r.job_id=j.id JOIN app.website_capture_calls c ON c.job_id=j.id
+            WHERE selected.id=$1 AND selected.organization_id=$2 AND selected.brand_id=$3 AND selected.status IN ('unknown','succeeded')
+              AND j.kind='website.extract' AND (j.status='unknown' OR (j.status='succeeded' AND jsonb_array_length(COALESCE(r.result->'visualErrors','[]'::jsonb))>0)) AND NOT j.cancel_requested`,[recovery,b.organization_id,id])).rows[0];
+          if(!source||!(source.checkpoint.phase==='polling'||(source.checkpoint.phase==='submitting'&&source.checkpoint.submittedAt)))
+            throw new ConflictException("This capture has no verifiable saved run to check. Contact support; do not submit another paid crawl.");
+          sourceId=source.id;url=source.website_url;
+          if((await db.query("SELECT r.job_id FROM app.intake_recoveries r JOIN app.jobs j ON j.id=r.job_id WHERE r.source_job_id=$1 AND j.status='succeeded'",[sourceId])).rowCount)
+            throw new ConflictException("This capture has already been recovered");
+        }
         const active = (
           await db.query(
             "SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('website.extract','brand.analyze') AND status IN ('queued','running','retrying') LIMIT 1",
@@ -131,17 +155,18 @@ export class Intake {
           throw new ConflictException(
             "Website or AI analysis is already running for this business",
           );
-        if (
-          v.kind === "brand.analyze" &&
+        if (!recovery &&
           (
             await db.query(
-              "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='brand.analyze' AND status='unknown' LIMIT 1",
-              [b.organization_id, id],
+              `SELECT j.id FROM app.jobs j WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind=ANY($3::text[]) AND j.status='unknown'
+               AND NOT EXISTS(SELECT 1 FROM app.intake_recoveries r JOIN app.jobs done ON done.id=r.job_id
+                WHERE r.source_job_id=COALESCE((SELECT source_job_id FROM app.intake_recoveries WHERE job_id=j.id),j.id) AND done.status='succeeded') LIMIT 1`,
+              [b.organization_id, id, automatic ? ["website.extract", "brand.analyze"] : [v.kind]],
             )
           ).rowCount
         )
           throw new ConflictException(
-            "An earlier AI request has an uncertain outcome. An operator must reconcile it before another generation.",
+            "An earlier request has an uncertain outcome. An operator must reconcile it before another request of this kind.",
           );
         const count = (
           await db.query(
@@ -149,7 +174,7 @@ export class Intake {
             [b.organization_id, id],
           )
         ).rows[0].n;
-        if (count >= 20)
+        if (count + (automatic ? 2 : 1) > 20)
           throw new ConflictException("Daily brand analysis limit reached");
         if (
           v.kind === "brand.analyze" &&
@@ -170,6 +195,7 @@ export class Intake {
           "INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,website_url) VALUES($1,$2,$3,$4,$5,$6)",
           [job, b.organization_id, id, key, requestHash, url],
         );
+        if(sourceId)await db.query("INSERT INTO app.intake_recoveries(job_id,organization_id,brand_id,source_job_id) VALUES($1,$2,$3,$4)",[job,b.organization_id,id,sourceId]);
         await db.query(
           "INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,$4)",
           [job, b.organization_id, id, v.kind],
@@ -178,6 +204,15 @@ export class Intake {
           "INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'intake.submitted',$4)",
           [b.organization_id, id, user, job],
         );
+        if(sourceId)await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'intake.recovery_requested',$4)",[b.organization_id,id,user,job]);
+        if (automatic) {
+          const child = randomUUID();
+          await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'brand.analyze')", [child,b.organization_id,id,user]);
+          await db.query("INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash) VALUES($1,$2,$3,$4,$5)", [child,b.organization_id,id,`analyze-website-${job}`,hash(canonicalJSON({kind:'brand.analyze',url:null}))]);
+          await db.query("INSERT INTO app.intake_dependencies(organization_id,brand_id,analysis_job_id,capture_job_id) VALUES($1,$2,$3,$4)", [b.organization_id,id,child,job]);
+          await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'brand.analyze')", [child,b.organization_id,id]);
+          await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'intake.submitted',$4)", [b.organization_id,id,user,child]);
+        }
         return { id: job, status: "queued" };
       },
       id,

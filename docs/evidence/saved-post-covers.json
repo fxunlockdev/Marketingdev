@@ -1,0 +1,33 @@
+{
+  "status": "deployed",
+  "scope": [
+    "Saved carousel first-slide covers in Calendar and Home",
+    "Saved video posters in Calendar and Home",
+    "Bounded image downloads and content integrity checks"
+  ],
+  "validation": {
+    "api_build": "passed",
+    "web_typecheck": "passed",
+    "browser_tests": {
+      "passed": 2,
+      "failed": 0,
+      "log": "work/post-covers-browser-final.log",
+      "paid_providers": "MOCKED",
+      "pixel_comparison": "decoded pixels match saved carousel slide and video poster"
+    },
+    "screenshots": [
+      "work/browser/carousel-calendar-cover.png",
+      "work/browser/home-video-cover.png"
+    ]
+  },
+  "api_deployment": "980c9265-4acb-4b00-94ae-2d19ebe12938",
+  "web_deployment": "43916b96-d94b-42e0-971c-4a708fa70ae8",
+  "limitations": [
+    "Not full Blaze UI/UX parity",
+    "No live paid generation executed",
+    "Real owner five-image campaign remains ungenerated"
+  ],
+  "api_deployment_status": "SUCCESS",
+  "web_deployment_status": "SUCCESS",
+  "public_health_http_status": 200
+}

@@ -21,3 +21,12 @@ test('adapter rejects invalid image pins, media and timeline fields and sanitize
  assert.throws(()=>validateVideoOverlays([overlay,overlay],3),/OVERLAY_INVALID/);
  await assert.rejects(new VideoRenderer(image).render(source.subarray(0,100),3),/VIDEO_MEDIA_/);
 });
+
+test('explicit reel framing returns a real vertical clip and matching poster',async()=>{
+ const r=await new VideoRenderer(image).render(source,3,[overlay],{width:1080,height:1920});
+ assert.equal(r.metadata.width,1080);assert.equal(r.metadata.height,1920);
+ assert.deepEqual(r.manifest.target,{width:1080,height:1920});assert.equal(r.manifest.framing,'contain');
+ const sharp=(await import('sharp')).default;const meta=await sharp(r.poster).metadata();
+ assert.ok(Math.abs(meta.width/meta.height-9/16)<0.01);
+ await assert.rejects(new VideoRenderer(image).render(source,3,[],{width:99999,height:1920}),/VIDEO_TARGET_INVALID/);
+});

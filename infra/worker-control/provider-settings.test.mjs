@@ -1,13 +1,13 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {providerSettings,providerRuntimeSettings} from './provider-settings.mjs';
+import {providerSettings,providerRuntimeSettings,imageRuntimeSettings} from './provider-settings.mjs';
 test('copies only provider credentials, never infrastructure or enable flags', () => {
   assert.deepEqual(providerSettings({OPENAI_API_KEY:'fixture',GEMINI_API_KEY:'fixture2',HIGGSFIELD_CREDENTIALS:'fixture:key',DATABASE_URL:'forbidden',WORKER_DATABASE_URL:'forbidden',VIDEO_ENABLED:'true',POSTIZ_PUBLISHING_ENABLED:'true',RAILWAY_TOKEN:'forbidden'}),{OPENAI_API_KEY:'fixture',GEMINI_API_KEY:'fixture2',HIGGSFIELD_CREDENTIALS:'fixture:key'});
 });
 test('video activation requires complete explicit settings and never forwards unrelated controls',()=>{
  const input={VIDEO_ENABLED:'true',OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key',VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_OUTPUT_ORIGINS:'https://video.example.org'};
- assert.deepEqual(providerRuntimeSettings({...input,POSTIZ_PUBLISHING_ENABLED:'true',APP_DATABASE_URL:'private'}),input);
- assert.deepEqual(providerRuntimeSettings({OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key'}),{OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key',VIDEO_ENABLED:'false'});
+ assert.deepEqual(providerRuntimeSettings({...input,POSTIZ_PUBLISHING_ENABLED:'true',APP_DATABASE_URL:'private'}),{...input,HIGGSFIELD_IMAGES_ENABLED:'false'});
+ assert.deepEqual(providerRuntimeSettings({OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key'}),{OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key',VIDEO_ENABLED:'false',HIGGSFIELD_IMAGES_ENABLED:'false'});
  for(const key of ['OPENAI_API_KEY','HIGGSFIELD_CREDENTIALS','VIDEO_ENCRYPTION_KEY','HIGGSFIELD_OUTPUT_ORIGINS']){
   const copy={...input};delete copy[key];assert.throws(()=>providerRuntimeSettings(copy),{message:'INVALID_VIDEO_SETTINGS'});
  }
@@ -33,4 +33,16 @@ test('authenticated provider output is an explicit exclusive operator policy',()
  const input={VIDEO_ENABLED:'true',OPENAI_API_KEY:'fixture',HIGGSFIELD_CREDENTIALS:'fixture:key',VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_OUTPUT_POLICY:'authenticated_provider_result'};
  assert.equal(providerRuntimeSettings(input).HIGGSFIELD_OUTPUT_POLICY,'authenticated_provider_result');
  for(const change of [{HIGGSFIELD_OUTPUT_ORIGINS:'https://example.com'},{HIGGSFIELD_OUTPUT_POLICY:'any_url'},{VIDEO_ENCRYPTION_KEY:''}])assert.throws(()=>providerRuntimeSettings({...input,...change}),{message:'INVALID_VIDEO_SETTINGS'});
+});
+
+test('Maxun credential is forwarded privately without enabling generation or exposing infrastructure',()=>{
+ assert.deepEqual(providerSettings({MAXUN_API_KEY:'fixture-maxun',DATABASE_URL:'never-forward'}),{MAXUN_API_KEY:'fixture-maxun'});
+ for(const value of ['secret\nvalue',' secret','secret\0',123])assert.throws(()=>providerSettings({MAXUN_API_KEY:value}),/INVALID_PROVIDER_SETTINGS/);
+});
+
+test('still image replacement requires an explicit switch and separate valid encryption key',()=>{
+ assert.deepEqual(imageRuntimeSettings({HIGGSFIELD_CREDENTIALS:'fixture'}),{HIGGSFIELD_IMAGES_ENABLED:'false'});
+ const input={HIGGSFIELD_IMAGES_ENABLED:'true',HIGGSFIELD_CREDENTIALS:'fixture',HIGGSFIELD_IMAGE_ENCRYPTION_KEY:'b'.repeat(64)};
+ assert.equal(imageRuntimeSettings(input).HIGGSFIELD_IMAGES_ENABLED,'true');
+ for(const change of [{HIGGSFIELD_IMAGES_ENABLED:'yes'},{HIGGSFIELD_CREDENTIALS:''},{HIGGSFIELD_IMAGE_ENCRYPTION_KEY:'short'},{VIDEO_ENCRYPTION_KEY:input.HIGGSFIELD_IMAGE_ENCRYPTION_KEY}])assert.throws(()=>imageRuntimeSettings({...input,...change}));
 });

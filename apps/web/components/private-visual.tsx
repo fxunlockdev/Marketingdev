@@ -3,10 +3,12 @@ import {useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import {Notice} from './primitives';
 
-export function PrivateVisual({businessId,visualId,label,alt,crop}:{businessId:string;visualId:string;label:string;alt:string;crop?:{left:number;top:number;width:number;height:number}|null}){
+export function PrivateVisual({businessId,visualId,label,alt,crop,autoLoad=false,presentation=false}:{businessId:string;visualId:string;label:string;alt:string;autoLoad?:boolean;presentation?:boolean;crop?:{left:number;top:number;width:number;height:number}|null}){
  const [preview,setPreview]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>();
+ const container=useRef<HTMLElement|null>(null);
  const current=useRef<{controller?:AbortController;url?:string}>({});
  useEffect(()=>{setPreview('');setBusy(false);setError(undefined);return()=>{current.current.controller?.abort();if(current.current.url)URL.revokeObjectURL(current.current.url);current.current={};};},[businessId,visualId,crop?.left,crop?.top,crop?.width,crop?.height]);
+ useEffect(()=>{if(!autoLoad||!container.current)return;const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){observer.disconnect();void load();}},{rootMargin:'100px'});observer.observe(container.current);return()=>observer.disconnect();},[autoLoad,businessId,visualId,crop?.left,crop?.top,crop?.width,crop?.height]);
  async function load(){
   current.current.controller?.abort();
   const controller=new AbortController();current.current.controller=controller;
@@ -37,5 +39,6 @@ export function PrivateVisual({businessId,visualId,label,alt,crop}:{businessId:s
    const url=URL.createObjectURL(blob);current.current.url=url;setPreview(url);
   }catch(e){if(!controller.signal.aborted)setError(e);}finally{if(!controller.signal.aborted)setBusy(false);}
  }
- return <div aria-busy={busy}><button type="button" disabled={busy} onClick={()=>void load()}>{busy?'Loading reference…':label}</button><Notice error={error}/>{preview&&<div style={{maxHeight:600,overflow:'auto',marginTop:16}}><img src={preview} alt={alt} style={{width:'100%',height:crop?400:'auto',objectFit:crop?'contain':undefined}}/></div>}</div>;
+ if(presentation)return <span ref={node=>{container.current=node;}} className="private-visual-presentation" aria-busy={busy}>{preview?<img src={preview} alt={alt}/>:<span className="private-visual-placeholder">{error?'Image unavailable':busy?'Loading image…':'Image preview'}</span>}</span>;
+ return <div ref={node=>{container.current=node;}} aria-busy={busy}>{(!autoLoad||!preview)&&<button type="button" disabled={busy} onClick={()=>void load()}>{busy?'Loading reference…':label}</button>}<Notice error={error}/>{preview&&<div tabIndex={0} role="region" aria-label={alt} style={{maxHeight:600,overflow:'auto',marginTop:16}}><img src={preview} alt={alt} style={{width:'100%',height:crop?400:'auto',objectFit:crop?'contain':undefined}}/></div>}</div>;
 }

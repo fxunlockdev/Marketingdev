@@ -1,0 +1,31 @@
+{
+  "date": "2026-10-26",
+  "scope": "Screenshot failure preserves independently verified DOM and broker-fetched website photos",
+  "provider_calls": 0,
+  "deployed": false,
+  "api_build": "passed",
+  "runtime_and_contract_tests": {
+    "passed": 7,
+    "failed": 0,
+    "log": "work/website-partial-capture-tests.log"
+  },
+  "intake_database_storage_tests": {
+    "passed": 20,
+    "failed": 0,
+    "log": "work/website-partial-capture-intake-storage.log"
+  },
+  "fixtures": "Real native Chromium with fixture HTTP broker and injected screenshot-only timeout. Real isolated PostgreSQL, object storage and production IntakeJobs with normalized mocked browser output. No live website result claimed.",
+  "checks": [
+    "Screenshot deadline yields SCREENSHOT_TIMEOUT and retains committed document evidence",
+    "Absent screenshot accepted; malformed present screenshot rejected",
+    "Only broker-fetched photographs accepted and normalized",
+    "Document loader and robots-checked URL provenance unchanged",
+    "Screenshot availability and saved capture coverage reflect actual evidence",
+    "Photos-only capture persists scoped source and photo bytes, survives job replay and rejects other tenant reads"
+  ],
+  "remaining": [
+    "amd64 runtime build and release",
+    "Live Runwal intake acceptance"
+  ],
+  "initial_non_product_failure": "--intake lacked running object storage; rerun with --intake-storage passed all 20."
+}

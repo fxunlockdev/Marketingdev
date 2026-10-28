@@ -35,3 +35,9 @@ test('uncapped creative calls still reserve usage, replay once and respect later
  await assert.rejects(run(),e=>e.code==='CREATIVE_BUDGET_EXHAUSTED');assert.equal(submissions,1);
  cap=undefined;await assert.rejects(run(),e=>e.code==='CREATIVE_BUDGET_EXHAUSTED');assert.equal(submissions,1);
 });
+
+test('monthly cap denial only accepts the exact database exception',async()=>{
+ const {monthlyBudgetExceeded}=await import('../../dist/spending-allowance.js');
+ assert.equal(monthlyBudgetExceeded({code:'P0001',message:'MONTHLY_GENERATION_BUDGET_EXHAUSTED'}),true);
+ for(const value of [null,undefined,new Error('MONTHLY_GENERATION_BUDGET_EXHAUSTED'),{code:'OTHER',message:'MONTHLY_GENERATION_BUDGET_EXHAUSTED'},{code:'P0001',message:'private provider error'}])assert.equal(monthlyBudgetExceeded(value),false);
+});

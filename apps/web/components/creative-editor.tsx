@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Canvas, FabricImage, Textbox } from "fabric";
+import { Canvas, FabricImage, Textbox, Rect } from "fabric";
 import type { Design } from "../../api/src/creative-design";
 import { api } from "./api";
 import { Field, Notice } from "./primitives";
@@ -51,7 +51,8 @@ export function CreativeEditor({
     c.upperCanvasEl.setAttribute("aria-hidden", "true");
     c.upperCanvasEl.tabIndex = -1;
     const fit = () => {
-      const w = Math.min(host.current!.clientWidth, design.width);
+      if (!active || !host.current) return;
+      const w = Math.min(host.current.clientWidth, design.width);
       c.setDimensions(
         { width: `${w}px`, height: `${(w * design.height) / design.width}px` },
         { cssOnly: true },
@@ -67,6 +68,11 @@ export function CreativeEditor({
     };
     c.on("selection:created", select);
     c.on("selection:updated", select);
+    c.on("object:moving", ({ target }) => {
+      const layer = current.current.design.layers.find(l => l.id === (target as any).layerId);
+      const backing = c.getObjects().find(o => (o as any).backingId === layer?.id);
+      if (backing && layer?.backing) backing.set({left:target.left-layer.backing.padding,top:target.top-layer.backing.padding});
+    });
     c.on("object:modified", ({ target }) => {
       if (!target || current.current.readOnly) return;
       const d = current.current.design,
@@ -78,10 +84,10 @@ export function CreativeEditor({
             ? {
                 ...l,
                 x: Math.max(
-                  0,
-                  Math.min(d.width - l.width, Math.round(target.left)),
+                  l.backing?.padding ?? 0,
+                  Math.min(d.width - l.width - (l.backing?.padding ?? 0), Math.round(target.left)),
                 ),
-                y: Math.max(0, Math.min(d.height - 1, Math.round(target.top))),
+                y: Math.max(l.backing?.padding ?? 0, Math.min(d.height - target.height - (l.backing?.padding ?? 0), Math.round(target.top))),
               }
             : l,
         ),
@@ -89,6 +95,8 @@ export function CreativeEditor({
     });
     (async () => {
       try {
+        await Promise.all(['DM Sans','DM Serif Display'].map(font=>document.fonts.load(`16px "${font}"`)));
+        if (!active) return;
         const grant = await api(
           `/api/v1/businesses/${businessId}/creative-media/${design.background_media_id}`,
         );
@@ -148,10 +156,10 @@ export function CreativeEditor({
   ]);
   useEffect(() => {
     const c = canvas.current;
-    if (!c) return;
+    if (!c || !ready) return;
     const ids = new Set(design.layers.map((l) => l.id));
     for (const o of [...c.getObjects()])
-      if (!ids.has((o as any).layerId)) c.remove(o);
+      if ((o as any).backingId || !ids.has((o as any).layerId)) c.remove(o);
     for (const l of design.layers) {
       let text = c.getObjects().find((o) => (o as any).layerId === l.id) as
         | Textbox
@@ -165,7 +173,7 @@ export function CreativeEditor({
           lockScalingX: true,
           lockScalingY: true,
           lockRotation: true,
-          splitByGrapheme: true,
+          splitByGrapheme: !l.backing,
           strokeWidth: 0,
           padding: 4,
         });
@@ -178,6 +186,8 @@ export function CreativeEditor({
         top: l.y,
         width: l.width,
         fontSize: l.fontSize,
+        fontWeight: l.fontWeight ?? 400,
+        splitByGrapheme: !l.backing,
         fontFamily: l.fontFamily,
         fill: l.fill,
         textAlign: l.align,
@@ -186,10 +196,17 @@ export function CreativeEditor({
         lockMovementX: readOnly,
         lockMovementY: readOnly,
       });
+      if (l.text.trim() && l.backing) {
+        const b = l.backing;
+        const backing = new Rect({ originX:'left', originY:'top', left:l.x-b.padding, top:l.y-b.padding, width:l.width+2*b.padding, height:text.height+2*b.padding, fill:b.fill, opacity:b.opacity, strokeWidth:0, selectable:false, evented:false });
+        (backing as any).backingId = l.id;
+        c.add(backing);
+      }
+      c.bringObjectToFront(text);
       text.setCoords();
     }
     c.requestRenderAll();
-  }, [design, readOnly, retry]);
+  }, [design, readOnly, retry, ready]);
   const layer =
     design.layers.find((l) => l.id === selected) ?? design.layers[0];
   function update(values: Partial<Design["layers"][number]>) {
@@ -197,7 +214,11 @@ export function CreativeEditor({
     onChange({
       ...design,
       layers: design.layers.map((l) =>
-        l.id === layer.id ? { ...l, ...values } : l,
+        l.id === layer.id ? (() => {
+          const next = { ...l, ...values };
+          if (next.backing) next.backing = { ...next.backing, padding: Math.max(0, Math.min(next.backing.padding, next.x, next.y, design.width-next.x-next.width)) };
+          return next;
+        })() : l,
       ),
     });
   }
@@ -215,7 +236,7 @@ export function CreativeEditor({
           type="number"
           min={min}
           max={max}
-          step="1"
+          step={label === "Backing opacity" ? "0.05" : "1"}
           value={value}
           onChange={(e) => {
             if (e.target.value !== "") {
@@ -301,7 +322,7 @@ export function CreativeEditor({
                       update({ fontFamily: e.target.value as any })
                     }
                   >
-                    {["Arial", "Georgia", "Verdana"].map((f) => (
+                    {["DM Sans", "DM Serif Display", "Arial", "Georgia", "Verdana"].map((f) => (
                       <option key={f}>{f}</option>
                     ))}
                   </select>
@@ -310,6 +331,13 @@ export function CreativeEditor({
               {number("Font size", layer.fontSize, 8, 200, (n) =>
                 update({ fontSize: n }),
               )}
+              <Field label="Text weight">{id => <select id={id} value={layer.fontWeight ?? 400} onChange={e=>update({fontWeight:Number(e.target.value) as 400|700})}><option value={400}>Regular</option><option value={700}>Bold</option></select>}</Field>
+              <Field label="Contrast backing">{id => <input id={id} type="checkbox" checked={!!layer.backing} onChange={e=>update({backing:e.target.checked?{fill:'#111111',opacity:0.88,padding:Math.min(16,layer.x,layer.y,design.width-layer.x-layer.width)}:undefined})}/>}</Field>
+              {layer.backing && <>
+                <Field label="Backing color">{id => <input id={id} type="color" value={layer.backing!.fill} onChange={e=>update({backing:{...layer.backing!,fill:e.target.value}})}/>}</Field>
+                {number("Backing opacity", layer.backing.opacity, 0, 1, n=>update({backing:{...layer.backing!,opacity:n}}))}
+                {number("Backing padding", layer.backing.padding, 0, Math.min(48,layer.x,layer.y,design.width-layer.x-layer.width), n=>update({backing:{...layer.backing!,padding:n}}))}
+              </>}
               <Field label="Text color">
                 {(id) => (
                   <input

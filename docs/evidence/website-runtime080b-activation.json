@@ -1,0 +1,9 @@
+{
+  "stage": "verified",
+  "worker_image": "sha256:580070be364fbd8e605bd46b3535b0f7dc04d19987f832f1fe592d6a2493b9e7",
+  "configuration": "5c5e0523dfacf5cd291084e562a80449568e1c11bcc3a893de79c3bd0060b91c",
+  "preview_sha256": "e3abf50330cdd964ab096e0c62c5ff155d9a9dc905899de67723657592dcf734",
+  "website_renderer": "sha256:687221641656625a232b9acf85e75755155f7adc00e69eef27694433c257a354",
+  "live_capture_passed": false,
+  "scope": "Verified runtime activation; live capture still fails. DOM evidence survives until screenshot stage; repair in progress."
+}

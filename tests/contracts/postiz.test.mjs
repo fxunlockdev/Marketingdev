@@ -192,3 +192,58 @@ test('Instagram image submission preserves slide order and rejects mixed media o
  handler=(req,res)=>{if(req.url==='/api/public/v1/integrations')return json(res,[{...integration,identifier:'instagram-standalone'}]);posts++;req.socket.destroy();};
  await assert.rejects(client().submitInstagramImages(input),e=>e.outcome==='unknown');assert.equal(posts,2);
 });
+
+test('Facebook two-step callback returns only safe Page choices and never a connected account',async()=>{
+ const response={id:'facebook-a',internalId:'member-a',name:'MOCK member',organizationId:'org-a',providerIdentifier:'facebook',inBetweenSteps:true,token:'PRIVATE_ACCOUNT',pages:[{id:'123',name:'MOCK Page',access_token:'PRIVATE_PAGE',picture:{data:{url:'https://cdn.example.test/photo?access_token=PRIVATE_PHOTO'}}}]};
+ handler=(req,res,body)=>{assert.equal(req.url,'/api/integrations/social-connect/facebook');assert.deepEqual(JSON.parse(body),{state:'abcdef123',code:'MOCK_CODE',timezone:'-480'});json(res,response);};
+ const result=await client().exchangeFacebookAuthorization('abcdef123','MOCK_CODE','-480');
+ assert.deepEqual(result,{integrationId:'facebook-a',internalId:'member-a',name:'MOCK member',pages:[{id:'123',name:'MOCK Page'}],selectionRequired:true});assert.ok(!JSON.stringify(result).includes('PRIVATE'));
+ for(const patch of [{organizationId:'org-b'},{providerIdentifier:'linkedin'},{inBetweenSteps:false},{pages:[response.pages[0],response.pages[0]]},{pages:[{id:'123',name:''}]},{pages:null}]){
+  handler=(req,res)=>json(res,{...response,...patch});await assert.rejects(client().exchangeFacebookAuthorization('abcdef123','MOCK_CODE','-480'),e=>e.code==='POSTIZ_RESPONSE_INVALID'&&e.outcome==='unknown'&&!JSON.stringify(e).includes('PRIVATE'));
+ }
+ requests=[];await assert.rejects(client().completeAuthorization('facebook','abcdef123','MOCK_CODE','-480'),e=>e.code==='POSTIZ_PROVIDER_REQUIRES_PAGE_SELECTION');assert.equal(requests.length,0);
+ await assert.rejects(client().exchangeFacebookAuthorization('bad','MOCK_CODE','-480'),e=>e.code==='POSTIZ_CALLBACK_INVALID');assert.equal(requests.length,0);
+ await assert.rejects(new PostizClient(config(),binding(keyB)).exchangeFacebookAuthorization('abcdef123','MOCK_CODE','-480'),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+});
+
+test('Facebook authorization constrains Meta redirect and page selection checks tenant and provider before mutation',async()=>{
+ let url='https://www.facebook.com/v25.0/dialog/oauth?response_type=code&client_id=MOCK&state=abcdef123&redirect_uri='+encodeURIComponent('https://desvio.test/integrations/social/facebook');
+ handler=(req,res)=>json(res,{url});assert.equal((await client().beginAuthorization('facebook')).state,'abcdef123');
+ url=url.replace('/v25.0/','/other/');await assert.rejects(client().beginAuthorization('facebook'),e=>e.code==='POSTIZ_RESPONSE_INVALID');
+ const input={integrationId:'facebook-a',state:'abcdef123',pageId:'123',availablePageIds:['123','456']};
+ requests=[];handler=(req,res,body)=>{if(req.url==='/api/public/v1/integrations')return json(res,[{...integration,id:'facebook-a',identifier:'facebook'}]);assert.equal(req.url,'/api/integrations/public/provider/facebook-a/connect');assert.deepEqual(JSON.parse(body),{state:'abcdef123',page:'123'});json(res,{success:true,token:'PRIVATE'});};
+ assert.deepEqual(await client().selectFacebookPage(input),{integrationId:'facebook-a',pageId:'123',status:'accepted'});assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ for(const patch of [{pageId:'789'},{availablePageIds:['123','123']},{state:'bad'}]){requests=[];await assert.rejects(client().selectFacebookPage({...input,...patch}),e=>e.code==='POSTIZ_PAGE_SELECTION_INVALID');assert.equal(requests.length,0);}
+ for(const patch of [{identifier:'linkedin'},{disabled:true},{id:'other'}]){requests=[];handler=(req,res)=>json(res,[{...integration,id:'facebook-a',identifier:'facebook',...patch}]);await assert.rejects(client().selectFacebookPage(input),e=>e.code==='POSTIZ_CHANNEL_UNAVAILABLE');assert.equal(requests.filter(r=>r.method==='POST').length,0);}
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).selectFacebookPage(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.length,1);
+});
+
+test('Facebook Page selection preserves unknown outcome without retrying an ambiguous mutation',async()=>{
+ const input={integrationId:'facebook-a',state:'abcdef123',pageId:'123',availablePageIds:['123']};
+ for(const kind of ['disconnect','500','invalid']){
+  requests=[];handler=(req,res)=>{if(req.url==='/api/public/v1/integrations')return json(res,[{...integration,id:'facebook-a',identifier:'facebook'}]);if(kind==='disconnect')return req.socket.destroy();json(res,{success:false,token:'PRIVATE'},kind==='500'?500:200);};
+  await assert.rejects(client().selectFacebookPage(input),e=>e.outcome==='unknown'&&!JSON.stringify(e).includes('PRIVATE'));assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ }
+});
+
+
+test('Facebook Page feed scheduling binds exact media and account without claiming publication',async()=>{
+ for(const kind of ['image','video','carousel']){
+  requests=[];const media=kind==='carousel'?[{id:'m1',path:base+'/uploads/a.png'},{id:'m2',path:base+'/uploads/b.png'}]:{id:'m1',path:base+'/uploads/a.'+(kind==='video'?'mp4':'png')};
+  handler=(req,res,body)=>{if(req.url.endsWith('/integrations'))return json(res,[{...integration,identifier:'facebook'}]);assert.equal(req.url,'/api/public/v1/posts');assert.deepEqual(JSON.parse(body),{type:'schedule',date:'2026-11-01T10:00:00.000Z',shortLink:false,tags:[],posts:[{integration:{id:'channel-a'},value:[{content:'Approved Page caption',image:Array.isArray(media)?media:[media]}],settings:{__type:'facebook',post_type:'post'}}]});json(res,[{postId:'fb-post',integration:'channel-a'}]);};
+  assert.deepEqual(await client().submitFacebook({integrationId:'channel-a',caption:'Approved Page caption',media,mediaType:kind,scheduledAt:'2026-11-01T10:00:00Z'}),{postId:'fb-post',integrationId:'channel-a',status:'accepted'});assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ }
+});
+test('Facebook scheduling refuses invalid media, wrong providers and foreign organizations before submitting',async()=>{
+ const media={id:'m1',path:base+'/uploads/a.png'},input={integrationId:'channel-a',caption:'Approved',media,scheduledAt:'2026-11-01T10:00:00Z'};
+ for(const patch of [{caption:''},{caption:'x'.repeat(3001)},{mediaType:'story'},{mediaType:'video'},{mediaType:'carousel',media:[media,media]},{media:{...media,path:'https://evil.test/a.png'}}]){requests=[];await assert.rejects(client().submitFacebook({...input,...patch}),e=>e.code==='POSTIZ_POST_INVALID');assert.equal(requests.length,0);}
+ for(const target of [{...integration},{...integration,identifier:'facebook',disabled:true}]){requests=[];handler=(req,res)=>json(res,[target]);await assert.rejects(client().submitFacebook(input),e=>e.code==='POSTIZ_CHANNEL_UNAVAILABLE');assert.equal(requests.filter(r=>r.method==='POST').length,0);}
+ requests=[];await assert.rejects(new PostizClient(config(),binding(keyB)).submitFacebook(input),e=>e.code==='POSTIZ_TENANT_MISMATCH');assert.equal(requests.filter(r=>r.method==='POST').length,0);
+});
+test('Facebook scheduling preserves unknown outcomes and never resubmits automatically',async()=>{
+ const input={integrationId:'channel-a',caption:'Approved',media:{id:'m1',path:base+'/uploads/a.png'},scheduledAt:'2026-11-01T10:00:00Z'};
+ for(const kind of ['disconnect','500','malformed','foreign-id']){
+  requests=[];handler=(req,res)=>{if(req.url.endsWith('/integrations'))return json(res,[{...integration,identifier:'facebook'}]);if(kind==='disconnect')return req.socket.destroy();if(kind==='500')return json(res,{secret:keyA},500);if(kind==='foreign-id')return json(res,[{postId:'fb-post',integration:'foreign-channel'}]);res.writeHead(200,{'content-type':'application/json'});res.end('secret '+keyA);};
+  await assert.rejects(client().submitFacebook(input),e=>e instanceof PostizError&&e.outcome==='unknown'&&!JSON.stringify(e).includes(keyA));assert.equal(requests.filter(r=>r.method==='POST').length,1);
+ }
+});

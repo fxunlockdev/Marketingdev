@@ -1,0 +1,11 @@
+"use client";
+import {useEffect,useState} from 'react';
+import {api,ApiError} from './api';
+import {Notice,Wordmark} from './primitives';
+import {socialName} from './postforme-connections';
+type ReturnAttempt={business_id:string;attempt_id:string;platform:string;expires_at:string};
+export function PostformeReturn(){
+ const [attempt,setAttempt]=useState<ReturnAttempt>(),[error,setError]=useState<unknown>(),[done,setDone]=useState(false),[busy,setBusy]=useState(true),[retry,setRetry]=useState(0),[canceled,setCanceled]=useState(false);
+ useEffect(()=>{let alive=true;setBusy(true);setError(undefined);const check=async()=>{try{const pending=await api<ReturnAttempt>('/api/v1/postforme/return');if(!alive)return;setAttempt(pending);const query=new URLSearchParams(location.search);const denied=query.has('error')||query.get('success')==='false'||query.get('denied')==='true';setCanceled(denied);if(denied)return;await api(`/api/v1/businesses/${pending.business_id}/postforme/connections/finish`,{attempt_id:pending.attempt_id});if(alive){setDone(true);try{sessionStorage.removeItem(`desvio:social-attempt:${pending.business_id}`);}catch{}}}catch(e){if(alive)setError(e);}finally{if(alive)setBusy(false);}};void check();return()=>{alive=false;};},[retry]);
+ return <main id="main" className="standalone"><Wordmark/><p className="eyebrow">Social connection</p><h1>{done?'Your account is connected':canceled?'Connection not completed':'Let’s check your connection'}</h1><p role="status">{busy?'Checking your authorized account securely…':done?`${socialName(attempt?.platform??'Social')} is ready. Return to your workspace to manage your accounts.`:canceled?'You can return to your accounts and connect again whenever you’re ready.':'We couldn’t confirm this connection. Your existing accounts remain saved.'}</p><Notice error={error}/><div className="connection-result-actions">{attempt&&<a className="button primary" href={`/b/${attempt.business_id}/connections`}>Back to accounts</a>}{error instanceof ApiError&&error.status===401?<a className="button" href="/sign-in">Sign in</a>:!!error&&<button disabled={busy} onClick={()=>setRetry(n=>n+1)}>Check again</button>}<a href="/brands">Your businesses</a></div></main>;
+}

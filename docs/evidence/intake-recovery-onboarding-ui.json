@@ -1,0 +1,15 @@
+{
+  "checked_at": "2026-10-24T11:22:22.745Z",
+  "passed": true,
+  "deployment": "a7f3acff-d37a-46f7-935a-afb5e0f55f66",
+  "checks": [
+    "authenticated actual failed job",
+    "specific failure stage",
+    "cause and recovery",
+    "expandable error code",
+    "retry button",
+    "capture requests durable automatic analysis (intercepted, not submitted)"
+  ],
+  "paid_requests": 0,
+  "scope": "Read-only UI check of the existing failure; no customer retry or analysis submitted."
+}

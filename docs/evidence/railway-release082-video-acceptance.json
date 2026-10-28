@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-10-28T14:34:25.488Z",
+  "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "passed": true,
+  "image": "sha256:95401ad08e49ae619fb9f1bae50cef443cf9c54bd72d3d31960b746cf292f9f5",
+  "architecture": "amd64",
+  "version": "desvio-video-render-v3/ffmpeg-7.1.5",
+  "width": 1080,
+  "height": 1920,
+  "duration_ms": 3000,
+  "video_bytes": 12892,
+  "poster_bytes": 4553,
+  "poster_width": 360,
+  "poster_height": 640,
+  "video_sha256": "c115f06e0d6db0111dd6099234a1abc085ee6e1f85bef78ca597cf35353cb391",
+  "poster_sha256": "72f1b27e2c15929413a25dec6a67b2ec05957ba490495018cb5156e53b85dbc5",
+  "external_calls": 0,
+  "activated": false,
+  "scope": "Native AMD64 network-disabled v3 synthetic video and poster acceptance; no paid generation, worker activation or live publishing proof"
+}

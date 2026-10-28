@@ -1,0 +1,7 @@
+{
+  "checked_at": "2026-10-24T13:26:33.881Z",
+  "passed": true,
+  "scope": "Authenticated deployed brand workspace: empty state when no businesses exist, management disclosure when a business exists; no deletion submitted",
+  "destructive_calls": 0,
+  "paid_calls": 0
+}

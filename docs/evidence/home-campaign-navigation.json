@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-25T07:57:50.033994+00:00",
+  "scope": "Simplified Home, dedicated weekly Campaigns page and persisted calendar filter",
+  "builds": [
+    "API TypeScript passed",
+    "Web production build passed"
+  ],
+  "browser_tests": {
+    "command": "node scripts/foundation-test.mjs --customer-web",
+    "passed": 20,
+    "failed": 0,
+    "duration_ms": 49285.71425
+  },
+  "verified": [
+    "Campaign counts from tenant-scoped saved plans and non-cancelled slots",
+    "Campaign link filters two posts excluding a third in an overlapping campaign",
+    "Filter survives reload",
+    "Show all campaigns removes URL filter and restores all three posts",
+    "Desktop and 320px mobile accessibility and overflow checks",
+    "Dedicated Campaigns route opens from Home and lists overlapping campaigns",
+    "Home activity is collapsed by default and opens on request"
+  ],
+  "visual_review": "Updated mobile screenshot inspected: campaign row and collapsed activity fit without overflow; 320px screenshot height reduced from 4199 to 2422 pixels for the same fixture.",
+  "external_generation": "Not invoked",
+  "deployed": false
+}

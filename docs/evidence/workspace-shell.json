@@ -1,0 +1,36 @@
+{
+  "status": "deployed",
+  "scope": [
+    "Compact sidebar with business switcher",
+    "Contextual page header and profile avatar",
+    "Home begins with upcoming posts",
+    "Campaign cards avoid duplicate reference preview"
+  ],
+  "validation": {
+    "web_typecheck": "passed",
+    "browser_tests": {
+      "passed": 1,
+      "failed": 0,
+      "log": "work/workspace-shell-browser.log",
+      "paid_providers": "MOCKED",
+      "coverage": [
+        "Business switcher location and selected brand",
+        "Home links and mobile menu",
+        "Mobile overflow and WCAG A/AA",
+        "Campaign reference editing and image-batch recovery",
+        "Calendar filters and focused review persistence"
+      ]
+    },
+    "screenshots": [
+      "work/browser/workspace-home-desktop.png",
+      "work/browser/workspace-home-mobile.png"
+    ]
+  },
+  "web_deployment": "690527a0-9c3c-44fb-a10e-ee1dd7bfa26a",
+  "limitations": [
+    "Full Blaze journey parity incomplete",
+    "No paid live generation performed",
+    "Home screenshot contains test fixtures and transient loading previews"
+  ],
+  "web_deployment_status": "SUCCESS"
+}

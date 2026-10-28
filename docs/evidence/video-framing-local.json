@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-10-26T13:53:34.567642+00:00",
+  "python_media_tests": 14,
+  "adapter_tests": 3,
+  "passed": true,
+  "vertical_dimensions": [
+    1080,
+    1920
+  ],
+  "log": "work/release081-video-runtime.log",
+  "scope": "Actual local native FFmpeg image and synthetic clips. No paid provider calls; not deployed or live Higgsfield output proof."
+}

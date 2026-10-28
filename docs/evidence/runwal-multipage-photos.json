@@ -1,0 +1,205 @@
+{
+  "checked_at": "2026-10-25T17:07:52.657Z",
+  "paid_calls": false,
+  "pages": [
+    {
+      "url": "https://runwalrealty.com/",
+      "requests": 11,
+      "photos": [
+        {
+          "sha256": "2a93914d8e74773e2c7f017239e019a6c9cc0617df5a35afe835989033ee2032",
+          "width": 1920,
+          "height": 1080,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2026/05/RunwalRealty_1920x1080px-01.jpg.jpeg",
+          "page_url": "https://runwalrealty.com/"
+        },
+        {
+          "sha256": "02c3cc79b4c8436caca43300e6f6a20720940869b4698491deef0f111727ef84",
+          "width": 500,
+          "height": 800,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2026/05/RunwalRealty_500x800.jpg.jpeg",
+          "page_url": "https://runwalrealty.com/"
+        },
+        {
+          "sha256": "237ee08a36e58b8d1a3133d89a73b1c3e59243c848870fab99d0fc67e650ddaf",
+          "width": 630,
+          "height": 723,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/06/630x723px.webp",
+          "page_url": "https://runwalrealty.com/"
+        },
+        {
+          "sha256": "84bd0db10cd76634efc6b6c40ae4d70edbe3d653b58c705c9938cecf7ab4e443",
+          "width": 630,
+          "height": 723,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/06/commercial-image.webp",
+          "page_url": "https://runwalrealty.com/"
+        },
+        {
+          "sha256": "c99f0bfe3eb090eb7230205496d1c16a2f9e2ddc9531c17d630d4dd5b0c97c0b",
+          "width": 630,
+          "height": 723,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/06/mall-Image.webp",
+          "page_url": "https://runwalrealty.com/"
+        },
+        {
+          "sha256": "5e0a4133e324448895c4dc12038ed215af5d1ebba375cacab22117e0c08103a1",
+          "width": 1280,
+          "height": 606,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2026/03/Resized.jpg",
+          "page_url": "https://runwalrealty.com/"
+        }
+      ],
+      "failures": [
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/mainLogo.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/logo.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/uploads/2026/09/telephone-call-64px.png",
+          "reason": "WEBSITE_PHOTO_NOT_SUITABLE"
+        }
+      ]
+    },
+    {
+      "url": "https://runwalrealty.com/about/company-overview/",
+      "requests": 12,
+      "photos": [
+        {
+          "sha256": "e47bdde95096902f9d8e9be9f8dd760f3ce712df9e57f0ed087191796f743234",
+          "width": 1920,
+          "height": 915,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/Company-Overview-Banner-2.jpg",
+          "page_url": "https://runwalrealty.com/about/company-overview/"
+        },
+        {
+          "sha256": "4501392c12cfa8d272026150f6e483471e2b7d472d3b6a694114bd7def4cbe84",
+          "width": 375,
+          "height": 535,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/company-Overview-Banner-3.jpg",
+          "page_url": "https://runwalrealty.com/about/company-overview/"
+        },
+        {
+          "sha256": "6785efe0860d03224d795ee2fcac569f6f4f48544a53d7a8427ee03bca767c28",
+          "width": 564,
+          "height": 674,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/who-we-are.jpg",
+          "page_url": "https://runwalrealty.com/about/company-overview/"
+        },
+        {
+          "sha256": "3d398d049ffecc9fe96d416b38af625b39fd38f99a21aaefbe84b2fe915e3844",
+          "width": 775,
+          "height": 548,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/about2.jpg",
+          "page_url": "https://runwalrealty.com/about/company-overview/"
+        },
+        {
+          "sha256": "fab559bf7cb1567d01d009c29efd176d48fb0e8f2415c886b35fc6426fc6e53d",
+          "width": 775,
+          "height": 550,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/Mission-Vision-1.jpg",
+          "page_url": "https://runwalrealty.com/about/company-overview/"
+        },
+        {
+          "sha256": "27843a90e355de2e14e8836fadffc584972a4c069f14945d3827e6a304bcc143",
+          "width": 1630,
+          "height": 695,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/mapbg.jpg",
+          "page_url": "https://runwalrealty.com/about/company-overview/"
+        }
+      ],
+      "failures": [
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/mainLogo.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/mainLogoheader.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/logo.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/uploads/2026/09/telephone-call-64px.png",
+          "reason": "WEBSITE_PHOTO_NOT_SUITABLE"
+        }
+      ]
+    },
+    {
+      "url": "https://runwalrealty.com/our-project/residential/ongoing/",
+      "requests": 13,
+      "photos": [
+        {
+          "sha256": "ce858d71f3aec5b0672381e761c81c092f81981a2da2d5ecdaba712b96cac69b",
+          "width": 1920,
+          "height": 1080,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2026/03/01-Web_Banners-1920x1080px_Malabar-1.jpg",
+          "page_url": "https://runwalrealty.com/our-project/residential/ongoing/"
+        },
+        {
+          "sha256": "9b8bb9c9d90bade761ab0a29b6f0929e36d3168de104ebeeaf61bc52189f9999",
+          "width": 1920,
+          "height": 915,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/Residential.jpg",
+          "page_url": "https://runwalrealty.com/our-project/residential/ongoing/"
+        },
+        {
+          "sha256": "d386c495badea923448cda9b3e4286606cadbf72c6393e783e5d8d91eb28f921",
+          "width": 375,
+          "height": 535,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/Residential-3.jpg",
+          "page_url": "https://runwalrealty.com/our-project/residential/ongoing/"
+        },
+        {
+          "sha256": "b42eb5c26dd649464b78035027d92f38fed2f95d0781cb594b9a898a158c2c15",
+          "width": 1920,
+          "height": 910,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2026/01/Auris-Banner.jpg",
+          "page_url": "https://runwalrealty.com/our-project/residential/ongoing/"
+        },
+        {
+          "sha256": "d067ac10a46a54e2ab0ebae5e011d6ab258e92a29fb375b56b617ac079d236d5",
+          "width": 1921,
+          "height": 910,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/07/Frame-9.webp",
+          "page_url": "https://runwalrealty.com/our-project/residential/ongoing/"
+        },
+        {
+          "sha256": "9e4583758fa37467be49066d22d4efcc993be1fcbf985bba57e8efc19b7f36ea",
+          "width": 1920,
+          "height": 910,
+          "source_url": "https://runwalrealty.com/wp-content/uploads/2025/04/Inner-Page-banner-1-1-1.webp",
+          "page_url": "https://runwalrealty.com/our-project/residential/ongoing/"
+        }
+      ],
+      "failures": [
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/mainLogo.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/mainLogoheader.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/logo.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/uploads/2026/09/telephone-call-64px.png",
+          "reason": "WEBSITE_PHOTO_NOT_SUITABLE"
+        },
+        {
+          "url": "https://runwalrealty.com/wp-content/themes/runwal/images/mapGold.svg",
+          "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+        }
+      ]
+    }
+  ],
+  "scope": "Real public website photo fetch and normalization only; does not prove complete onboarding or automatic creative reference selection."
+}

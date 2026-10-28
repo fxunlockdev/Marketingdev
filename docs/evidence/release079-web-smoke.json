@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-26T12:04:51.279Z",
+  "passed": true,
+  "catalog_cards": 4,
+  "setup_open_cancel": true,
+  "reload": true,
+  "scope": "Actual deployed strategy UI, setup opening/cancel and reload; no launch/generation/spending."
+}

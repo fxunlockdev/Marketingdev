@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-10-24T14:15:42.832707+00:00",
+  "web_deployment": "5c547b64-f0b9-4bc1-a116-7c0054d457b3",
+  "web_status": "SUCCESS",
+  "browser_tests": {
+    "passed": 20,
+    "log": "work/onboarding-hotfix-browser.log",
+    "provider_transport": "MOCK"
+  },
+  "creative_foundation_tests": {
+    "passed": 16,
+    "log": "work/creative-direction-foundation-2.log",
+    "provider_transport": "MOCK"
+  },
+  "contracts": {
+    "passed": 17,
+    "log": "work/plan-date-contracts.log"
+  },
+  "paid_calls": 0,
+  "owner_plan_recovery": "docs/evidence/owner-plan-recovery.json",
+  "worker_rollout": "ACTIVATED",
+  "worker_image": "sha256:b35e643f0db7eb5f64049c4228f03295857dbf5c8d65b86391486e4614431924",
+  "deployed_ui_check": "docs/evidence/onboarding-hotfix-deployed.json",
+  "visual_quality_acceptance": "OWNER_TEST_PENDING"
+}

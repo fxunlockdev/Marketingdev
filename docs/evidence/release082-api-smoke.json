@@ -1,0 +1,10 @@
+{
+  "generation_quote_status": 200,
+  "quoted_slots": 4,
+  "checked_at": "2026-10-28T14:24:53.594Z",
+  "passed": true,
+  "status": 200,
+  "catalog_entries": 4,
+  "saved_strategies": 0,
+  "scope": "Authenticated deployed strategy and generation quote read for existing owner. No strategy creation or provider calls."
+}

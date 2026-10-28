@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-10-24T13:35:39.052913+00:00",
+  "web_deployment": "98d49a22-c866-4d5a-938e-a07eb01c3e9f",
+  "web_status": "SUCCESS",
+  "focused_customer_browser_tests": {
+    "passed": 20,
+    "failed": 0,
+    "log": "work/manage-brand-browser-final.log"
+  },
+  "full_browser_suite": {
+    "passed": 51,
+    "failed": 0,
+    "log": "work/shared-interactions-browser.log",
+    "log_sha256": "b958cfcfe50420dfa4fed08c9754152774a50bb9d11d1fbdef8b984b8f03b802",
+    "scope": "Real local UI/auth/database/private storage/queues/rendering. OpenAI, Higgsfield and Postiz provider responses mocked. No paid live acceptance."
+  },
+  "deployed_ui_evidence": "docs/evidence/manage-brand-deployed-ui.json",
+  "gpt_runtime_evidence": "docs/evidence/gpt-research-runtime-readiness.json",
+  "changes": [
+    "separate management page with collapsed deletion",
+    "zero-business workspace header without unusable selector/Create",
+    "single-business module navigation",
+    "shared hover, keyboard focus, touch and reduced-motion interactions",
+    "calendar/review card action hints"
+  ],
+  "paid_calls": false,
+  "live_generation_verified": false
+}

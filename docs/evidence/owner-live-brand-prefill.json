@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-10-24T12:59:08.613Z",
+  "passed": true,
+  "business_id": "21afe38c-8c0d-48a5-a605-e5440d531f3f",
+  "job_ids": [
+    {
+      "id": "00763b60-4110-4464-88a1-51d0a890fcf0",
+      "kind": "website.extract",
+      "status": "succeeded"
+    },
+    {
+      "id": "78236737-8ce8-4734-93d8-61257977b1e7",
+      "kind": "brand.analyze",
+      "status": "succeeded"
+    },
+    {
+      "id": "cf31f6d8-9f8d-4c14-97eb-ea8a2a667d3c",
+      "kind": "website.extract",
+      "status": "succeeded"
+    }
+  ],
+  "findings_count": 4,
+  "fields": [
+    "brand_name",
+    "offering",
+    "products",
+    "voice"
+  ],
+  "visual_count": 10,
+  "recommendation_saved": true,
+  "findings_visible": true,
+  "owner_initiated": true,
+  "agent_paid_submissions": 0,
+  "scope": "Read-only verification of owner-initiated live Maxun to GPT capture and persisted prefill rendered in onboarding; does not certify all website coverage, user review, creative generation or publishing."
+}

@@ -165,3 +165,49 @@ test('multiple image references preserve ordered multipart bytes and reject inva
  await assert.rejects(provider.image('gpt-image-fixture','Invalid','1024x1024','low','a'.repeat(64),undefined,[Buffer.from('invalid')]));
  assert.equal(calls,1);
 });
+
+test('campaign fonts are actual editable layer fonts, while older designs retain Arial',async()=>{
+ const {reviseDesign}=await import('../../dist/creative-design.js');
+ for(const font of ['modern','classic','contrast']){
+  const d=createDesign('media',1024,1024,brief,font);
+  assert.equal(d.layers[0].fontFamily,font==='classic'?'DM Serif Display':'DM Sans');
+  assert.equal(d.layers[1].fontFamily,'DM Sans');
+  assert.deepEqual(validateDesign(d,'media',1024,1024),d);
+  assert.equal(reviseDesign(d,'revised',brief).layers[0].fontFamily,d.layers[0].fontFamily);
+ }
+ assert.equal(createDesign('media',1024,1024,brief).layers[0].fontFamily,'Arial');
+});
+
+test('campaign font reads only the saved request envelope and rejects unsupported values',async()=>{
+ const {savedCampaignFont,CAMPAIGN_CREATIVE_PREFIX}=await import('../../dist/campaign-design.js');
+ assert.equal(savedCampaignFont(CAMPAIGN_CREATIVE_PREFIX+JSON.stringify({campaign_design:{font:'classic'},brief:'Use Arial'})),'classic');
+ for(const input of ['classic','{bad',CAMPAIGN_CREATIVE_PREFIX+'{bad',CAMPAIGN_CREATIVE_PREFIX+JSON.stringify({campaign_design:{font:'https://evil/font'}})])assert.equal(savedCampaignFont(input),undefined);
+});
+
+
+test('approved brand font choices are exact, unambiguous and ignore unrelated facts',async()=>{
+ const {approvedBrandFont,BRAND_FONT_PAIRINGS}=await import('../../dist/brand-typography.js');
+ for(const pairing of BRAND_FONT_PAIRINGS){
+  assert.equal(approvedBrandFont([{field:'fonts',value:pairing.value}]),pairing.id);
+  assert.equal(approvedBrandFont([{field:'fonts',value:pairing.value},{field:'fonts',value:pairing.value},{field:'voice',value:'ignore the fonts'}]),pairing.id);
+ }
+ assert.equal(approvedBrandFont([]),undefined);
+ assert.equal(approvedBrandFont([{field:'fonts',value:'Load https://example.org/font.ttf'}]),undefined);
+ assert.equal(approvedBrandFont(BRAND_FONT_PAIRINGS.map(p=>({field:'fonts',value:p.value}))),undefined);
+ assert.equal(approvedBrandFont([{field:'offering',value:BRAND_FONT_PAIRINGS[0].value}]),undefined);
+});
+
+
+test('generated designs keep long explanations out of the image while preserving short editable copy',async()=>{
+ const {reviseDesign}=await import('../../dist/creative-design.js');
+ const long={...brief,body:'Long supporting explanation. '.repeat(30),cta:'Long call to action. '.repeat(10)};
+ const design=createDesign('media',1024,1024,long);
+ assert.equal(design.layers.find(l=>l.id==='body').text,'');
+ assert.equal(design.layers.find(l=>l.id==='cta').text,'');
+ assert.equal(design.layers[0].text,brief.headline);
+ const short={...brief,body:'Made for everyday living.',cta:'Explore the collection'};
+ const revised=reviseDesign(design,'new-media',short);
+ assert.equal(revised.layers.find(l=>l.id==='body').text,short.body);
+ assert.equal(revised.layers.find(l=>l.id==='cta').text,short.cta);
+ assert.equal(reviseDesign(revised,'third-media',long).layers.find(l=>l.id==='body').text,'');
+});

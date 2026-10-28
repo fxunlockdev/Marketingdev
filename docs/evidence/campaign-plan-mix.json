@@ -1,0 +1,34 @@
+{
+  "status": "locally_verified_not_deployed",
+  "scope": "Editable monthly planning presets from assigned generation plan; calendar-month length for daily image quantities on $800 tier",
+  "checks": {
+    "api_build": "passed",
+    "web_build": "passed",
+    "typecheck": "passed",
+    "date_and_mix_contracts": {
+      "passed": 2,
+      "failed": 0
+    },
+    "budget_foundation": {
+      "passed": 2,
+      "failed": 0
+    },
+    "campaign_browser": {
+      "passed": 1,
+      "failed": 0
+    }
+  },
+  "logs": [
+    "work/campaign-plan-mix-contracts.log",
+    "work/campaign-plan-mix-foundation.log",
+    "work/campaign-plan-mix-browser.log",
+    "work/campaign-plan-mix-build.log"
+  ],
+  "limitations": [
+    "No deployment or paid calls",
+    "Presets are editable draft quantities, not hard package entitlements",
+    "Daily placement and monthly post/reel quota enforcement remain incomplete",
+    "Outer-tier quantities are implementation defaults",
+    "Video drafts are not proof of finished reels or provider availability"
+  ]
+}

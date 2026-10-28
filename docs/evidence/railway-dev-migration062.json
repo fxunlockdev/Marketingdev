@@ -1,0 +1,31 @@
+{
+  "checked_at": "2026-10-24T12:50:08.806Z",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "service_id": "45ae520d-f681-424b-8758-6cee8789b2cf",
+  "deployment_id": "9a3a9f85-4c4c-4482-9d14-26ddd8a7fcbd",
+  "deployment_status": "REMOVED",
+  "source_commit": "d19d188dde5240f4427e9625228f64338897fd5b",
+  "migrations": [
+    {
+      "file": "062_capture_visual_recovery.sql",
+      "sha256": "c59bb7c3fd37fdc8e06fe9e56bc494b38702d0d60059fc417a3ff4dfef7d0415"
+    }
+  ],
+  "bootstrap_output": {
+    "status": "configured",
+    "replayed": true,
+    "roles": [
+      "desvio_app",
+      "desvio_auth",
+      "desvio_mail",
+      "desvio_worker",
+      "desvio_dispatcher",
+      "desvio_provisioner"
+    ]
+  },
+  "active_secret_variables_cleared": true,
+  "scope": "Actual dedicated dev migrations through 062, checksum replay and all six runtime-role login checks. API/web and customer/provider acceptance remain pending.",
+  "live_model_or_social_calls": false,
+  "cleanup_verified": true
+}

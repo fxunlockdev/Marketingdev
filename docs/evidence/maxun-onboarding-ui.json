@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-10-24T09:43:12.326Z",
+  "passed": true,
+  "deployment": "0efb0ca6-955a-4753-bfe6-a50930f4ad86",
+  "checks": [
+    "authenticated actual failed job",
+    "specific failure stage",
+    "cause and recovery",
+    "expandable error code",
+    "retry button"
+  ],
+  "paid_requests": 0,
+  "scope": "Read-only UI check of the existing failure; no customer retry or analysis submitted."
+}

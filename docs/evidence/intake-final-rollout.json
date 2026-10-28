@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-10-24T10:28:15.996649+00:00",
+  "api_deployment": "fe89c230-1fde-45f7-99ba-57f8590e5ff2",
+  "railway_observed_status": "SUCCESS",
+  "tests": {
+    "intake_storage": {
+      "passed": 12,
+      "failed": 0,
+      "log": "work/intake-ordering-check.log",
+      "providers": "mocked"
+    },
+    "customer_browser": {
+      "passed": 16,
+      "failed": 0,
+      "log": "work/intake-customer-recheck.log",
+      "providers": "mocked"
+    },
+    "contracts": {
+      "passed": 171,
+      "failed": 0,
+      "log": "work/intake-final-contracts.log",
+      "providers": "mocked"
+    }
+  },
+  "paid_provider_flow_verified": false,
+  "owner_live_test_pending": true
+}

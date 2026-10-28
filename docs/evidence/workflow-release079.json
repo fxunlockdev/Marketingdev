@@ -1,0 +1,42 @@
+{
+  "checked_at": "2026-10-26T11:55:09.688770+00:00",
+  "source_snapshot": "work/workflow-release-079",
+  "migration": "6359cf0d-c5df-4231-a41a-c73115018e84",
+  "migration_status": "SUCCESS then REMOVED",
+  "api_deployment": "a77ed5da-fc02-46eb-996e-902bda3e0baf",
+  "web_deployment": "e73200f7-107a-42af-8d17-ee5317ce033d",
+  "application_deployment_status": "SUCCESS",
+  "worker": "sha256:e80c5aaf4f2dfe70448bf4f77dae8583063691e45694bb5d02b661e4e17f13c5",
+  "worker_activation": "activated",
+  "tests": {
+    "contracts": {
+      "passed": 251,
+      "failed": 0
+    },
+    "strategy_foundation": {
+      "passed": 3,
+      "failed": 0
+    },
+    "strategy_browser": {
+      "passed": 1,
+      "failed": 0
+    },
+    "rendered_intake_storage": {
+      "passed": 19,
+      "failed": 0
+    },
+    "native_website_sandbox": "passed"
+  },
+  "paid_calls": false,
+  "authenticated_strategy_read": "passed",
+  "website_capture": {
+    "passed": true,
+    "pages": 1,
+    "photos": 2,
+    "text_characters": 8322,
+    "partial": true,
+    "paid_calls": 0,
+    "tenant_intake_tested": false,
+    "evidence": "railway-website-live.json"
+  }
+}

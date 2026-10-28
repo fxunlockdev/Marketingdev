@@ -1,0 +1,40 @@
+{
+  "status": "locally_verified_not_deployed",
+  "scope": "Reviewed static campaign images queued atomically with persisted receipt, real job status, reload recovery and generated previews",
+  "migration": "071_campaign_image_batches.sql",
+  "checks": {
+    "api_build": "passed",
+    "web_build": "passed",
+    "creative_foundation": {
+      "passed": 17,
+      "failed": 0
+    },
+    "campaign_browser": {
+      "passed": 1,
+      "failed": 0
+    },
+    "diff_check": "passed"
+  },
+  "verified": [
+    "Batch posts/revisions checked before creation",
+    "Concurrent identical requests yield the same jobs",
+    "Changed payload, foreign plan/posts, viewer and other-account access rejected",
+    "Each generated version attached to its own slot",
+    "Latest batch status survives reload",
+    "Selected Canvas conversation retained in URL after batch creates additional threads",
+    "Two generated thumbnails load after reload"
+  ],
+  "logs": [
+    "work/campaign-image-batch-foundation.log",
+    "work/campaign-image-batch-browser.log",
+    "work/campaign-image-batch-web-build.log"
+  ],
+  "screenshot": "work/browser/campaign-image-batch.png",
+  "limitations": [
+    "Local auth, database, storage, worker and renderer; mocked external model/image transport",
+    "No paid calls or deployment",
+    "Video generation remains individual script/reference approval",
+    "No batch cost quote or finished export/publishing acceptance",
+    "Not complete Blaze parity"
+  ]
+}

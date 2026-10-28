@@ -10,7 +10,7 @@ export async function GET(request:NextRequest){
  let origin:URL,apiBase:URL;
  try{origin=new URL(process.env.APP_ORIGIN!);apiBase=new URL(process.env.API_ORIGIN!);if(origin.origin!==process.env.APP_ORIGIN||request.headers.get('host')!==origin.host||origin.username||origin.password||apiBase.username||apiBase.password||!(origin.protocol==='https:'||origin.protocol==='http:'&&['127.0.0.1','localhost','[::1]'].includes(origin.hostname))||!['http:','https:'].includes(apiBase.protocol)||apiBase.pathname!=='/'||apiBase.search||apiBase.hash)throw new Error();}catch{return new Response('Connection return is unavailable. Open Desvio and start again.',{status:503,headers:{'cache-control':'no-store','referrer-policy':'no-referrer','content-type':'text/plain'}});}
  const redirect=(path:string)=>{const response=NextResponse.redirect(new URL(path,origin),303);response.headers.set('Cache-Control','no-store');response.headers.set('Referrer-Policy','no-referrer');return response;};
- const provider=request.nextUrl.pathname.endsWith('/instagram-standalone')?'instagram-standalone':'linkedin';
+ const provider=request.nextUrl.pathname.endsWith('/instagram-standalone')?'instagram-standalone':request.nextUrl.pathname.endsWith('/facebook')?'facebook':'linkedin';
  const query=request.nextUrl.searchParams,state=query.get('state')??'',parts=state.split('.'),brand=parts[0],attempt=parts[1];
  const validState=query.getAll('state').length===1&&parts.length===3&&uuid.test(brand)&&uuid.test(attempt)&&/^[A-Za-z0-9_-]{43}$/.test(parts[2]);
  const failure=(reason:string)=>redirect('/integrations/social/result?reason='+reason+(validState?'&business='+brand+'&attempt='+attempt:''));

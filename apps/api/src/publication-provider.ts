@@ -1,6 +1,6 @@
 // Eligibility is checked against metadata saved with the exact canonical render.
 // Legacy renders without that evidence must be rendered and approved again.
-export function publicationChannel(provider:string){return provider==='linkedin'?'linkedin':provider==='instagram-standalone'?'instagram':null;}
+export function publicationChannel(provider:string){return provider==='facebook'?'facebook':provider==='linkedin'?'linkedin':provider==='instagram-standalone'?'instagram':null;}
 export function validReel(row:any){
  const m=row?.manifest?.metadata,bytes=Number(row?.bytes);
  return !!m&&typeof row.sha256==='string'&&/^[a-f0-9]{64}$/.test(row.sha256)

@@ -1,0 +1,49 @@
+{
+  "checked_at": "2026-10-24T12:59:31.466596+00:00",
+  "scope": "Onboarding UX and saved Maxun screenshot recovery. Provider responses mocked in local tests. First-calendar browser test verifies durable UI request and navigation, not genuine model output.",
+  "checks": [
+    {
+      "suite": "contracts",
+      "passed": 181,
+      "failed": 0,
+      "log": "work/onboarding-contracts.log",
+      "sha256": "808911dc6f271477fe027259ae1cfe236374b517fee60be3b29a1700a1fd40e8"
+    },
+    {
+      "suite": "intake_storage",
+      "passed": 14,
+      "failed": 0,
+      "log": "work/maxun-cloud-visual-recovery-tests.log",
+      "sha256": "c2c43f2d19f06b61e9afa6a28c870094ddf9431b6d4dca9ae686402c4a641ecb"
+    },
+    {
+      "suite": "customer_browser",
+      "passed": 20,
+      "failed": 0,
+      "log": "work/onboarding-customer-browser.log",
+      "sha256": "4a71c19e8fc4301b551241188f5fc15b2f9a38f76a2c772eef5cf5ba6280d165"
+    }
+  ],
+  "production_web_build": "passed",
+  "source_sha256": {
+    "apps/web/components/businesses.tsx": "c2d1529536a03733f97529654577b776608bb51c12a5ffdae1911efcba7ce597",
+    "apps/web/components/intake.tsx": "4f45a3494a117d80d8923283a8928846c98f18d64e0af025ff9306a5e419725d",
+    "apps/web/components/first-plan.tsx": "080402bedab132edc4e89a8dd59ea43aacc7c8ec883f2aa37dd098e9631e6781",
+    "apps/web/app/v5.css": "f2ecffb3f3682e486734e2c89b0bef95b4c656e980f469b44e28bf8ca3c06b94",
+    "apps/api/src/maxun-screenshots.ts": "2b75e65d08283ab0602138a9ac79306cfbec65dce8db12d293a4c5b49cb97815",
+    "apps/api/src/intake.ts": "c7ab7c728c1ee4801feed74a8c4d82af10eafa8fef8285bd8169bdd867a4a9ff",
+    "database/migrations/062_capture_visual_recovery.sql": "c59bb7c3fd37fdc8e06fe9e56bc494b38702d0d60059fc417a3ff4dfef7d0415"
+  },
+  "presentation_change_after_browser_tests": "Moved populated findings before missing fields; production build rechecked.",
+  "api_deployment": "25a887aa-69d5-4165-816d-ef365580708c",
+  "api_status": "SUCCESS",
+  "web_deployment": "e119f467-4054-43ed-8d15-d81b9b270a4c",
+  "web_status": "SUCCESS",
+  "worker_image": "sha256:7f1071b0f472dea9e5dee6e803a31f4aa0f061503ab2493421a76eb13f89b5b1",
+  "worker_activation": "verified",
+  "paid_agent_submissions": 0,
+  "full_product_release_gate": "NOT_PASSED",
+  "deployed_ui_verified": true,
+  "owner_screenshot_recovery": "succeeded: 10 captures, zero visual errors",
+  "deployed_check": "docs/evidence/owner-live-brand-prefill.json"
+}

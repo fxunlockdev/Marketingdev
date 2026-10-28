@@ -1,8 +1,10 @@
+import {CREATIVE_PLANNER_LIMITS} from './creative-budget.js';
 import OpenAI, { toFile } from "openai";
 import sharp from "sharp";
 import { canonicalJSON, hash } from "./brand-brain.js";
 import {
   CreativeError,
+  creativeBriefSchema,
   type PlannerRequest,
   type PlannerResponse,
 } from "./creative-contracts.js";
@@ -23,7 +25,7 @@ export class CreativeProvider {
     if (
       !Number.isInteger(request.step) ||
       request.step < 1 ||
-      request.step > 3 ||
+      request.step > CREATIVE_PLANNER_LIMITS.steps ||
       !request.messages.length ||
       request.messages.length > 30 ||
       request.tools.length > 1 ||
@@ -75,13 +77,14 @@ export class CreativeProvider {
         strict: false,
       })),
       parallel_tool_calls: false,
+      ...(request.creative_fact_ids?{text:{format:{type:'json_schema' as const,name:'desvio_creative_brief',strict:true,schema:creativeBriefSchema(request.creative_fact_ids)}}}:{}),
     };
     const bytes = Buffer.byteLength(canonicalJSON(body));
-    if (bytes > 400000) throw new CreativeError("SKILL_INPUT_LIMIT");
+    if (bytes > CREATIVE_PLANNER_LIMITS.bodyBytes) throw new CreativeError("SKILL_INPUT_LIMIT");
     return {
       body,
       sha256: hash(canonicalJSON(body)),
-      maxInputTokens: bytes + 2048,
+      maxInputTokens: bytes + CREATIVE_PLANNER_LIMITS.inputAllowance,
       maxOutputTokens,
     };
   }

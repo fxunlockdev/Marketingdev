@@ -1,0 +1,29 @@
+{
+  "checked_at": "2026-10-24T15:08:42.205946+00:00",
+  "backend": {
+    "pass": 18,
+    "fail": 0,
+    "log": "work/overview-posts-backend.log",
+    "external_publishing": "mocked"
+  },
+  "customer_browser": {
+    "pass": 20,
+    "fail": 0,
+    "log": "work/overview-posts-browser-verified.log",
+    "coverage": [
+      "actual persisted post cards and slot navigation",
+      "320/390/768/1440 layout and accessibility",
+      "duplicate description selection and Offering confirmation",
+      "tenant roles and workspace navigation"
+    ]
+  },
+  "canvas_prior_batch": {
+    "pass": 12,
+    "fail": 0,
+    "log": "work/calendar-reference-browser-targeted.log",
+    "providers": "mocked"
+  },
+  "api_deployment": "0b71f6c2-5530-408f-9716-a45fbbbb3e97",
+  "web_deployed": "a277b1e3-d779-456b-8e29-d4f87e30f581",
+  "paid_calls": 0
+}

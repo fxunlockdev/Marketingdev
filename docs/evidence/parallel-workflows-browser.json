@@ -1,0 +1,18 @@
+{
+  "checked_at": "2026-10-26T10:56:54.284134+00:00",
+  "passed": true,
+  "tests": 7,
+  "failures": 0,
+  "log": "work/parallel-workflows-browser.log",
+  "scope": [
+    "Calendar missing-image generation and reload",
+    "Calendar archive and restore",
+    "Standalone image history/archive/restore",
+    "Stock photo replacement retaining caption",
+    "Carousel history/archive/restore",
+    "Video playback/history/archive/restore",
+    "Generation email opt-in/reload/cancellation"
+  ],
+  "provider_mode": "Mock provider responses; real local auth, storage, database, workflows and media rendering. No external mail, publishing or paid generation.",
+  "live_delivery_verified": false
+}

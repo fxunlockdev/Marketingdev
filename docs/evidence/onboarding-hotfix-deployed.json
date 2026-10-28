@@ -1,0 +1,6 @@
+{
+  "checked_at": "2026-10-24T14:12:24.629Z",
+  "passed": true,
+  "scope": "Authenticated read-only deployed onboarding selector and Canvas planner; no generation or customer mutations",
+  "paid_calls": 0
+}

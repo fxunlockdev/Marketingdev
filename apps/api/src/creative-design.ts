@@ -12,16 +12,23 @@ export type Design = {
     y: number;
     width: number;
     fontSize: number;
-    fontFamily: "Arial" | "Georgia" | "Verdana";
+    fontFamily: "Arial" | "Georgia" | "Verdana" | "DM Sans" | "DM Serif Display";
     fill: string;
+    fontWeight?: 400 | 700;
+    backing?: { fill: string; opacity: number; padding: number };
     align: "left" | "center" | "right";
   }[];
 };
+// Long explanations belong in the caption. The default layout has space for
+// a short supporting line, not an article overlapping the CTA and photograph.
+function visualBody(text: string): string { return text.trim().length <= 120 ? text.trim() : ""; }
+function visualCta(text: string): string { return text.trim().length <= 80 ? text.trim() : ""; }
 export function createDesign(
   mediaId: string,
   width: number,
   height: number,
   brief: CreativeBrief,
+  font?: "modern" | "classic" | "contrast",
 ): Design {
   return {
     schema_version: 1,
@@ -37,32 +44,38 @@ export function createDesign(
         y: height * 0.07,
         width: width * 0.86,
         fontSize: 56,
-        fontFamily: "Arial",
-        fill: brief.palette[1],
+        fontFamily: font === "classic" ? "DM Serif Display" : font ? "DM Sans" : "Arial",
+        fill: "#ffffff",
+        fontWeight: 700,
+        backing: { fill: "#111111", opacity: 0.88, padding: 16 },
         align: "left",
       },
       {
         id: "body",
         type: "text",
-        text: brief.body,
+        text: visualBody(brief.body),
         x: width * 0.07,
         y: height * 0.68,
         width: width * 0.86,
         fontSize: 28,
-        fontFamily: "Arial",
-        fill: brief.palette[1],
+        fontFamily: font ? "DM Sans" : "Arial",
+        fill: "#ffffff",
+        fontWeight: 700,
+        backing: { fill: "#111111", opacity: 0.88, padding: 16 },
         align: "left",
       },
       {
         id: "cta",
         type: "text",
-        text: brief.cta,
+        text: visualCta(brief.cta),
         x: width * 0.07,
-        y: height * 0.87,
+        y: height * 0.82,
         width: width * 0.86,
         fontSize: 32,
-        fontFamily: "Arial",
-        fill: brief.palette[1],
+        fontFamily: font ? "DM Sans" : "Arial",
+        fill: "#ffffff",
+        fontWeight: 700,
+        backing: { fill: "#111111", opacity: 0.88, padding: 16 },
         align: "left",
       },
     ],
@@ -91,14 +104,16 @@ export function validateDesign(
   for (const l of v.layers) {
     if (
       !l ||
-      Object.keys(l).sort().join(",") !==
+      Object.keys(l).filter(k => !["fontWeight", "backing"].includes(k)).sort().join(",") !==
         "align,fill,fontFamily,fontSize,id,text,type,width,x,y" ||
       !/^[-a-z0-9]{1,40}$/.test(l.id) ||
       seen.has(l.id) ||
+      (l.fontWeight !== undefined && ![400, 700].includes(l.fontWeight)) ||
+      (l.backing !== undefined && (!l.backing || Object.keys(l.backing).sort().join(",") !== "fill,opacity,padding" || !/^#[a-f0-9]{6}$/i.test(l.backing.fill) || !Number.isFinite(l.backing.opacity) || l.backing.opacity < 0 || l.backing.opacity > 1 || !Number.isFinite(l.backing.padding) || l.backing.padding < 0 || l.backing.padding > 48 || l.x < l.backing.padding || l.y < l.backing.padding || l.x + l.width + l.backing.padding > width)) ||
       l.type !== "text" ||
       typeof l.text !== "string" ||
       l.text.length > 1000 ||
-      !["Arial", "Georgia", "Verdana"].includes(l.fontFamily) ||
+      !["Arial", "Georgia", "Verdana", "DM Sans", "DM Serif Display"].includes(l.fontFamily) ||
       !["left", "center", "right"].includes(l.align) ||
       !/^#[a-f0-9]{6}$/i.test(l.fill) ||
       ![l.x, l.y, l.width, l.fontSize].every(Number.isFinite) ||
@@ -126,8 +141,8 @@ export function reviseDesign(
 ): Design {
   const copy: Record<string, string> = {
     headline: brief.headline,
-    body: brief.body,
-    cta: brief.cta,
+    body: visualBody(brief.body),
+    cta: visualCta(brief.cta),
   };
   return {
     ...parent,

@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-10-25T14:13:53.294240+00:00",
+  "scope": "Navigation link discovery in bounded static website capture",
+  "source_sha256": "9f033594e5aa25527d800ff4eb6e1cd06040191328f01b8351ce20aefc6a5267",
+  "api_build": "passed",
+  "contracts": {
+    "passed": 14,
+    "failed": 0
+  },
+  "foundation": {
+    "passed": 18,
+    "failed": 0,
+    "log": "work/navigation-intake-tests.log",
+    "provider": "mock AI; real isolated database/storage/scanner/Temporal"
+  },
+  "public_site_check": "runwal-direct-website-text.json",
+  "paid_calls": 0,
+  "deployed": true,
+  "limitations": [
+    "Static HTML only; JavaScript execution not included"
+  ],
+  "deployed_evidence": "website-navigation-hosted.json"
+}

@@ -24,6 +24,34 @@ export class BusinessOverview {
   const recommendations=(await db.query("SELECT id,state,content,applicability,created_at FROM app.memory_lessons WHERE state IN ('proposed','testing') ORDER BY created_at DESC,id LIMIT 3")).rows.map(r=>({id:r.id,state:r.state,title:r.content.title,summary:r.content.summary,hypothesis:r.content.hypothesis,next_test:r.content.next_test,limitations:r.content.limitations,evidence_count:r.content.evidence_ids.length,applicability:r.applicability,created_at:r.created_at}));
   const generation_activity=(await db.query(`SELECT kind,count(*)::int AS requested,count(*) FILTER(WHERE status='succeeded')::int AS completed,count(*) FILTER(WHERE status='unknown')::int AS uncertain
    FROM app.jobs WHERE kind IN ('creative.generate','creative.video','plan.generate','insight.generate') AND created_at>now()-interval '30 days' GROUP BY kind ORDER BY kind`)).rows;
-  return {business_id:brand,counts,activity,performance,recommendations,generation_activity,checked_at:new Date().toISOString(),analytics_available:performance.available_count>0};
+  const upcoming_posts=(await db.query(`SELECT s.id,s.channel,s.format,s.creative_spec,s.hook,s.brief,s.state,s.planned_at,
+    p.timezone,p.starts_on::text,p.title AS plan_title,v.design,s.video_version_id,s.carousel_version_id,
+    COALESCE(v.project_id,vv.project_id,cv.project_id) AS project_id,
+    latest.status AS generation_status
+    FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id
+    LEFT JOIN app.creative_versions v ON v.id=s.creative_version_id
+    LEFT JOIN app.video_versions vv ON vv.id=s.video_version_id
+    LEFT JOIN app.carousel_versions cv ON cv.id=s.carousel_version_id
+    LEFT JOIN LATERAL (
+      SELECT j.status FROM app.jobs j WHERE j.id IN (
+        SELECT g.job_id FROM app.content_slot_generations g WHERE g.slot_id=s.id
+        UNION ALL SELECT r.job_id FROM app.video_requests r WHERE r.slot_id=s.id
+        UNION ALL SELECT r.job_id FROM app.content_slot_carousel_generations r WHERE r.slot_id=s.id
+      ) ORDER BY j.created_at DESC,j.id DESC LIMIT 1
+    ) latest ON true
+    WHERE s.organization_id=$1 AND s.brand_id=$2 AND s.state<>'cancelled'
+      AND (s.planned_at AT TIME ZONE p.timezone)::date >= (now() AT TIME ZONE p.timezone)::date
+      AND NOT EXISTS(SELECT 1 FROM app.publication_requests r WHERE r.slot_id=s.id AND r.phase='accepted' AND r.observed_state='published')
+    ORDER BY s.planned_at,s.id LIMIT 6`,[b.organization_id,brand])).rows;
+  const campaigns=(await db.query(`SELECT p.id,p.title,p.starts_on::text,
+    (p.starts_on+p.duration_days-1)::text AS ends_on,
+    count(s.id)::int AS post_count,
+    count(s.id) FILTER(WHERE s.state='pending_review')::int AS awaiting_review,
+    count(s.id) FILTER(WHERE s.state='approved')::int AS approved_count
+    FROM app.content_plans p LEFT JOIN app.content_slots s ON s.plan_id=p.id AND s.state<>'cancelled'
+    WHERE p.organization_id=$1 AND p.brand_id=$2
+      AND p.starts_on+p.duration_days > (now() AT TIME ZONE p.timezone)::date
+    GROUP BY p.id ORDER BY p.starts_on,p.id LIMIT 6`,[b.organization_id,brand])).rows;
+  return {business_id:brand,campaigns,counts,activity,performance,recommendations,generation_activity,upcoming_posts,checked_at:new Date().toISOString(),analytics_available:performance.available_count>0};
  },brand);}
 }

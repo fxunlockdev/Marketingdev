@@ -94,6 +94,22 @@ export class Businesses {
       throw e;
     }
   }
+  async remove(user:string,id:string,input:unknown) {
+    const v=object(input,['organization_id','name','revision']);id=uuid(id);
+    if(typeof v.organization_id!=='string'||typeof v.name!=='string'||!Number.isSafeInteger(v.revision)||Number(v.revision)<1)throw new BadRequestException('Confirm the saved brand name before deleting');
+    const org=uuid(v.organization_id);
+    try{return await this.database.transaction(user,org,true,async db=>{
+      await db.query('SELECT app.remove_business($1,$2,$3,$4)',[org,id,v.name,v.revision]);
+      return {id,removed:true};
+    });}catch(e){
+      const message=(e as Error).message;
+      if(message==='BUSINESS_OWNER_REQUIRED')throw new ForbiddenException('Only the account owner can delete a brand');
+      if(message==='BUSINESS_NOT_FOUND')throw new NotFoundException('Brand not found');
+      if(message==='BUSINESS_CONFIRMATION_CHANGED')throw new ConflictException('The brand changed. Reload and confirm its current name');
+      if(message==='BUSINESS_HAS_ACTIVE_WORK')throw new ConflictException('Finish or cancel active jobs and resolve scheduled or uncertain publications before deleting this brand');
+      throw e;
+    }
+  }
   async onboarding(user: string, id: string, input?: unknown) {
     const business = await this.resolve(user, id);
     return this.database.transaction(
@@ -185,8 +201,8 @@ export class Businesses {
           typeof value.must_avoid !== "string" ||
           value.must_avoid.length > 2000 ||
           !Array.isArray(value.channels) ||
-          value.channels.length > 2 ||
-          value.channels.some((c) => !["linkedin", "instagram"].includes(c)) ||
+          value.channels.length > 3 ||
+          value.channels.some((c) => !["linkedin", "instagram", "facebook"].includes(c)) ||
           new Set(value.channels).size !== value.channels.length
         )
           throw new BadRequestException(

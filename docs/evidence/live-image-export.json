@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-10-26T11:37:17.923Z",
+  "passed": true,
+  "format": "jpeg",
+  "width": 1080,
+  "height": 1080,
+  "bytes": 445256,
+  "sha256": "66e01436afaeb07ba52db993373e423deb0306fb8271cf2cf2d520aee2cb9734",
+  "reload": true,
+  "scope": "Actual deployed export and download of existing generated image. No new AI generation, approval or publication."
+}

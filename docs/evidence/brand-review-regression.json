@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-10-24T14:55:47.079028+00:00",
+  "brand_foundation": {
+    "passed": 8,
+    "failed": 0,
+    "log": "work/brand-review-fix-tests.log"
+  },
+  "customer_browser": {
+    "passed": 20,
+    "failed": 0,
+    "log": "work/brand-review-customer-tests-retry.log"
+  },
+  "contracts": {
+    "passed": 189,
+    "failed": 0,
+    "log": "work/brand-review-contracts.log"
+  },
+  "calendar_affected_journey": {
+    "passed": true,
+    "scope": "Real local services: uploaded reference sent, saved thumbnail blob displayed, feedback and approval, tenant isolation; model transport mocked",
+    "log": "work/calendar-reference-browser-targeted.log"
+  },
+  "full_canvas_rerun": {
+    "passed": 12,
+    "failed": 0,
+    "log": "work/calendar-reference-browser-targeted.log",
+    "providers": "mocked"
+  },
+  "paid_calls": 0
+}

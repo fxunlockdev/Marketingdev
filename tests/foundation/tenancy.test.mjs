@@ -555,3 +555,26 @@ test('dev without email accepts an existing verified password account but denies
   assert.equal(await isolated.mailWorker.runOnce(),null);
  }finally{await isolated.close();}
 });
+
+ test('owner brand removal hides scoped records, blocks active work and frees allowance without erasing audit',async()=>{
+ const owner=await signup('removal-'+randomUUID());
+ await request('/api/v1/accounts/current/initialize',{method:'POST',cookie:owner.cookie,body:{}});
+ const created=[];
+ for(let i=0;i<3;i++){const r=await request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{name:'Remove brand '+i}});assert.equal(r.status,201,JSON.stringify(r.body));created.push(r.body);}
+ const b=created[0],path='/api/v1/businesses/'+b.id,body={organization_id:b.organization_id,name:b.name,revision:b.revision};
+ assert.equal((await request(path,{method:'DELETE',cookie:bob.cookie,body})).status,404);
+ const delegate=await signup('removal-admin-'+randomUUID());await admin.query("INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')",[b.organization_id,delegate.id]);assert.equal((await request(path,{method:'DELETE',cookie:delegate.cookie,body})).status,403);
+ assert.equal((await request(path,{method:'DELETE',cookie:owner.cookie,body:{...body,name:'wrong'}})).status,409);
+ const job=randomUUID();await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'website.extract')",[job,b.organization_id,b.id,owner.id]);
+ assert.equal((await request(path,{method:'DELETE',cookie:owner.cookie,body})).status,409);
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[job]);
+ assert.equal((await request(path,{method:'DELETE',cookie:owner.cookie,body})).status,200);
+ assert.equal((await request(path,{method:'DELETE',cookie:owner.cookie,body})).status,200);
+ assert.equal((await request(path,{cookie:owner.cookie})).status,404);
+ const list=await request('/api/v1/businesses',{cookie:owner.cookie});assert.equal(list.body.businesses.some(x=>x.id===b.id),false);
+ const quota=await request('/api/v1/accounts/current/entitlements',{cookie:owner.cookie});assert.equal(quota.body.active_businesses,2);
+ assert.equal((await request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{name:'Replacement'}})).status,201);
+ await assert.rejects(admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'website.extract')",[randomUUID(),b.organization_id,b.id,owner.id]),e=>e.message==='BUSINESS_REMOVED');
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE brand_id=$1 AND action='brand.removed'",[b.id])).rows[0].n,1);
+ const appPool=new Pool({connectionString:config.appDatabaseUrl});try{const db=new TenantDatabase(appPool);await db.transaction(owner.id,b.organization_id,false,async c=>{assert.equal((await c.query('SELECT id FROM app.jobs WHERE brand_id=$1',[b.id])).rowCount,0);});}finally{await appPool.end();}
+ });

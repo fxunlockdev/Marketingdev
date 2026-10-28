@@ -18,7 +18,7 @@ import {OAuthSecrets} from '../../dist/oauth-secrets.js';
 import {PostizVault} from '../../dist/postiz-vault.js';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),workerPool=new Pool({connectionString:config.jobs.workerDatabaseUrl});
 const encryptionKey=randomBytes(32).toString('hex'),vault=new PostizVault(encryptionKey),keyA='MOCK_POSTIZ_KEY_A_'+randomBytes(16).toString('hex'),keyB='MOCK_POSTIZ_KEY_B_'+randomBytes(16).toString('hex');
-let oauth,oauthSecrets,exchangeCalls=0,startCalls=0,listCalls=0,exchangeBehavior,listBehavior,startBehavior;
+let oauth,oauthSecrets,exchangeCalls=0,startCalls=0,listCalls=0,exchangeBehavior,listBehavior,startBehavior,pageBehavior,pageCalls=0;
 const oauthKey=randomBytes(32).toString('hex');
 let app,base,ws,service,handler,jobs,alice,bob,editor,viewer,selected,orgA,orgB,brandA,brandB,sibling,provider,providerBase,behavior,calls=0;
 const identity=k=>k===keyA?'oauth-remote-org-a':'oauth-remote-org-b';
@@ -42,8 +42,9 @@ before(async()=>{
  jobs=new AssetJobs(workerPool,null,null);handler=new SocialJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test'},encryptionKey});
  oauthSecrets=new OAuthSecrets(oauthKey);oauth=new SocialOAuthJobs(jobs,{client:{baseURL:providerBase+'/api',mediaOrigins:[providerBase],callbackOrigin:'https://desvio.test',mode:'test',timeoutMs:1500},encryptionKey},oauthKey);
  behavior=async(req,res)=>{
-  if(['/api/public/v1/social/linkedin','/api/public/v1/social/instagram-standalone'].includes(req.url.split('?')[0])){startCalls++;return startBehavior(req,res);}
-  if(['/api/integrations/social-connect/linkedin','/api/integrations/social-connect/instagram-standalone'].includes(req.url)){exchangeCalls++;let raw='';for await(const chunk of req)raw+=chunk;return exchangeBehavior(req,res,JSON.parse(raw));}
+  if(['/api/public/v1/social/linkedin','/api/public/v1/social/instagram-standalone','/api/public/v1/social/facebook'].includes(req.url.split('?')[0])){startCalls++;return startBehavior(req,res);}
+  if(['/api/integrations/social-connect/linkedin','/api/integrations/social-connect/instagram-standalone','/api/integrations/social-connect/facebook'].includes(req.url)){exchangeCalls++;let raw='';for await(const chunk of req)raw+=chunk;return exchangeBehavior(req,res,JSON.parse(raw));}
+  if(req.url==='/api/integrations/public/provider/facebook-channel/connect'){pageCalls++;let raw='';for await(const chunk of req)raw+=chunk;return pageBehavior(req,res,JSON.parse(raw));}
   if(req.url==='/api/public/v1/integrations'){listCalls++;return listBehavior(req,res);}
   res.writeHead(404);res.end();
  };
@@ -195,4 +196,86 @@ test('Instagram standalone binds OAuth, replay keys and reconnect to the exact p
  const reconnectState=await status(reconnect.body),j2=await complete({...reconnect.body,state:new URL(reconnectState.authorization_url).searchParams.get('state')});
  exchangeBehavior=(req,res)=>json(res,{id:'different-instagram',organizationId:identity(req.headers.authorization),providerIdentifier:'instagram-standalone',internalId:'OTHER_IG_PERSON',name:'Wrong account'});
  assert.equal(await oauth.run(scope(j2)),'unknown');assert.equal((await status(reconnect.body)).job.error_code,'POSTIZ_RECONNECT_IDENTITY_MISMATCH');
+});
+
+async function facebookAttempt(){
+ startBehavior=(req,res)=>json(res,{url:'https://www.facebook.com/v25.0/dialog/oauth?'+new URLSearchParams({state:'MOCK_UPSTREAM_STATE',client_id:'MOCK_APP',response_type:'code',redirect_uri:'https://desvio.test/integrations/social/facebook'})});
+ exchangeBehavior=(req,res)=>json(res,{id:'facebook-channel',organizationId:identity(req.headers.authorization),providerIdentifier:'facebook',internalId:'MOCK_MEMBER',name:'MOCK member',inBetweenSteps:true,pages:[{id:'123',name:'MOCK Page',access_token:'PRIVATE_PAGE_TOKEN'},{id:'456',name:'Other Page'}]});
+ listBehavior=(req,res)=>json(res,[{...channel('facebook-channel'),identifier:'facebook',name:'MOCK Page'}]);
+ pageBehavior=(req,res,body)=>{assert.deepEqual(body,{state:'MOCK_UPSTREAM_STATE',page:'123'});json(res,{success:true});};
+ const r=await api(endpoint()+'/oauth/facebook',{method:'POST',body:{},key:randomUUID()});assert.equal(r.status,201,JSON.stringify(r.body));
+ assert.equal(await oauth.run(scope(r.body)),'awaiting_consent');const a=await status(r.body);return {...r.body,state:new URL(a.authorization_url).searchParams.get('state')};
+}
+const choosePage=(a,page_id='123',user=alice)=>api(authorizationPath(a)+'/page',{user,method:'POST',body:{page_id}});
+
+test('Facebook Page choices persist privately; explicit selection resumes the durable workflow once',async()=>{
+ const a=await facebookAttempt(),j=await complete(a),before=exchangeCalls,beforePages=pageCalls;
+ const running=workflow(j);
+ try{
+  let pending;for(let i=0;i<100;i++){pending=await status(a);if(pending.phase==='awaiting_page')break;await new Promise(r=>setTimeout(r,100));}
+  assert.equal(pending.phase,'awaiting_page');assert.deepEqual(pending.pages,[{id:'123',name:'MOCK Page'},{id:'456',name:'Other Page'}]);assert.ok(!JSON.stringify(pending).includes('PRIVATE_PAGE_TOKEN'));
+  const stored=(await admin.query('SELECT encrypted_code,page_choices FROM app.social_callbacks WHERE job_id=$1',[j.id])).rows[0];assert.equal(stored.encrypted_code,null);assert.ok(!JSON.stringify(stored).includes('PRIVATE_PAGE_TOKEN'));assert.equal(pageCalls,beforePages);
+  assert.equal(await handler.run(scope(await queue())),'succeeded');
+  assert.equal((await read()).channels.find(c=>c.provider==='facebook').observed_state,'unconfirmed');
+  assert.equal((await workerPool.query('SELECT * FROM app.facebook_connection_observations')).rowCount,0);
+  await assert.rejects(app.database.pool.query('SELECT * FROM app.facebook_connection_observations'),e=>e.code==='42501');
+  assert.equal((await choosePage(a,'789')).status,400);assert.equal((await choosePage(a,'123',bob)).status,404);assert.equal((await choosePage(a,'123',viewer)).status,403);
+  const email=(await admin.query('SELECT email FROM auth."user" WHERE id=$1',[alice.id])).rows[0].email,login=await api('/api/auth/sign-in/email',{user:null,method:'POST',body:{email,password:'long-social-fixture-password'}});assert.equal((await choosePage(a,'123',{id:alice.id,cookie:login.cookie})).status,404);
+  const [first,replay]=await Promise.all([choosePage(a),choosePage(a)]);assert.equal(first.status,201,JSON.stringify(first.body));assert.equal(first.body.id,replay.body.id);assert.equal((await choosePage(a,'456')).status,409);
+  assert.equal(await running,'succeeded');assert.equal(exchangeCalls,before+1);assert.equal(pageCalls,beforePages+1);assert.equal((await status(a)).phase,'succeeded');assert.deepEqual((await status(a)).pages,[]);
+  assert.equal((await choosePage(a)).body.id,j.id);assert.equal(await oauth.run(scope(j)),'finished');assert.equal(pageCalls,beforePages+1);
+  const saved=(await admin.query("SELECT internal_id FROM app.social_channels WHERE brand_id=$1 AND remote_id='facebook-channel'",[brandA.id])).rows[0];assert.equal(saved.internal_id,'123');
+  assert.equal(await handler.run(scope(await queue())),'succeeded');assert.equal((await read()).channels.find(c=>c.provider==='facebook').observed_state,'available');
+  listBehavior=(req,res)=>json(res,[{...channel('foreign-facebook'),identifier:'facebook',name:'Unconfirmed Page'}]);
+  assert.equal(await handler.run(scope(await queue())),'succeeded');assert.equal((await read()).channels.find(c=>c.name==='Unconfirmed Page').observed_state,'unconfirmed');
+  assert.equal((await workerPool.query('SELECT * FROM app.social_page_selections')).rowCount,0);
+ }finally{await admin.query("UPDATE app.social_authorizations SET expires_at=now()-interval '1 second' WHERE id=$1",[a.id]);await running;}
+});
+
+test('Facebook selection expiry and lost response never repeat code exchange or Page mutation',async()=>{
+ const a=await facebookAttempt(),j=await complete(a);assert.equal(await oauth.run(scope(j)),'awaiting_page');const before=exchangeCalls,beforePages=pageCalls;
+ await admin.query("UPDATE app.social_authorizations SET expires_at=now()-interval '1 second' WHERE id=$1",[a.id]);assert.equal((await choosePage(a)).status,409);assert.equal((await status(a)).phase,'expired');assert.deepEqual((await status(a)).pages,[]);assert.equal(await oauth.run(scope(j)),'finished');assert.equal(pageCalls,beforePages);assert.equal(exchangeCalls,before);
+ assert.equal((await admin.query('SELECT phase FROM app.facebook_connection_observations WHERE job_id=$1',[j.id])).rows[0].phase,'abandoned');
+ assert.equal(await handler.run(scope(await queue())),'succeeded');assert.equal((await read()).channels.find(c=>c.name==='MOCK Page').observed_state,'unconfirmed');
+ const recovery=await facebookAttempt(),recoveredJob=await complete(recovery);assert.equal(await oauth.run(scope(recoveredJob)),'awaiting_page');assert.equal((await choosePage(recovery)).status,201);assert.equal(await oauth.run(scope(recoveredJob)),'succeeded');
+ assert.equal(await handler.run(scope(await queue())),'succeeded');assert.equal((await read()).channels.find(c=>c.name==='MOCK Page').observed_state,'available');
+ const b=await facebookAttempt(),k=await complete(b);assert.equal(await oauth.run(scope(k)),'awaiting_page');assert.equal((await read()).channels.find(c=>c.remote_id==='facebook-channel')?.observed_state??'unconfirmed','unconfirmed');assert.equal((await choosePage(b)).status,201);pageBehavior=(req,res)=>req.socket.destroy();
+ assert.equal(await oauth.run(scope(k)),'unknown');assert.equal((await status(b)).phase,'unknown');assert.equal(pageCalls,beforePages+2);assert.equal(await oauth.run(scope(k)),'finished');assert.equal(pageCalls,beforePages+2);
+ const c=await facebookAttempt(),l=await complete(c);assert.equal(await oauth.run(scope(l)),'awaiting_page');assert.equal((await choosePage(c)).status,201);await admin.query("UPDATE app.social_callbacks SET phase='selecting_page' WHERE job_id=$1",[l.id]);assert.equal(await oauth.run(scope(l)),'finished');assert.equal((await status(c)).phase,'unknown');assert.equal(pageCalls,beforePages+2);
+});
+
+test('Facebook pending Page choices are canceled when the initiating session or role is revoked',async()=>{
+ const a=await facebookAttempt(),j=await complete(a);assert.equal(await oauth.run(scope(j)),'awaiting_page');assert.equal((await choosePage(a)).status,201);const before=pageCalls;
+ await admin.query("UPDATE app.memberships SET role='editor' WHERE organization_id=$1 AND user_id=$2",[orgA.id,alice.id]);try{assert.equal(await oauth.run(scope(j)),'finished');}finally{await admin.query("UPDATE app.memberships SET role='owner' WHERE organization_id=$1 AND user_id=$2",[orgA.id,alice.id]);}
+ assert.equal((await status(a)).phase,'canceled');assert.equal(pageCalls,before);
+ const b=await facebookAttempt(),k=await complete(b);assert.equal(await oauth.run(scope(k)),'awaiting_page');const session=(await admin.query('SELECT s.id,s."expiresAt" FROM auth.session s JOIN app.social_authorizations a ON a.session_id=s.id WHERE a.id=$1',[b.id])).rows[0];
+ await admin.query("UPDATE auth.session SET \"expiresAt\"=now()-interval '1 second' WHERE id=$1",[session.id]);try{assert.equal(await oauth.run(scope(k)),'finished');}finally{await admin.query('UPDATE auth.session SET "expiresAt"=$2 WHERE id=$1',[session.id,session.expiresAt]);}
+ assert.equal((await status(b)).phase,'canceled');assert.equal(pageCalls,before);
+});
+
+test('unresolved Facebook mutations cannot be concealed by a later successful selection or account refresh',async()=>{
+ // Earlier interruption tests deliberately leave uncertain mutations for this
+ // remote integration. A fresh acknowledgement does not settle those requests.
+ const a=await facebookAttempt(),j=await complete(a);assert.equal(await oauth.run(scope(j)),'awaiting_page');assert.equal((await choosePage(a)).status,201);
+ assert.equal(await oauth.run(scope(j)),'unknown');assert.equal((await status(a)).job.error_code,'SOCIAL_OTHER_AUTHORIZATION_UNRESOLVED');
+ assert.equal(await handler.run(scope(await queue())),'succeeded');
+ assert.equal((await read()).channels.find(c=>c.provider==='facebook'&&c.name==='MOCK Page').observed_state,'unconfirmed');
+ const sync=await queue();await jobs.transaction(scope(sync),async db=>{
+  const rows=(await db.query('SELECT organization_id,brand_id FROM app.facebook_connection_observations')).rows;
+  assert.ok(rows.length>0);assert.ok(rows.every(r=>r.organization_id===orgA.id&&r.brand_id===brandA.id));
+  assert.equal((await db.query("UPDATE app.facebook_connection_observations SET phase='verified'")).rowCount,0);
+ });
+});
+
+
+test('Page-picker cancellation is session-bound, prevents selection, and does not submit a Page mutation',async()=>{
+ const a=await facebookAttempt(),j=await complete(a);assert.equal(await oauth.run(scope(j)),'awaiting_page');const before=pageCalls;
+ const cancel=user=>api(authorizationPath(a)+'/cancel',{method:'POST',body:{},user});
+ assert.equal((await cancel(bob)).status,404);assert.equal((await cancel(viewer)).status,403);
+ const first=await cancel(alice),second=await cancel(alice);assert.equal(first.status,201);assert.equal(first.body.id,second.body.id);
+ assert.equal((await status(a)).phase,'canceling');assert.deepEqual((await status(a)).pages,[]);assert.equal((await choosePage(a)).status,409);
+ assert.equal(await oauth.run(scope(j)),'finished');assert.equal((await status(a)).phase,'canceled');assert.equal(pageCalls,before);
+ assert.equal((await admin.query('SELECT phase FROM app.facebook_connection_observations WHERE job_id=$1',[j.id])).rows[0].phase,'abandoned');
+ const b=await facebookAttempt(),k=await complete(b);assert.equal(await oauth.run(scope(k)),'awaiting_page');assert.equal((await choosePage(b)).status,201);
+ assert.equal((await api(authorizationPath(b)+'/cancel',{method:'POST',body:{}})).status,409);
 });

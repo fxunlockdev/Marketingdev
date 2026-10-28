@@ -1,7 +1,41 @@
 {
-  "checked_at": "2026-10-24T09:02:14.149Z",
-  "status": "activated",
-  "preview_sha256": "4cf4f7ca46124053d930bc84acdb9c09f9055484578e12255a3ee5035192e4cb",
-  "backup_container": "desvio-worker-rollback-1aede203-c2f3-428c-95e1-cbef90a8c10a",
+  "checked_at": "2026-10-28T18:06:07.484Z",
+  "status": "preview",
+  "version": 1,
+  "worker": {
+    "before": {
+      "id": "1f9eab524516d5d2cfb0a3a9940a00a68ee084fa5864f052b5fae59375d03d1c",
+      "image": "sha256:e4e3b7bb1e2c699f717aeefb8907554f606c54b105eead02b3eaffc9c46d8ce3",
+      "configuration": "acf5a9cb92fbd6d51b5304a35c921b56638ac2aa1c597e1966c611457895c969"
+    },
+    "image": "sha256:8fa0514ef86598ce463997df56b014756eb2cb66ea6fdcacc0f9d6e5ccaa618b",
+    "configuration": "cfd7ca0d71f76fdee18529bdf66d4fbc477d9b9463db8401d33daf28acd2042c",
+    "replace": true
+  },
+  "api": {
+    "before": {
+      "HIGGSFIELD_IMAGES_ENABLED": "false",
+      "POSTIZ_OAUTH_ENABLED": "false",
+      "VIDEO_ENABLED": "true",
+      "POSTIZ_ENABLED": "true",
+      "POSTIZ_PROVISIONING_ENABLED": "true",
+      "POSTIZ_PUBLISHING_ENABLED": "false",
+      "VIDEO_RUNTIME_IMAGE": "sha256:95401ad08e49ae619fb9f1bae50cef443cf9c54bd72d3d31960b746cf292f9f5",
+      "RENDER_RUNTIME_IMAGE": "sha256:60d6e8ad5728739ba78c6ddf70a93975097eedbf0c42f63b8df89f069c6bf0d4"
+    },
+    "after": {
+      "HIGGSFIELD_IMAGES_ENABLED": "false",
+      "POSTIZ_OAUTH_ENABLED": "false",
+      "VIDEO_ENABLED": "true",
+      "POSTIZ_ENABLED": "true",
+      "POSTIZ_PROVISIONING_ENABLED": "true",
+      "POSTIZ_PUBLISHING_ENABLED": "false",
+      "VIDEO_RUNTIME_IMAGE": "sha256:95401ad08e49ae619fb9f1bae50cef443cf9c54bd72d3d31960b746cf292f9f5",
+      "RENDER_RUNTIME_IMAGE": "sha256:60d6e8ad5728739ba78c6ddf70a93975097eedbf0c42f63b8df89f069c6bf0d4"
+    },
+    "deploymentId": "4ecae3c1-d56f-4554-8052-2704e4956bc9",
+    "update": false
+  },
+  "preview_sha256": "0f4ac73155e96c1a8bc0f34a4707477d3fd6b76bee29bc6f294917befa016c4d",
   "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
 }

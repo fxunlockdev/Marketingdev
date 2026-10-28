@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-10-28T14:43:33.572Z",
+  "web_deployment": {
+    "id": "c4f0ee00-557a-4a64-bf2e-927f3d077349",
+    "status": "SUCCESS"
+  },
+  "api_deployment": {
+    "id": "43c497e3-1cca-417d-849f-f46fd74cf47b",
+    "status": "SUCCESS"
+  },
+  "migrations": "081 and 082 applied; bootstrap removed and temporary secrets cleared",
+  "worker_activation": {
+    "checked_at": "2026-10-28T14:40:01.124Z",
+    "status": "activated",
+    "preview_sha256": "2d1e7650b64bce70dbba71f06d360b53eb7de1ceefd87156623253b2308ae146",
+    "backup_container": "desvio-worker-rollback-ebcd406e-ea15-4b76-9830-b18908bf4f8f",
+    "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
+  },
+  "source_manifest": "work/release082-source.json",
+  "hosted_smoke": "docs/evidence/release082-web-smoke.json",
+  "native_video": "docs/evidence/railway-release082-video-acceptance.json",
+  "paid_calls": 0,
+  "limitations": [
+    "Social posting and billing deferred by user",
+    "Resend deferred",
+    "Higgsfield image replacement remains disabled pending live configuration/eligibility",
+    "Local browser generation tests use mocked paid provider transport",
+    "Not a complete Blaze parity or production certification"
+  ]
+}

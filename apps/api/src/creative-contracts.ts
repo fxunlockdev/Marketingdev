@@ -24,7 +24,7 @@ export type CreativeInput = {
   };
   prompt: string;
   format: "static" | "ad";
-  channel: "linkedin" | "instagram";
+  channel: "linkedin" | "instagram" | "facebook";
   parent: null | {
     caption: string;
     headline: string;
@@ -41,6 +41,7 @@ export type PlannerMessage = {
   tool_call_id?: string;
 };
 export type PlannerRequest = {
+  creative_fact_ids?: string[]; // Added only by trusted static-creative runtime, never sandbox input.
   type: "model";
   step: number;
   messages: PlannerMessage[];
@@ -70,6 +71,12 @@ export const selectedSkills = (format: CreativeInput["format"]) =>
     "social",
     ...(format === "ad" ? ["ad-creative"] : []),
   ].sort();
+export function creativeBriefSchema(factIds:string[]){
+  if(!Array.isArray(factIds)||!factIds.length||factIds.length>200||factIds.some(id=>typeof id!=='string'||!id||id.length>128))throw new CreativeError('CREATIVE_BRIEF_INVALID');
+  const text=(maxLength:number,minLength=0)=>({type:'string',minLength,maxLength});
+  const properties={headline:text(140),body:text(500),cta:text(80),caption:text(3000,1),image_prompt:text(8000,1),palette:{type:'array',minItems:2,maxItems:2,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}},fact_ids:{type:'array',minItems:1,maxItems:20,items:{type:'string',enum:[...new Set(factIds)]}},warnings:{type:'array',maxItems:10,items:text(500)}};
+  return {type:'object',additionalProperties:false,properties,required:Object.keys(properties)};
+}
 export function validateBrief(
   value: unknown,
   input: CreativeInput,

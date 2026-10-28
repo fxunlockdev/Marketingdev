@@ -17,3 +17,10 @@ test('worker host forwards only the explicit authenticated video policy and reje
  assert.equal(workerHostSpec(env).values.HIGGSFIELD_OUTPUT_POLICY,'authenticated_provider_result');
  for(const change of [{HIGGSFIELD_OUTPUT_POLICY:'all'},{HIGGSFIELD_OUTPUT_POLICY:'exact_origins'},{HIGGSFIELD_OUTPUT_ORIGINS:'https://example.com'}])assert.throws(()=>workerHostSpec({...env,...change}),/WORKER_CONFIGURATION_INVALID/);
 });
+
+test('optional website renderer is pinned, forwarded, inspected and fingerprints readiness',()=>{
+ const prior=workerHostSpec(fixture()),image='sha256:'+'f'.repeat(64);
+ const next=workerHostSpec({...fixture(),WEBSITE_RENDER_IMAGE:image});
+ assert.equal(next.values.WEBSITE_RENDER_IMAGE,image);assert.equal(next.images.length,6);assert.ok(next.images.includes(image));assert.notEqual(next.configurationHash,prior.configurationHash);
+ for(const value of ['latest','','repo:tag','sha256:nope'])assert.throws(()=>workerHostSpec({...fixture(),WEBSITE_RENDER_IMAGE:value}),/WORKER_PIN_REQUIRED/);
+});

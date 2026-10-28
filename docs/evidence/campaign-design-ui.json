@@ -1,0 +1,73 @@
+{
+  "status": "verification_in_progress_not_deployed",
+  "implemented": [
+    "Four visual campaign styles",
+    "Three typography treatments using bundled Google Fonts",
+    "Persisted design selection in campaign request and plan",
+    "Design instructions forwarded to static creative generation",
+    "Approved brand-photo previews across style and font cards",
+    "Preview-image selector independent of post reference choices",
+    "Non-interactive private image presentation inside radio cards"
+  ],
+  "verified": {
+    "api_build": "passed",
+    "web_build": "passed after fixes",
+    "planning_contracts": {
+      "passed": 9,
+      "failed": 0
+    },
+    "python_compile": "passed",
+    "campaign_browser": "Passed visual choice, mobile accessibility, persisted design and uncertain-request recovery in prior full suite",
+    "web_typecheck": "passed after onboarding and missing-detail save guards",
+    "customer_browser": {
+      "passed": 23,
+      "failed": 0,
+      "provider": "mocked paid transport; actual auth, database, storage and worker"
+    },
+    "planning_foundation": {
+      "passed": 19,
+      "failed": 0,
+      "provider": "mocked paid transport; actual isolated skill runtime"
+    },
+    "creative_foundation": {
+      "passed": 16,
+      "failed": 0,
+      "provider": "mocked paid image transport; actual isolated skill runtime and durable storage",
+      "log": "work/campaign-design-creative.log"
+    },
+    "photo_preview_browser": {
+      "passed": 1,
+      "failed": 0,
+      "scope": "Approved private reference loading, style/font radio selection, Back preservation, mobile overflow and WCAG2A/AA checks; includes existing saved-topic journey",
+      "provider": "Mocked paid transport; real local auth, database, storage and worker",
+      "log": "work/campaign-photo-design-browser.log",
+      "final_layout_recheck": "passed; final screenshot inspected"
+    }
+  },
+  "pending": [],
+  "test_session": 4002,
+  "logs": [
+    "work/campaign-design-browser.log",
+    "work/campaign-design-planning.log",
+    "work/campaign-design-creative.log"
+  ],
+  "test_setup": "Scanner startup allowance extended to ten minutes for full signature validation under emulation; no freshness/readiness bypass",
+  "limitations": [
+    "Not deployed",
+    "No paid generation calls",
+    "Exact font rendering is a design instruction, not guaranteed raster output",
+    "Brand-wide defaults and existing campaign editing remain unfinished",
+    "Preview browser screenshots use a solid-colour image fixture; production brand photo aesthetics not certified"
+  ],
+  "latest_fixes": [
+    "Brand approval disabled until fact correction and refreshed review complete; delayed-response regression added",
+    "Campaign step strip keyboard focus enabled after mobile axe finding",
+    "Onboarding and manual/missing fact saves share pending-save guard",
+    "Corrected two promise-timer test delays"
+  ],
+  "last_full_browser_run": {
+    "passed": 23,
+    "failed": 0
+  },
+  "last_setup_failure": "Resolved: creative foundation 16/16 passed after provenance fixture and migration column-permission fixes."
+}

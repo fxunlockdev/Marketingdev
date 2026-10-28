@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-26T11:57:49.227Z",
+  "passed": true,
+  "status": 200,
+  "catalog_entries": 4,
+  "saved_strategies": 0,
+  "scope": "Authenticated deployed strategy read for existing owner. No strategy creation or provider calls."
+}

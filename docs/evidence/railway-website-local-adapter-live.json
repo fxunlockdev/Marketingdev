@@ -1,0 +1,76 @@
+{
+  "passed": true,
+  "operator_probe": true,
+  "tenant_authorization_tested": false,
+  "url": "https://runwalrealty.com/",
+  "image": "sha256:4452071e703e04bbf8e9d882cf3c32b3eff057a542d2e3b233983dbe86ce6e89",
+  "isolated_browser_verified": true,
+  "paid_calls": 0,
+  "database_mutations": 0,
+  "coverage": {
+    "provider": "self_hosted_browser",
+    "method": "rendered_desktop",
+    "pages": [
+      "https://runwalrealty.com/"
+    ],
+    "screenshotsAvailable": false,
+    "photosAvailable": 12,
+    "partial": true
+  },
+  "capture_diagnostics": [
+    {
+      "page": 0,
+      "code": "DOM_LOAD_TIMEOUT"
+    },
+    {
+      "page": 0,
+      "code": "SCREENSHOT_TIMEOUT"
+    },
+    {
+      "page": 1,
+      "code": "NAVIGATION_FAILED"
+    },
+    {
+      "page": 2,
+      "code": "NAVIGATION_FAILED"
+    }
+  ],
+  "text_characters": 10839,
+  "text_sample": "About Us +\nClose\nCompany Overview  Journey  CSR  Team \nOur Projects +\nClose\nResidential  Commercial  Organized Retail \nNRI Corner\nClub Oasis\nInvestors\nCustomer Corner +\nClose\nR Loyalist  The Specialists \nCareers\nContact Us\nEnquire Now\nMenu\n \nProject Sales Enquiry 022-62328585\n \nRunwal Realty - Real Estate Developer in Mumbai, Thane & Pune\n\nBuilding for Generations to Come\n\nAt Runwal Realty, we believe that the true measure of our work isn’t just in square feet—it’s in the lives we shape and the legacies we help build. We are a prominent real estate development company with a strong focus on lifestyle-oriented projects and a diversified portfolio spanning across residential, commercial and organized retail projects.\n48+ Years of the ‘Runwal’ brand\n35+ Completed Projects\n22+ Awards & Accolades\nOur Real Estate Projects\nResidential\n\nRunwal Realty offers luxury residences in Mumbai, combining timeless design, curated amenities, and serene landscapes to deliver a lifestyle of elegance, comfort, and seamless city access.\n\nRead More\nCommercial\n\nRunwal Realty’s commercial spaces blend striking design and prime locations, offering modern businesses a prestigious address that inspires growth, productivity, and lasting professional impact.\n\nRead More\nRetail\n\nRunwal Realty redefines Mumbai retail with iconic destinations—curated spaces that blend luxury, experience, and opportunity for elite brands and discerning shoppers seeking more than just stores.\n\nRead More\n\nUnveiling Luxury Excellence\n\nOngoing Projects in Mumbai, Thane & Pune\nResidential\nView All\nRunwal Malabar: An address for th",
+  "broker_requests": 44,
+  "broker_bytes": 7476249,
+  "denied_resources": {},
+  "visual_errors": [],
+  "assets": [
+    {
+      "kind": "photo",
+      "page_url": "https://runwalrealty.com/",
+      "sha256": "02c3cc79b4c8436caca43300e6f6a20720940869b4698491deef0f111727ef84",
+      "width": 500,
+      "height": 800,
+      "source_url": "https://runwalrealty.com/wp-content/uploads/2026/05/RunwalRealty_500x800.jpg.jpeg",
+      "path": "work/website-live-preview/0-photo.jpg"
+    },
+    {
+      "kind": "photo",
+      "page_url": "https://runwalrealty.com/",
+      "sha256": "2a93914d8e74773e2c7f017239e019a6c9cc0617df5a35afe835989033ee2032",
+      "width": 1920,
+      "height": 1080,
+      "source_url": "https://runwalrealty.com/wp-content/uploads/2026/05/RunwalRealty_1920x1080px-01.jpg.jpeg",
+      "path": "work/website-live-preview/1-photo.jpg"
+    },
+    {
+      "kind": "photo",
+      "page_url": "https://runwalrealty.com/",
+      "sha256": "237ee08a36e58b8d1a3133d89a73b1c3e59243c848870fab99d0fc67e650ddaf",
+      "width": 630,
+      "height": 723,
+      "source_url": "https://runwalrealty.com/wp-content/uploads/2025/06/630x723px.webp",
+      "path": "work/website-live-preview/2-photo.jpg"
+    }
+  ],
+  "local_adapter": true,
+  "checked_at": "2026-10-26T14:16:20.743Z",
+  "scope": "Public website capture only; no paid AI, database mutation or tenant intake completion"
+}

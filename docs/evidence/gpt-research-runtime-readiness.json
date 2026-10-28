@@ -1,0 +1,12 @@
+{
+  "checked_at": "2026-10-24T13:26:10.418Z",
+  "model": "gpt-5.4-mini-2026-03-17",
+  "openai_key_present": true,
+  "website_policies": 4,
+  "max_tool_calls": 3,
+  "max_output_tokens": 4000,
+  "provider": "openai",
+  "screenshots": false,
+  "paid_calls": false,
+  "scope": "Actual deployed adapter, model metadata access and database policy presence; no paid research or output-quality verification."
+}

@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-10-24T10:58:39.771881+00:00",
+  "deployed": false,
+  "contracts_passed": 178,
+  "storage_passed": 12,
+  "paid_calls": false,
+  "providers": "mocked",
+  "verified": [
+    "lost create response resolves unique tenant/job robot",
+    "lost execute response resolves single API run since stored submission timestamp",
+    "checkpoint replay resumes same run without POST",
+    "ambiguous, absent, foreign or malformed candidates remain unknown",
+    "legacy submitting checkpoints without timestamp not guessed"
+  ],
+  "remaining": [
+    "explicit recovery action for already terminal unknown jobs",
+    "deployment",
+    "owner live provider acceptance"
+  ],
+  "contract_source": "https://docs.maxun.dev/api/cloud-api"
+}

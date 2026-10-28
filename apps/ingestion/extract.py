@@ -56,10 +56,6 @@ def main():
     logging.disable(logging.CRITICAL)
     warnings.filterwarnings("ignore")
     kind = sys.argv[1] if len(sys.argv) == 2 else ""
-    if kind == "website":
-        from website import main as website_main
-        website_main()
-        return
     if kind not in ("pdf", "pptx"):
         fail("UNSUPPORTED_DOCUMENT")
     data = sys.stdin.buffer.read(MAX_BYTES + 1)

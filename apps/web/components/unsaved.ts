@@ -1,6 +1,7 @@
 "use client";
 import { useEffect } from "react";
 const editors=new Set<symbol>();
+export function hasUnsavedChanges(){return editors.size>0;}
 export function confirmNavigation(){return !editors.size||window.confirm('Leave this page? Your unsaved changes will be lost.');}
 // Native navigation warning; never persists passwords, private files or grants in web storage.
 export function useUnsavedChanges(dirty: boolean) {

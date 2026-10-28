@@ -1,0 +1,71 @@
+{
+  "checked_at": "2026-10-24T10:41:03.026Z",
+  "images": {
+    "doc": "sha256:1b5a92d5e659ae8a5f47994f3d0705671712bc673c65f1d01bea6ad165fe0a57",
+    "worker": "sha256:f773ff23c345bfdcd63dfed2960132313ce5f97e58b12705167957d2ca898950"
+  },
+  "document": {
+    "crawl4ai_absent": true,
+    "website_script_absent": true,
+    "visual_script_absent": true,
+    "browser_absent": true,
+    "docling_present": true
+  },
+  "trusted": {
+    "parser_absent": true,
+    "visual_absent": true,
+    "maxun_present": true
+  },
+  "local_only": false,
+  "contracts": 172,
+  "intake_storage": 11,
+  "document_tests": 8,
+  "paid_calls": false,
+  "worker_activation": {
+    "checked_at": "2026-10-24T10:48:48.198Z",
+    "status": "activated",
+    "preview_sha256": "8663156153ded730c4e02cb95323e010b23d77ef64bae666e87d9dac7e022617",
+    "backup_container": "desvio-worker-rollback-4e14b4a9-d3b5-4c7b-94a4-a8ee75ca7c25",
+    "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
+  },
+  "api_deployment": "3f7b149f-9062-46f3-80c4-7ee1ada9d5b8",
+  "api_observed_status": "SUCCESS",
+  "runtime_readiness": {
+    "checked_at": "2026-10-24T10:49:40.092Z",
+    "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+    "status": "configuration_matches",
+    "running": true,
+    "desired_image": "sha256:f773ff23c345bfdcd63dfed2960132313ce5f97e58b12705167957d2ca898950",
+    "video_enabled": true,
+    "publishing_enabled": false,
+    "credentials_present": {
+      "OPENAI_API_KEY": true,
+      "GEMINI_API_KEY": true,
+      "HIGGSFIELD_CREDENTIALS": true
+    },
+    "changed_services": false,
+    "paid_calls": false,
+    "scope": "Exact local image inventory and desired worker configuration only. Provider access, business allowances, API flags and live acceptance are separate."
+  },
+  "registration": {
+    "checked_at": "2026-10-24T10:49:45.402Z",
+    "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+    "queues": [
+      {
+        "type": 1,
+        "pollers": 1
+      },
+      {
+        "type": 2,
+        "pollers": 1
+      }
+    ],
+    "roles": [
+      "desvio_worker",
+      "desvio_dispatcher"
+    ],
+    "scope": "Actual workflow/activity pollers and role logins; durable job execution/recovery not yet accepted"
+  },
+  "maxun_account_http": 200,
+  "live_capture_verified": false
+}

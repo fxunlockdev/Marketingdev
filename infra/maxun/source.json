@@ -1,0 +1,11 @@
+{
+  "archive": "maxun-develop.zip",
+  "archive_sha256": "df42b4fdc75942cd4605d74da41d80f7dac5994d79d2db59de87d3ccfdc3c889",
+  "archive_commit": "8f2ab6bdafcb66e3417d4342964fba11dd615d0a",
+  "version": "0.0.48",
+  "core": "0.0.38",
+  "license": "AGPL-3.0-or-later",
+  "deployment": "NOT_DEPLOYED",
+  "upstream": "https://github.com/getmaxun/maxun",
+  "scope": "Backend source supplied by owner. No upstream UI exposed. Lock generated from package.backend.json with install scripts disabled."
+}

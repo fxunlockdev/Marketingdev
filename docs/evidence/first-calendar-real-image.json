@@ -1,0 +1,14 @@
+{
+  "checked_at": "2026-10-26T10:07:39.945Z",
+  "job": "a4d3f711-a661-4211-8a23-893067381802",
+  "slot": "466b6bec-db00-44c0-955d-517fa1eae384",
+  "version": "81662880-f848-4602-a75c-731840cfa295",
+  "state": "draft_ready",
+  "bytes": 2242549,
+  "width": 1024,
+  "height": 1024,
+  "sha256": "0396b828b47c1413a4c15eada82de8e78fb2c5565417047ecbcb29c36bc32e66",
+  "decoded": true,
+  "live_provider": true,
+  "published": false
+}

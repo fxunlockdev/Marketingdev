@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-10-24T12:55:23.814Z",
+  "business_id": "21afe38c-8c0d-48a5-a605-e5440d531f3f",
+  "source_job_id": "cf31f6d8-9f8d-4c14-97eb-ea8a2a667d3c",
+  "recovery_job_id": "00763b60-4110-4464-88a1-51d0a890fcf0",
+  "status": "succeeded",
+  "error_code": null,
+  "visual_count": 10,
+  "visual_errors": [],
+  "new_ai_jobs": 0,
+  "paid_submission": false,
+  "scope": "Existing owner capture recovery only: Maxun GET and private screenshot persistence. No crawl execution or AI submission."
+}

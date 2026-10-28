@@ -1,0 +1,67 @@
+{
+  "status": "ADAPTER_READY",
+  "deployed": false,
+  "upstream_commit": "651876e24317c2d8e717262cf98267ec6f699180",
+  "verified": {
+    "api_build": "passed",
+    "postiz_contracts": {
+      "passed": 25,
+      "failed": 0,
+      "log": "work/facebook-adapter-contracts.log",
+      "transport": "local HTTP fixtures; no live Meta authorization"
+    },
+    "social_foundation": {
+      "passed": 39,
+      "failed": 0,
+      "log": "work/facebook-cancel-foundation.log",
+      "session": 92608,
+      "transport": "real database/auth/durable workflow, mocked external Meta/Postiz HTTP",
+      "scope": "Expiry and cancellation recovery, explicit selection, unknown mutation preservation, session/tenant isolation"
+    },
+    "browser": {
+      "passed": 10,
+      "failed": 0,
+      "log": "work/facebook-cancel-browser.log",
+      "session": 60044,
+      "transport": "actual local Next/Nest/auth/Postgres/Temporal; explicitly mocked external consent and Postiz HTTP",
+      "screenshot": "work/browser/facebook-page-picker.png",
+      "accessibility": "zero axe violations in Facebook picker; existing desktop/mobile connection checks passed",
+      "scope": "Full connection suite, refresh during selection, background preparation, cancel Page choice and reconnect successfully"
+    }
+  },
+  "implemented": [
+    "Exact Facebook authorization origin/path/callback validation",
+    "Separate two-step code exchange returning only Page IDs and names",
+    "Page selection verifies actual remote tenant and matching Facebook integration before mutation",
+    "Unknown selection outcomes are not retried automatically",
+    "Raw account and Page tokens and picture URLs never returned",
+    "Session-bound persisted Page choices with expiry, tenant RLS and immutable idempotent selection",
+    "Durable workflow waits for explicit selection; interrupted Page mutations become unknown without replay",
+    "Facebook-specific server-only callback route",
+    "Explicit customer Page picker, saved choices on reload, locked submission state and accessible selection",
+    "Refresh requires a saved Page-selection acknowledgement; intermediate Facebook imports remain unconfirmed",
+    "New exchanges invalidate prior Facebook availability until selection can be confirmed",
+    "Connection polling discards stale loads and continues active work in background tabs",
+    "Expired or canceled unsubmitted Page choices can be superseded by a later confirmed selection",
+    "Session-bound Page-picker cancellation rejects already accepted selections"
+  ],
+  "remaining": [
+    "Reconnect must preserve selected Page identity",
+    "Facebook media publishing adapter and end-to-end workflow",
+    "Live owner Meta-app configuration and account verification",
+    "Operator reconciliation for unresolved earlier Facebook mutations"
+  ],
+  "customer_enabled": "local implementation only; not deployed",
+  "pending_verification": [],
+  "browser_attempt_with_failures": {
+    "log": "work/facebook-observations-browser.log",
+    "passed": 7,
+    "failed": 2,
+    "detail": "Preparing connection remained visible; cancel/retry and following callback checks timed out. Page picker/refresh test passed. Polling fix being rechecked."
+  },
+  "migrations": [
+    "065_facebook_page_selection.sql",
+    "066_facebook_connection_observations.sql",
+    "067_facebook_selection_recovery.sql"
+  ]
+}

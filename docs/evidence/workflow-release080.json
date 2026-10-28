@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-10-26T13:15:54.715568+00:00",
+  "migration": "REMOVED_AFTER_SUCCESS_AND_SECRET_CLEANUP",
+  "api_deployment": {
+    "id": "c5876d82-06ca-467f-ae67-55d17568ceb2",
+    "status": "SUCCESS"
+  },
+  "web_deployment": {
+    "id": "e811df88-08f0-4d55-9e59-f9fb5d19450a",
+    "status": "SUCCESS"
+  },
+  "authenticated_smoke": "docs/evidence/release080-api-smoke.json",
+  "worker": {
+    "status": "ACTIVATED",
+    "image": "sha256:580070be364fbd8e605bd46b3535b0f7dc04d19987f832f1fe592d6a2493b9e7",
+    "registration_evidence": "docs/evidence/railway-worker-registration.json"
+  },
+  "scope": "Reviewed quote/strategy reads and worker activation verified; live Runwal capture failed and is under repair. Full product not complete.",
+  "live_capture": {
+    "passed": false,
+    "error": "AI_RESEARCH_NO_SOURCES",
+    "broker_requests": 30,
+    "paid_calls": 0,
+    "investigation": "Browser navigation/capture timing under bounded concurrent fetches"
+  }
+}

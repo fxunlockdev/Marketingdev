@@ -5,11 +5,12 @@ import {fileURLToPath} from 'node:url';
 import {setTimeout} from 'node:timers/promises';
 import {loadDevWorker,inspectDevWorker,startDevWorker} from './start-dev.mjs';
 import {activationPlan,activate,API_ACTIVATION_KEYS,apiSettingDefault} from './activation.mjs';
+import {waitForDeployment} from './deployment-wait.mjs';
 const service='21260f12-2ad2-413c-9f67-2a1c4d6f8c83';
 const quote=s=>"'"+s.replaceAll("'","'\\''")+"'";
 const env={...process.env,RAILWAY_CALLER:'skill:use-railway@1.7.0',RAILWAY_AGENT_SESSION:'desvio-coordinated-activation'};
 const call=(args,input,timeout=30000)=>execFileSync('railway',args,{env,input,encoding:'utf8',timeout,maxBuffer:2000000,stdio:['pipe','pipe','pipe']});
-export function activationIO(){
+export function activationIO({onDeployment=async()=>{}}={}){
  let context,plan,trackedDeployment;
  const scope=()=>['--project',context.state.project_id,'--environment',context.state.environment_id,'--service',service];
  const remote=(code,input,seconds=30)=>call(['sandbox','exec','--id',context.state.id,'--project',context.state.project_id,'--environment',context.state.environment_id,'--timeout',String(seconds),'--','python3 -c '+quote(code)],JSON.stringify(input),(seconds+10)*1000);
@@ -26,6 +27,7 @@ export function activationIO(){
    plan=activationPlan(snapshot);trackedDeployment=api.deploymentId;return snapshot;
   },
   async lock(token){remote(`import sys,json,os\nx=json.load(sys.stdin)\np='${lockPath}'\nos.mkdir(p,0o700)\nopen(p+'/token','w').write(x['token'])`,{token});},
+  async assertLock(token){remote(locked,{token});},
   async unlock(token){remote(locked+`os.unlink(p+'/token')\nos.rmdir(p)`,{token});},
   async assertIdle(){
    const js=`import {Pool} from 'pg';let raw='';for await(const chunk of process.stdin)raw+=chunk;const db=new Pool({connectionString:JSON.parse(raw).url,connectionTimeoutMillis:10000});try{const r=await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE status IN ('queued','running','retrying')");if(r.rows[0].n!==0)throw Error('BUSY');console.log('idle');}finally{await db.end();}`;
@@ -51,26 +53,19 @@ export function activationIO(){
    }
    if(!passed)throw Error('ACTIVATION_WORKER_VERIFICATION_FAILED');
   },
-  async setAPI(values){
+  async setAPI(values,{forceRedeploy=false}={}){
    guardDeployment();
    const prior=variables();
    const keys=API_ACTIVATION_KEYS;
    if(keys.some(k=>!Object.hasOwn(values,k)))throw Error('ACTIVATION_API_CONFIGURATION_INVALID');
-   if(keys.every(k=>(prior[k]??apiSettingDefault(k))===values[k]))return;
+   if(!forceRedeploy&&keys.every(k=>(prior[k]??apiSettingDefault(k))===values[k]))return;
    call(['variable','set',...keys.map(k=>k+'='+values[k]),...scope(),'--skip-deploys','--json']);
    const result=JSON.parse(call(['redeploy',...scope(),'--yes','--json']));
    const id=result.deploymentId??result.id;
    if(typeof id!=='string'||! /^[a-f0-9-]{36}$/.test(id))throw Error('ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED');
    const previous=trackedDeployment;trackedDeployment=id;
-   for(let i=0;i<60;i++){
-    const current=status();
-    if(current.deploymentId===previous){await setTimeout(5000);continue;}
-    if(current.deploymentId!==id)throw Error('ACTIVATION_API_DEPLOYMENT_CHANGED');
-    if(current.status==='SUCCESS'&&!current.stopped)return;
-    if(['FAILED','CRASHED','REMOVED','SKIPPED','NEEDS_APPROVAL'].includes(current.status))throw Error('ACTIVATION_API_DEPLOYMENT_FAILED');
-    await setTimeout(5000);
-   }
-   throw Error('ACTIVATION_API_DEPLOYMENT_UNCONFIRMED');
+   await onDeployment({deployment_id:id,previous_deployment_id:previous});
+   await waitForDeployment({id,previous,status,progress:value=>console.error(JSON.stringify(value))});
   },
   async verifyAPI(values){
    const current=guardDeployment(),actual=variables();

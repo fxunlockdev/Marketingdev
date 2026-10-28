@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-24T10:49:00.020Z",
+  "maxun_key_present": true,
+  "maxun_account_http": 200,
+  "checkpoint_table_present": true,
+  "dependency_table_present": true,
+  "paid_calls": false,
+  "scope": "Deployed worker credential authentication and checkpoint table existence only; no paid capture or model verification."
+}

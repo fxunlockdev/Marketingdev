@@ -1,8 +1,8 @@
 {
-  "checked_at": "2026-10-23T12:56:33.774Z",
+  "checked_at": "2026-10-26T10:26:41.424Z",
   "passed": true,
-  "image": "sha256:1d91dc8906c70727e43fb19a858e3486b1754839f0a1fede9a825a159db25774",
-  "backup_container": "desvio-worker-rollback-pre046",
+  "image": "sha256:11411a6a5826b95203cb01d0ce5b840161333be0df5cffc1c6a17aafad552a9d",
+  "backup_container": "desvio-worker-rollback-20261026-visual-copy",
   "paid_calls": false,
-  "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+  "scope": "Inline website capture and concise visual-copy worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
 }

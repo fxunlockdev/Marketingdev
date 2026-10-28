@@ -1,3 +1,4 @@
+import {generationPlanMix} from './generation-plan.js';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { createHash } from 'node:crypto';
 import { TenantDatabase } from './database.js';
@@ -33,6 +34,24 @@ export class Workspaces {
       const { rows } = await db.query(`SELECT o.id, o.name, m.role FROM app.organizations o
         JOIN app.memberships m ON m.organization_id=o.id AND m.user_id=$1 AND m.active ORDER BY o.created_at, o.id LIMIT 100`, [user]);
       return { workspaces: rows };
+    });
+  }
+
+  generationUsage(user:string,organizationId:string){
+    const org=uuid(organizationId);
+    return this.database.transaction(user,org,false,async db=>{
+      const {rows:[row]}=await db.query(`SELECT p.monthly_price_usd,p.enabled,
+        COALESCE(u.reserved_micros,0)::text AS used,
+        (date_trunc('month',now() AT TIME ZONE 'UTC')+interval '1 month') AT TIME ZONE 'UTC' AS resets_at
+        FROM app.generation_plans p LEFT JOIN app.monthly_generation_usage u
+        ON u.organization_id=p.organization_id AND u.month_start=date_trunc('month',now() AT TIME ZONE 'UTC')::date
+        WHERE p.organization_id=$1`,[org]);
+      if(!row)return {configured:false};
+      // One credit reserves one cent of provider capacity, priced at 5x cost.
+      // Round used credits upward so the UI never overstates remaining capacity.
+      const total=row.monthly_price_usd*20,used=Math.ceil(Number(row.used)/10000);
+      return {configured:true,enabled:row.enabled,total_credits:total,used_credits:used,
+        suggested_monthly_mix:generationPlanMix(row.monthly_price_usd),remaining_credits:row.enabled?Math.max(0,total-used):0,resets_at:row.resets_at};
     });
   }
 
@@ -74,6 +93,7 @@ export class Workspaces {
         WHERE organization_id=$1 AND operation='brand.create' AND key=$2`, [org, key]);
       if (prior) {
         if (prior.request_hash !== hash) throw new ConflictException('This request key was already used for different content');
+        if(!(await db.query('SELECT app.business_active($1,$2) AS active',[org,prior.response.id])).rows[0].active)throw new ConflictException('This creation request belongs to a deleted brand. Start a new request');
         return prior.response as Brand;
       }
       // Serialize the workspace brand limit, including requests with different keys.

@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-10-26T11:10:09.783398+00:00",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "api": {
+    "deployment_id": "25973ca1-e883-4fba-8c05-b0a66f69b0df",
+    "status": "SUCCESS"
+  },
+  "web": {
+    "deployment_id": "1aadce47-c091-458d-8468-1b3026f7f539",
+    "status": "SUCCESS"
+  },
+  "snapshot": "work/workflow-release-078",
+  "migrations": "075\u2013078",
+  "browser_tests": 7,
+  "live_smoke": "docs/evidence/workflow-release-dev-smoke.json",
+  "limitations": [
+    "Resend deferred; no live email",
+    "Pexels not configured; stock provider verified with mocks only",
+    "Strategy and isolated rendered capture are later undeployed work"
+  ],
+  "paid_calls": false
+}

@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-10-28T14:14:40.718Z",
+  "deployment_id": "546f62b9-1920-4100-8858-fa576603a7c1",
+  "deployment_result": "SUCCESS",
+  "bootstrap_removed": true,
+  "temporary_credentials_removed": true,
+  "migrations": [
+    {
+      "file": "081_campaign_formats.sql",
+      "sha256": "664b1cc4a16c80f46b98334904399ddafcabf7bea1c1c2517f5413ab84d1f08d"
+    },
+    {
+      "file": "082_higgsfield_image_replacements.sql",
+      "sha256": "d3435846fa8c4c18d6f439842e7494e897920c08b863a0602f2da37212084418"
+    }
+  ],
+  "runtime_role_logins": 6,
+  "scope": "Existing dev database migration replay and role checks. No paid calls."
+}

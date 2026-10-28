@@ -1,0 +1,37 @@
+{
+  "status": "MOCKED",
+  "scope": "Release081 explicit campaign content mix planning and visual builder",
+  "checks": {
+    "planning_contracts": {
+      "passed": 18,
+      "log": "work/campaign-formats-planning-contracts.log"
+    },
+    "planning_foundation": {
+      "passed": 24,
+      "log": "work/campaign-formats-planning-foundation.log",
+      "runtime_image": "sha256:c295bcb36ee6a68c7b88e78c16109c3945f84c0f83759a4b77ad3f3ab9c98b03"
+    },
+    "campaign_builder_browser": {
+      "passed": 3,
+      "log": "work/campaign-formats-builder-browser.log",
+      "screenshot": "work/browser/campaign-format-mix-mobile.png"
+    },
+    "web_typecheck": "passed"
+  },
+  "verified": [
+    "Exact per-channel format/placement/aspect/slide-count validation and persisted slots",
+    "Legacy static/video planning remains supported without inferred specifications",
+    "Daily static-feed coverage with spaced reels",
+    "Tenant isolation and idempotent replay for mixed planning",
+    "Production web build, mobile overflow and accessibility checks",
+    "Unsupported LinkedIn story/reel controls excluded",
+    "Video pre-generation approval displays explicit placement/aspect and submits saved spec"
+  ],
+  "limitations": [
+    "Provider planning responses are mocked; no paid provider calls made",
+    "Screenshot fixture has no approved brand image and shows a clearly labelled layout sample; picker uses approved private brand photos when present",
+    "Mixed-format generation and renderer verification owned by separate agent evidence",
+    "Video target summary added and typechecked; complete paid-video browser flow pending separate verification",
+    "No deployment performed by this agent"
+  ]
+}

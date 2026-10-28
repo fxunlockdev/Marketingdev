@@ -81,6 +81,13 @@ test('exact verified social binding can be enabled and revoked; listing omits cr
  await admin.query("INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id) VALUES($1,$2,$3,$4,'linkedin','LOCAL TEST','available',now(),now(),1,$5)",[channel,org,brand,remote,job]);
  const m=manifest();m.grants=[{kind:'publishing',enabled:true,expires_at:m.grants[0].expires_at,channel_id:channel,remote_account_id:remote,daily_limit:1}];
  let p=await configureProviders(admin,m,options);await configureProviders(admin,m,{...options,approval:p.preview_sha256});
+ for(const provider of ['instagram-standalone','facebook']){
+  await admin.query('UPDATE app.social_channels SET provider=$2 WHERE id=$1',[channel,provider]);
+  const next={...m,change_id:randomUUID()};const preview=await configureProviders(admin,next,options);await configureProviders(admin,next,{...options,approval:preview.preview_sha256});
+ }
+ await admin.query('UPDATE app.social_channels SET publishing_held=true WHERE id=$1',[channel]);
+ await assert.rejects(configureProviders(admin,{...m,change_id:randomUUID()},options),{code:'CONFIGURATION_ACCOUNT_MISMATCH'});
+ await admin.query('UPDATE app.social_channels SET publishing_held=false WHERE id=$1',[channel]);
  const listing=await inspectConfiguration(admin,options);assert.ok(listing.businesses.some(b=>b.business_id===brand));assert.equal(JSON.stringify(listing).includes('credential'),false);
  const revoke={...m,change_id:randomUUID(),grants:[{...m.grants[0],enabled:false}]};p=await configureProviders(admin,revoke,options);await configureProviders(admin,revoke,{...options,approval:p.preview_sha256});
  assert.equal((await admin.query('SELECT expires_at FROM app.publication_grants WHERE brand_id=$1',[brand])).rows[0].expires_at.toISOString(),'1970-01-01T00:00:00.000Z');
@@ -213,4 +220,21 @@ test('all model default types inherit exact settings and malformed policy rolls 
  const rejected=randomUUID();await assert.rejects(admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[rejected,workspace,'Must roll back']));
  assert.equal((await admin.query('SELECT id FROM app.brands WHERE id=$1',[rejected])).rowCount,0);
  assert.equal((await admin.query('SELECT * FROM app.analysis_grants WHERE brand_id=$1',[rejected])).rowCount,0);
+});
+
+test('generation plan assignment is previewed, audited, idempotent and cannot reset monthly usage',async()=>{
+ const m={version:1,change_id:randomUUID(),organization_id:org,operator_reference:'LOCAL PLAN TEST',scope:'generation_plan',monthly_price_usd:800,enabled:true};
+ for(const bad of [{monthly_price_usd:801},{monthly_price_usd:'800'},{enabled:'true'},{business_id:brand},{grants:[]},{api_key:'secret'}])assert.throws(()=>configurationManifest({...m,...bad}),e=>e.code?.startsWith('CONFIGURATION_'));
+ const p=await configureProviders(admin,m,options);assert.equal(p.status,'preview');assert.equal(p.provider_budget_micros,160000000);assert.equal((await admin.query('SELECT * FROM app.generation_plans WHERE organization_id=$1',[org])).rowCount,0);
+ // Spend arriving after a preview requires a fresh preview, not a silent reset.
+ await admin.query("INSERT INTO app.monthly_generation_usage VALUES($1,date_trunc('month',now() AT TIME ZONE 'UTC')::date,12000000)",[org]);
+ await assert.rejects(configureProviders(admin,m,{...options,approval:p.preview_sha256}),{code:'CONFIGURATION_PREVIEW_STALE'});
+ const refreshed=await configureProviders(admin,m,options);assert.equal(refreshed.remaining_micros,148000000);
+ assert.equal((await configureProviders(admin,m,{...options,approval:refreshed.preview_sha256})).status,'applied');
+ assert.equal((await configureProviders(admin,m,{...options,approval:refreshed.preview_sha256})).status,'already_applied');
+ await assert.rejects(configureProviders(admin,{...m,monthly_price_usd:1000},options),{code:'CONFIGURATION_CHANGE_ID_REUSED'});
+ assert.equal((await admin.query('SELECT reserved_micros FROM app.monthly_generation_usage WHERE organization_id=$1',[org])).rows[0].reserved_micros,'12000000');
+ const audit=(await admin.query('SELECT configuration FROM app.operator_configuration_changes WHERE change_id=$1',[m.change_id])).rows[0].configuration;assert.equal(audit.manifest.scope,'generation_plan');assert.equal(audit.usage.reserved_micros,'12000000');
+ const disable={...m,change_id:randomUUID(),enabled:false};const dp=await configureProviders(admin,disable,options);assert.equal(dp.provider_budget_micros,0);await configureProviders(admin,disable,{...options,approval:dp.preview_sha256});assert.equal((await admin.query('SELECT enabled FROM app.generation_plans WHERE organization_id=$1',[org])).rows[0].enabled,false);
+ await assert.rejects(configureProviders(admin,{...m,change_id:randomUUID(),organization_id:randomUUID()},options),{code:'CONFIGURATION_WORKSPACE_MISMATCH'});
 });

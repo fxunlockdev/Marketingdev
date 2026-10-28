@@ -78,7 +78,7 @@ async function setupProvider(){
  await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,channelId]);
  provider=createServer(async(req,res)=>{const parts=[];for await(const p of req)parts.push(p);const raw=Buffer.concat(parts);assert.equal(req.headers.authorization,credential);
   if(req.url==='/api/public/v1/me')return reply(res,{organization:{id:binding.remote_organization_id,name:'MOCK org'}});
-  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false},...(instagramChannelId?[{id:'instagram-mock-channel',identifier:'instagram-standalone',name:'MOCK Instagram profile',disabled:false}]:[])]);
+  if(req.url==='/api/public/v1/integrations')return reply(res,[{id:'facebook-mock-channel',identifier:'facebook',name:'MOCK Facebook Page',disabled:false},{id:'publication-mock-channel',identifier:'linkedin',name:'MOCK staging profile',disabled:false},...(instagramChannelId?[{id:'instagram-mock-channel',identifier:'instagram-standalone',name:'MOCK Instagram profile',disabled:false}]:[])]);
   if(req.url.startsWith('/api/public/v1/analytics/post/'))return reply(res,mode==='analyticsFail'?{}:mode==='analyticsEmpty'?[]:[{label:'Impressions',data:[{date:'2026-10-23',total:120}],percentageChange:0}],mode==='analyticsFail'?503:200);
   if(req.url==='/api/public/v1/upload'){uploads++;const video=raw.includes(Buffer.from('Content-Type: video/mp4')),jpeg=raw.includes(Buffer.from('Content-Type: image/jpeg')),marker=Buffer.from(`Content-Type: ${video?'video/mp4':jpeg?'image/jpeg':'image/png'}\r\n\r\n`),start=raw.indexOf(marker)+marker.length,end=raw.lastIndexOf(Buffer.from('\r\n--'));lastUpload=raw.subarray(start,end);if(video)assert.equal(lastUpload.subarray(4,8).toString(),'ftyp');else assert.equal((await sharp(lastUpload).metadata()).format,jpeg?'jpeg':'png');if(afterUpload)await afterUpload();if(mode==='uploadLost'){req.socket.destroy();return;}return reply(res,{id:'mock-upload-'+uploads,path:providerBase+'/uploads/mock-'+uploads+(video?'.mp4':jpeg?'.jpg':'.png')});}
   if(req.url==='/api/public/v1/posts'){submissions++;if(mode==='postRejected')return reply(res,{},401);const body=JSON.parse(raw),id='mock-post-'+randomUUID();postRows.push({id,integration:{id:body.posts[0].integration.id,providerIdentifier:body.posts[0].settings.__type},content:body.posts[0].value[0].content,publishDate:body.date,state:remoteState,releaseId:remoteState==='PUBLISHED'?'MOCK_RELEASE':null,releaseURL:null});if(mode==='postLost'){req.socket.destroy();return;}return reply(res,[{postId:id,integration:body.posts[0].integration.id}]);}
@@ -88,7 +88,7 @@ async function setupProvider(){
 }
 afterEach(()=>{mode='';afterUpload=undefined;remoteState='QUEUE';});
 
-async function approvedPost(label){const v=await fixture({},label),e=await render(v),date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'MOCK publication',objective:'Approved publication test',starts_on:start,timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:date,brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
+async function approvedPost(label,channel='linkedin'){const v=await fixture({},label),e=await render(v),date=new Date(Math.floor(Date.now()/60000)*60000+2*86400000).toISOString(),start=date.slice(0,10),p=await plans.create(alice.id,brand.id,{title:'MOCK publication',objective:'Approved publication test',starts_on:start,timezone:'UTC',slots:[{channel,format:'static',planned_at:date,brief:'TEST FIXTURE',creative_version_id:v.id}]},randomUUID());
  let slot=(await plans.list(alice.id,brand.id,{start:start+'T00:00:00Z',end:new Date(Date.parse(start)+30*86400000).toISOString(),plan_id:p.id})).slots[0];slot=await plans.review(alice.id,brand.id,slot.id,{revision:slot.revision,creative_version_id:v.id,creative_sha256:v.sha256,decision:'pending_review'});
  await exports.approve(alice.id,brand.id,e.id,{sha256:e.sha256,source_sha256:v.sha256,context_type:'slot',context_id:slot.id,context_revision:slot.revision,confirmed:true});slot=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[slot.id])).rows[0];return {v,e,slot,body:{slot_id:slot.id,revision:slot.revision,export_id:e.id,channel_id:channelId,confirmed:true}};
 }
@@ -117,14 +117,20 @@ async function setupBrowser(){
 after(async()=>{clearInterval(dispatchTimer);await browser?.close();if(worker){worker.shutdown();await workerRun;}await native?.close();await connection?.close();await dispatchPool?.end();for(const child of children.reverse()){if(child.exitCode===null&&child.signalCode===null){const done=once(child,'exit');child.kill('SIGTERM');await Promise.race([done,delay(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await done;}}}provider?.closeAllConnections();if(provider)await new Promise(r=>provider.close(r));store.close();await app?.close();await Promise.all([admin.end(),workerPool.end()]);});
 const url=b=>base+`/b/${b.id}/publishing`;
 const activity=()=>page.getByRole('region',{name:'Publishing activity'});
+async function overviewResults(browserPage=page,business=brand){
+ await browserPage.goto(base+`/b/${business.id}/overview`);
+ await browserPage.locator('summary').filter({hasText:/^Activity and results/}).click();
+}
+
 const card=f=>activity().getByRole('listitem').filter({has:page.getByText(f.v.caption,{exact:true})});
 async function choose(f){await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByRole('heading',{name:'Confirm publication'})).toBeVisible();await expect(page.getByRole('img',{name:'Exact approved image to be published'})).toBeVisible();await page.getByLabel('Publish to',{exact:true}).selectOption(channelId);await expect(page.getByLabel(/I authorize this exact image/)).toBeEnabled();}
 async function confirm(){await page.getByLabel(/I authorize this exact image/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();}
 
 test('approved image → exact account/time consent → persisted publishing result, history and real overview counts',async()=>{
  remoteState='PUBLISHED';const f=fixtures[0],before=submissions;await choose(f);await expect(page.getByRole('button',{name:'Confirm and schedule'})).toBeDisabled();assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-confirm-desktop.png'});await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-confirm-mobile.png'});await page.setViewportSize({width:1440,height:1100});await confirm();await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,before+1);assert.equal(digest(lastUpload),f.e.sha256);await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();await card(f).getByRole('button',{name:'Status history'}).click();await expect(card(f).getByRole('list').getByText('Published',{exact:true})).toBeVisible();
+ const queuePreview=page.locator('.publication-ready-preview').first();await queuePreview.scrollIntoViewIfNeeded();await expect(queuePreview.locator('img')).toBeVisible();assert.ok(await queuePreview.locator('img').evaluate(img=>img.naturalWidth>0));
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/publishing-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/publishing-mobile.png',fullPage:true});await page.setViewportSize({width:1440,height:1100});
- await page.getByRole('link',{name:'Overview',exact:true}).click();await expect(page.getByRole('heading',{name:'Northstar Coffee, at a glance.'})).toBeVisible();await expect(page.getByRole('link',{name:/^Published posts 1 View/})).toBeVisible();assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/overview-desktop.png',fullPage:true});
+ await page.getByRole('link',{name:'Home',exact:true}).click();await expect(page.getByRole('heading',{name:'Your content, at a glance.'})).toBeVisible();await expect(page.getByRole('link',{name:/^Published posts 1 View/})).toBeVisible();assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/overview-desktop.png',fullPage:true});
 });
 test('lost provider acknowledgement is held and cannot be submitted again after reload',async()=>{
  const f=fixtures[1];mode='postLost';await choose(f);const before=submissions;await confirm();await expect(card(f).getByText('Outcome uncertain',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,before+1);await page.reload();await expect(card(f).getByText('Outcome uncertain',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Ready to publish'}).getByText(f.v.caption,{exact:true})).toHaveCount(0);await expect(card(f).getByRole('button',{name:'Check post status'})).toHaveCount(0);
@@ -140,11 +146,22 @@ test('cancel before submission uses the real queued job; an ambiguous client res
 test('status checks preserve history, business switching isolates records, and readonly members cannot publish',async()=>{
  const f=fixtures[0];await page.goto(url(brand));mode='listMissing';await card(f).getByRole('button',{name:'Check post status'}).click();await expect(card(f).getByText('Post not found',{exact:true})).toBeVisible({timeout:30000});await card(f).getByRole('button',{name:'Status history'}).click();await expect(card(f).getByRole('list').getByText('Published',{exact:true})).toBeVisible();mode='';
  await reader.goto(url(brand));await expect(reader.getByText('You can view publishing activity.',{exact:false})).toBeVisible();await expect(reader.getByRole('button',{name:'Review and schedule'})).toHaveCount(0);await expect(reader.getByRole('button',{name:'Check post status'})).toHaveCount(0);await other.goto(url(brand));await expect(other.getByRole('heading',{name:'Business unavailable'})).toBeVisible();
- await page.getByLabel('Business',{exact:true}).selectOption(sibling.id);await expect(page.getByText('No publishing requests match this view.',{exact:true})).toBeVisible();await expect(page.getByText(f.v.caption,{exact:true})).toHaveCount(0);await page.getByRole('link',{name:'Overview',exact:true}).click();await expect(page.getByRole('link',{name:/^Published posts 0 View/})).toBeVisible();await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/overview-mobile.png',fullPage:true});assert.deepEqual(pageErrors,[]);assert.ok(!(await page.content()).includes(credential));assert.ok(!logs.includes(credential));assert.deepEqual(await page.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});
+ await page.getByLabel('Business',{exact:true}).selectOption(sibling.id);await expect(page.getByText('No publishing requests match this view.',{exact:true})).toBeVisible();await expect(page.getByText(f.v.caption,{exact:true})).toHaveCount(0);await page.getByRole('link',{name:'Home',exact:true}).click();await expect(page.getByRole('link',{name:/^Published posts 0 View/})).toBeVisible();await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/overview-mobile.png',fullPage:true});assert.deepEqual(pageErrors,[]);assert.ok(!(await page.content()).includes(credential));assert.ok(!logs.includes(credential));assert.deepEqual(await page.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});
 });
 
+// Seeded provider output is intentionally not a generation test. Keep its
+// temporary video job away from the publishing-only Temporal worker.
+async function seedPublicationVideo(options){
+ const previous=paused;paused=true;
+ try{
+  for(let i=0;dispatching&&i<100;i++)await delay(50);
+  assert.equal(dispatching,false,'Dispatcher must be idle before fixture creation');
+  return await publishingVideo(options);
+ }finally{paused=previous;}
+}
+
 test('approved video preview → explicit exact-media consent → one MP4 upload and reconciled publication (MOCK Postiz)',async()=>{
- const f=await publishingVideo({admin,store,canvas,exports,plans,alice,org,brand,fixture,render,image:config.videoRenderImage,staticImage:renderer.image});
+ const f=await seedPublicationVideo({admin,store,canvas,exports,plans,alice,org,brand,fixture,render,image:config.videoRenderImage,staticImage:renderer.image});
  remoteState='PUBLISHED';const count=submissions,mediaPattern=config.storage.endpoint+'/**';await page.route(mediaPattern,route=>route.fulfill({contentType:'video/mp4',body:'CORRUPT TEST VIDEO'}));await page.goto(url(brand)+'?slot='+f.slot.id);
  await expect(page.getByText('The approved video failed its integrity check.',{exact:true})).toBeVisible();await expect(page.getByLabel(/I authorize this exact video/)).toBeDisabled();assert.equal(submissions,count);await page.unroute(mediaPattern);await page.getByRole('button',{name:'Reload approved video'}).click();
  await expect(page.getByRole('heading',{name:'Confirm publication'})).toBeVisible();await expect(page.getByLabel('Exact approved video to be published')).toBeVisible();
@@ -156,46 +173,46 @@ test('approved video preview → explicit exact-media consent → one MP4 upload
 
 
 test('performance shows saved metrics, filters posts and distinguishes upstream failure from zero engagement',async()=>{
- await page.goto(url(brand));const panel=page.getByRole('region',{name:'Post performance',exact:true});
+ await page.goto(url(brand));await page.getByRole('button',{name:'Performance',exact:true}).click();const panel=page.getByRole('region',{name:'Post performance',exact:true});
  await expect(panel.getByRole('cell',{name:'120',exact:true}).first()).toBeVisible({timeout:30000});
- await page.goto(base+`/b/${brand.id}/overview`);const results=page.getByRole('region',{name:'Recent post results',exact:true});await expect(results.getByText(/120/).first()).toBeVisible();await expect(results.getByText(/not summed or ranked/)).toBeVisible();await page.goto(url(brand));
- await panel.getByLabel('Performance channel',{exact:true}).selectOption('instagram');await expect(panel.getByText('No confirmed published posts match these filters.',{exact:true})).toBeVisible();
+ await overviewResults();const results=page.getByRole('region',{name:'Recent post results',exact:true});await expect(results.getByText(/120/).first()).toBeVisible();await expect(results.getByText(/not summed or ranked/)).toBeVisible();await page.goto(url(brand));await page.getByRole('button',{name:'Performance',exact:true}).click();
+ await panel.getByLabel('Performance channel',{exact:true}).selectOption('instagram');await expect(panel.getByText('Your results will appear here',{exact:true})).toBeVisible();
  await panel.getByLabel('Performance channel',{exact:true}).selectOption('linkedin');await panel.getByLabel('Performance format',{exact:true}).selectOption('video');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);
  await panel.getByLabel('Performance format',{exact:true}).selectOption('');
  mode='analyticsFail';const record=(await publisher.list(alice.id,brand.id)).publications.find(r=>r.observed_state==='published');
  const check=await publisher.reconcile(alice.id,brand.id,record.id,randomUUID());await handler.reconcile(scope(check));await panel.getByRole('button',{name:'Refresh saved metrics'}).click();
  await expect(panel.getByText('The latest metrics check failed.',{exact:false})).toBeVisible();
- await page.goto(base+`/b/${brand.id}/overview`);await expect(results.getByText('The latest metrics check failed.',{exact:true})).toBeVisible();await page.goto(url(brand));
+ await overviewResults();await expect(results.getByText('The latest metrics check failed.',{exact:true})).toBeVisible();await page.goto(url(brand));await page.getByRole('button',{name:'Performance',exact:true}).click();
  mode='analyticsEmpty';const next=await publisher.reconcile(alice.id,brand.id,record.id,randomUUID());await handler.reconcile(scope(next));await panel.getByRole('button',{name:'Refresh saved metrics'}).click();await expect(panel.getByText('The platform returned no metrics. This does not mean zero engagement.',{exact:true})).toBeVisible();
  await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await panel.screenshot({path:'work/browser/post-performance-mobile.png'});
- await page.goto(base+`/b/${brand.id}/overview`);await expect(results.getByText('The platform returned no metrics. This does not mean zero engagement.',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/overview-results-mobile.png',fullPage:true});
+ await overviewResults();await expect(results.getByText('The platform returned no metrics. This does not mean zero engagement.',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/overview-results-mobile.png',fullPage:true});
 });
 
 
 test('AI analysis becomes a reviewed business-memory hypothesis and retirement removes future creative context',async()=>{
  await admin.query("INSERT INTO app.insight_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'openai',true,'MOCK-text',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER MOCK')",[org.id,brand.id]);
- await page.goto(url(brand));const lessons=page.getByRole('region',{name:'Performance lessons',exact:true});
+ await page.goto(base+`/b/${brand.id}/memory`);await page.getByRole('button',{name:'What’s working',exact:true}).click();const lessons=page.getByRole('region',{name:'Performance lessons',exact:true});
  await lessons.getByRole('button',{name:'Analyze saved performance',exact:true}).click();
  await expect(lessons.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible({timeout:60000});
  await expect(lessons.getByRole('button',{name:'Approve for testing',exact:true})).toBeDisabled();await lessons.getByText('Evidence and limitations',{exact:true}).click();await expect(lessons.getByText('Small sample; no causal conclusion.',{exact:true})).toBeVisible();
  await lessons.getByLabel('Where this lesson applies',{exact:true}).fill('LinkedIn CTA variations only');await lessons.getByRole('checkbox',{name:/I understand this is an unproven hypothesis/}).check();await lessons.getByRole('button',{name:'Approve for testing',exact:true}).click();await expect(lessons.getByText('Approved for testing · unproven',{exact:true})).toBeVisible();
- await page.goto(base+`/b/${brand.id}/overview`);const ideas=page.getByRole('region',{name:'Ideas from your performance',exact:true});await expect(ideas.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();await expect(ideas.getByText('Approved for testing · unproven',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Generation activity · last 30 days',exact:true}).getByText(/Performance analysis: 1 requested · 1 completed/)).toBeVisible();
+ await overviewResults();const ideas=page.getByRole('region',{name:'Ideas from your performance',exact:true});await expect(ideas.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();await expect(ideas.getByText('Approved for testing · unproven',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Generation activity · last 30 days',exact:true}).getByText(/Performance analysis: 1 requested · 1 completed/)).toBeVisible();
  // Inspect settled contrast after the intentional one-time Overview entrance.
- await page.locator('.studio-flow').evaluate(el=>Promise.all(el.getAnimations({subtree:true}).map(animation=>animation.finished)));assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.screenshot({path:'work/browser/overview-recommendations-mobile.png',fullPage:true});
- await page.goto(base+`/b/${brand.id}/memory`);await expect(page.getByRole('heading',{name:'Memory',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();
+ await page.getByRole('main').evaluate(el=>Promise.all(el.getAnimations({subtree:true}).filter(animation=>animation.effect?.getTiming().iterations!==Infinity).map(animation=>animation.finished)));assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.screenshot({path:'work/browser/overview-recommendations-mobile.png',fullPage:true});
+ await page.goto(base+`/b/${brand.id}/memory`);await expect(page.getByRole('heading',{name:'Learnings',exact:true})).toBeVisible();await page.getByRole('button',{name:'What’s working',exact:true}).click();await expect(page.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();
  await page.getByText('Experiment results (0)',{exact:true}).click();
  await expect(page.getByRole('button',{name:'Save experiment report',exact:true})).toBeDisabled();
  await page.getByLabel('Experiment start date',{exact:true}).fill('2026-01-01');await page.getByLabel('Experiment end date',{exact:true}).fill('2026-01-07');
  await page.getByLabel('Test method',{exact:true}).fill('Two CTA variants compared over the same window.');await page.getByLabel('Results and limitations',{exact:true}).fill('Two posts only; different audiences mean these results are inconclusive.');
  await page.getByRole('checkbox',{name:/I confirm these are our reported observations/}).check();await page.getByRole('button',{name:'Save experiment report',exact:true}).click();await expect(page.getByRole('heading',{name:'Inconclusive · team report',exact:true})).toBeVisible();
- await page.reload();await page.getByText('Experiment results (1)',{exact:true}).click();await expect(page.getByText('Results and limitations: Two posts only; different audiences mean these results are inconclusive.',{exact:true})).toBeVisible();
+ await page.reload();await page.getByRole('button',{name:'What’s working',exact:true}).click();await page.getByText('Experiment results (1)',{exact:true}).click();await expect(page.getByText('Results and limitations: Two posts only; different audiences mean these results are inconclusive.',{exact:true})).toBeVisible();
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.screenshot({path:'work/browser/memory-experiment-mobile.png',fullPage:true});
  await expect(page.getByRole('link',{name:'Try in Canvas',exact:true})).toBeVisible();await page.getByRole('checkbox',{name:/I understand this is an unproven hypothesis/}).check();await page.getByRole('button',{name:'Retire learning',exact:true}).click();await expect(page.getByRole('link',{name:'Try in Canvas',exact:true})).toHaveCount(0);
- await page.getByRole('button',{name:'Retired',exact:true}).click();await expect(page.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();
- await reader.goto(base+`/b/${brand.id}/memory`);await expect(reader.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();await reader.getByText('Experiment results (1)',{exact:true}).click();await expect(reader.getByRole('heading',{name:'Inconclusive · team report',exact:true})).toBeVisible();await expect(reader.getByRole('button',{name:'Save experiment report',exact:true})).toHaveCount(0);await expect(reader.getByRole('button',{name:'Approve for testing',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Retired',exact:true}).click();await page.getByRole('button',{name:'Retired',exact:true}).hover();await expect(page.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();
+ await reader.goto(base+`/b/${brand.id}/memory`);await reader.getByRole('button',{name:'What’s working',exact:true}).click();await expect(reader.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toBeVisible();await reader.getByText('Experiment results (1)',{exact:true}).click();await expect(reader.getByRole('heading',{name:'Inconclusive · team report',exact:true})).toBeVisible();await expect(reader.getByRole('button',{name:'Save experiment report',exact:true})).toHaveCount(0);await expect(reader.getByRole('button',{name:'Approve for testing',exact:true})).toHaveCount(0);
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/performance-memory-mobile.png',fullPage:true});
- await page.goto(base+`/b/${brand.id}/overview`);await expect(ideas.getByText('No saved performance recommendations yet.',{exact:false})).toBeVisible();await expect(ideas.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toHaveCount(0);
- await reader.goto(base+`/b/${sibling.id}/overview`);await expect(reader.getByRole('region',{name:'Recent post results',exact:true}).getByText('No confirmed published posts yet.',{exact:false})).toBeVisible();
+ await overviewResults();await expect(ideas.getByText('No saved performance recommendations yet.',{exact:false})).toBeVisible();await expect(ideas.getByRole('heading',{name:'TEST CTA experiment',exact:true})).toHaveCount(0);
+ await overviewResults(reader,sibling);await expect(reader.getByRole('region',{name:'Recent post results',exact:true}).getByText('No confirmed published posts yet.',{exact:false})).toBeVisible();
 });
 
 async function approvedCarousel(){
@@ -219,7 +236,7 @@ test('carousel preview checks every saved slide before consent, publishes once a
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-carousel-confirm.png'});
  await page.getByLabel(/I authorize this exact carousel/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.equal(uploads,uploadCount+2);
  await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
- const panel=page.getByRole('region',{name:'Post performance',exact:true});await panel.getByLabel('Performance format',{exact:true}).selectOption('carousel');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);await expect(panel.getByRole('heading',{name:/Carousel/})).toBeVisible();
+ await page.getByRole('button',{name:'Performance',exact:true}).click();const panel=page.getByRole('region',{name:'Post performance',exact:true});await panel.getByLabel('Performance format',{exact:true}).selectOption('carousel');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);await expect(panel.getByRole('heading',{name:/Carousel/})).toBeVisible();
 });
 
 
@@ -228,7 +245,7 @@ test('Instagram Reel offers only its channel account and persists exact approved
  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'social.sync','succeeded')",[sync,org.id,brand.id,alice.id]);
  await admin.query("INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id) VALUES($1,$2,$3,'instagram-mock-channel','instagram-standalone','MOCK Instagram profile','available',now(),now(),1,$4)",[instagramChannelId,org.id,brand.id,sync]);
  await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,instagramChannelId]);
- const f=await publishingVideo({admin,store,canvas,exports,plans,alice,org,brand,fixture,render,image:config.videoRenderImage,staticImage:renderer.image,channel:'instagram'});
+ const f=await seedPublicationVideo({admin,store,canvas,exports,plans,alice,org,brand,fixture,render,image:config.videoRenderImage,staticImage:renderer.image,channel:'instagram'});
  remoteState='PUBLISHED';mode='';const count=submissions;
  await page.setViewportSize({width:1280,height:900});await page.goto(url(brand)+'?slot='+f.slot.id);
  await expect(page.getByLabel('Exact approved video to be published')).toBeVisible();
@@ -271,4 +288,21 @@ test('Instagram calendar review prepares the actual JPEG, requires its approval,
  await page.reload();await expect(card({v}).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
  await page.screenshot({path:'work/browser/publishing-instagram-image.png',fullPage:true});
+});
+
+
+test('Facebook approved image offers only its Page and publishes once after explicit consent (MOCK Postiz)',async()=>{
+ const fb=randomUUID(),sync=randomUUID();
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'social.sync','succeeded')",[sync,org.id,brand.id,alice.id]);
+ await admin.query("INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id) VALUES($1,$2,$3,'facebook-mock-channel','facebook','MOCK Facebook Page','available',now(),now(),1,$4)",[fb,org.id,brand.id,sync]);
+ await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,fb]);
+ const f=await approvedPost('Facebook browser','facebook'),count=submissions;remoteState='PUBLISHED';
+ await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByRole('img',{name:'Exact approved image to be published'})).toBeVisible();
+ const account=page.getByLabel('Publish to',{exact:true});await expect(account.locator('option')).toHaveText(['Choose a Facebook account','MOCK Facebook Page · Facebook']);
+ await account.selectOption(fb);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
+ await page.getByLabel(/I authorize this exact image/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();
+ await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.equal(digest(lastUpload),f.e.sha256);
+ await page.reload();await expect(card(f).getByText('MOCK Facebook Page · Facebook',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
+ assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
+ await page.screenshot({path:'work/browser/facebook-publication.png',fullPage:true});
 });

@@ -6,7 +6,7 @@ export const VIDEO_SKILLS={
  video:{skill_sha256:'0a35e32dda553707996bf383c00ecf971d05127d35d5d814577457c23a3ab591',tree_sha256:'76696e47ce406b06143b50a08d75effa0a5dfd109f12beb86fd5e3d1b68900f1'},
  'ad-creative':CREATIVE_SKILLS['ad-creative'],'product-marketing':CREATIVE_SKILLS['product-marketing'],social:CREATIVE_SKILLS.social,
 };
-export type VideoPlanningInput={task:'video';brand:CreativeInput['brand'];prompt:string;channel:'linkedin'|'instagram';duration_seconds:number;
+export type VideoPlanningInput={task:'video';brand:CreativeInput['brand'];prompt:string;channel:'linkedin'|'instagram'|'facebook';duration_seconds:number;
  reference:{kind:'image'|'video';sha256:string;width:number;height:number;duration_seconds:number|null;caption:string}};
 export type VideoBrief={title:string;caption:string;video_prompt:string;fact_ids:string[];warnings:string[];
  beats:{start_ms:number;end_ms:number;action:string;camera:string}[];
@@ -18,7 +18,7 @@ const sha=(v:any)=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v);
 const time=(v:any)=>Number.isSafeInteger(v)&&v>=0;
 export function validateVideoInput(v:any):asserts v is VideoPlanningInput {
  const fail=()=>{throw new CreativeError('VIDEO_PLAN_INPUT_INVALID');};
- if(!fields(v,['task','brand','prompt','channel','duration_seconds','reference'])||v.task!=='video'||!plain(v.prompt,4000)||!['linkedin','instagram'].includes(v.channel)||!Number.isInteger(v.duration_seconds)||v.duration_seconds<3||v.duration_seconds>15)fail();
+ if(!fields(v,['task','brand','prompt','channel','duration_seconds','reference'])||v.task!=='video'||!plain(v.prompt,4000)||!['linkedin','instagram','facebook'].includes(v.channel)||!Number.isInteger(v.duration_seconds)||v.duration_seconds<3||v.duration_seconds>15)fail();
  if(!fields(v.brand,['id','sha256','facts',...(v.brand?.learning===undefined?[]:['learning'])])||(v.brand.learning!==undefined&&!validLearning(v.brand.learning))||!plain(v.brand.id,100)||!sha(v.brand.sha256)||!Array.isArray(v.brand.facts)||!v.brand.facts.length||v.brand.facts.length>200||v.brand.facts.some((f:any)=>!fields(f,['id','field','value'])||!plain(f.id,100)||!plain(f.field,100)||!plain(f.value,4000))||new Set(v.brand.facts.map((f:any)=>f.id)).size!==v.brand.facts.length)fail();
  const r=v.reference;
  if(!fields(r,['kind','sha256','width','height','duration_seconds','caption'])||!['image','video'].includes(r.kind)||!sha(r.sha256)||![r.width,r.height].every(n=>Number.isInteger(n)&&n>=64&&n<=4096)||!plain(r.caption,3000,true)||(r.kind==='image'?r.duration_seconds!==null:typeof r.duration_seconds!=='number'||!Number.isFinite(r.duration_seconds)||r.duration_seconds<1||r.duration_seconds>30))fail();

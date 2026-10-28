@@ -1,0 +1,30 @@
+{
+  "checked_at": "2026-10-25T14:21:12.538Z",
+  "passed": true,
+  "parser_version": "website-text-v2",
+  "navigation_discovery": true,
+  "pages": [
+    {
+      "url": "https://runwalrealty.com/",
+      "chunks": 67,
+      "coverage": "server_html_only"
+    },
+    {
+      "url": "https://runwalrealty.com/about/company-overview/",
+      "chunks": 46,
+      "coverage": "server_html_only"
+    },
+    {
+      "url": "https://runwalrealty.com/about/our-journey/",
+      "chunks": 30,
+      "coverage": "server_html_only"
+    },
+    {
+      "url": "https://runwalrealty.com/about/csr/",
+      "chunks": 21,
+      "coverage": "server_html_only"
+    }
+  ],
+  "paid_calls": 0,
+  "scope": "Direct public website retrieval from deployed trusted worker; no paid AI call"
+}

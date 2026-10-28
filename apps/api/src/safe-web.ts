@@ -4,16 +4,6 @@ import { lookup } from "node:dns/promises";
 import { BlockList, isIP } from "node:net";
 import { request as httpsRequest } from "node:https";
 import { request as httpRequest } from "node:http";
-import robotsModule from "robots-parser";
-type Robots = {
-  isAllowed(url: string, agent: string): boolean | undefined;
-  getCrawlDelay(agent: string): number | undefined;
-};
-const robotsParser = robotsModule as unknown as (
-  url: string,
-  text: string,
-) => Robots;
-
 export class IntakeError extends Error {
   constructor(readonly code: string) {
     super(code);
@@ -111,6 +101,7 @@ export class SafeWeb {
     url: URL,
     maxBytes = 2 * 1024 * 1024,
     accept = "text/html,text/plain;q=0.9",
+    timeoutMs = 15000,
   ): Promise<WebResponse> {
     websiteURL(url.href, true);
     const addresses = await Promise.race([
@@ -181,7 +172,7 @@ export class SafeWeb {
       );
       const timer = setTimeout(
         () => finish(new IntakeError("WEBSITE_FETCH_TIMEOUT")),
-        15000,
+        Math.max(1,Math.min(15000,timeoutMs)),
       );
       function finish(error?: Error, result?: WebResponse) {
         if (done) return;
@@ -194,129 +185,5 @@ export class SafeWeb {
       req.on("error", () => finish(new IntakeError("WEBSITE_FETCH_FAILED")));
       req.end();
     });
-  }
-}
-export type HtmlPage = { url: string; html: string; sha256: string };
-export class WebsiteReader {
-  constructor(readonly web = new SafeWeb()) {}
-  async read(
-    start: string,
-    onPage: (url: string, html: string) => Promise<string[]>,
-    check: () => Promise<void> = async () => {},
-  ) {
-    const root = websiteURL(start),
-      queue = [root.href],
-      seen = new Set<string>(),
-      pages: string[] = [],
-      skipped: { url: string; code: string }[] = [];
-    const policies = new Map<string, ReturnType<typeof robotsParser>>();
-    let requests = 0;
-    const sameSite = (url: URL) =>
-      url.hostname.replace(/^www\./, "") ===
-        root.hostname.replace(/^www\./, "") &&
-      !(root.protocol === "https:" && url.protocol === "http:");
-    const fetch = async (url: URL, max?: number) => {
-      await check();
-      if (++requests > 18) throw new IntakeError("WEBSITE_REQUEST_LIMIT");
-      return this.web.fetch(url, max);
-    };
-    async function allowed(url: URL) {
-      if (!policies.has(url.origin)) {
-        const r = await fetch(new URL("/robots.txt", url), 256 * 1024);
-        if (r.status !== 404 && (r.status < 200 || r.status >= 300))
-          throw new IntakeError("WEBSITE_ROBOTS_UNAVAILABLE");
-        const p = robotsParser(
-          url.origin + "/robots.txt",
-          r.status === 404 ? "" : r.bytes.toString("utf8"),
-        );
-        policies.set(url.origin, p);
-      }
-      const p = policies.get(url.origin)!;
-      if (p.isAllowed(url.href, agent) === false)
-        throw new IntakeError("WEBSITE_ROBOTS_DISALLOWED");
-      const delay = p.getCrawlDelay(agent);
-      if (delay !== undefined && delay > 10)
-        throw new IntakeError("WEBSITE_CRAWL_DELAY_TOO_LONG");
-      // Sequential bounded reads honor at least one second between page requests.
-      await new Promise((resolve) =>
-        setTimeout(resolve, Math.max(1, delay ?? 1) * 1000),
-      );
-    }
-    while (queue.length && pages.length < 5 && seen.size < 12) {
-      let url = websiteURL(queue.shift()!);
-      if (seen.has(url.href)) continue;
-      const initial = url.href;
-      seen.add(initial);
-      try {
-        let response: WebResponse | undefined;
-        for (let redirect = 0; redirect <= 3; redirect++) {
-          if (!sameSite(url)) throw new IntakeError("WEBSITE_REDIRECT_BLOCKED");
-          await allowed(url);
-          response = await fetch(url);
-          if (![301, 302, 303, 307, 308].includes(response.status)) break;
-          const location = response.headers.location;
-          if (typeof location !== "string" || redirect === 3)
-            throw new IntakeError("WEBSITE_REDIRECT_LIMIT");
-          url = websiteURL(new URL(location, url).href);
-        }
-        if (!response || response.status < 200 || response.status >= 300)
-          throw new IntakeError("WEBSITE_HTTP_ERROR");
-        if (
-          !/^text\/html(?:;|$)/i.test(
-            String(response.headers["content-type"] ?? ""),
-          )
-        )
-          throw new IntakeError("WEBSITE_NOT_HTML");
-        if (
-          /charset\s*=\s*(?!utf-8|us-ascii)[a-z0-9-]+/i.test(
-            String(response.headers["content-type"]),
-          )
-        )
-          throw new IntakeError("WEBSITE_ENCODING_UNSUPPORTED");
-        const html = new TextDecoder("utf-8", { fatal: true }).decode(
-          response.bytes,
-        );
-        const links = await onPage(url.href, html);
-        pages.push(url.href);
-        seen.add(url.href);
-        for (const href of links.slice(0, 100)) {
-          try {
-            const candidate = websiteURL(new URL(href, url).href);
-            if (
-              sameSite(candidate) &&
-              !/(?:^|\/)(?:login|logout|checkout|cart|account|search)(?:\/|$)/i.test(
-                candidate.pathname,
-              ) &&
-              !seen.has(candidate.href) &&
-              queue.length < 30
-            )
-              queue.push(candidate.href);
-          } catch {}
-        }
-        const relevance = (u: string) =>
-          /\/(about|our-story|brand|products?|services?|collections?)([\/-]|$)/i.test(
-            new URL(u).pathname,
-          )
-            ? 2
-            : /privacy|terms|cookies/i.test(u)
-              ? -1
-              : 0;
-        queue.sort((a, b) => relevance(b) - relevance(a));
-      } catch (error) {
-        skipped.push({
-          url: initial,
-          code:
-            error instanceof IntakeError ? error.code : "WEBSITE_READ_FAILED",
-        });
-        if (!pages.length) throw error;
-      }
-    }
-    return {
-      pages,
-      skipped,
-      coverage: "server_html_only",
-      pageLimit: 5,
-      requests,
-    };
   }
 }

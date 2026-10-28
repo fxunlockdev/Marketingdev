@@ -1,0 +1,29 @@
+{
+  "status": "deployed",
+  "scope": "Multi-page website photo capture",
+  "limits": {
+    "pages": 4,
+    "photos_per_page": 6,
+    "total_photos": 20,
+    "requests": 48,
+    "milliseconds": 60000
+  },
+  "validation": {
+    "build": "passed",
+    "contracts_passed": 14,
+    "intake_integration_passed": 18,
+    "mocked_paid_provider": true,
+    "real_runwal_photos": 18,
+    "real_runwal_pages": 3,
+    "real_capture_evidence": "docs/evidence/runwal-multipage-photos.json",
+    "worker_image_boundary": "passed"
+  },
+  "limitations": [
+    "Only researched same-host pages are enriched",
+    "Does not automatically select references for campaign slots yet",
+    "Does not retrofit existing brand assets",
+    "Full product and social publishing parity remain unverified"
+  ],
+  "worker_image": "sha256:ff95c8abdcb92c10179207f0ad233de31b2e8757d6fcb33c3ffe393f43d12c91",
+  "deployment_evidence": "docs/evidence/railway-worker-rollout.json"
+}

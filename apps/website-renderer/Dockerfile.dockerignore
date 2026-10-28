@@ -1,0 +1,8 @@
+**
+!apps/
+!apps/website-renderer/
+!apps/website-renderer/package.json
+!apps/website-renderer/package-lock.json
+!apps/website-renderer/runtime.mjs
+!apps/website-renderer/Dockerfile
+!apps/website-renderer/Dockerfile.dockerignore

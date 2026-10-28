@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-10-26T01:53:46.760871+00:00",
+  "contracts": {
+    "passed": 14,
+    "failed": 0,
+    "log": "work/planning-references-contracts.log"
+  },
+  "integration": {
+    "passed": 23,
+    "failed": 0,
+    "log": "work/planning-references-integration-final.log",
+    "provider": "MOCK; actual isolated skill runtime, database, Temporal and persistence"
+  },
+  "deployment": {
+    "api": "22d783ed-f3d6-46c6-8949-02c809c3e67b",
+    "api_status": "SUCCESS",
+    "worker": "sha256:7fbba706605380b916689d4db0d3c702afc138810d3d3db65c6f6634875b2170",
+    "skills": "sha256:ab41b717f177af90e843aa82530cf4318a44df2af88bfa001d502d585bd22234",
+    "migration": "074_planning_brand_references.sql",
+    "worker_registration_verified": true
+  },
+  "scope": "New campaign plans can select up to three approved brand references per static post, validate IDs and revocation and save them for existing reference preview/generation. Video reference selection remains in video review. Does not retrofit old plans or automatically approve website assets.",
+  "paid_provider_calls": false,
+  "web_card_cleanup": "Browser verification pending; not deployed"
+}

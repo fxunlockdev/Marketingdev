@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-10-24T11:27:56.749766+00:00",
+  "deployed": true,
+  "contracts_passed": 179,
+  "storage_passed": 13,
+  "customer_browser_passed": 17,
+  "paid_calls": false,
+  "provider_results": "mocked",
+  "ui_post": "intercepted browser POST; real backend submission covered by storage suite",
+  "remaining": [
+    "live owner provider acceptance"
+  ],
+  "migration_deployed": true,
+  "migration_secret_cleanup_verified": true,
+  "api_deployment": "4087761c-bfdb-41be-940e-4455bedb975d",
+  "web_deployment": "a7f3acff-d37a-46f7-935a-afb5e0f55f66",
+  "security_passed": true,
+  "foundation_passed": 192,
+  "deployed_authenticated_ui_passed": true,
+  "worker_image": "sha256:2590b662eba80f7ca4af91b55e743fe0929d569bd09ffc98e63b423a8c5f457e",
+  "worker_configuration_matches": true,
+  "workflow_pollers": 1,
+  "activity_pollers": 1,
+  "maxun_account_http": 200
+}

@@ -1,4 +1,5 @@
-import {exceedsAllowance} from "./spending-allowance.js";
+import {planningReferences,assertPlanningReferences} from './planning-references.js';
+import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
 import {approvedLearning,assertLearningCurrent} from './learning-context.js';
 import {ApiError as GeminiAPIError} from '@google/genai';
 import {GeminiPlanner} from './gemini-planner.js';
@@ -23,6 +24,7 @@ export class PlanningJobs {
    const bound=(await db.query('SELECT provider,selected_model,loop_id,scheduled_at,input,execution_input FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];
    if(!bound||bound.provider!==providerName||bound.selected_model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
    await assertLearningCurrent(db,(bound.execution_input??bound.input).brand.learning);
+   await assertPlanningReferences(db,j.organization_id,j.brand_id,(bound.execution_input??bound.input).references);
    if(new Date(bound.scheduled_at).getTime()>Date.now())throw new CreativeError('PLAN_NOT_DUE');
    const loop=bound.loop_id?(await db.query('SELECT * FROM app.planning_loops WHERE id=$1',[bound.loop_id])).rows[0]:null;
    if(bound.loop_id&&(!loop||loop.stopped_at))throw new CreativeError('PLAN_ACCESS_REVOKED');
@@ -35,11 +37,12 @@ export class PlanningJobs {
    }
    if(providerName!=='openai')throw new CreativeError('PLAN_GPT_REQUIRED');
    if(loop&&(await db.query("SELECT job_id FROM app.planning_calls WHERE loop_id=$1 AND job_id<>$2 AND status IN ('submitted','unknown') LIMIT 1",[loop.id,j.id])).rowCount)throw new CreativeError('PLAN_LOOP_NEEDS_ATTENTION');
+   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`planning-budget:${j.brand_id.toLowerCase()}`]);
    const grant=(await db.query('SELECT * FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,providerName])).rows[0];
    if(!grant)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
    if(grant.model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
    const cost=Math.ceil(wire.maxInputTokens*Number(grant.input_micros_per_token)+wire.maxOutputTokens*Number(grant.output_micros_per_token));
-   const used=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3',[j.organization_id,j.brand_id,providerName])).rows[0].n);
+   const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM (SELECT reserved_micros FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2 AND $3='openai') reservations",[j.organization_id,j.brand_id,providerName])).rows[0].n);
    if(!Number.isSafeInteger(cost)||cost<=0||exceedsAllowance(cost+used,grant.budget_micros))throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
    if(loop){const loopUsed=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.planning_calls WHERE loop_id=$1',[loop.id])).rows[0].n);if(cost+loopUsed>Number(loop.budget_micros))throw new CreativeError('PLAN_LOOP_BUDGET_EXHAUSTED');}
    await db.query("INSERT INTO app.planning_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider,loop_id) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8,$9)",[j.id,message.step,j.organization_id,j.brand_id,model,wire.sha256,cost,providerName,bound.loop_id]);
@@ -74,7 +77,7 @@ export class PlanningJobs {
       const latest=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[j.organization_id,j.brand_id])).rows[0];
       const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0];
       if(!latest||hash(canonicalJSON(latest.snapshot))!==latest.sha256||!prefs||prefs.step!==3||!prefs.channels.length)throw new CreativeError('PLAN_BRAND_INTEGRITY_FAILED');
-      const input={...request.input,brand:{id:latest.id,sha256:latest.sha256,learning:await approvedLearning(db),facts:latest.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{...request.input.preferences,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,revision:prefs.revision}};
+      const input={...request.input,references:await planningReferences(db,j.organization_id,j.brand_id),brand:{id:latest.id,sha256:latest.sha256,learning:await approvedLearning(db),facts:latest.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{...request.input.preferences,goal:prefs.goal,cadence:prefs.cadence,channels:request.input.content_mix?[...new Set(request.input.content_mix.map((row:any)=>row.channel))]:request.input.campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,revision:prefs.revision}};
       if(Buffer.byteLength(JSON.stringify(input))>390000)throw new CreativeError('SKILL_INPUT_LIMIT');
       request.execution_input=input;request.execution_sha256=hash(canonicalJSON(input));request.execution_brain_id=latest.id;
       await db.query('UPDATE app.planning_requests SET execution_input=$2,execution_sha256=$3,execution_brain_id=$4 WHERE job_id=$1',[j.id,JSON.stringify(input),request.execution_sha256,latest.id]);
@@ -112,14 +115,16 @@ export class PlanningJobs {
     const prior=(await db.query('SELECT id FROM app.content_plans WHERE job_id=$1',[j.id])).rows[0];
     if(prior)return this.finish(db,j,'succeeded');
     if((await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0].n>=36)throw new CreativeError('PLAN_LIMIT_REACHED');
+    const selected=new Set(result.plan.slots.flatMap(s=>s.reference_ids??[]));
+    await assertPlanningReferences(db,j.organization_id,j.brand_id,(input.references??[]).filter(r=>selected.has(r.id)));
     const planId=randomUUID(),reserved=(await db.query('SELECT sum(reserved_micros)::text AS n FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0].n;
-    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,learning:input.brand.learning??[],resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
+    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,learning:input.brand.learning??[],resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},content_mix:resolved.content_mix??null,source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
     await db.query(`INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,origin,created_by,request_key,request_hash,job_id,brain_id,strategy,skill_manifest,duration_days)
-      VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify(result.plan),JSON.stringify(manifest),resolved.duration_days??30]);
+      VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,input.campaign?.name??result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify({...result.plan,...(input.campaign?{campaign:input.campaign}: {})}),JSON.stringify(manifest),resolved.duration_days??30]);
     for(const [index,s] of result.plan.slots.entries()){
      const sid=randomUUID();
-     await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index,video_draft)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,[sid,j.organization_id,j.brand_id,planId,s.channel,s.planned_at,s.format,s.brief,s.pillar,s.hook,s.cta,j.requested_by,index,s.video_draft?JSON.stringify(s.video_draft):null]);
+     await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index,video_draft,reference_ids,creative_spec)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,[sid,j.organization_id,j.brand_id,planId,s.channel,s.planned_at,s.format,s.brief,s.pillar,s.hook,s.cta,j.requested_by,index,s.video_draft?JSON.stringify(s.video_draft):null,s.reference_ids??[],s.creative_spec?JSON.stringify(s.creative_spec):null]);
      const snapshot={...s,plan_id:planId,origin:'generated',strategy_slot_index:index,state:'content_needed',creative_version_id:null,creative_sha256:null};
      await db.query(`INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,feedback,snapshot)
        VALUES($1,$2,$3,$4,1,'created',$5,'',$6)`,[randomUUID(),j.organization_id,j.brand_id,sid,j.requested_by,JSON.stringify(snapshot)]);
@@ -129,6 +134,7 @@ export class PlanningJobs {
     return this.finish(db,j,'succeeded');
    });
   }catch(error){
+      if(monthlyBudgetExceeded(error))error=new CreativeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
    if(!(error instanceof CreativeError))throw error;
    return this.jobs.transaction(scope,async(db,j)=>{
     if(terminal.has(j.status))return j.status;

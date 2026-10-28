@@ -9,7 +9,6 @@ import { Pool } from "pg";
 import OpenAI from "openai";
 import { BrandAnalyzer } from "../../dist/brand-analysis.js";
 import { IntakeJobs } from "../../dist/intake-jobs.js";
-import { WebsiteParser } from "../../dist/website-parser.js";
 import { createApplication } from "../../dist/app.js";
 import { ObjectStore, digest } from "../../dist/object-store.js";
 import { AssetJobs } from "../../dist/jobs.js";
@@ -335,7 +334,14 @@ test("Correct/Wrong/Edit decisions use revision conflicts and immutable owner-ap
   const duplicate = (await brain()).findings.find(
     (f) => f.field === "voice" && f.id !== voice.id,
   );
-  assert.equal((await review(duplicate, "wrong")).status, 200);
+  const selected=(await brain()).findings.find(f=>f.id===voice.id);
+  const choose=alternatives=>request(`${path()}/brain/findings/${selected.id}`,{method:'PATCH',body:{revision:selected.revision,decision:'edited',value:'Direct and warm',alternatives}});
+  const unrelated=(await brain()).findings.find(f=>f.field==='brand_name');
+  assert.equal((await choose([{id:unrelated.id,revision:unrelated.revision}])).status,409);
+  assert.equal((await brain()).findings.find(f=>f.id===selected.id).revision,selected.revision,'Failed alternative choice must roll back selected update');
+  assert.equal((await choose([{id:duplicate.id,revision:duplicate.revision-1}])).status,409);
+  assert.equal((await choose([{id:duplicate.id,revision:duplicate.revision}])).status,200);
+  assert.equal((await brain()).findings.find(f=>f.id===duplicate.id).status,'wrong');
   assert.equal((await approve(state.revision)).status, 409);
   state = await brain();
   const approved = await approve(state.revision);
@@ -557,7 +563,7 @@ test("scanned guidelines persist real OCR provenance through owner correction an
     }}));
     const analysis = await request(intakePath,{method:"POST",key:randomUUID(),body:{kind:"brand.analyze"}});
     assert.equal(analysis.status,201,JSON.stringify(analysis.body));
-    const handler = new IntakeJobs(new AssetJobs(workerPool,store,null),new WebsiteParser(process.env.DOCUMENT_PARSER_IMAGE),analyzer);
+    const handler = new IntakeJobs(new AssetJobs(workerPool,store,null),analyzer);
     const scope={organizationId:org.id,brandId:brand.id,jobId:analysis.body.id};
     assert.equal(await handler.run(scope),"succeeded");
     assert.equal(await handler.run(scope),"finished");

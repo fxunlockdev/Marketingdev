@@ -1,0 +1,29 @@
+{
+  "status": "local_verified",
+  "scope": "Optional campaign tone, inspiration, include and avoid preferences",
+  "paid_provider_calls": false,
+  "deployment": "not_performed",
+  "checks": {
+    "api_build": "passed",
+    "web_typecheck": "passed",
+    "planning_contracts": "16/16 passed",
+    "planning_foundation": "23/23 passed; actual isolated skill runtime and database, mocked provider",
+    "exports_foundation": "15/15 passed; saved video and carousel inputs, cross-brand plan rejection, actual local renderer with mocked provider",
+    "campaign_builder_browser": "3/3 passed; real auth/backend, optional preference fields, accessibility and identical request recovery across reload; submission transport mocked",
+    "creative_foundation": "19/19 passed; campaign preferences reached actual isolated planner Responses request, generated saved version attached privately, foreign tenant denied"
+  },
+  "logs": [
+    "work/refinement-api-build.log",
+    "work/refinement-web-types.log",
+    "work/refinement-contracts.log",
+    "work/refinement-planning.log",
+    "work/refinement-exports.log",
+    "work/refinement-browser.log",
+    "work/refinement-creative.log"
+  ],
+  "screenshot": "work/browser/campaign-builder-review.png",
+  "remaining_validation": [
+    "Live model adherence is not established by mocked provider tests"
+  ],
+  "release_requirement": "Rebuild and deploy the skill runtime with the API/web change: the campaign input schema now accepts optional refinement. No database migration is needed."
+}

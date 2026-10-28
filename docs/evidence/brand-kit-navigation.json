@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-10-25T08:08:40.923011+00:00",
+  "scope": "Dedicated Brand Kit with profile/style, private files and approved references",
+  "build": "Web production build passed",
+  "test": {
+    "command": "node scripts/foundation-test.mjs --customer-web",
+    "passed": 21,
+    "failed": 0,
+    "duration_ms": 74466.971041
+  },
+  "verified": [
+    "Profile correction persists across reload",
+    "Uncommitted edit blocks brand approval",
+    "Explicit approval saves new brand version",
+    "New approved wording is visible in own memory and absent in another business",
+    "Media section exposes existing uploaded file",
+    "Switching sections returns saved profile"
+  ],
+  "limits": [
+    "Local only, not deployed",
+    "No new paid API calls",
+    "Visual font/style galleries and complete media experience remain unfinished"
+  ]
+}

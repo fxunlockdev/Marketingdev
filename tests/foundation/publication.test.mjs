@@ -155,7 +155,7 @@ test('publication is disabled by default, holds daily reservations, and stores i
 
 test('overview aggregates actual business records and denies foreign tenants',async()=>{
  const r=await api(path('overview'));assert.equal(r.status,200);assert.equal(r.body.business_id,brand.id);assert.equal(r.body.analytics_available,(await publisher.analytics(alice.id,brand.id)).posts.some(p=>p.state==='available'));assert.equal(r.body.performance.available_count,(await publisher.analytics(alice.id,brand.id)).posts.filter(p=>p.state==='available').length);
- const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);assert.deepEqual(other.body.performance.posts,[]);assert.deepEqual(other.body.recommendations,[]);assert.deepEqual(other.body.generation_activity,[]);
+ const expected=(await admin.query("SELECT count(*)::int AS n FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows[0].n;assert.equal(r.body.counts.published_posts,expected);assert.ok(r.body.counts.creative_projects>0);assert.equal((await api(path('overview'),{user:bob})).status,404);assert.equal((await api(path('overview'),{user:viewer})).status,200);const other=await api(path('overview',sibling));assert.equal(other.body.counts.creative_projects,0);assert.equal(other.body.counts.published_posts,0);assert.equal(other.body.activity.length,0);assert.deepEqual(other.body.performance.posts,[]);assert.deepEqual(other.body.recommendations,[]);assert.deepEqual(other.body.generation_activity,[]);assert.deepEqual(other.body.upcoming_posts,[]);assert.ok(r.body.upcoming_posts.length>0&&r.body.upcoming_posts.length<=6);assert.ok(r.body.upcoming_posts.every(p=>Object.hasOwn(p,'creative_spec')));assert.ok(r.body.upcoming_posts.some(p=>p.design?.background_media_id));const publishedIds=(await admin.query("SELECT slot_id FROM app.publication_requests WHERE brand_id=$1 AND phase='accepted' AND observed_state='published'",[brand.id])).rows.map(x=>x.slot_id);assert.ok(r.body.upcoming_posts.every(p=>!publishedIds.includes(p.id)));const owned=(await admin.query('SELECT id FROM app.content_slots WHERE brand_id=$1',[brand.id])).rows.map(x=>x.id);assert.ok(r.body.upcoming_posts.every(p=>owned.includes(p.id)));
 });
 
 
@@ -287,6 +287,23 @@ test('approved Instagram JPEG is uploaded unchanged once and reconciled against 
   assert.equal(await handler.run(scope(j)),'accepted');assert.deepEqual(lastUpload,bytes);assert.equal(submissions,count+1);
   assert.equal((await handler.reconcile(scope(j))).state,'published');assert.equal(await handler.run(scope(j)),'accepted');assert.equal(submissions,count+1);
   const changed=await approvedPost('instagram'),pending=await queuePost(changed),before=uploads;
+  await admin.query('DELETE FROM app.creative_export_approvals WHERE export_id=$1',[changed.e.id]);
+  assert.equal(await handler.run(scope(pending)),'rejected');assert.equal(uploads,before);
+ }finally{providerName='linkedin';await admin.query("UPDATE app.social_channels SET provider='linkedin' WHERE id=$1",[channelId]);}
+});
+
+
+test('Facebook approved image reaches its Page exactly once, preserves private bytes and reconciles',async()=>{
+ providerName='facebook';await admin.query('UPDATE app.social_channels SET provider=$2 WHERE id=$1',[channelId,providerName]);
+ try{
+  const f=await approvedPost('facebook'),bytes=await store.read((await admin.query('SELECT object_key FROM app.creative_exports WHERE id=$1',[f.e.id])).rows[0].object_key);
+  assert.ok((await publisher.ready(alice.id,brand.id)).posts.some(p=>p.export_id===f.e.id));
+  assert.ok((await publisher.list(alice.id,brand.id)).destinations.some(c=>c.id===channelId&&c.provider==='facebook'));
+  const j=await queuePost(f),count=submissions;remoteState='PUBLISHED';
+  assert.equal(await handler.run(scope(j)),'accepted',JSON.stringify(await record(j)));assert.deepEqual(lastUpload,bytes);assert.equal(submissions,count+1);
+  assert.equal((await handler.reconcile(scope(j))).state,'published');assert.equal(await handler.run(scope(j)),'accepted');assert.equal(submissions,count+1);
+  const wrong=await approvedPost('linkedin');await assert.rejects(queuePost(wrong),/compatible final media/);
+  const changed=await approvedPost('facebook'),pending=await queuePost(changed),before=uploads;
   await admin.query('DELETE FROM app.creative_export_approvals WHERE export_id=$1',[changed.e.id]);
   assert.equal(await handler.run(scope(pending)),'rejected');assert.equal(uploads,before);
  }finally{providerName='linkedin';await admin.query("UPDATE app.social_channels SET provider='linkedin' WHERE id=$1",[channelId]);}

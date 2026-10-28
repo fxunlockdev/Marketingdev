@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {campaignPostProgress} from '../../apps/web/components/campaign-post-progress.ts';
+test('failed/rejected campaign visuals show explicit recovery instead of Image idea',()=>{for(const status of ['failed','rejected']){const state=campaignPostProgress(status);assert.equal(state.label,'Generation failed');assert.equal(state.recover,true);assert.match(state.description,/topic is saved/);}});
+test('unknown outcome directs reconciliation before retry; pending never offers recovery',()=>{assert.match(campaignPostProgress('unknown').description,/check its status before trying again/);for(const status of ['queued','running','retrying'])assert.equal(campaignPostProgress(status).recover,false);});
+test('ready media is not obscured by completed status while detached media can be recovered',()=>{assert.equal(campaignPostProgress('succeeded'),null);assert.equal(campaignPostProgress(undefined),null);assert.equal(campaignPostProgress('needs_attachment').label,'Visual ready to attach');assert.equal(campaignPostProgress('awaiting_approval').label,'Review your script');});

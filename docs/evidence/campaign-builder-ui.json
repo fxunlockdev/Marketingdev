@@ -1,0 +1,43 @@
+{
+  "status": "local_verified_not_deployed",
+  "feature": "Campaign details, content mix and persistent review request",
+  "validation": {
+    "api_build": "passed",
+    "web_build": "passed",
+    "planning_contract_tests": {
+      "passed": 9,
+      "failed": 0
+    },
+    "planning_foundation_tests": {
+      "passed": 19,
+      "failed": 0,
+      "provider": "mocked model transport; actual isolated skill runtime and Temporal"
+    },
+    "customer_browser_tests": {
+      "passed": 23,
+      "failed": 0,
+      "campaign_submission": "mocked transport; actual app, identity, storage and brand services"
+    }
+  },
+  "checks": [
+    "Campaign context reaches planner and persists in saved plan",
+    "Selected campaign channels do not overwrite business defaults",
+    "www target URLs normalized",
+    "Uncertain request retains same idempotency key after reload",
+    "Brand Kit prevents unsaved approval and refresh responses cannot overwrite newer reads",
+    "Mobile review layout and automated accessibility"
+  ],
+  "logs": [
+    "work/campaign-planning-foundation.log",
+    "work/campaign-builder-browser-final.log",
+    "work/campaign-web-build.log"
+  ],
+  "screenshot": "work/browser/campaign-builder-review.png",
+  "paid_api_spend_usd": 0,
+  "limitations": [
+    "Instagram and LinkedIn only",
+    "Draft plan generation; full visual styles/fonts/asset selection flow unfinished",
+    "Credit economics and all-channel publishing not completed",
+    "No deployment or live provider verification in this pass"
+  ]
+}

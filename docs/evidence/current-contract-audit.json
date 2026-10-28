@@ -1,0 +1,10 @@
+{
+  "checked_at": "2026-10-25T14:34:04.179590+00:00",
+  "command": "npm run test:contracts",
+  "passed": true,
+  "tests": 217,
+  "failures": 0,
+  "log": "work/current-contract-audit.log",
+  "scope": "Local adapter/validation contracts; not live provider or production acceptance",
+  "paid_calls": 0
+}

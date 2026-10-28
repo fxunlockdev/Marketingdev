@@ -1,36 +1,42 @@
 {
-  "checked_at": "2026-10-24T08:56:58.246Z",
+  "checked_at": "2026-10-28T17:31:04.690Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:a506423f2a665f0405ab5156f76832b6c67f8cf905d15521e999f448643e7cbe",
+      "image_id": "sha256:8fa0514ef86598ce463997df56b014756eb2cb66ea6fdcacc0f9d6e5ccaa618b",
       "architecture": "amd64",
       "user": "node"
     },
     {
       "role": "documents",
-      "image_id": "sha256:0eef648f8282201133fcd899748b3cf0a29ab73b082e62b611f76eaae3921bfb",
+      "image_id": "sha256:1b5a92d5e659ae8a5f47994f3d0705671712bc673c65f1d01bea6ad165fe0a57",
       "architecture": "amd64",
       "user": "65534:65534"
     },
     {
       "role": "skills",
-      "image_id": "sha256:163116efa89f6154741b0d705f800d0b47378f319d05ebd471dcd2bfdffbb82a",
+      "image_id": "sha256:27cb8f5907fa7bc372d26474ec853c56ca56d90e1ed756238689a5ac3a52b9f5",
       "architecture": "amd64",
       "user": "65534:65534"
     },
     {
       "role": "static_renderer",
-      "image_id": "sha256:3acac21a8c3699076221d08a132dc87e78d7baf745425cdcfe4e5006b7e78ae6",
+      "image_id": "sha256:60d6e8ad5728739ba78c6ddf70a93975097eedbf0c42f63b8df89f069c6bf0d4",
       "architecture": "amd64",
       "user": "65534:65534"
     },
     {
       "role": "video_renderer",
-      "image_id": "sha256:5c67acaa9ce07138248e8dae28d4f432475b31877a78e38da4a548324c36fbf7",
+      "image_id": "sha256:95401ad08e49ae619fb9f1bae50cef443cf9c54bd72d3d31960b746cf292f9f5",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "website_renderer",
+      "image_id": "sha256:4452071e703e04bbf8e9d882cf3c32b3eff057a542d2e3b233983dbe86ce6e89",
       "architecture": "amd64",
       "user": "65534:65534"
     }
   ],
-  "scope": "Locally built amd64 images only; not registry upload, hosted worker or connected services proof"
+  "scope": "Frozen088 worker image; host activation must be checked separately"
 }

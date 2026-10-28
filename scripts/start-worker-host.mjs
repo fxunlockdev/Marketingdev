@@ -5,17 +5,18 @@ import {statSync} from 'node:fs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {workerConfigFromEnv} from '../dist/config.js';
-const allowed=['APP_MODE','WORKER_DATABASE_URL','DISPATCHER_DATABASE_URL','TEMPORAL_ADDRESS','TEMPORAL_NAMESPACE','TEMPORAL_TASK_QUEUE','POSTIZ_PROVISION_TASK_QUEUE','S3_ENDPOINT','S3_REGION','S3_BUCKET','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY','CLAMD_HOST','CLAMD_PORT','DOCUMENT_PARSER_IMAGE','SKILL_RUNTIME_IMAGE','RENDER_RUNTIME_IMAGE','VIDEO_RUNTIME_IMAGE','OPENAI_API_KEY','GEMINI_API_KEY','VIDEO_ENABLED','VIDEO_ENCRYPTION_KEY','HIGGSFIELD_CREDENTIALS','HIGGSFIELD_OUTPUT_ORIGINS','HIGGSFIELD_OUTPUT_POLICY','POSTIZ_ENABLED','POSTIZ_PUBLISHING_ENABLED','POSTIZ_BASE_URL','POSTIZ_MEDIA_ORIGINS','POSTIZ_CALLBACK_ORIGIN','POSTIZ_ENCRYPTION_KEY','OAUTH_ENCRYPTION_KEY'];
+const allowed=['APP_MODE','WORKER_DATABASE_URL','DISPATCHER_DATABASE_URL','TEMPORAL_ADDRESS','TEMPORAL_NAMESPACE','TEMPORAL_TASK_QUEUE','POSTIZ_PROVISION_TASK_QUEUE','S3_ENDPOINT','S3_REGION','S3_BUCKET','S3_ACCESS_KEY_ID','S3_SECRET_ACCESS_KEY','CLAMD_HOST','CLAMD_PORT','WEBSITE_RENDER_IMAGE','DOCUMENT_PARSER_IMAGE','SKILL_RUNTIME_IMAGE','RENDER_RUNTIME_IMAGE','VIDEO_RUNTIME_IMAGE','OPENAI_API_KEY','MAXUN_API_KEY','GEMINI_API_KEY','VIDEO_ENABLED','VIDEO_ENCRYPTION_KEY','HIGGSFIELD_CREDENTIALS','HIGGSFIELD_IMAGES_ENABLED','HIGGSFIELD_IMAGE_ENCRYPTION_KEY','HIGGSFIELD_OUTPUT_ORIGINS','HIGGSFIELD_OUTPUT_POLICY','POSTIZ_ENABLED','POSTIZ_PUBLISHING_ENABLED','POSTIZ_BASE_URL','POSTIZ_MEDIA_ORIGINS','POSTIZ_CALLBACK_ORIGIN','POSTIZ_ENCRYPTION_KEY','OAUTH_ENCRYPTION_KEY'];
 const imageKeys=['DESVIO_WORKER_IMAGE','DOCUMENT_PARSER_IMAGE','SKILL_RUNTIME_IMAGE','RENDER_RUNTIME_IMAGE','VIDEO_RUNTIME_IMAGE'];
 export function workerHostSpec(env){
  if(env.DOCKER_HOST||env.DOCKER_CONTEXT)throw new Error('WORKER_LOCAL_DAEMON_REQUIRED');
  for(const key of ['MIGRATION_DATABASE_URL','AUTH_DATABASE_URL','APP_DATABASE_URL','MAIL_DATABASE_URL','SMTP_PASSWORD','POSTIZ_PROVISIONER_DATABASE_URL'])if(env[key])throw new Error('WORKER_EXCESS_PRIVILEGE');
- for(const key of imageKeys)if(!/^sha256:[a-f0-9]{64}$/.test(env[key]??''))throw new Error('WORKER_PIN_REQUIRED');
+ const configuredImageKeys=[...imageKeys,...(env.WEBSITE_RENDER_IMAGE!==undefined?['WEBSITE_RENDER_IMAGE']:[])];
+ for(const key of configuredImageKeys)if(!/^sha256:[a-f0-9]{64}$/.test(env[key]??''))throw new Error('WORKER_PIN_REQUIRED');
  for(const key of ['VIDEO_ENABLED','POSTIZ_ENABLED','POSTIZ_PUBLISHING_ENABLED'])if(!['true','false'].includes(env[key]))throw new Error('WORKER_EXPLICIT_FLAGS_REQUIRED');
  const values=Object.fromEntries(allowed.filter(k=>env[k]!==undefined).map(k=>[k,env[k]]));
  try{workerConfigFromEnv(values);}catch{throw new Error('WORKER_CONFIGURATION_INVALID');}
  const configurationHash=createHash('sha256').update(JSON.stringify({image:env.DESVIO_WORKER_IMAGE,values})).digest('hex');
- return {image:env.DESVIO_WORKER_IMAGE,values,configurationHash,images:imageKeys.map(k=>env[k])};
+ return {image:env.DESVIO_WORKER_IMAGE,values,configurationHash,images:configuredImageKeys.map(k=>env[k])};
 }
 export function startWorkerHost(env=process.env,{check=false}={}){
  const spec=workerHostSpec(env),name='desvio-trusted-worker';

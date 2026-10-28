@@ -44,7 +44,7 @@ SUITES = {
     "social": [["npm", "run", "build"], ["node", "--test", "tests/contracts/postiz.test.mjs", "tests/contracts/provisioning.test.mjs"], ["node", "scripts/foundation-test.mjs", "--social"]],
     "offline": [["npm", "run", "build"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/offline", "-v"]],
     "browser": [["npm", "run", "build"], ["npm", "run", "test:browser"]],
-    "contracts": [["npm", "run", "build"], ["node", "--test", "tests/contracts/sdk.test.mjs", "tests/contracts/intake.test.mjs", "tests/contracts/creative.test.mjs", "tests/contracts/planning.test.mjs", "tests/contracts/gemini.test.mjs", "tests/contracts/local-calendar.test.mjs", "tests/contracts/calendar-export.test.mjs", "tests/contracts/postiz.test.mjs", "tests/contracts/provisioning.test.mjs", "tests/contracts/higgsfield.test.mjs", "tests/contracts/video-download.test.mjs", "tests/contracts/video-planning.test.mjs", "tests/contracts/published-media.test.mjs", "tests/contracts/live-creative.test.mjs"]],
+    "contracts": [["npm", "run", "build"], ["node", "--test", *[str(path.relative_to(ROOT)) for path in sorted((ROOT / "tests/contracts").glob("*.test.mjs"))]]],
     "security": [["npm", "run", "build"], ["npm", "audit", "--omit=dev", "--audit-level=moderate", "--json"], ["npm", "audit", "--prefix", "apps/media", "--omit=dev", "--audit-level=moderate", "--json"], ["npm", "run", "test:foundation"], [sys.executable, "-m", "unittest", "discover", "-s", "tests/security", "-v"]],
 }
 
@@ -69,7 +69,7 @@ def write_status():
     refs = [f"docs/evidence/{name}.json" for name in SUITES if (EVIDENCE / f"{name}.json").exists()]
     integrations = {name: {"state": "NOT_IMPLEMENTED", "live_test": False, "evidence": refs,
                            "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."}
-                    for name in ["crawl4ai", "docling", "deepagents", "openai_images", "higgsfield_video", "creative_editor", "postiz_publish", "performance_learning", "tenant_runtime"]}
+                    for name in ["maxun", "docling", "deepagents", "openai_images", "higgsfield_video", "creative_editor", "postiz_publish", "performance_learning", "tenant_runtime"]}
     integrations["tenant_runtime"]["blocked_reason"] = "Auth/workspace/brand/team APIs and RLS are implemented locally; deployed private storage, generation-worker authorization and deployed tenant journey remain incomplete."
     security_path = EVIDENCE / "security.json"
     security = json.loads(security_path.read_text()) if security_path.exists() else {}
@@ -98,10 +98,10 @@ def write_status():
     integrations["v5_business_ui"] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/security.json", "docs/evidence/browser.json"],
         "blocked_reason": "Business navigation, scoped records, source review and saved goals/prefill fixtures are tested locally. Actual AI output quality, strategy/plan and creative/social workflows remain incomplete; unavailable controls are labeled honestly."}
-    for capability in ["crawl4ai", "website_visual_evidence", "ai_brand_onboarding"]:
+    for capability in ["openai_website_research", "website_visual_evidence", "ai_brand_onboarding"]:
         integrations[capability] = {"state": "ADAPTER_READY" if foundation_passed and browser_passed else "NOT_IMPLEMENTED", "live_test": False,
             "evidence": ["docs/evidence/security.json", "docs/evidence/contracts.json", "docs/evidence/browser.json"],
-            "blocked_reason": "Local real Crawl4AI/Chromium/private storage and RLS tests, MOCK website resources/model responses, saved AI prefill/visual-guidance browser fixtures and multimodal SDK image/citation/budget contracts. Real public rendered HTTP smoke is separately scoped. Deployed broker, actual visual-model quality, paid model evidence and full end-to-end product remain incomplete."}
+            "blocked_reason": "Production website intake now uses bounded GPT web research with cited, explicitly AI-written notes, followed by GPT brand synthesis. Transport tests are MOCK; actual PostgreSQL ledger/RLS/replay and private storage tests cover handoff. Deployed model-metadata access does not prove paid research or output quality. GPT research does not provide screenshots; uploaded assets and historical captures remain available. Owner live onboarding acceptance is pending."}
     contracts_path = EVIDENCE / "contracts.json"
     contracts = json.loads(contracts_path.read_text()) if contracts_path.exists() else {}
     video_contracts_ready = contracts.get("passed") is True and contracts.get("source_sha256") == source_hash()
@@ -218,7 +218,13 @@ def run_suite(name):
     started_hash = source_hash()
     results = []
     for command in SUITES[name]:
-        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=600)
+        # Full browser runs include real media rendering and durable video polling.
+        # The old ten-minute limit interrupted healthy runs before later modules.
+        browser_command = "test:browser" in command or any(
+            flag in command for flag in ("--web", "--canvas-web", "--customer-web", "--social-web", "--publishing-web")
+        )
+        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True,
+                                timeout=1800 if browser_command else 600)
         log = result.stdout + result.stderr
         print(log, end="")
         results.append({"command": command, "exit_code": result.returncode, "output": log})

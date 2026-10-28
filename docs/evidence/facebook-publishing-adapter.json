@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-10-25T12:38:29.628267+00:00",
+  "status": "ADAPTER_READY",
+  "scope": "Facebook Page feed publication transport only",
+  "upstream_commit": "651876e24317c2d8e717262cf98267ec6f699180",
+  "tests": {
+    "passed": 28,
+    "failed": 0,
+    "log": "work/facebook-publishing-contracts.log",
+    "external_transport": "local mock HTTP server"
+  },
+  "api_build": "passed",
+  "live_provider_calls": 0,
+  "customer_enabled": false,
+  "deployed": false,
+  "remaining": [
+    "Facebook content channel schemas and planning/creative path",
+    "Durable publication worker and approval compatibility",
+    "Operator grant and destination UI",
+    "Live Meta acceptance and publication tests"
+  ]
+}

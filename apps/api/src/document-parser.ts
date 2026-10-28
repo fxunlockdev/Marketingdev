@@ -174,11 +174,11 @@ export class DocumentParser {
 export async function runIntakeSandbox(
   image: string,
   bytes: Buffer,
-  kind: "pdf" | "pptx" | "website",
+  kind: "pdf" | "pptx",
 ) {
   if (
     !/^sha256:[a-f0-9]{64}$/.test(image) ||
-    !["pdf", "pptx", "website"].includes(kind)
+    !["pdf", "pptx"].includes(kind)
   )
     throw new Error("INVALID_SANDBOX_CONFIG");
   const name = `desvio-parser-${randomUUID()}`;
@@ -237,7 +237,7 @@ export async function runIntakeSandbox(
       );
       child.stdout.on("data", (chunk: Buffer) => {
         length += chunk.length;
-        if (length > (kind === "website" ? 2 : 36) * 1024 * 1024) finish(invalid());
+        if (length > 36 * 1024 * 1024) finish(invalid());
         else output += chunk.toString("utf8");
       });
       child.stdin.on("error", () => {});

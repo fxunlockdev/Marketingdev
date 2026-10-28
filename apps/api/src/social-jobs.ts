@@ -1,3 +1,4 @@
+import {facebookPageConfirmed} from './facebook-connection-state.js';
 import {randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
 import {PostizClient,PostizError,type PostizConfig} from './postiz-client.js';
@@ -49,8 +50,8 @@ export class SocialJobs {
     // Do not clear previous knowledge on a failed read. A successful empty list
     // means previously observed channels are now missing, not healthy/connected.
     await db.query("UPDATE app.social_channels SET observed_state='missing',last_checked_at=now(),last_job_id=$1 WHERE brand_id=$2",[j.id,j.brand_id]);
-    for(const c of channels)await db.query(`INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,profile,picture,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now(),$10,$11)
-      ON CONFLICT(remote_id) DO UPDATE SET internal_id=CASE WHEN social_channels.account_revision=EXCLUDED.account_revision AND social_channels.provider=EXCLUDED.provider THEN social_channels.internal_id ELSE NULL END,provider=EXCLUDED.provider,name=EXCLUDED.name,profile=EXCLUDED.profile,picture=EXCLUDED.picture,observed_state=EXCLUDED.observed_state,last_seen_at=EXCLUDED.last_seen_at,last_checked_at=EXCLUDED.last_checked_at,account_revision=EXCLUDED.account_revision,last_job_id=EXCLUDED.last_job_id`,[randomUUID(),j.organization_id,j.brand_id,c.id,c.provider,c.name,c.profile,c.picture,c.disabled?'disabled':'available',input.revision,j.id]);
+    for(const c of channels){const observed=c.disabled?'disabled':c.provider==='facebook'&&!await facebookPageConfirmed(db,c.id,input.revision)?'unconfirmed':'available';await db.query(`INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,profile,picture,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,now(),now(),$10,$11)
+      ON CONFLICT(remote_id) DO UPDATE SET internal_id=CASE WHEN social_channels.account_revision=EXCLUDED.account_revision AND social_channels.provider=EXCLUDED.provider THEN social_channels.internal_id ELSE NULL END,provider=EXCLUDED.provider,name=EXCLUDED.name,profile=EXCLUDED.profile,picture=EXCLUDED.picture,observed_state=EXCLUDED.observed_state,last_seen_at=EXCLUDED.last_seen_at,last_checked_at=EXCLUDED.last_checked_at,account_revision=EXCLUDED.account_revision,last_job_id=EXCLUDED.last_job_id`,[randomUUID(),j.organization_id,j.brand_id,c.id,c.provider,c.name,c.profile,c.picture,observed,input.revision,j.id]);}
     await db.query("UPDATE app.social_disconnects d SET phase='absent' WHERE d.phase IN ('queued','removing','checking','unknown') AND NOT EXISTS(SELECT 1 FROM app.social_channels c WHERE c.id=d.channel_id AND c.observed_state<>'missing')");
     const pending=(await db.query("SELECT 1 FROM app.social_disconnects WHERE job_id=$1 AND phase<>'absent'",[j.id])).rowCount;
     if(pending){await db.query("UPDATE app.social_disconnects SET phase='unknown' WHERE job_id=$1",[j.id]);return this.finish(db,j,'failed','SOCIAL_REMOVAL_UNCONFIRMED');}

@@ -1,0 +1,75 @@
+{
+  "status": "ADAPTER_READY",
+  "date": "2026-10-26",
+  "provider_calls": 0,
+  "deployed": false,
+  "production_worker_wired": false,
+  "api_build": "passed",
+  "offline_contract_and_real_chromium_tests": {
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+  },
+  "actual_network_none_container_tests": {
+    "passed": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "tested_local_image": "sha256:0ce1176fe724305f652fc844795b43607db568b4a94d2b1a84f74e66223f39d8",
+  "tested_architecture": "arm64",
+  "fixtures": "JavaScript inserts text and photo absent from initial HTML. All website responses are fixture transports; no external website or paid provider request.",
+  "verified_boundaries": [
+    "private and mixed DNS rejection",
+    "POST and foreign API rejection",
+    "robots refusal",
+    "MIME and finite request limits",
+    "IPC primitive rejection",
+    "resource whitelist prototype rejection",
+    "history.replaceState provenance refusal",
+    "tenant permission callback cancellation",
+    "real screenshot/photo decoding",
+    "actual Docker network:none capture"
+  ],
+  "remaining": [
+    "reviewed inventory activation and deployment",
+    "owner website acceptance"
+  ],
+  "logs": [
+    "work/website-render-build.log",
+    "work/website-render-tests.log",
+    "work/website-render-container-build.log",
+    "work/website-render-container-test.log",
+    "work/website-render-amd64-build.log",
+    "work/website-render-amd64-test.log",
+    "work/website-render-amd64-launch.log",
+    "work/website-render-config-tests.log",
+    "work/website-render-intake-storage.log",
+    "work/website-render-final-contracts.log",
+    "work/website-render-native-script.log"
+  ],
+  "worker_source_wired": true,
+  "offline_contract_tests": {
+    "passed": 18,
+    "failed": 0
+  },
+  "amd64_image": "sha256:11931e9ad1bebc55463e4e1dbf9931fafd91b3c24c5bdf9656b9ae1d77ec1444",
+  "amd64_build": "passed",
+  "amd64_local_emulation_test": "failed: Chromium launch SIGSEGV under arm64 emulation; native amd64 acceptance required",
+  "intake_storage_foundation": {
+    "passed": 19,
+    "failed": 0,
+    "skipped": 0
+  },
+  "final_targeted_contracts": {
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0
+  },
+  "native_acceptance_script": "passed on native arm64",
+  "native_amd64_host_acceptance": {
+    "passed": true,
+    "evidence": "docs/evidence/railway-website-render-acceptance.json",
+    "external_calls": 0,
+    "activated": false
+  }
+}

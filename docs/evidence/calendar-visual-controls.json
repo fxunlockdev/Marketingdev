@@ -1,0 +1,30 @@
+{
+  "status": "deployed",
+  "deployment_id": "8e55f2d7-cfbb-4316-8eb2-bacd1896c9f4",
+  "typecheck": "passed",
+  "browser_test": {
+    "command": "node scripts/foundation-test.mjs --campaign-review-web",
+    "passed": 1,
+    "failed": 0,
+    "log": "work/calendar-polish-final-browser.log",
+    "provider": "mocked"
+  },
+  "checks": [
+    "Seven horizontally scrollable week columns with cards at least 240px wide",
+    "Filters hidden until opened, status selection and clear work",
+    "Mobile has no document overflow",
+    "WCAG A/AA scan passed",
+    "Planning activity collapsed by default",
+    "Focused review, generation recovery and saved edits still pass"
+  ],
+  "screenshots": [
+    "work/browser/calendar-week-desktop.png",
+    "work/browser/calendar-week-mobile.png"
+  ],
+  "limits": [
+    "No live provider call or social publishing",
+    "Saved video/carousel cover previews still incomplete",
+    "Full journey parity remains incomplete"
+  ],
+  "deployment_status": "SUCCESS"
+}

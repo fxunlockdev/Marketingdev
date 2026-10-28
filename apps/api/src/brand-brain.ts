@@ -108,7 +108,7 @@ export class BrandBrain {
     return this.run(user, org, brand, false, async (db) => {
       const state = (
         await db.query(
-          "SELECT revision FROM app.brand_review_state WHERE organization_id=$1 AND brand_id=$2",
+          "SELECT revision FROM app.brand_review_state WHERE organization_id=$1 AND brand_id=$2 FOR SHARE",
           [org, brand],
         )
       ).rows[0];
@@ -249,7 +249,7 @@ export class BrandBrain {
     input: unknown,
   ) {
     id = uuid(id);
-    const body = object(input, ["revision", "decision", "value"]);
+    const body = object(input, ["revision", "decision", "value", "alternatives"]);
     if (
       !["correct", "wrong", "edited"].includes(String(body.decision)) ||
       !Number.isSafeInteger(body.revision) ||
@@ -258,6 +258,14 @@ export class BrandBrain {
       throw new BadRequestException(
         "A saved revision and Correct, Wrong or Edit decision are required",
       );
+    const alternatives = body.alternatives === undefined ? [] : body.alternatives;
+    if (!Array.isArray(alternatives) || alternatives.length > 499 ||
+        alternatives.some((a:any) => !a || typeof a !== 'object' || !Number.isSafeInteger(a.revision) || a.revision < 1) ||
+        (alternatives.length && body.decision === 'wrong'))
+      throw new BadRequestException('Choose a description before replacing alternatives');
+    const alternativeIds = alternatives.map((a:any) => uuid(a.id));
+    if (new Set(alternativeIds).size !== alternativeIds.length || alternativeIds.includes(id))
+      throw new BadRequestException('Duplicate alternative');
     const value = body.decision === "edited" ? text(body.value) : null;
     if (body.decision !== "edited" && body.value !== undefined)
       throw new BadRequestException("Only Edit accepts a replacement value");
@@ -265,7 +273,7 @@ export class BrandBrain {
       await lockReview(db, org, brand);
       const result = (
         await db.query(
-          `UPDATE app.brand_findings SET status=$4,value=CASE WHEN $4='edited' THEN $5 ELSE original_value END,revision=revision+1,reviewed_by=$6,reviewed_at=now() WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND revision=$7 RETURNING id,status,value,revision`,
+          `UPDATE app.brand_findings SET status=$4,value=CASE WHEN $4='edited' THEN $5 ELSE original_value END,revision=revision+1,reviewed_by=$6,reviewed_at=now() WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND revision=$7 RETURNING id,status,value,revision,field`,
           [org, brand, id, body.decision, value, user, body.revision],
         )
       ).rows[0];
@@ -282,6 +290,14 @@ export class BrandBrain {
         throw new ConflictException(
           "This finding changed. Reload before saving your decision.",
         );
+      }
+      for (const alternative of alternatives) {
+        const replaced = await db.query(
+          `UPDATE app.brand_findings SET status='wrong',revision=revision+1,reviewed_by=$6,reviewed_at=now()
+           WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND revision=$4 AND field=$5 RETURNING id`,
+          [org,brand,alternative.id,alternative.revision,result.field,user]);
+        if (!replaced.rowCount) throw new ConflictException('These descriptions changed. Refresh your profile and choose again.');
+        await this.audit(db,user,org,brand,'brain.wrong',alternative.id);
       }
       await bumpReview(db, org, brand);
       await this.audit(db, user, org, brand, `brain.${body.decision}`, id);

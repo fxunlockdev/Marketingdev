@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-10-26T12:29:30.121258+00:00",
+  "scope": "Local broker contracts; not deployed live-capture proof",
+  "passed": true,
+  "tests": 11,
+  "changes": [
+    "Single-flight robots reads per origin",
+    "Four concurrent bounded fetches; original deadline/request/total byte limits retained"
+  ],
+  "evidence": "work/website-broker-concurrency.log",
+  "paid_calls": 0,
+  "independent_review": "Passed including queued permission revocation and deadline checks"
+}

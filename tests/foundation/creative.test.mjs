@@ -1,3 +1,5 @@
+import {ContentPlan} from '../../dist/content-plan.js';
+import {SlotCreatives} from '../../dist/slot-creatives.js';
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
@@ -118,6 +120,10 @@ async function standard(url, init) {
     );
   }
   imageCalls++;
+  const imagePrompt = path === "/v1/images/edits" ? init.body.get("prompt") : JSON.parse(init.body).prompt;
+  assert.ok(imagePrompt.includes('Acme Dental'));
+  assert.ok(imagePrompt.includes('Use generous spacing and restrained typography.'));
+  assert.ok(!imagePrompt.includes(config.storage.secretAccessKey));
   if (path === "/v1/images/edits") {
     assert.equal(
       digest(Buffer.from(await init.body.get("image").arrayBuffer())),
@@ -184,6 +190,7 @@ before(async () => {
     ["brand_name", "Acme Dental"],
     ["offering", "Scheduling tools for dental practices"],
     ["audience", "Dental practices"],
+    ["fonts", "Headlines: DM Sans, weight 600. Body: DM Sans, weight 400."],
   ])
     await brain.manual(alice, org.id, brand.id, { field, value }, randomUUID());
   let state = await brain.read(alice, org.id, brand.id);
@@ -375,6 +382,8 @@ test("real Temporal workflow executes isolated owner skills, mocked OpenAI gener
   project = state.projects.find((p) => p.latest_version_id);
   version = (await canvas.project(alice, brand.id, project.id)).versions[0];
   assert.equal(version.status, "draft");
+  assert.equal(version.design.layers[0].fontFamily,'DM Sans');
+  assert.equal(version.design.layers[1].fontFamily,'DM Sans');
   assert.equal(version.skill_manifest.skills.length, 4);
   assert.ok(version.skill_manifest.reserved_cost_micros >= 100000);
   const signed = await canvas.media(alice, brand.id, version.media_id);
@@ -579,8 +588,8 @@ test("cancellation and access loss prevent creative promotion; new user edits ar
 
 // Slot workflows use real database roles, isolated skills and private storage.
 // Only the provider transport is MOCK; no live creative-quality claim.
-const {ContentPlan}=await import('../../dist/content-plan.js');
-const {SlotCreatives}=await import('../../dist/slot-creatives.js');
+
+
 const plans=new ContentPlan(businesses),slotCreatives=new SlotCreatives(plans,canvas);
 async function plannedSlot(){
  const p=await plans.create(alice,brand.id,{title:'TEST FIXTURE plan',objective:'Explain the offering',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',planned_at:'2026-11-05T08:00:00Z',format:'static',brief:'Explain our scheduling tool',pillar:'Education',hook:'A calmer day',cta:'Learn more'}]},randomUUID());
@@ -590,17 +599,26 @@ const decision=(s,d,feedback='')=>({revision:s.revision,creative_version_id:s.cr
 let linkedSlot;
 test('planned draft generation is atomic/idempotent, privately attaches the exact creative and records review history',async()=>{
  const s=await plannedSlot(),key=randomUUID(),body={revision:s.revision,feedback:'Keep it simple'};
+ // Generated-plan fixture obeys the provenance constraint; the planning suite
+ // separately proves actual model-to-plan persistence.
+ const planJob=randomUUID(),approvedBrain=(await brain.read(alice,org.id,brand.id)).active;
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'plan.generate','succeeded')",[planJob,org.id,brand.id,alice]);
+ await admin.query("UPDATE app.content_plans SET origin='generated',job_id=$3,brain_id=$4,strategy=$2,skill_manifest=$5 WHERE id=$1",[s.plan_id,{campaign:{design:{style:'editorial',font:'classic'},refinement:{tone:'Warm',references:'Editorial magazines',include:'Approved service details',avoid:'Urgency and discounts'}}},planJob,approvedBrain.id,{test_fixture:true}]);
  await assert.rejects(slotCreatives.generate(viewer,brand.id,s.id,body,key),/read-only|cannot/i);
  await assert.rejects(slotCreatives.detail(bob,brand.id,s.id),/not found/i);
  const results=await Promise.all([slotCreatives.generate(alice,brand.id,s.id,body,key),slotCreatives.generate(alice,brand.id,s.id,body,key)]);
  assert.equal(results[0].id,results[1].id);
  await assert.rejects(slotCreatives.generate(alice,brand.id,s.id,{...body,feedback:'Changed'},key),/another creative/);
  const count=imageCalls,j=results[0];
+ const savedPrompt=(await admin.query('SELECT prompt FROM app.creative_requests WHERE job_id=$1',[j.id])).rows[0].prompt;assert.match(savedPrompt,/editorial magazine/);assert.match(savedPrompt,/DM Serif Display/);assert.match(savedPrompt,/Urgency and discounts/);assert.match(savedPrompt,/approved brand facts authoritative/);
  const unrelated=await plannedSlot();
  await jobs.transaction(scope(j),async db=>{assert.equal((await db.query("UPDATE app.content_slots SET state='draft_ready' WHERE id=$1",[unrelated.id])).rowCount,0);});
  await assert.rejects(jobs.transaction(scope(j),db=>db.query("UPDATE app.content_slots SET state='approved' WHERE id=$1",[s.id])),e=>e.code==='42501');
- assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.equal(imageCalls,count+1);
+ let sawCampaignPreferences=false;transport=async(url,init)=>{if(new URL(url).pathname==='/v1/responses'){const payload=JSON.stringify(JSON.parse(init.body));sawCampaignPreferences=payload.includes('Urgency and discounts')&&payload.includes('approved brand facts authoritative');}return standard(url,init);};
+ try{assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.equal(imageCalls,count+1);assert.ok(sawCampaignPreferences,'Saved campaign preferences reach the actual isolated planner model request');}finally{transport=undefined;}
  const detail=await slotCreatives.detail(alice,brand.id,s.id);linkedSlot=detail.slot;
+ await assert.rejects(canvas.project(bob,brand.id,linkedSlot.project_id),/not found|access|member/i);
+ const generatedDesign=(await canvas.project(alice,brand.id,linkedSlot.project_id)).versions.find(v=>v.id===linkedSlot.creative_version_id).design;assert.equal(generatedDesign.layers[0].fontFamily,'DM Serif Display');assert.equal(generatedDesign.layers[1].fontFamily,'DM Sans');
  assert.equal(linkedSlot.state,'draft_ready');assert.equal(linkedSlot.approved_by,null);assert.equal(linkedSlot.revision,3);
  assert.equal(detail.generations[0].attachment_status,'attached');assert.equal(detail.generations[0].attached_version_id,linkedSlot.creative_version_id);
  assert.deepEqual(detail.events.map(e=>e.action),['created','generation_requested','creative_attached']);
@@ -704,10 +722,26 @@ test('approved private brand references reach MOCK image edits with immutable pr
  assert.equal(Number((await admin.query("SELECT reserved_micros FROM app.creative_calls WHERE job_id=$1 AND step='image'",[j.id])).rows[0].reserved_micros),200000);
  assert.deepEqual(v.skill_manifest.references[0].crop,approval.crop);assert.equal(v.skill_manifest.references[0].source_sha256,digest(jpg));assert.equal(v.skill_manifest.references[0].id,ref.id);assert.equal(uploads,1);
  assert.equal(await handler.run(scope(j)),'finished');assert.equal(uploads,1);
+ const originalSlot=await plannedSlot();
+ await assert.rejects(plans.edit(viewer,brand.id,originalSlot.id,{revision:originalSlot.revision,reference_ids:[ref.id]}));
+ await assert.rejects(plans.edit(alice,brand.id,originalSlot.id,{revision:originalSlot.revision,reference_ids:[randomUUID()]}),/unavailable|approved/);
+ await assert.rejects(plans.edit(alice,brand.id,originalSlot.id,{revision:originalSlot.revision,reference_ids:[ref.id,ref.id]}),/once/);
+ const slot=await plans.edit(alice,brand.id,originalSlot.id,{revision:originalSlot.revision,reference_ids:[ref.id]});
+ assert.deepEqual((await slotCreatives.detail(alice,brand.id,slot.id)).slot.reference_ids,[ref.id]);
+ const slotKey=randomUUID(),slotBody={revision:slot.revision};
+ const slotJob=await slotCreatives.generate(alice,brand.id,slot.id,slotBody,slotKey);
+ assert.equal((await slotCreatives.generate(alice,brand.id,slot.id,slotBody,slotKey)).id,slotJob.id);
+ await assert.rejects(slotCreatives.generate(alice,brand.id,slot.id,{...slotBody,reference_ids:[]},slotKey),/another creative request/);
+ transport=async(url,init)=>{if(new URL(url).pathname==='/v1/images/edits'){assert.equal(init.body.getAll('image[]').length,1);assert.ok(init.body.get('prompt').includes(approval.label));return Response.json({created:1,data:[{b64_json:png.toString('base64')}]});}return standard(url,init);};
+ try{assert.equal(await handler.run(scope(slotJob)),'succeeded',JSON.stringify(await row(slotJob)));}finally{transport=undefined;}
+ const savedSlot=(await slotCreatives.detail(alice,brand.id,slot.id)).slot;
+ assert.equal(savedSlot.skill_manifest.references[0].id,ref.id);
  const pending=await canvas.submit(alice,brand.id,thread.id,body,randomUUID()),calls=planCalls+imageCalls;
  await canvas.revokeReference(alice,brand.id,ref.id);
  assert.equal(await handler.run(scope(pending)),'rejected');assert.equal((await row(pending)).error_code,'CREATIVE_REFERENCE_REVOKED');assert.equal(planCalls+imageCalls,calls);
  await assert.rejects(canvas.submit(alice,brand.id,thread.id,body,randomUUID()),/no longer approved/);
+ await assert.rejects(plans.edit(alice,brand.id,savedSlot.id,{revision:savedSlot.revision,reference_ids:[ref.id]}),/unavailable|approved/);
+ await assert.rejects(slotCreatives.generate(alice,brand.id,savedSlot.id,{revision:savedSlot.revision},randomUUID()),/unavailable|approved/);
  assert.equal((await canvas.references(alice,brand.id)).references.length,0);
  const reapproved=await canvas.approveReference(alice,brand.id,approval);
  assert.notEqual(reapproved.id,ref.id);
@@ -746,8 +780,117 @@ test('immutable request ceiling bounds planning and image calls independently of
  assert.equal((await canvas.submit(alice,brand.id,thread.id,body,key)).id,j.id);
  await assert.rejects(canvas.submit(alice,brand.id,thread.id,{...body,max_cost_micros:100000},key),/different|another/);
  assert.equal(await handler.run(scope(j)),'rejected');assert.equal((await row(j)).error_code,'CREATIVE_REQUEST_BUDGET_EXHAUSTED');assert.equal(planCalls+imageCalls,calls);
- const k=await canvas.submit(alice,brand.id,thread.id,{...request('Plan but do not exceed the image budget'),max_cost_micros:99999},randomUUID()),images=imageCalls;
- assert.equal(await handler.run(scope(k)),'rejected');assert.equal((await row(k)).error_code,'CREATIVE_REQUEST_BUDGET_EXHAUSTED');assert.equal(imageCalls,images);
- const reserved=Number((await admin.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE job_id=$1',[k.id])).rows[0].n);assert.ok(reserved>0&&reserved<=99999);
+ const k=await canvas.submit(alice,brand.id,thread.id,{...request('Plan but do not exceed the image budget'),max_cost_micros:99999},randomUUID()),images=imageCalls,plansBefore=planCalls;
+ assert.equal(await handler.run(scope(k)),'rejected');assert.equal((await row(k)).error_code,'CREATIVE_REQUEST_BUDGET_EXHAUSTED');assert.equal(imageCalls,images);assert.equal(planCalls,plansBefore);
+ const reserved=Number((await admin.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE job_id=$1',[k.id])).rows[0].n);assert.equal(reserved,0);
  for(const p of [app,worker])await assert.rejects(p.query('UPDATE app.creative_requests SET max_cost_micros=1000000 WHERE job_id=$1',[k.id]),e=>e.code==='42501');
+ const affordable=await canvas.submit(alice,brand.id,thread.id,{...request('Affordable capped image'),max_cost_micros:1000000},randomUUID());
+ assert.equal(await handler.run(scope(affordable)),'succeeded');
+ const total=Number((await admin.query('SELECT sum(reserved_micros) AS n FROM app.creative_calls WHERE job_id=$1',[affordable.id])).rows[0].n);assert.ok(total>100000&&total<=1000000);
+ const after=planCalls+imageCalls;assert.equal(await handler.run(scope(affordable)),'finished');assert.equal(planCalls+imageCalls,after);
+});
+
+test('campaign image batch atomically queues reviewed posts, replays without duplicates and retains job isolation',async()=>{
+ await grant(100000000);transport=undefined;
+ const plan=await plans.create(alice,brand.id,{title:'TEST image batch',objective:'Explain the offering',starts_on:'2026-11-01',timezone:'UTC',slots:[0,1].map(i=>({channel:'linkedin',planned_at:`2026-11-0${i+1}T08:00:00Z`,format:'static',brief:`Our scheduling tool ${i}`,pillar:'Education',hook:`A calmer day ${i}`,cta:'Learn more'}))},randomUUID());
+ const slots=(await plans.list(alice,brand.id,{start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:plan.id})).slots;
+ const body={slots:slots.map(s=>({id:s.id,revision:s.revision})),credit_cap:200},key=randomUUID();
+ const count=async()=>Number((await admin.query('SELECT count(*) AS n FROM app.content_slot_generations WHERE slot_id=ANY($1::uuid[])',[slots.map(s=>s.id)])).rows[0].n);
+ await assert.rejects(slotCreatives.generateBatch(viewer,brand.id,plan.id,body,key),/read-only|cannot/i);
+ await assert.rejects(slotCreatives.generateBatch(bob,brand.id,plan.id,body,key),/not found/i);
+ await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{slots:[body.slots[0],{...body.slots[1],revision:999}]},key),/changed/);assert.equal(await count(),0);
+ const unrelated=await plannedSlot();await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{slots:[body.slots[0],{id:unrelated.id,revision:unrelated.revision}]},key),/not found/i);assert.equal(await count(),0);
+ await admin.query('UPDATE app.creative_grants SET max_image_request_micros=5000000 WHERE brand_id=$1',[brand.id]);const quoted=await slotCreatives.batchStatus(alice,brand.id,plan.id);assert.ok(quoted.quote.available);assert.ok(quoted.quote.slots.every(s=>s.credits>500));await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,body,key),/capacity of at least/);assert.equal(await count(),0);await admin.query('UPDATE app.creative_grants SET max_image_request_micros=100000 WHERE brand_id=$1',[brand.id]);
+ const [a,b]=await Promise.all([slotCreatives.generateBatch(alice,brand.id,plan.id,body,key),slotCreatives.generateBatch(alice,brand.id,plan.id,body,key)]);
+ assert.deepEqual(a,b);assert.equal(a.jobs.length,2);assert.equal(await count(),2);
+ const snapshot=(await admin.query('SELECT reviewed_slots,credit_cap FROM app.campaign_image_batches WHERE request_key=$1',[key])).rows[0];assert.deepEqual(snapshot.reviewed_slots,body.slots);assert.equal(snapshot.credit_cap,200);const perImage=(await admin.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=ANY($1::uuid[])',[a.jobs.map(j=>j.id)])).rows;assert.ok(perImage.every(r=>Number(r.max_cost_micros)===1000000));await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,credit_cap:201},key),/another campaign/);
+ await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{slots:[body.slots[0]]},key),/another campaign/);
+ await assert.rejects(canvas.submit(alice,brand.id,thread.id,request(),randomUUID()),/running|uncertain/);
+ for(const j of a.jobs){assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));}
+ const status=await slotCreatives.batchStatus(alice,brand.id,plan.id);assert.equal(status.request_key,key);assert.equal(status.jobs.length,2);await assert.rejects(slotCreatives.batchStatus(bob,brand.id,plan.id),/not found/i);
+ const replay=await slotCreatives.generateBatch(alice,brand.id,plan.id,body,key);assert.ok(replay.jobs.every(j=>j.status==='succeeded'));assert.equal(await count(),2);
+ for(const s of slots){const d=await slotCreatives.detail(alice,brand.id,s.id);assert.equal(d.slot.state,'draft_ready');assert.equal(d.generations.length,1);assert.equal(d.generations[0].attachment_status,'attached');}
+
+ const direct=await plannedSlot();
+ const directJob=await slotCreatives.generate(alice,brand.id,direct.id,{revision:direct.revision},randomUUID());
+ const directStatus=await slotCreatives.batchStatus(alice,brand.id,direct.plan_id);
+ assert.equal(directStatus.request_key,undefined);assert.equal(directStatus.jobs.length,1);assert.equal(directStatus.jobs[0].id,directJob.id);
+ assert.equal(await handler.run(scope(directJob)),'succeeded');
+ assert.equal((await slotCreatives.batchStatus(alice,brand.id,direct.plan_id)).jobs[0].status,'succeeded');
+ await assert.rejects(app.query('DELETE FROM app.campaign_image_batches'),e=>e.code==='42501');
+});
+
+test('standalone Canvas archive preserves history, rejects mutations and restores without publication',async()=>{
+ const {ProjectArchive}=await import('../../dist/project-archive.js'),archive=new ProjectArchive(canvas);
+ const p=(await admin.query(`SELECT p.id,p.latest_version_id FROM app.creative_projects p WHERE p.brand_id=$1 AND p.latest_version_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM app.creative_versions v JOIN app.content_slots s ON s.creative_version_id=v.id WHERE v.project_id=p.id) AND NOT EXISTS(SELECT 1 FROM app.creative_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.project_id=p.id AND j.status IN ('queued','running','retrying')) ORDER BY p.created_at DESC LIMIT 1`,[brand.id])).rows[0];
+ assert.ok(p);const original=await canvas.project(alice,brand.id,p.id),current=original.versions.find(v=>v.id===p.latest_version_id),rev=original.project.archive_revision;
+ await assert.rejects(archive.change(bob,brand.id,p.id,{revision:rev},true),/not found/i);
+ await assert.rejects(archive.change(viewer,brand.id,p.id,{revision:rev},true),/read-only|cannot/i);
+ await assert.rejects(archive.change(alice,brand.id,p.id,{revision:rev+1},true),/changed/i);
+ const before=Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand.id])).rows[0].n);
+ const archived=await archive.change(alice,brand.id,p.id,{revision:rev},true);assert.ok(archived.archived_at);
+ assert.ok((await archive.list(alice,brand.id,{})).projects.some(x=>x.id===p.id));
+ await assert.rejects(archive.list(bob,brand.id,{}),/not found/i);
+ assert.ok(!(await canvas.thread(alice,brand.id,original.project.thread_id)).projects.some(x=>x.id===p.id));
+ assert.deepEqual((await canvas.project(alice,brand.id,p.id)).versions,original.versions);
+ await assert.rejects(canvas.save(alice,brand.id,p.id,{parent_id:current.id,design:current.design,caption:current.caption}),/Restore.*archived/i);
+ await assert.rejects(canvas.submit(alice,brand.id,original.project.thread_id,request('Change archived image',current.id),randomUUID()),/Restore.*archived/i);
+ await assert.rejects(canvas.review(alice,brand.id,current.id,{decision:'in_review',feedback:'',revision:current.review_revision}),/Restore.*archived/i);
+ await assert.rejects(archive.change(alice,brand.id,p.id,{revision:rev},false),/changed/i);
+ const restored=await archive.change(alice,brand.id,p.id,{revision:archived.archive_revision},false);assert.equal(restored.archived_at,null);
+ assert.ok((await canvas.thread(alice,brand.id,original.project.thread_id)).projects.some(x=>x.id===p.id));
+ assert.ok(!(await archive.list(alice,brand.id,{})).projects.some(x=>x.id===p.id));
+ assert.deepEqual((await canvas.project(alice,brand.id,p.id)).versions,original.versions);
+ assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand.id])).rows[0].n),before);
+ const linked=(await admin.query('SELECT v.project_id FROM app.content_slots s JOIN app.creative_versions v ON v.id=s.creative_version_id WHERE s.brand_id=$1 LIMIT 1',[brand.id])).rows[0];
+ assert.ok(linked);await assert.rejects(archive.change(alice,brand.id,linked.project_id,{revision:1},true),/belongs to a post/);
+});
+
+test('standalone video and carousel projects archive with scoped durable restore',async()=>{
+ const {ProjectArchive}=await import('../../dist/project-archive.js'),archive=new ProjectArchive(canvas);
+ for(const kind of ['video','carousel']){
+  const id=randomUUID();
+  if(kind==='video')await admin.query("INSERT INTO app.video_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,'TEST archive video',$5)",[id,org.id,brand.id,thread.id,alice]);
+  else await admin.query('INSERT INTO app.carousel_projects(id,organization_id,brand_id,created_by) VALUES($1,$2,$3,$4)',[id,org.id,brand.id,alice]);
+  await assert.rejects(archive.change(bob,brand.id,id,{revision:1},true,kind),/not found/i);
+  await assert.rejects(archive.change(viewer,brand.id,id,{revision:1},true,kind),/read-only|cannot/i);
+  const archived=await archive.change(alice,brand.id,id,{revision:1},true,kind);
+  const result=(await archive.list(alice,brand.id,{})).projects.find(p=>p.id===id);
+  assert.equal(result.kind,kind);assert.equal(result.version_count,0);assert.ok(result.archived_at);
+  await assert.rejects(archive.change(alice,brand.id,id,{revision:1},false,kind),/changed/i);
+  await archive.change(alice,brand.id,id,{revision:archived.archive_revision},false,kind);
+  assert.ok(!(await archive.list(alice,brand.id,{})).projects.some(p=>p.id===id));
+ }
+ assert.throws(()=>archive.change(alice,brand.id,randomUUID(),{revision:1},true,'invalid'),/Choose/);
+});
+
+test('campaign image batch atomically prepares mixed formats without dispatching unapproved video',async()=>{
+ const {CarouselGeneration}=await import('../../dist/carousel-generation.js');
+ await grant(100000000);transport=undefined;
+ const service=new SlotCreatives(plans,canvas,new CarouselGeneration(canvas,'sha256:'+'0'.repeat(64)));
+ const definitions=[['carousel','feed','portrait',3],['static','story','vertical',null],['video','reel','vertical',null],['video','story','vertical',null]];
+ const plan=await plans.create(alice,brand.id,{title:'TEST mixed campaign',objective:'Show the product',starts_on:'2026-12-01',timezone:'UTC',slots:definitions.map(([format,placement,aspect,slide_count],i)=>({channel:'instagram',planned_at:`2026-12-0${i+1}T08:00:00Z`,format,creative_spec:{placement,aspect,slide_count},brief:`Our scheduling tool ${i}`,pillar:'Education',hook:'A calmer day',cta:'Learn more'}))},randomUUID());
+ const slots=(await plans.list(alice,brand.id,{start:'2026-12-01T00:00:00Z',end:'2027-01-01T00:00:00Z',plan_id:plan.id})).slots;
+ const quote=(await service.batchStatus(alice,brand.id,plan.id)).quote;assert.equal(quote.slots.length,4);assert.equal(quote.slots.filter(s=>s.credits===0).length,2);
+ const cap=quote.slots.reduce((n,s)=>n+s.credits,0),body={slots:slots.map(s=>({id:s.id,revision:s.revision})),credit_cap:cap},key=randomUUID();
+ const before=(await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE kind='creative.video'")).rows[0].n;
+ await assert.rejects(service.generateBatch(alice,brand.id,plan.id,{...body,credit_cap:cap-1},key),/capacity/);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.campaign_batch_items WHERE request_key=$1',[key])).rows[0].n,0);
+ const result=await service.generateBatch(alice,brand.id,plan.id,body,key);assert.equal(result.jobs.length,4);assert.equal(result.jobs.filter(j=>j.status==='awaiting_approval').length,2);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE kind='creative.video'")).rows[0].n,before);
+ const items=(await admin.query('SELECT * FROM app.campaign_batch_items WHERE request_key=$1',[key])).rows;assert.equal(items.length,4);assert.ok(items.every(i=>i.source_revision===1&&i.creative_spec));
+ const carousel=items.find(i=>i.format==='carousel'),children=(await admin.query('SELECT generation_job_id FROM app.carousel_children WHERE parent_job_id=$1',[carousel.job_id])).rows;assert.equal(children.length,3);
+ const parent=(await admin.query('SELECT max_cost_micros,creative_spec FROM app.carousel_requests WHERE job_id=$1',[carousel.job_id])).rows[0];assert.equal(Number(parent.max_cost_micros),quote.slots.find(s=>s.id===carousel.slot_id).planning_credits*10000);
+ const staticRequest=(await admin.query('SELECT creative_spec,size FROM app.creative_requests WHERE job_id=$1',[items.find(i=>i.format==='static').job_id])).rows[0];assert.equal(staticRequest.creative_spec.placement,'story');assert.equal(staticRequest.size,'1024x1536');
+ // The real normalized story must fit storage; mismatched target pairs remain invalid.
+ const storyItem=items.find(i=>i.format==='static'),mediaId=randomUUID();
+ const mediaInsert='INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,1,$7,$8)';
+ const mediaArgs=[mediaId,storyItem.organization_id,brand.id,storyItem.job_id,'TEST/story-dimension-regression','a'.repeat(64)];
+ await admin.query(mediaInsert,[...mediaArgs,1080,1920]);await admin.query('DELETE FROM app.creative_media WHERE id=$1',[mediaId]);
+ for(const [width,height] of [[1920,1080],[1080,1536]])await assert.rejects(admin.query(mediaInsert,[...mediaArgs,width,height]),/creative_media_canonical_dimensions/);
+ assert.deepEqual(await service.generateBatch(alice,brand.id,plan.id,body,key),result);
+ await assert.rejects(service.batchStatus(bob,brand.id,plan.id),/not found/);
+ assert.equal((await service.batchStatus(alice,brand.id,plan.id)).jobs.length,4);
+ // End this fixture's unexecuted requests without making any provider call.
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=ANY($1::uuid[]) OR id IN (SELECT generation_job_id FROM app.carousel_children WHERE parent_job_id=$2) OR id IN (SELECT export_job_id FROM app.carousel_children WHERE parent_job_id=$2)",[items.flatMap(i=>i.job_id?[i.job_id]:[]),carousel.job_id]);
 });

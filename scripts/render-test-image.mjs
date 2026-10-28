@@ -16,6 +16,11 @@ export function prepareRenderImage() {
       "apps/media/package.json",
       "apps/media/package-lock.json",
       "apps/media/runtime.mjs",
+      "apps/web/public/fonts/dm-sans.ttf",
+      "apps/web/public/fonts/dm-serif-display.ttf",
+      "apps/web/public/fonts/dmsans-OFL.txt",
+      "apps/web/public/fonts/dmserifdisplay-OFL.txt",
+      "apps/web/public/fonts/sources.json",
     ]) {
       const target = join(context, relative);
       mkdirSync(dirname(target), { recursive: true });

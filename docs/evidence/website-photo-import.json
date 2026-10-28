@@ -1,0 +1,79 @@
+{
+  "checked_at": "2026-10-25T12:27:28.461852+00:00",
+  "status": "LOCAL_VERIFIED",
+  "scope": "Website photo enrichment and private onboarding persistence",
+  "api_build": "passed",
+  "web_build": "passed",
+  "contracts": {
+    "passed": 18,
+    "failed": 0,
+    "log": "work/website-photos-contracts.log"
+  },
+  "foundation": {
+    "passed": 17,
+    "failed": 0,
+    "log": "work/website-photos-foundation.log",
+    "providers": "mock OpenAI; real local PostgreSQL/object storage/scanner"
+  },
+  "live_photo_fetch": {
+    "checked_at": "2026-10-25T12:26:58.967Z",
+    "website": "https://runwalrealty.com/",
+    "requests": 11,
+    "photo_count": 6,
+    "photos": [
+      {
+        "width": 1920,
+        "height": 1080,
+        "sha256": "2a93914d8e74773e2c7f017239e019a6c9cc0617df5a35afe835989033ee2032"
+      },
+      {
+        "width": 500,
+        "height": 800,
+        "sha256": "02c3cc79b4c8436caca43300e6f6a20720940869b4698491deef0f111727ef84"
+      },
+      {
+        "width": 630,
+        "height": 723,
+        "sha256": "237ee08a36e58b8d1a3133d89a73b1c3e59243c848870fab99d0fc67e650ddaf"
+      },
+      {
+        "width": 630,
+        "height": 723,
+        "sha256": "84bd0db10cd76634efc6b6c40ae4d70edbe3d653b58c705c9938cecf7ab4e443"
+      },
+      {
+        "width": 630,
+        "height": 723,
+        "sha256": "c99f0bfe3eb090eb7230205496d1c16a2f9e2ddc9531c17d630d4dd5b0c97c0b"
+      },
+      {
+        "width": 1280,
+        "height": 606,
+        "sha256": "5e0a4133e324448895c4dc12038ed215af5d1ebba375cacab22117e0c08103a1"
+      }
+    ],
+    "failures": [
+      {
+        "url": "https://runwalrealty.com/wp-content/themes/runwal/images/mainLogo.svg",
+        "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+      },
+      {
+        "url": "https://runwalrealty.com/wp-content/themes/runwal/images/logo.svg",
+        "reason": "WEBSITE_PHOTO_TYPE_UNSUPPORTED"
+      },
+      {
+        "url": "https://runwalrealty.com/wp-content/uploads/2026/09/telephone-call-64px.png",
+        "reason": "WEBSITE_PHOTO_NOT_SUITABLE"
+      }
+    ],
+    "paid_calls": 0
+  },
+  "migration": "072_website_photos.sql",
+  "deployed": false,
+  "paid_calls": 0,
+  "limitations": [
+    "One cited static HTML page per research job",
+    "Stock search and rendered website capture are not included",
+    "Live deployed onboarding not verified"
+  ]
+}

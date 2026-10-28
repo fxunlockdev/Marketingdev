@@ -13,5 +13,6 @@ test('Reel eligibility requires canonical metadata bound to the approved bytes',
 test('Publication destination mapping supports only implemented providers',()=>{
  assert.equal(publicationChannel('linkedin'),'linkedin');
  assert.equal(publicationChannel('instagram-standalone'),'instagram');
- for(const provider of ['instagram','facebook','unknown',''])assert.equal(publicationChannel(provider),null);
+ assert.equal(publicationChannel('facebook'),'facebook');
+ for(const provider of ['instagram','youtube','tiktok','twitter','google','unknown',''])assert.equal(publicationChannel(provider),null);
 });

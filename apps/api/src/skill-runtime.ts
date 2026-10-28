@@ -1,6 +1,6 @@
 import {validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
 import {validateInsightResult,type InsightInput} from './insight-contracts.js';
-import {validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
+import {scheduleGeneratedPlan,validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
 import {validateVideoInput,validateVideoPlanningResult,type VideoPlanningInput,type VideoPlanningResult} from './video-planning.js';
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -19,10 +19,12 @@ export class SkillRuntime {
     return !!this.image && /^sha256:[a-f0-9]{64}$/.test(this.image);
   }
   plan(input:CreativeInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<SkillResult> {
-    return this.run(input,model,value=>validateSkillResult(value,input));
+    return this.run(input,request=>model({...request,creative_fact_ids:input.brand.facts.map(f=>f.id)}),value=>validateSkillResult(value,input));
   }
   contentPlan(input:PlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<PlanningResult> {
-    return this.run(input,model,value=>validatePlanningResult(value,input));
+    // Daily placement limits belong to the application, not the isolated model input.
+    const {max_posts_per_day,...providerInput}=input;
+    return this.run(providerInput,model,value=>validatePlanningResult({...value,plan:scheduleGeneratedPlan(value.plan,input)},input));
   }
   videoPlan(input:VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<VideoPlanningResult> {
     validateVideoInput(input);

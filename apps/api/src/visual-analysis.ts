@@ -35,7 +35,7 @@ export async function prepareVisuals(
     if (bytes.length !== row.bytes || digest(bytes) !== row.sha256)
       throw new IntakeError("AI_VISUAL_INTEGRITY_FAILED");
     const metadata = await sharp(bytes, {
-      limitInputPixels: 25_000_000,
+      limitInputPixels: 64_000_000,
     }).metadata();
     if (
       metadata.format !== "jpeg" ||
@@ -75,7 +75,7 @@ export async function prepareVisuals(
         width: row.width,
         height: region.height,
       };
-      const encoded = await sharp(bytes, { limitInputPixels: 25_000_000 })
+      const encoded = await sharp(bytes, { limitInputPixels: 64_000_000 })
         .extract({
           left: crop.x,
           top: crop.y,

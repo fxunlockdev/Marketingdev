@@ -1,0 +1,30 @@
+{
+  "status": "deployed",
+  "scope": [
+    "Visual font pairing choices in brand fact creation and editing",
+    "Saved font samples and safe hex-color swatches"
+  ],
+  "validation": {
+    "typecheck": "passed",
+    "browser_tests": {
+      "passed": 4,
+      "failed": 0,
+      "log": "work/brand-style-preview-browser.log",
+      "coverage": [
+        "Existing signup, onboarding and private upload",
+        "Choose pairing, save correction, approve brand and reload",
+        "Mobile overflow and WCAG A/AA"
+      ]
+    },
+    "screenshot": "work/browser/brand-kit-typography.png",
+    "visual_inspection": "completed",
+    "paid_providers": "not_called"
+  },
+  "limitations": [
+    "Supported bundled typefaces only; unknown fonts remain text",
+    "Does not yet set default editable-layer fonts for non-campaign generation",
+    "No new live generation or publishing verification"
+  ],
+  "web_deployment": "28ff9788-ae78-412e-92b0-5012dec3416b",
+  "web_deployment_status": "SUCCESS"
+}

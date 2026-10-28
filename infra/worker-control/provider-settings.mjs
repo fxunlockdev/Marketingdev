@@ -1,7 +1,7 @@
 import {validHiggsfieldCredential} from '../../dist/higgsfield-client.js';
 import {VideoDownload} from '../../dist/video-download.js';
 // Railway settings are operator input, never authority to replace infrastructure credentials.
-const keys = ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'HIGGSFIELD_CREDENTIALS'];
+const keys = ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'HIGGSFIELD_CREDENTIALS', 'MAXUN_API_KEY'];
 export function providerSettings(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('INVALID_PROVIDER_SETTINGS');
   const output = {};
@@ -18,7 +18,7 @@ export function providerSettings(input) {
 
 // An explicit operator switch is required. Merely adding a paid credential cannot enable video.
 export function providerRuntimeSettings(input){
- const credentials=providerSettings(input),enabled=input.VIDEO_ENABLED??'false';
+ const credentials={...providerSettings(input),...imageRuntimeSettings(input)},enabled=input.VIDEO_ENABLED??'false';
  if(!['true','false'].includes(enabled))throw Error('INVALID_VIDEO_SETTINGS');
  if(enabled==='false')return {...credentials,VIDEO_ENABLED:'false'};
  try{
@@ -38,4 +38,12 @@ export function providerRuntimeSettings(input){
   new VideoDownload(origins); // Reuse the real downloader's exact-origin/SSRF configuration rules.
   return {...credentials,VIDEO_ENABLED:'true',VIDEO_ENCRYPTION_KEY:input.VIDEO_ENCRYPTION_KEY,HIGGSFIELD_OUTPUT_ORIGINS:origins.join(',')};
  }catch{throw Error('INVALID_VIDEO_SETTINGS');}
+}
+
+export function imageRuntimeSettings(input){
+ const enabled=input.HIGGSFIELD_IMAGES_ENABLED??'false';
+ if(!['true','false'].includes(enabled))throw Error('INVALID_IMAGE_REPLACEMENT_SETTINGS');
+ if(enabled==='false')return {HIGGSFIELD_IMAGES_ENABLED:'false'};
+ if(!validHiggsfieldCredential(input.HIGGSFIELD_CREDENTIALS)||!/^[a-f0-9]{64}$/.test(input.HIGGSFIELD_IMAGE_ENCRYPTION_KEY??'')||input.HIGGSFIELD_IMAGE_ENCRYPTION_KEY===input.VIDEO_ENCRYPTION_KEY)throw Error('INVALID_IMAGE_REPLACEMENT_SETTINGS');
+ return {HIGGSFIELD_IMAGES_ENABLED:'true',HIGGSFIELD_IMAGE_ENCRYPTION_KEY:input.HIGGSFIELD_IMAGE_ENCRYPTION_KEY};
 }

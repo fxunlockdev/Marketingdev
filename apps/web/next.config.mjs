@@ -10,6 +10,11 @@ if (
 export default {
   output: process.env.DESVIO_STANDALONE === "true" ? "standalone" : undefined,
   poweredByHeader: false,
+  webpack(config) {
+    // Shared pure API helpers use NodeNext .js imports; resolve their TS sources in the web bundle.
+    config.resolve.extensionAlias = {...config.resolve.extensionAlias, ".js": [".ts", ".tsx", ".js"]};
+    return config;
+  },
   devIndicators: false,
   outputFileTracingRoot: fileURLToPath(new URL("../..", import.meta.url)),
   async rewrites() {

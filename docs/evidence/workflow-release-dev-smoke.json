@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-26T11:09:15.959Z",
+  "passed": true,
+  "results": [
+    {
+      "path": "creative-project-archive",
+      "status": 200
+    },
+    {
+      "path": "generation-notifications",
+      "status": 200,
+      "email_available": false
+    }
+  ],
+  "archive_ui_reload": true,
+  "scope": "Read-only authenticated dev release check. No paid generation, stock provider request, email or publishing."
+}

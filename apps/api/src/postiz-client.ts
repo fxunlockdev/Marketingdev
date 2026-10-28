@@ -8,6 +8,8 @@ export class PostizError extends Error {
 }
 export type PostizConfig={baseURL:string;mediaOrigins:string[];callbackOrigin:string;mode:'test'|'development'|'staging';timeoutMs?:number};
 export type PostizBinding={organizationId:string;brandId:string;remoteOrganizationId:string;apiKey:string};
+export type FacebookPageChoice={id:string;name:string};
+export type FacebookPageSelection={integrationId:string;internalId:string;name:string;pages:FacebookPageChoice[];selectionRequired:true};
 export type PostizIntegration={id:string;name:string;provider:string;disabled:boolean;profile:string|null;picture:string|null};
 export type PostizPost={id:string;integrationId:string;provider:string;content:string;publishDate:string;state:'queued'|'published'|'failed'|'draft'|'unknown';remoteState:string;releaseId:string|null;releaseURL:string|null};
 const fail=()=>{throw new PostizError('POSTIZ_RESPONSE_INVALID');};
@@ -61,7 +63,7 @@ export class PostizClient {
  private integrations(value:any):PostizIntegration[]{return this.checked(value,v=>{if(!Array.isArray(v)||v.length>500)return fail();const seen=new Set<string>();return v.map(raw=>{const r=record(raw),id=remoteId(r.id);if(seen.has(id))return fail();seen.add(id);return {id,name:str(r.name,300),provider:str(r.identifier,100),disabled:bool(r.disabled),profile:optionalURL(r.profile),picture:optionalURL(r.picture)};});});}
  async removeIntegration(id:string){id=remoteId(id);await this.verify();const value=await this.request('public/v1/integrations/'+encodeURIComponent(id),'DELETE');return this.checked(value,v=>{if(remoteId(record(v).id)!==id)return fail();return {id,publishingStopped:false as const};},true);}
  async listIntegrations(){await this.verify();return this.integrations(await this.request('public/v1/integrations'));}
- // Only audited single-step providers; page selection is a separate workflow.
+ // Single-step callbacks and Facebook's page-selection callback stay separate.
  async beginLinkedIn(internalId?:string){return this.beginAuthorization('linkedin',internalId);}
  async completeLinkedIn(state:string,code:string,timezone:string){return this.completeAuthorization('linkedin',state,code,timezone);}
  async beginAuthorization(provider:string,internalId?:string){
@@ -74,15 +76,43 @@ export class PostizClient {
   },true);
  }
  private oauthProvider(provider:string){
+  if(provider==='facebook')return {origin:'https://www.facebook.com',path:'/v25.0/dialog/oauth'};
   if(provider==='linkedin')return {origin:'https://www.linkedin.com',path:'/oauth/v2/authorization'};
   if(provider==='instagram-standalone')return {origin:'https://www.instagram.com',path:'/oauth/authorize'};
   throw new PostizError('POSTIZ_PROVIDER_UNSUPPORTED');
  }
  async completeAuthorization(provider:string,state:string,code:string,timezone:string){
+  if(provider==='facebook')throw new PostizError('POSTIZ_PROVIDER_REQUIRES_PAGE_SELECTION');
   this.oauthProvider(provider);
   if(!/^[a-zA-Z0-9_-]{6,256}$/.test(state)||!code||code.length>8000||/[\x00-\x1f\x7f]/.test(code)||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840)throw new PostizError('POSTIZ_CALLBACK_INVALID');
   await this.verify();const value=await this.request('integrations/social-connect/'+provider,'POST',JSON.stringify({state,code,timezone}),'application/json');
   return this.checked(value,v=>{const r=record(v);if(r.organizationId!==this.#remoteOrg||r.providerIdentifier!==provider||r.inBetweenSteps===true||r.isBetweenSteps===true||r.pages&&(!Array.isArray(r.pages)||r.pages.length))return fail();return {id:remoteId(r.id),internalId:remoteId(r.internalId),name:str(r.name,300)};},true);
+ }
+ /** Two-step adapter only. The durable caller must bind state, persist the choices,
+  * and obtain an explicit selection before calling selectFacebookPage. */
+ async exchangeFacebookAuthorization(state:string,code:string,timezone:string):Promise<FacebookPageSelection>{
+  if(!/^[a-zA-Z0-9_-]{6,256}$/.test(state)||!code||code.length>8000||/[\x00-\x1f\x7f]/.test(code)||! /^-?\d{1,4}$/.test(timezone)||Math.abs(Number(timezone))>840)throw new PostizError('POSTIZ_CALLBACK_INVALID');
+  await this.verify();
+  const value=await this.request('integrations/social-connect/facebook','POST',JSON.stringify({state,code,timezone}),'application/json');
+  return this.checked(value,v=>{const r=record(v);
+   if(r.organizationId!==this.#remoteOrg||r.providerIdentifier!=='facebook'||r.inBetweenSteps!==true||!Array.isArray(r.pages)||r.pages.length>500)return fail();
+   const seen=new Set<string>();const pages=r.pages.map((raw:unknown)=>{const page=record(raw),id=remoteId(page.id);if(seen.has(id))return fail();seen.add(id);
+    // Upstream pages include access_token. Never forward the raw object or photo URL.
+    return {id,name:str(page.name,300)};
+   });
+   return {integrationId:remoteId(r.id),internalId:remoteId(r.internalId),name:str(r.name,300),pages,selectionRequired:true as const};
+  },true);
+ }
+ async selectFacebookPage(input:{integrationId:string;state:string;pageId:string;availablePageIds:readonly string[]}){
+  let id:string,pageId:string;
+  try{id=remoteId(input.integrationId);pageId=remoteId(input.pageId);
+   if(!/^[a-zA-Z0-9_-]{6,256}$/.test(input.state)||!Array.isArray(input.availablePageIds)||input.availablePageIds.length>500||!input.availablePageIds.includes(pageId)||new Set(input.availablePageIds).size!==input.availablePageIds.length)throw new Error();
+   input.availablePageIds.forEach(remoteId);
+  }catch{throw new PostizError('POSTIZ_PAGE_SELECTION_INVALID');}
+  const target=(await this.listIntegrations()).find(i=>i.id===id);
+  if(!target||target.provider!=='facebook'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const value=await this.request('integrations/public/provider/'+encodeURIComponent(id)+'/connect','POST',JSON.stringify({state:input.state,page:pageId}),'application/json');
+  return this.checked(value,v=>{if(record(v).success!==true)return fail();return {integrationId:id,pageId,status:'accepted' as const};},true);
  }
  private media(value:any,extension='png'){return this.checked(value,v=>{const r=record(v),url=new URL(str(r.path,2048));if(!this.#origins.has(url.origin)||url.username||url.password||url.hash||!url.pathname.toLowerCase().endsWith('.'+extension))return fail();return {id:remoteId(r.id),path:url.href};},true);}
  async uploadPNG(bytes:Buffer,expectedSHA:string){
@@ -143,6 +173,24 @@ export class PostizClient {
   const target=(await this.listIntegrations()).find(i=>i.id===id);
   if(!target||target.provider!=='instagram-standalone'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
   const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:[media]}],settings:{__type:'instagram-standalone',post_type:'post',is_trial_reel:false}}]};
+  const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
+  return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
+ }
+ // Facebook Page feed posts; Stories have a separate upstream lifecycle.
+ async submitFacebook(input:{integrationId:string;caption:string;media:{id:string;path:string}|{id:string;path:string}[];mediaType?:'image'|'video'|'carousel';scheduledAt:string}){
+  let id:string,date:string,media:{id:string;path:string}[];
+  try{
+   id=remoteId(input.integrationId);date=iso(input.scheduledAt);
+   if(input.mediaType!==undefined&&!['image','video','carousel'].includes(input.mediaType))throw new Error();
+   if(input.mediaType==='carousel'){
+    if(!Array.isArray(input.media)||input.media.length<2||input.media.length>10)throw new Error();
+    media=input.media.map(m=>this.media(m,'png'));
+   }else{if(Array.isArray(input.media))throw new Error();media=[this.media(input.media,input.mediaType==='video'?'mp4':'png')];}
+   if(new Set(media.map(m=>m.id)).size!==media.length||new Set(media.map(m=>m.path)).size!==media.length||typeof input.caption!=='string'||!input.caption.trim()||[...input.caption].length>3000||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(input.caption))throw new Error();
+  }catch{throw new PostizError('POSTIZ_POST_INVALID');}
+  const target=(await this.listIntegrations()).find(i=>i.id===id);
+  if(!target||target.provider!=='facebook'||target.disabled)throw new PostizError('POSTIZ_CHANNEL_UNAVAILABLE');
+  const body={type:'schedule',date,shortLink:false,tags:[],posts:[{integration:{id},value:[{content:input.caption,image:media}],settings:{__type:'facebook',post_type:'post'}}]};
   const value=await this.request('public/v1/posts','POST',JSON.stringify(body),'application/json');
   return this.checked(value,v=>{if(!Array.isArray(v)||v.length!==1)return fail();const r=record(v[0]);if(r.integration!==id)return fail();return {postId:remoteId(r.postId),integrationId:id,status:'accepted' as const};},true);
  }

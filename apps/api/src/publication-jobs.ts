@@ -51,7 +51,7 @@ export class PublicationJobs {
     let media=current.remote_media;
     if(current.carousel_version_id){const slides=await this.slides(db,current);if(slides.some((s:any)=>s.phase!=='uploaded'))throw new PostizError('PUBLICATION_OUTCOME_UNKNOWN');media=slides.map((s:any)=>s.remote_media);}
     const input={integrationId:current.remote_channel_id,caption:current.caption,media,scheduledAt:new Date(current.scheduled_at).toISOString()};
-    const remote=await (current.provider==='instagram-standalone'?(current.video_version_id?this.client(scope,a).submitInstagramReel(input):this.client(scope,a).submitInstagramImages({...input,media:[media]})):this.client(scope,a).submitLinkedIn({...input,mediaType:current.carousel_version_id?'carousel':current.video_version_id?'video':'image'}));
+    const remote=await (current.provider==='instagram-standalone'?(current.video_version_id?this.client(scope,a).submitInstagramReel(input):this.client(scope,a).submitInstagramImages({...input,media:[media]})):current.provider==='facebook'?this.client(scope,a).submitFacebook({...input,mediaType:current.carousel_version_id?'carousel':current.video_version_id?'video':'image'}):this.client(scope,a).submitLinkedIn({...input,mediaType:current.carousel_version_id?'carousel':current.video_version_id?'video':'image'}));
     await db.query("UPDATE app.publication_requests SET remote_post_id=$2,phase='accepted' WHERE job_id=$1",[j.id,remote.postId]);await this.#social.finish(db,j,'succeeded');
    });return 'accepted';
   }catch(e){

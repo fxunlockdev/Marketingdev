@@ -19,7 +19,7 @@ import tempfile
 
 MAX_BYTES = 64 * 1024 * 1024
 MAX_REQUEST = ((MAX_BYTES + 2) // 3) * 4 + 4096
-VERSION = "desvio-video-render-v2/ffmpeg-7.1.5"
+VERSION = "desvio-video-render-v3/ffmpeg-7.1.5"
 _LIBRARY = {"aarch64": "aarch64-linux-gnu", "x86_64": "x86_64-linux-gnu"}.get(platform.machine())
 if _LIBRARY is None:
     raise RuntimeError("Unsupported isolated video architecture")
@@ -146,7 +146,7 @@ def overlay_filters(overlays, root, width, height):
 
 
 def run(value):
-    if not isinstance(value, dict) or set(value) not in ({"version", "input_base64", "input_sha256", "expected_duration_seconds"}, {"version", "input_base64", "input_sha256", "expected_duration_seconds", "overlays"}) or value["version"] != 1 or type(value["expected_duration_seconds"]) is not int or not 3 <= value["expected_duration_seconds"] <= 15 or not isinstance(value["input_base64"], str) or len(value["input_base64"]) > MAX_REQUEST-4096:
+    if not isinstance(value, dict) or set(value) not in ({"version", "input_base64", "input_sha256", "expected_duration_seconds"}, {"version", "input_base64", "input_sha256", "expected_duration_seconds", "overlays"}, {"version", "input_base64", "input_sha256", "expected_duration_seconds", "overlays", "target"}) or value["version"] != 1 or type(value["expected_duration_seconds"]) is not int or not 3 <= value["expected_duration_seconds"] <= 15 or not isinstance(value["input_base64"], str) or len(value["input_base64"]) > MAX_REQUEST-4096:
         reject("VIDEO_MEDIA_INPUT_INVALID")
     try:
         source = base64.b64decode(value["input_base64"], validate=True)
@@ -159,6 +159,9 @@ def run(value):
     if source[4:8] != b"ftyp":
         reject("VIDEO_MEDIA_CONTAINER_INVALID")
     expected = value["expected_duration_seconds"]
+    target = value.get("target")
+    if target is not None and (not isinstance(target, dict) or set(target) != {"width", "height"} or type(target["width"]) is not int or type(target["height"]) is not int or (target["width"], target["height"]) not in {(1024,1024),(1024,1536),(1536,1024),(1080,1920)}):
+        reject("VIDEO_TARGET_INVALID")
     overlays = validate_overlays(value.get("overlays", []), expected)
     with tempfile.TemporaryDirectory(prefix="desvio-video-") as folder:
         root = Path(folder)
@@ -167,7 +170,11 @@ def run(value):
         metadata = probe(original, expected)
         ratio = min(1, 1920/max(metadata["width"], metadata["height"]), 1080/min(metadata["width"], metadata["height"]))
         width, height = [max(2, int(n*ratio)//2*2) for n in [metadata["width"], metadata["height"]]]
-        filters = [f"scale={width}:{height}:flags=lanczos", "setsar=1", *overlay_filters(overlays, root, width, height)]
+        if target:
+            width, height = target["width"], target["height"]
+            filters = [f"scale={width}:{height}:force_original_aspect_ratio=decrease:force_divisible_by=2:flags=lanczos", f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=black", "setsar=1", *overlay_filters(overlays, root, width, height)]
+        else:
+            filters = [f"scale={width}:{height}:flags=lanczos", "setsar=1", *overlay_filters(overlays, root, width, height)]
         command("ffmpeg", ["-hide_banner", "-loglevel", "error", "-nostdin", "-xerror", "-max_error_rate", "0", "-max_alloc", "67108864", "-filter_threads", "1",
             *INPUT_OPTIONS, "-i", str(original), "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "-1", "-map_chapters", "-1",
             "-vf", ",".join(filters), "-r", "30", "-c:v", "libx264", "-threads", "2", "-preset", "fast", "-crf", "20",
@@ -184,7 +191,7 @@ def run(value):
         if not 24 <= canonical.stat().st_size <= MAX_BYTES or not 24 <= thumb.stat().st_size <= 2*1024*1024:
             reject("VIDEO_MEDIA_OUTPUT_LIMIT")
         clip, poster = canonical.read_bytes(), thumb.read_bytes()
-        return {"type": "result", "version": VERSION, "overlays": overlays, "input_sha256": value["input_sha256"], "metadata": saved,
+        return {"type": "result", "version": VERSION, "overlays": overlays, "target": target, "input_sha256": value["input_sha256"], "metadata": saved,
                 "video": {"mime": "video/mp4", "sha256": hashlib.sha256(clip).hexdigest(), "base64": base64.b64encode(clip).decode()},
                 "poster": {"mime": "image/png", "sha256": hashlib.sha256(poster).hexdigest(), "base64": base64.b64encode(poster).decode()}}
 

@@ -1,0 +1,20 @@
+{
+  "status": "offline_verified_deployed",
+  "test": "node scripts/foundation-test.mjs --campaign-review-web",
+  "result": {
+    "passed": 1,
+    "failed": 0
+  },
+  "log": "work/progress-recovery-browser.log",
+  "typecheck": "passed",
+  "provider_mode": "mocked",
+  "paid_calls": 0,
+  "deployment_id": "615622ce-c2f3-4413-b16e-78c284679bcf",
+  "scope": "Automatic retry of failed image-batch reads; no automatic generation resubmission",
+  "limitations": [
+    "Full visual parity incomplete",
+    "Intermittent background image-job delay not diagnosed",
+    "Real customer images not generated in this test"
+  ],
+  "deployment_status": "SUCCESS"
+}

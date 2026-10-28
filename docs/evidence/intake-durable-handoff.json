@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-10-24T09:55:14.030291+00:00",
+  "storage_backed_tests": {
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0
+  },
+  "contract_tests": {
+    "passed": 171,
+    "failed": 0
+  },
+  "worker_restart_test": "passed against actual disposable Temporal server",
+  "providers": "MOCKED",
+  "paid_calls": false,
+  "deployed": false,
+  "source_sha256": {
+    "apps/api/src/intake.ts": "d332aa56f571d8f19cc3390657f96b4bf3203cfef6e3dd9e184c3b17f2e847a7",
+    "apps/api/src/intake-jobs.ts": "a14235daa1c85fced119cf8182d2cab6b65aaa2ad397790ba2036b95dd8992d0",
+    "apps/api/src/asset-workflow.ts": "1336d832218371a27e5956819fd3af4387db2042a145219d35aee8ec2ae6ac04",
+    "apps/web/components/intake.tsx": "d777c39960ba0290808c02845b729bc1b702b121939ec3154cb589c94434cf87",
+    "database/migrations/059_intake_dependencies.sql": "2e61d04f0a50085e03de51fdce76fb357ba6c3611cc1c503b5a94a88228a25af",
+    "tests/foundation/intake.test.mjs": "404d25707e130fc743f75114020801895219315b7835efafd91bb6202f3fcd91"
+  }
+}

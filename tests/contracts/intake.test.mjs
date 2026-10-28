@@ -5,11 +5,11 @@ import {
   publicAddress,
   websiteURL,
   SafeWeb,
-  WebsiteReader,
 } from "../../dist/safe-web.js";
 import {
   BrandAnalyzer,
   validateAnalysis,
+  recoverAnalysis,
   analysisRequest,
 } from "../../dist/brand-analysis.js";
 import { prepareVisuals } from "../../dist/visual-analysis.js";
@@ -231,42 +231,6 @@ test("mixed public/private DNS answers fail before opening a socket", async () =
   );
   assert.equal(calls, 1);
 });
-test("robots denial and cross-site redirect stop before target fetch (MOCK transport)", async () => {
-  const calls = [];
-  const web = {
-    fetch: async (u) => {
-      calls.push(u.href);
-      return {
-        status: 200,
-        headers: { "content-type": "text/plain" },
-        bytes: Buffer.from("User-agent: *\nDisallow: /"),
-      };
-    },
-  };
-  await assert.rejects(
-    new WebsiteReader(web).read("https://example.org/", async () => []),
-    /ROBOTS_DISALLOWED/,
-  );
-  assert.equal(calls.length, 1);
-  const redirs = [];
-  const redirect = {
-    fetch: async (u) => {
-      redirs.push(u.href);
-      return u.pathname === "/robots.txt"
-        ? { status: 404, headers: {}, bytes: Buffer.alloc(0) }
-        : {
-            status: 302,
-            headers: { location: "http://127.0.0.1/private" },
-            bytes: Buffer.alloc(0),
-          };
-    },
-  };
-  await assert.rejects(
-    new WebsiteReader(redirect).read("https://example.org/", async () => []),
-    /UNSAFE_WEBSITE_URL/,
-  );
-  assert.equal(redirs.length, 2);
-});
 test("structured OpenAI extraction sends actual SDK contract, no tools/storage/retries (MOCK provider)", async () => {
   let calls = 0;
   const sdk = new OpenAI({
@@ -368,4 +332,23 @@ test("missing key, refusal, incomplete and malformed AI response produce no fabr
       /AI_/,
     );
   }
+});
+
+test("partial analysis preserves grounded facts without a second paid call", () => {
+ const partial = structuredClone(result);
+ partial.findings.push({field:"brand_name",value:"Invented",chunk_id:"foreign-tenant",quote:"Invented"});
+ partial.recommendation.cadence = 99;
+ const recovered = recoverAnalysis(partial, input);
+ assert.deepEqual(recovered.findings, result.findings);
+ assert.equal(recovered.recommendation, null);
+ assert.match(recovered.missing.at(-1), /omitted/);
+ assert.deepEqual(validateAnalysis(recovered, input), recovered);
+ assert.deepEqual(recoverAnalysis(result, input), result);
+});
+test("partial recovery cannot accept wholly forged facts or overwrite owner review", () => {
+ const forged = structuredClone(result); forged.findings[0].quote="forged"; forged.recommendation=null;
+ assert.throws(()=>recoverAnalysis(forged,input), /AI_OUTPUT_INVALID/);
+ const reviewed={...input,reviewed:[{field:"offering",value:"Owner version",status:"edited"}]};
+ assert.equal(recoverAnalysis(result,reviewed).findings.length,0);
+ assert.throws(()=>recoverAnalysis({...result,extra:true},input),/AI_OUTPUT_INVALID/);
 });

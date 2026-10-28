@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "checked_at": "2026-10-24T15:26:12.497Z",
+  "scope": "Deployed form accepts www URL and adds HTTPS; intercepted submission, no business created",
+  "paid_calls": 0,
+  "customer_mutations": 0
+}

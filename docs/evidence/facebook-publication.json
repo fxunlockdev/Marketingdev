@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-10-25T13:11:19.089221+00:00",
+  "status": "ADAPTER_READY",
+  "scope": "Facebook Page image publication through real local services and mock provider transport; selected-filter hover regression",
+  "tests": {
+    "contracts": {
+      "passed": 47,
+      "failed": 0,
+      "log": "work/facebook-content-contracts.log",
+      "sha256": "8fa817d844fc2216efdf364c761b602c342f8002e82f6604b0441b3193e78bf3"
+    },
+    "publishing": {
+      "passed": 19,
+      "failed": 0,
+      "log": "work/facebook-publication-foundation.log",
+      "sha256": "337fb0f70879d2c7cf7283344905d7b1e75f48638aa8768f824561bfbb213ebc"
+    },
+    "planning": {
+      "passed": 21,
+      "failed": 0,
+      "log": "work/facebook-plan-foundation.log",
+      "sha256": "c3e32aa6e4195abe9d9ad411c69202286d5388bbcead4ffdfa99e2a37e1a8c3e"
+    },
+    "operator": {
+      "passed": 14,
+      "failed": 0,
+      "log": "work/facebook-grant-foundation.log",
+      "sha256": "3899a0b330807230c7ea21fa3476e386dafd36559d78e6e2cd78e239357dd7ed"
+    },
+    "browser": {
+      "passed": 12,
+      "failed": 0,
+      "log": "work/facebook-publication-browser.log",
+      "sha256": "340469a230fc9c8afba736226d63f47938988bb8af5a79e87e8336c7ae812a12"
+    }
+  },
+  "deployed": false,
+  "live_provider_calls": 0,
+  "remaining": [
+    "Live Meta verification",
+    "Deployment",
+    "Facebook video and multi-image full-path verification",
+    "Targeted Facebook reconnect"
+  ]
+}

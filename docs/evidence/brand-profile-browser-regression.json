@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-10-25T07:47:06.108569+00:00",
+  "scope": "Local customer browser suite after brand profile grouping and evidence removal",
+  "command": "node scripts/foundation-test.mjs --customer-web",
+  "passed": 20,
+  "failed": 0,
+  "duration_ms": 53214.371042,
+  "services": "Real disposable PostgreSQL, Garage, ClamAV with updated signatures, Temporal and local SMTP",
+  "paid_providers": "Mocked; no paid API calls",
+  "fixes": [
+    "Refresh pinned test scanner signatures before startup, preserving production seven-day freshness enforcement",
+    "Locate correction test by stable offering heading rather than mutable source text"
+  ],
+  "verified": [
+    "Private upload, scan, normalized reference preview and original-byte download",
+    "Failed and stale edits retain user input",
+    "Brand review, tenant access, account flows, narrow-layout accessibility and onboarding regression"
+  ],
+  "not_verified": [
+    "Live provider generation quality",
+    "All-channel OAuth and publishing",
+    "Deployed changes",
+    "Complete requested Blaze-like journey"
+  ]
+}

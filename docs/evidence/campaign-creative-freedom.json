@@ -1,0 +1,37 @@
+{
+  "checked_at": "2026-10-25T12:35:09.603726+00:00",
+  "status": "LOCAL_VERIFIED",
+  "scope": "Campaign creative direction selection and persistence",
+  "api_build": "passed",
+  "web_build": "passed",
+  "python_compile": "passed",
+  "contracts": {
+    "passed": 12,
+    "failed": 0,
+    "log": "work/campaign-creativity-contracts.log"
+  },
+  "planning_integration": {
+    "passed": 20,
+    "failed": 0,
+    "log": "work/campaign-creativity-foundation.log"
+  },
+  "browser": {
+    "passed": 3,
+    "failed": 0,
+    "log": "work/campaign-creativity-browser.log",
+    "verified": [
+      "selection retained across Back",
+      "mobile WCAG A/AA scan",
+      "review and interrupted submission reload preserve selected mode",
+      "same idempotency key and payload on retry"
+    ],
+    "screenshot": "work/browser/campaign-creativity.png"
+  },
+  "paid_calls": 0,
+  "deployed": false,
+  "limitations": [
+    "Mock generation and transport tests do not prove real visual quality",
+    "Strict unmodified asset mode not included",
+    "No full-product parity claim"
+  ]
+}

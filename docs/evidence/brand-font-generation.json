@@ -1,0 +1,37 @@
+{
+  "status": "deployed",
+  "scope": [
+    "Shared Brand Kit font pairing catalog",
+    "Approved immutable brand snapshot selects default editable-layer fonts",
+    "Campaign selection overrides brand default; image edits preserve previous design"
+  ],
+  "validation": {
+    "api_build": "passed",
+    "web_typecheck": "passed",
+    "contract_tests": {
+      "passed": 7,
+      "failed": 0,
+      "log": "work/brand-font-generation-contracts.log"
+    },
+    "integration_tests": {
+      "passed": 17,
+      "failed": 0,
+      "log": "work/brand-font-generation-integration.log",
+      "paid_providers": "mocked",
+      "services": "Real disposable PostgreSQL, Temporal, private storage and isolated skills runtime"
+    }
+  },
+  "limitations": [
+    "Only exact supported font-pairing values select a default; ambiguous or arbitrary descriptions remain prompt context",
+    "This connects font families; editable-layer font weight support remains a separate renderer limitation",
+    "No live paid provider or social publishing acceptance claim"
+  ],
+  "worker_rollout": {
+    "checked_at": "2026-10-26T08:05:05.763Z",
+    "passed": true,
+    "image": "sha256:0046cdbfdbfd81d04b6d859dcc7484b60aa24ebf2fb51e38ced335af545b8e60",
+    "backup_container": "desvio-worker-rollback-20261026-brand-fonts",
+    "paid_calls": false,
+    "scope": "Approved brand-font generation worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+  }
+}

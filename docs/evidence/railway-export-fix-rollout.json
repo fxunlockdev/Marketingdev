@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-26T11:31:08.640Z",
+  "passed": true,
+  "image": "sha256:11411a6a5826b95203cb01d0ce5b840161333be0df5cffc1c6a17aafad552a9d",
+  "backup_container": "desvio-worker-rollback-20261026-export-buffer",
+  "paid_calls": false,
+  "scope": "Native buffer image decoding renderer activated after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+}

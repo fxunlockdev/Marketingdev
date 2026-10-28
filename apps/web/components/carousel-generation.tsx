@@ -1,4 +1,5 @@
 "use client";
+import {directedPrompt,type Creativity} from './creative-direction';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import {Field,Notice} from './primitives';
@@ -8,22 +9,22 @@ type Slide={parent_job_id:string;position:number;generation_status:string;export
 type State={runs:Run[];slides:Slide[]};
 const active=(r:Run)=>['queued','running','retrying'].includes(r.status);
 export function CarouselGeneration({businessId,canEdit,onOpen,onSlide}:{businessId:string;canEdit:boolean;onOpen:(id:string)=>Promise<void>;onSlide:(thread:string,project:string)=>void}){
- const root=`/api/v1/businesses/${businessId}/carousel-generations`,[data,setData]=useState<State>(),[prompt,setPrompt]=useState(''),[count,setCount]=useState(3),[channel,setChannel]=useState('linkedin'),[provider,setProvider]=useState('openai'),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>();
+ const root=`/api/v1/businesses/${businessId}/carousel-generations`,[data,setData]=useState<State>(),[prompt,setPrompt]=useState(''),[count,setCount]=useState(3),[channel,setChannel]=useState('linkedin'),[creativity,setCreativity]=useState<Creativity>('normal'),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>();
  const key=useRef(crypto.randomUUID()),lock=useRef(false);useUnsavedChanges(!!prompt||busy);
  const load=useCallback(async()=>setData(await api<State>(root)),[root]);
  useEffect(()=>{let alive=true;void api<State>(root).then(v=>{if(alive)setData(v);}).catch(e=>{if(alive)setError(e);});return()=>{alive=false;};},[root]);
  const running=data?.runs.some(active),held=data?.runs.some(r=>r.status==='unknown');
  useEffect(()=>{if(!running)return;const timer=setInterval(()=>{if(!document.hidden)void load().catch(setError);},2500);return()=>clearInterval(timer);},[running,load]);
  function changed(){key.current=crypto.randomUUID();}
- async function generate(){if(lock.current)return;lock.current=true;setBusy(true);setError(undefined);try{await api(root,{prompt,slide_count:count,channel,size:'1024x1024',text_provider:provider},'POST',key.current);setPrompt('');changed();await load();}catch(e){setError(e);}finally{setBusy(false);lock.current=false;}}
+ async function generate(){if(lock.current)return;lock.current=true;setBusy(true);setError(undefined);try{await api(root,{prompt:directedPrompt(prompt,creativity),slide_count:count,channel,size:'1024x1024',text_provider:'openai'},'POST',key.current);setPrompt('');changed();await load();}catch(e){setError(e);}finally{setBusy(false);lock.current=false;}}
  async function cancel(id:string){setBusy(true);setError(undefined);try{await api(`${root}/${id}/cancel`,{});await load();}catch(e){setError(e);}finally{setBusy(false);}}
  return <section aria-label="Generate a carousel"><h3>Generate a carousel</h3><p>Describe your story. AI uses your approved brand knowledge to plan and create the slides together. Review the finished carousel before publishing.</p><Notice error={error}/>
  {canEdit&&<form onSubmit={e=>{e.preventDefault();void generate();}}><fieldset disabled={busy||running||held}><legend>Carousel brief</legend>
- <Field label="Carousel idea">{id=><textarea id={id} required maxLength={4000} value={prompt} onChange={e=>{setPrompt(e.target.value);changed();}}/>}</Field>
+ <Field label="Carousel idea">{id=><textarea id={id} required maxLength={3600} value={prompt} onChange={e=>{setPrompt(e.target.value);changed();}}/>}</Field>
  <Field label="Number of carousel slides">{id=><input id={id} type="number" min={2} max={10} required value={count} onChange={e=>{setCount(Number(e.target.value));changed();}}/>}</Field>
- <Field label="Generate carousel for">{id=><select id={id} value={channel} onChange={e=>{setChannel(e.target.value);changed();}}><option value="linkedin">LinkedIn</option><option value="instagram">Instagram</option></select>}</Field>
- <Field label="Carousel planning model">{id=><select id={id} value={provider} onChange={e=>{setProvider(e.target.value);changed();}}><option value="openai">OpenAI GPT</option></select>}</Field>
- <p className="hint">Creates square images with OpenAI. Generation uses your configured allowance; no separate prompt approval is required for static images.</p><button type="submit" className="primary" disabled={!prompt.trim()||!data}>Generate carousel</button>
+ <Field label="Generate carousel for">{id=><select id={id} value={channel} onChange={e=>{setChannel(e.target.value);changed();}}><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select>}</Field>
+ <Field label="Carousel creativity">{id=><select id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);changed();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></select>}</Field>
+ <p className="hint">Create a coordinated set of images for your story.</p><button type="submit" className="primary" disabled={!prompt.trim()||!data}>Generate carousel</button>
  </fieldset></form>}
  {running&&<p role="status">Your carousel is being prepared. You can leave this page and return later.</p>}{held&&<p role="status">A generation result needs reconciliation. Further generation is paused to prevent duplicate charges.</p>}
  <button type="button" disabled={busy} onClick={()=>{if(!document.hidden)void load().catch(setError);}}>Refresh carousel progress</button>

@@ -1,0 +1,73 @@
+{
+  "status": "locally_verified_not_deployed",
+  "migration": "068_shared_monthly_generation_budget.sql",
+  "scope": "Account/month conservative provider reservation counter shared across research, analysis, planning, creative planning/images/edits and video; existing brand/provider grants still apply",
+  "plan_caps_usd": {
+    "500": 100,
+    "800": 160,
+    "1000": 200
+  },
+  "verified": {
+    "api_build": "passed",
+    "web_typecheck": "passed",
+    "allowance_contracts": {
+      "passed": 4,
+      "failed": 0
+    },
+    "intake_storage_foundation": {
+      "passed": 16,
+      "failed": 0
+    },
+    "focused_monthly_budget": {
+      "passed": 1,
+      "failed": 0
+    },
+    "operator_configuration": {
+      "passed": 14,
+      "failed": 0
+    },
+    "balance_foundation": {
+      "passed": 2,
+      "failed": 0
+    },
+    "balance_browser": {
+      "passed": 1,
+      "failed": 0,
+      "scope": "Authenticated header balance and disclosure, campaign flow, mobile overflow and accessibility"
+    },
+    "web_build": "passed"
+  },
+  "coverage": [
+    "All four ledgers share the same cap",
+    "Two brands share account usage",
+    "Concurrent requests cannot overspend remaining allowance",
+    "Duplicate conflict/replay is charged once",
+    "Prior month excluded",
+    "Unknown outcome retains reservation",
+    "Worker cannot directly read configuration/counters; app reads require scoped active membership, runtime writes denied",
+    "Disabled plan denies spend even with zero usage",
+    "Research worker reports allowance exhaustion before any external request",
+    "Operator plan assignment previews limits and remaining usage, checks stale previews, records immutable audit and retains usage across upgrades/disabling",
+    "Customer balance rounds used credits up and hides dollar costs",
+    "Foreign/revoked members denied balance reads",
+    "Header shows credits and reset details for configured account; no fabricated value for unassigned account"
+  ],
+  "logs": [
+    "work/shared-monthly-budget.log",
+    "work/shared-monthly-budget-focused.log",
+    "work/shared-monthly-budget-contracts.log",
+    "work/generation-plan-operator.log",
+    "work/generation-balance-foundation.log",
+    "work/generation-balance-browser.log",
+    "work/generation-balance-web-build.log"
+  ],
+  "limitations": [
+    "No paid provider calls",
+    "Not deployed or assigned to customers",
+    "Unassigned accounts retain existing provider grant limits",
+    "Five reels and daily static entitlements unfinished",
+    "Per-call reservation accuracy and live provider pricing must be audited to substantiate realized margin",
+    "Calendar-month accounting; subscription anniversary cycles not implemented",
+    "Other worker rejection UI paths compiled but not individually exercised in this focused test"
+  ]
+}

@@ -1,9 +1,19 @@
 "use client";
+import {useRouter} from 'next/navigation';
+import {postFormatLabel} from './post-format';
+import {directedPrompt,type Creativity} from './creative-direction';
+import {BrandReferences} from "./brand-references";
+import {GeneratedReplacement} from './generated-replacement';
+import {StockPicker} from "./stock-picker";
+import {PostThumbnail} from "./post-thumbnail";
+import {CampaignImages} from "./campaign-images";
+import {SavedReferencePreviews} from "./brand-references";
 import {CalendarCarouselReview} from './carousels';
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
-import { CreativeEditor } from "./creative-editor";
+import { CreativeEditor, type Design } from "./creative-editor";
+import "./content-workspace-refinement.css";
 import {VideoReview} from './video-canvas';
 import {CreativeExportPanel} from './creative-export';
 import { useUnsavedChanges } from "./unsaved";
@@ -32,6 +42,7 @@ const channels = [
   ["", "All channels"],
   ["linkedin", "LinkedIn"],
   ["instagram", "Instagram"],
+  ["facebook", "Facebook"],
 ];
 const running = (j: any) =>
   ["queued", "running", "retrying"].includes(j.status);
@@ -79,6 +90,24 @@ function requestKey(
     ref.current = { body: value, key: crypto.randomUUID() };
   return ref.current!.key;
 }
+function DateStrip({date,onSelect,counts}:{date:string;onSelect:(date:string)=>void;counts:Record<string,number>}) {
+ const selected=useRef<HTMLButtonElement>(null);
+ useEffect(()=>{selected.current?.scrollIntoView({block:'nearest',inline:'center',behavior:'instant'});},[date]);
+ const first=date.slice(0,7)+'-01',last=addDays(first,32).slice(0,7)+'-01',days:string[]=[];
+ for(let day=first;day<last;day=addDays(day,1))days.push(day);
+ return <nav className="plan-date-strip" aria-label="Choose a day">{days.map(day=><button key={day} ref={day===date?selected:undefined} aria-pressed={day===date} aria-label={`${new Intl.DateTimeFormat('en',{timeZone:'UTC',weekday:'short'}).format(new Date(day+'T12:00:00Z'))} ${Number(day.slice(-2))} ${new Intl.DateTimeFormat('en',{timeZone:'UTC',month:'short'}).format(new Date(day+'T12:00:00Z'))}${counts[day]?` ${counts[day]} ${counts[day]===1?'post':'posts'}`:''}, ${day.slice(0,4)}`} onClick={()=>onSelect(day)}><span>{new Intl.DateTimeFormat('en',{timeZone:'UTC',weekday:'short'}).format(new Date(day+'T12:00:00Z'))}</span>{" "}<strong>{Number(day.slice(-2))}</strong>{" "}<span>{new Intl.DateTimeFormat('en',{timeZone:'UTC',month:'short'}).format(new Date(day+'T12:00:00Z'))}</span>{" "}{counts[day]>0&&<span className="date-post-count">{counts[day]} {counts[day]===1?'post':'posts'}</span>}</button>)}</nav>;
+}
+function DailyPosts({posts,businessId,onOpen,writable,onRefresh}:{posts:any[];businessId:string;onOpen:(id:string)=>void;writable:boolean;onRefresh:()=>void}) {
+ const [index,setIndex]=useState(0),current=Math.min(index,posts.length-1),post=posts[current];
+ if(!post)return null;
+ const hasCreative=Boolean(post.creative_version_id||post.video_version_id||post.carousel_version_id);
+ return <section className="daily-post-stage" aria-label="Posts for selected day"><div className="daily-post-pager"><button aria-label="Previous post" disabled={current===0} onClick={()=>setIndex(current-1)}>←</button><p role="status">Post {current+1} of {posts.length}</p><button aria-label="Next post" disabled={current>=posts.length-1} onClick={()=>setIndex(current+1)}>→</button></div>
+ <article className={`daily-post ${hasCreative?'':'daily-post-unfinished'}`}><header><strong>{name(post.channel)} · {postFormatLabel(post)}</strong><time dateTime={post.planned_at}>{when(post)}</time></header>
+ {hasCreative?<PostThumbnail key={post.id} businessId={businessId} post={post}/>:post.reference_ids?.length?<div className="daily-reference"><SavedReferencePreviews businessId={businessId} ids={post.reference_ids.slice(0,1)}/><span>Reference image · final design not generated yet</span></div>:null}
+ <div className="daily-post-copy"><span className={`plan-state state-${post.state}`}>{hasCreative?labels[post.state]:'Topic ready'}</span><h2>{post.hook||post.brief}</h2>{hasCreative&&<p>{post.caption||post.brief}</p>}
+ {!hasCreative&&post.format==='static'&&<CampaignImages key={post.id} businessId={businessId} planId={post.plan_id} slots={[post]} disabled={!writable} onRefresh={onRefresh} compact/>}
+ <button className={hasCreative?'primary':''} onClick={()=>onOpen(post.id)}>{hasCreative?'Open post':post.format==='video'?'Review script & framing':post.format==='carousel'?'Review carousel topic':'Edit topic & image'}</button></div></article></section>;
+}
 export function ContentWorkspace({
   business,
   inbox = false,
@@ -86,12 +115,15 @@ export function ContentWorkspace({
   business: Business;
   inbox?: boolean;
 }) {
+  const router=useRouter();
   const root = `/api/v1/businesses/${business.id}`;
+  const [dateCounts,setDateCounts]=useState<Record<string,number>>({});
   const [prefs, setPrefs] = useState<any>(),
     [anchor, setAnchor] = useState(""),
-    [view, setView] = useState("month"),
+    [view, setView] = useState("week"),
     [days, setDays] = useState("30"),
     [channel, setChannel] = useState(""),
+    [campaign,setCampaign] = useState(""),
     [state, setState] = useState(""),
     [page, setPage] = useState(1),
     [data, setData] = useState<any>(),
@@ -106,41 +138,30 @@ export function ContentWorkspace({
   const [moveDay, setMoveDay] = useState<string>();
   const dragged = useRef<string | null>(null);
   const [postDirty, setPostDirty] = useState(false),
-    trigger = useRef<HTMLElement | null>(null);
+    trigger = useRef<HTMLElement | null>(null),
+    calendarHeading = useRef<HTMLHeadingElement>(null);
   const [generate, setGenerate] = useState(false),
     [start, setStart] = useState(""),
     [planDays,setPlanDays]=useState(30),
-    [planningProvider,setPlanningProvider]=useState('openai'),[postCount,setPostCount]=useState(30),[videoCount,setVideoCount]=useState(0),
+    [planningCreativity,setPlanningCreativity]=useState<Creativity>('normal'),[postCount,setPostCount]=useState(30),[videoCount,setVideoCount]=useState(0),
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
-  useEffect(()=>{const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
-  const [exporting,setExporting]=useState(false),exportActive=useRef(true);
-  useEffect(()=>{exportActive.current=true;return()=>{exportActive.current=false;};},[]);
-  async function exportCalendar(format:'csv'|'ics'){
-    if(!prefs||!first||!last||exporting)return;
-    setExporting(true);setError(undefined);
-    try{
-      const query=new URLSearchParams({start:dayStart(first,prefs.timezone),end:dayStart(last,prefs.timezone),format,...(channel?{channel}:{}),...(state?{state}:{})});
-      const file=await api(`${root}/content-plan/export?${query}`);
-      if(!exportActive.current)return;
-      const url=URL.createObjectURL(new Blob([file.content],{type:file.content_type}));
-      const link=document.createElement('a');link.href=url;link.download=file.filename;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
-      setMessage(`Exported ${file.count} saved posts. This does not schedule or publish them.`);
-    }catch(e){if(exportActive.current)setError(e);}finally{if(exportActive.current)setExporting(false);}
-  }
+  useEffect(()=>{const plan=new URLSearchParams(location.search).get('plan');setCampaign(plan&&/^[a-f0-9-]{36}$/i.test(plan)?plan:'');const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
   const canWrite = ['owner','admin','editor'].includes(business.role),
     canReview = ["owner", "admin", "reviewer"].includes(business.role);
   useUnsavedChanges(!!brief || busy);
   useEffect(() => {
     let active = true;
     api(`${root}/onboarding`)
-      .then((p) => {
+      .then(async (p) => {
         if (active) {
-          setPrefs(p);
           const today = localMinute(Date.now(), p.timezone).slice(0, 10);
           const requested=new URLSearchParams(location.search).get('start');
-          setAnchor(requested&&/^\d{4}-\d{2}-\d{2}$/.test(requested)&&Number.isFinite(Date.parse(requested))?requested:today);
+          let initial=requested&&/^\d{4}-\d{2}-\d{2}$/.test(requested)&&Number.isFinite(Date.parse(requested))?requested:today;
+          if(!requested&&!inbox){try{const overview=await api(`${root}/overview`);const next=overview.upcoming_posts?.[0];if(next)initial=localMinute(Date.parse(next.planned_at),p.timezone).slice(0,10);}catch{/* Calendar remains usable if overview is unavailable. */}}
+          if(!active)return;setAnchor(initial);
           setStart(today);
+          setPrefs(p);
         }
       })
       .catch((e) => active && setError(e));
@@ -158,7 +179,7 @@ export function ContentWorkspace({
       ? addDays(first, Number(days))
       : view === "month"
         ? addDays(first, 32).slice(0, 7) + "-01"
-        : addDays(first, view === "week" ? 7 : 30)
+        : addDays(first, view === "day" ? 1 : view === "week" ? 7 : 30)
     : "";
   useEffect(() => {
     if (!prefs || !first || !last) return;
@@ -172,6 +193,7 @@ export function ContentWorkspace({
           end: dayStart(last, prefs.timezone),
           page: String(page),
           ...(channel ? { channel } : {}),
+          ...(campaign ? { plan_id: campaign } : {}),
           ...(state ? { state } : {}),
         });
         const [list, queue] = await Promise.all([
@@ -189,7 +211,9 @@ export function ContentWorkspace({
     return () => {
       active = false;
     };
-  }, [root, prefs, first, last, page, channel, state, inbox, reload]);
+  }, [root, prefs, first, last, page, channel, campaign, state, inbox, reload]);
+  const month=anchor.slice(0,7);
+  useEffect(()=>{if(!prefs||!month||inbox)return;let active=true;const first=month+'-01';const q=new URLSearchParams({start:dayStart(first,prefs.timezone),end:dayStart(addDays(first,32).slice(0,7)+'-01',prefs.timezone),...(channel?{channel}:{}),...(campaign?{plan_id:campaign}:{}),...(state?{state}:{})});void(async()=>{const counts:Record<string,number>={};let page=1,more=false;do{q.set('page',String(page));const result=await api(root+'/content-plan?'+q);if(!active)return;for(const post of result.slots){const day=localMinute(Date.parse(post.planned_at),prefs.timezone).slice(0,10);counts[day]=(counts[day]??0)+1;}more=result.has_more;page++;}while(more&&page<=100);if(active)setDateCounts(counts);})().catch(()=>{if(active)setDateCounts({});});return()=>{active=false;};},[root,prefs,month,channel,campaign,state,inbox,reload]);
   useEffect(() => {
     if (!jobs.some(running)) return;
     const timer = setInterval(() => {if(!document.hidden)setReload((n) => n + 1);}, 4000);
@@ -201,10 +225,12 @@ export function ContentWorkspace({
       !window.confirm("Discard your unsaved post changes and feedback?")
     )
       return;
+    if(!inbox&&!day){router.push(`/b/${business.id}/campaign-post?slot=${id}`);return;}
     trigger.current = document.activeElement as HTMLElement;
     setPostDirty(false);
     setMoveDay(day);
     setSelected(id);
+    const url=new URL(location.href);url.searchParams.set("slot",id);history.replaceState(history.state,"",url);
   }
   function filter(change: () => void) {
     change();
@@ -219,7 +245,7 @@ export function ContentWorkspace({
         ? last
         : !inbox && view === "month"
           ? addDays(first, -1).slice(0, 7) + "-01"
-          : addDays(first, -(inbox ? Number(days) : view === "week" ? 7 : 30));
+          : addDays(first, -(inbox ? Number(days) : view === "day" ? 1 : view === "week" ? 7 : 30));
     if (next < "2000-01-01" || next > "2100-12-01") return;
     filter(() => setAnchor(next));
   }
@@ -227,7 +253,7 @@ export function ContentWorkspace({
     setBusy(true);
     setError(undefined);
     try {
-      const body = { provider:planningProvider,starts_on: start, brief, duration_days:planDays,post_count:postCount,video_count:videoCount };
+      const body = { provider:"openai",starts_on: start, brief:directedPrompt(brief,planningCreativity), duration_days:planDays,post_count:postCount,video_count:videoCount };
       await api(
         `${root}/content-plan/generate`,
         body,
@@ -280,30 +306,18 @@ export function ContentWorkspace({
   if (first && last) {
     for (let d = first; d < last; d = addDays(d, 1)) calendarDays.push(d);
   }
+  if(selected)return <div className="content-workspace post-review-workspace">
+    <SlotPanel key={`${selected}:${moveDay??"open"}`} moveTo={moveDay&&prefs?{day:moveDay,timezone:prefs.timezone}:undefined}
+      business={business} slotId={selected} onChanged={()=>setReload(n=>n+1)} onDirty={setPostDirty}
+      onClose={()=>{
+        setSelected(null);setPostDirty(false);setMoveDay(undefined);
+        const url=new URL(location.href);url.searchParams.delete('slot');history.replaceState(history.state,'',url);
+        requestAnimationFrame(()=>calendarHeading.current?.focus());
+      }}/>
+  </div>;
   return (
-    <div className="content-workspace">
-      <div className="section-heading">
-        <div>
-          <h1>{inbox ? "Review Inbox" : "Content Plan"}</h1>
-          <p>
-            {inbox
-              ? "Review each channel’s next month, with every version and decision saved."
-              : "A clear plan for " +
-                business.name +
-                ". Turn each idea into a creative you can review."}
-          </p>
-        </div>
-        {!inbox && canWrite && (
-          <button
-            className="primary"
-            aria-expanded={generate}
-            aria-controls="plan-generator"
-            onClick={() => setGenerate((v) => !v)}
-          >
-            Create content plan
-          </button>
-        )}
-      </div>
+    <div className={`content-workspace ${inbox ? "approval-workspace" : "calendar-workspace"}`}>
+      {inbox?<div className="section-heading"><div><h1 ref={calendarHeading} tabIndex={-1}>Approvals</h1><p>Review your posts, make adjustments, and approve the versions you love.</p></div></div>:<h1 className="sr-only" ref={calendarHeading} tabIndex={-1}>Calendar</h1>}
       <Notice error={error} />
       {message && <p role="status">{message}</p>}
       {generate && (
@@ -328,7 +342,7 @@ export function ContentWorkspace({
               }}
             >
               <Field label="Plan duration (days)">{id=><input id={id} type="number" min={1} max={90} required value={planDays} onChange={e=>{setPlanDays(Number(e.target.value));setPostCount(Number(e.target.value));}}/>}</Field>
-              <Field label="Planning model">{id=><select id={id} value={planningProvider} onChange={e=>setPlanningProvider(e.target.value)}><option value="openai">OpenAI GPT</option></select>}</Field>
+              <Field label="Plan creativity">{id=><select id={id} value={planningCreativity} onChange={e=>setPlanningCreativity(e.target.value as Creativity)}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></select>}</Field>
               <Field label="Videos in this plan">{id=><input id={id} type="number" min={0} max={Math.min(postCount,30)} required value={videoCount} onChange={e=>setVideoCount(Number(e.target.value))}/>}</Field>
               <Field label="Draft post count">{id=><input id={id} type="number" min={1} max={90} required value={postCount} onChange={e=>setPostCount(Number(e.target.value))}/>}</Field>
               <Field label="Plan starts on">
@@ -352,7 +366,7 @@ export function ContentWorkspace({
                   <textarea
                     id={id}
                     aria-describedby={hint}
-                    maxLength={2000}
+                    maxLength={1600}
                     value={brief}
                     onChange={(e) => setBrief(e.target.value)}
                   />
@@ -370,8 +384,8 @@ export function ContentWorkspace({
         </section>
       )}
       {jobs.length > 0 && !inbox && (
-        <details className="v5-panel" open={jobs.some(running)}>
-          <summary>Plan activity ({jobs.length})</summary>
+        <details className="calendar-activity">
+          <summary>Plan activity{jobs.some(j=>running(j)&&!j.cancel_requested) ? ` · ${jobs.filter(j=>running(j)&&!j.cancel_requested).length} in progress` : jobs.some(j=>["failed","rejected","unknown"].includes(j.status)) ? " · Needs attention" : ""}</summary>
           <ul className="plan-job-list">
             {jobs.slice(0, 10).map((j) => (
               <li key={j.id}>
@@ -410,22 +424,18 @@ export function ContentWorkspace({
           </ul>
         </details>
       )}
-      <nav className="plan-channels" aria-label="Content channels">
-        {channels.map(([value, title]) => (
-          <button
-            key={value}
-            aria-pressed={channel === value}
-            onClick={() => filter(() => setChannel(value))}
-          >
-            {title}
-          </button>
-        ))}
-      </nav>
       <section
         className="v5-panel plan-main"
         aria-label={inbox ? "Review queue" : "Content calendar"}
       >
         <div className="plan-toolbar">
+          {!inbox&&canWrite&&<button className="primary calendar-create-plan" aria-expanded={generate} aria-controls="plan-generator" onClick={()=>setGenerate(v=>!v)}>Create content plan</button>}
+          <div className="calendar-period" role="group" aria-label="Calendar navigation">
+            <button aria-label={view==='day'?'Previous day':'Previous period'} disabled={!first || first<='2000-01-01'} onClick={()=>movePeriod(-1)}>‹</button>
+            <button disabled={!prefs} onClick={()=>filter(()=>setAnchor(localMinute(Date.now(),prefs.timezone).slice(0,10)))}>Today</button>
+            <button aria-label={view==='day'?'Next day':'Next period'} disabled={!last || last>'2100-12-01'} onClick={()=>movePeriod(1)}>›</button>
+          </div>
+          {campaign&&<button onClick={()=>{filter(()=>setCampaign(''));const url=new URL(location.href);url.searchParams.delete('plan');history.replaceState(history.state,'',url);}}>Show all campaigns</button>}
           <Field label={inbox ? "Review from" : "Calendar date"}>
             {(id) => (
               <input
@@ -433,6 +443,7 @@ export function ContentWorkspace({
                 type="date"
                 min="2000-01-01"
                 max="2100-12-01"
+                disabled={!prefs}
                 value={anchor}
                 onChange={(e) => filter(() => setAnchor(e.target.value))}
               />
@@ -460,13 +471,28 @@ export function ContentWorkspace({
                   value={view}
                   onChange={(e) => filter(() => setView(e.target.value))}
                 >
+                  <option value="day">Day</option>
                   <option value="month">Month</option>
-                  <option value="week">7 days</option>
+                  <option value="week">Visual week</option>
                   <option value="list">30-day list</option>
                 </select>
               )}
             </Field>
           )}
+          <details className="calendar-filters">
+            <summary>Filters{channel || state ? ' · Active' : ''}</summary>
+            <div className="calendar-filter-fields">
+      <nav className="plan-channels" aria-label="Content channels">
+        {channels.map(([value, title]) => (
+          <button
+            key={value}
+            aria-pressed={channel === value}
+            onClick={() => filter(() => setChannel(value))}
+          >
+            {title}
+          </button>
+        ))}
+      </nav>
           <Field label="Post status">
             {(id) => (
               <select
@@ -491,28 +517,16 @@ export function ContentWorkspace({
               </select>
             )}
           </Field>
+            {(channel || state) && <button onClick={()=>filter(()=>{setChannel('');setState('');})}>Clear filters</button>}
+            </div>
+          </details>
           <button onClick={() => setReload((n) => n + 1)}>Refresh posts</button>
-          {!inbox&&<><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('csv')}>Export CSV</button><button disabled={!data?.total||exporting} onClick={()=>void exportCalendar('ics')}>Export calendar</button></>}
           {!inbox && canWrite && view !== 'list' && <button onClick={() => filter(() => setView('list'))}>Select drafts for review</button>}
         </div>
-        {!inbox&&canWrite&&view!=='list'&&<p>Drag a post to another day, then review and save the new date. You can also open any post and edit its planned date using the keyboard.</p>}
-        <div className="plan-actions" aria-label="Calendar navigation">
-          <button
-            disabled={!first || first <= "2000-01-01"}
-            onClick={() => movePeriod(-1)}
-          >
-            Previous period
-          </button>
-          <button
-            disabled={!last || last > "2100-12-01"}
-            onClick={() => movePeriod(1)}
-          >
-            Next period
-          </button>
-        </div>
+        {!inbox&&canWrite&&['month','week'].includes(view)&&<p className="calendar-board-hint">Open a post to edit · Drag to reschedule</p>}
+        {!inbox && view==='day' && anchor && <DateStrip date={anchor} counts={dateCounts} onSelect={date=>filter(()=>setAnchor(date))} />}
         <p className="hint">
-          {prefs?.timezone ?? "Loading time zone…"} · Planned dates only.
-          Publishing requires a connected social account and a separate action.
+          {prefs?.timezone ?? "Loading time zone…"}
         </p>
         {!data && !error ? (
           <Loading />
@@ -524,7 +538,7 @@ export function ContentWorkspace({
                   {data.total} {data.total === 1 ? "post" : "posts"} in this
                   view{data.total > 100 ? ` · Page ${page}` : ""}
                 </p>
-                <div>
+                {(page>1||data.has_more)&&<div>
                   <button
                     disabled={page === 1}
                     onClick={() => setPage((p) => p - 1)}
@@ -537,9 +551,9 @@ export function ContentWorkspace({
                   >
                     Next page
                   </button>
-                </div>
+                </div>}
               </div>
-              {data.total === 0 ? (
+              {!inbox && view === 'day' && data.total > 0 ? <DailyPosts key={`${anchor}:${channel}:${state}:${page}`} posts={data.slots} businessId={business.id} onOpen={selectPost} writable={["owner","admin","editor"].includes(business.role)} onRefresh={()=>setReload(n=>n+1)} /> : data.total === 0 ? (
                 <div className="plan-empty">
                   <h2>
                     {inbox
@@ -551,6 +565,7 @@ export function ContentWorkspace({
                       ? "Posts appear here after they are sent for review. Change the dates or channel to see other posts."
                       : "Create a plan from your brand, or choose another date range to find saved posts."}
                   </p>
+                  {!inbox&&<a className="button primary" href={`/b/${business.id}/campaigns`}>Open campaigns</a>}
                   {inbox && (
                     <a href={`/b/${business.id}/content-plan`}>
                       Open Content Plan
@@ -559,7 +574,8 @@ export function ContentWorkspace({
                 </div>
               ) : !inbox && view !== "list" ? (
                 <div
-                  className="plan-grid"
+                  className={`plan-grid ${view==='week'?'plan-grid-week':'plan-grid-month'}`}
+                  tabIndex={view==='week'?0:undefined}
                   role="list"
                   aria-label="Days in this view"
                 >
@@ -595,17 +611,13 @@ export function ContentWorkspace({
                             onClick={() => selectPost(s.id)}
                             aria-label={`Open ${name(s.channel)} post: ${s.hook || s.brief}`}
                           >
-                            <span>
-                              {name(s.channel)} ·{" "}
-                              {localMinute(s.planned_at, prefs.timezone).slice(
-                                11,
-                              )}
-                            </span>
-                            <span>{s.format === 'video' ? 'Video' : s.format==='carousel'?'Carousel':'Static post'}</span>
-                            <strong>{s.hook || s.brief}</strong>
+                            <span className="calendar-card-heading"><span>{postFormatLabel(s)}</span><time dateTime={s.planned_at}>{localMinute(s.planned_at,prefs.timezone).slice(11)}</time></span>
+                            <PostThumbnail businessId={business.id} post={s}/><strong>{s.hook || s.brief}</strong>
+                            <span className="calendar-card-channel">{name(s.channel)}</span>
                             <span className={`plan-state state-${s.state}`}>
                               {labels[s.state]}
                             </span>
+                            <span className="post-action-hint" aria-hidden="true">{canWrite || canReview ? 'Review & edit' : 'View post'} <span>→</span></span>
                           </button>
                         ))}
                     </section>
@@ -641,15 +653,16 @@ export function ContentWorkspace({
                         <span>
                           {name(s.channel)} · {when(s)} ({s.timezone})
                         </span>
-                        <span>{s.format === 'video' ? 'Video' : s.format==='carousel'?'Carousel':'Static post'}</span>
-                            <strong>{s.hook || s.brief}</strong>
+                        <span>{postFormatLabel(s)}</span>
+                            <PostThumbnail businessId={business.id} post={s}/><strong>{s.hook || s.brief}</strong>
                         <span>{s.caption || s.brief}</span>
                         <span className={`plan-state state-${s.state}`}>
                           {labels[s.state]}
                           {s.has_newer_version
-                            ? " · Newer Canvas version available"
+                            ? " · Newer creative version available"
                             : ""}
                         </span>
+                        <span className="post-action-hint" aria-hidden="true">{canWrite || canReview ? 'Review & edit' : 'View post'} <span>→</span></span>
                       </button>
                     </li>
                   ))}
@@ -694,25 +707,11 @@ export function ContentWorkspace({
           {selection.length > 30 && <p>Select at most 30 posts at a time.</p>}
         </section>
       )}
-      {selected && (
-        <SlotPanel
-          key={`${selected}:${moveDay??"open"}`}
-          moveTo={moveDay?{day:moveDay,timezone:prefs.timezone}:undefined}
-          business={business}
-          slotId={selected}
-          onChanged={() => setReload((n) => n + 1)}
-          onDirty={setPostDirty}
-          onClose={() => {
-            setSelected(null);
-            setPostDirty(false);
-            queueMicrotask(() => trigger.current?.focus());
-          }}
-        />
-      )}
+
     </div>
   );
 }
-function SlotPanel({
+export function SlotPanel({
   business,
   slotId,
   moveTo,
@@ -733,10 +732,15 @@ function SlotPanel({
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false),
     [feedback, setFeedback] = useState(""),
+    [referenceIds,setReferenceIds]=useState<string[]>([]),
     [reset, setReset] = useState(false),
     [message, setMessage] = useState(""),
     [ready, setReady] = useState(false),
-    [chosen, setChosen] = useState("");
+    [chosen, setChosen] = useState(""),
+    [editing, setEditing] = useState(false),
+    [editDesign, setEditDesign] = useState<Design>(),
+    [editCaption, setEditCaption] = useState(""),
+    [savedEdit, setSavedEdit] = useState<string>();
   const pendingMove = useRef(moveTo);
   const dirtyRef = useRef(false),
     heading = useRef<HTMLHeadingElement>(null),
@@ -769,6 +773,7 @@ function SlotPanel({
             local: localMinute(planned, d.slot.timezone),
           });
           setChosen(planned);
+          setReferenceIds(d.slot.reference_ids??[]);
         }
       } catch (e) {
         if (alive.current) setError(e);
@@ -797,11 +802,12 @@ function SlotPanel({
         JSON.stringify(draft.video_draft)!==JSON.stringify(s.video_draft) ||
         draft.local !== localMinute(s.planned_at, s.timezone));
   useEffect(()=>setReady(false),[s?.creative_version_id,s?.video_version_id,s?.carousel_version_id]);
-  dirtyRef.current = dirty;
-  useUnsavedChanges(dirty || !!feedback || busy);
+  const referenceDirty=!!s&&JSON.stringify(referenceIds)!==JSON.stringify(s.reference_ids??[]);
+  dirtyRef.current = dirty||referenceDirty||editing;
+  useUnsavedChanges(dirty || !!feedback || busy || referenceDirty || editing);
   useEffect(
-    () => onDirty(dirty || !!feedback || busy),
-    [dirty, feedback, busy, onDirty],
+    () => onDirty(dirty || !!feedback || busy || referenceDirty || editing),
+    [dirty, feedback, busy, referenceDirty, editing, onDirty],
   );
   useEffect(() => {
     if (!active) return;
@@ -813,7 +819,7 @@ function SlotPanel({
   }, [active, load]);
   const canWrite = ['owner','admin','editor'].includes(business.role),
     canReview = ["owner", "admin", "reviewer"].includes(business.role),
-    locked = busy || !canWrite;
+    locked = busy || !canWrite || editing;
   async function act(
     action: () => Promise<unknown>,
     text: string,
@@ -837,7 +843,26 @@ function SlotPanel({
       if (alive.current) setBusy(false);
     }
   }
+  async function saveDesign() {
+    if (!editDesign || busy || !canWrite || (s.state === "approved" && !reset)) return;
+    setBusy(true); setError(undefined);
+    try {
+      // Keep the saved version if attaching fails: retry only attachment, never duplicate the edit.
+      const versionId = savedEdit || (await api(`${root}/creative-projects/${s.project_id}/versions`, {
+        parent_id: s.creative_version_id, design: editDesign, caption: editCaption,
+      })).id;
+      setSavedEdit(versionId);
+      await api(`${root}/content-slots/${slotId}`, {
+        revision: s.revision, creative_version_id: versionId, reset_approval: reset,
+      }, "PATCH");
+      setEditing(false); setSavedEdit(undefined); setReset(false);
+      setMessage("Design saved. Your updated post is ready for review.");
+      await load(true); changed.current();
+    } catch (e) { setError(e); await load(); }
+    finally { setBusy(false); }
+  }
   function review(decision: string) {
+    if (editing) return;
     void act(
       () =>
         api(`${root}/reviews/${slotId}`, {
@@ -864,7 +889,7 @@ function SlotPanel({
         : "";
   const leave = () => {
     if (
-      (dirty || feedback) &&
+      (dirty || feedback || referenceDirty || editing) &&
       !window.confirm("Discard your unsaved changes and feedback?")
     )
       return;
@@ -897,16 +922,28 @@ function SlotPanel({
           </p>
           <div className="slot-columns">
             <div>
-              {s.carousel_version_id ? <CalendarCarouselReview businessId={business.id} projectId={s.project_id} versionId={s.carousel_version_id} canEdit={canWrite} canReview={canReview} disabled={busy||dirty} onReady={setReady} onChanged={async()=>{await load(true);changed.current();}}/> : s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/canvas?thread=${s.thread_id}`}>Give video feedback in Canvas</a></> : s.design ? (
+              {s.carousel_version_id ? <CalendarCarouselReview businessId={business.id} projectId={s.project_id} versionId={s.carousel_version_id} canEdit={canWrite} canReview={canReview} disabled={busy||dirty} onReady={setReady} onChanged={async()=>{await load(true);changed.current();}}/> : s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Edit video</a></> : s.design ? (
                 <>
+                  {canWrite && !editing && s.state !== 'cancelled' && <div className="post-design-actions"><button className="primary" disabled={busy||dirty||referenceDirty||!!active||!!held||s.has_newer_version} onClick={()=>{setEditDesign(structuredClone(s.design));setEditCaption(s.caption||'');setSavedEdit(undefined);setEditing(true);}}>Edit design</button></div>}
                   <CreativeEditor
                     businessId={business.id}
-                    design={s.design}
-                    onChange={() => {}}
-                    readOnly
-                    previewOnly
+                    design={editing && editDesign ? editDesign : s.design}
+                    onChange={setEditDesign}
+                    readOnly={!editing || busy || !!savedEdit}
+                    previewOnly={!editing}
                     onExportReady={(fn) => setReady(!!fn)}
                   />
+                  {canWrite && editing && s.state !== 'cancelled' && <div className="post-design-actions">
+                    {<>
+                      <Field label="Caption">{id=><textarea id={id} value={editCaption} maxLength={3000} disabled={busy||!!savedEdit} onChange={e=>setEditCaption(e.target.value)}/>}</Field>
+                      {s.state==='approved'&&<label className="plan-select"><input type="checkbox" checked={reset} disabled={busy} onChange={e=>setReset(e.target.checked)}/>Save as a draft and review this updated design again.</label>}
+                      {savedEdit&&<p role="status">Your design version is saved. Retry attaching it to this post, or close the editor and use Attach latest creative version.</p>}
+                      <button className="primary" disabled={busy||(s.state==='approved'&&!reset)} onClick={()=>void saveDesign()}>{busy?'Saving…':savedEdit?'Attach saved design':'Save design'}</button>
+                      <button disabled={busy} onClick={()=>{if(window.confirm(savedEdit?'Close the editor? Your saved version is retained.':'Discard unsaved design changes?')){setEditing(false);setSavedEdit(undefined);void load(true);}}}>Cancel editing</button>
+                    </>}
+                  </div>}
+                  {canWrite&&<GeneratedReplacement key={`generated:${business.id}:${slotId}:${s.creative_version_id}`} businessId={business.id} projectId={s.project_id} parentId={s.creative_version_id} channel={s.channel} disabled={locked||dirty||referenceDirty||!!active||!!held||s.has_newer_version||s.state==='cancelled'} onReady={async()=>{setMessage('Replacement ready. Attach the latest version below when you are ready to review it.');await load(true);changed.current();}}/>}
+                  {canWrite&&<StockPicker key={`${business.id}:${slotId}:${s.creative_version_id}`} businessId={business.id} purpose="replacement" disabled={locked||dirty||referenceDirty||!!active||!!held||s.has_newer_version||s.state==='cancelled'||(s.state==='approved'&&!reset)} onSelected={async referenceId=>{setBusy(true);setError(undefined);try{const saved=await api(`${root}/stock/projects/${s.project_id}/replace`,{parent_id:s.creative_version_id,reference_id:referenceId});await api(`${root}/content-slots/${slotId}`,{revision:s.revision,creative_version_id:saved.id,reset_approval:reset},'PATCH');setReset(false);setMessage('Photo replaced. This post is a draft ready for review.');await load(true);changed.current();}catch(e){await load(true);throw e;}finally{setBusy(false);}}}/> }
                   <h3>Saved caption</h3>
                   <p className="slot-caption">{s.caption}</p>
                   <details>
@@ -918,24 +955,24 @@ function SlotPanel({
                       <p key={i}>{w}</p>
                     ))}
                   </details>
-                  <a href={`/b/${business.id}/canvas?thread=${s.thread_id}`}>
-                    Edit in Canvas
+                  <a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>
+                    Open campaign editor
                   </a>
                 </>
               ) : (
                 <div className="plan-empty">
                   <h3>This idea needs a creative</h3>
-                  {s.format==='video'&&!dirty&&<a href={`/b/${business.id}/canvas?slot=${s.id}`}>Create this video in Canvas</a>}
+                  {s.format==='video'&&!dirty&&<a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Create this video</a>}
                   <p>
-                    {s.format==='video'?'Review your script below, then choose an approved reference image in Canvas.':'Create an image from the saved brief, then review it here.'}
+                    {s.format==='video'?'Review your script below, then choose an approved reference image in the campaign editor.':'Create an image from the saved brief, then review it here.'}
                   </p>
                 </div>
               )}
-              {data?.videos?.map((run:any)=><div key={run.job_id}><p role="status">Video: {run.status.replaceAll('_',' ')}</p><a href={`/b/${business.id}/canvas?thread=${run.thread_id}`}>Open video prompt and review</a>{run.output_version_id&&run.output_version_id!==s.video_version_id&&<button disabled={locked||dirty||(s.state==='approved'&&!reset)} onClick={()=>void act(()=>api(`${root}/content-slots/${slotId}`,{revision:s.revision,video_version_id:run.output_version_id,reset_approval:reset},'PATCH'),'Saved video attached as an unapproved draft.')}>Attach this saved video</button>}</div>)}
+              {data?.videos?.map((run:any)=><div key={run.job_id}><p role="status">Video: {run.status.replaceAll('_',' ')}</p><a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Open video prompt and review</a>{run.output_version_id&&run.output_version_id!==s.video_version_id&&<button disabled={locked||dirty||(s.state==='approved'&&!reset)} onClick={()=>void act(()=>api(`${root}/content-slots/${slotId}`,{revision:s.revision,video_version_id:run.output_version_id,reset_approval:reset},'PATCH'),'Saved video attached as an unapproved draft.')}>Attach this saved video</button>}</div>)}
               {s.has_newer_version && (
                 <div className="notice">
                   <p>
-                    A newer Canvas version is available. This post still uses
+                    A newer creative version is available. This post still uses
                     its previous saved version.
                   </p>
                   <button
@@ -954,16 +991,30 @@ function SlotPanel({
                             },
                             "PATCH",
                           ),
-                        "Latest Canvas version attached as an unapproved draft.",
+                        "Latest creative version attached as an unapproved draft.",
                       )
                     }
                   >
-                    Attach latest Canvas version
+                    Attach latest creative version
                   </button>
                 </div>
               )}
             </div>
-            <div>
+            <div className="post-review-controls" inert={editing || undefined}>
+                  {s.state === "approved" && (
+                    <label className="plan-select">
+                      <input
+                        type="checkbox"
+                        checked={reset}
+                        onChange={(e) => setReset(e.target.checked)}
+                      />
+                      I understand that changing this post resets approval and
+                      requires a new review.
+                    </label>
+                  )}
+
+              <details className="post-brief-details" open={!s.creative_version_id&&!s.video_version_id&&!s.carousel_version_id||undefined}>
+              <summary>Edit topic & schedule</summary>
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1069,17 +1120,6 @@ function SlotPanel({
                       )}
                     </Field>
                   )}
-                  {s.state === "approved" && (
-                    <label className="plan-select">
-                      <input
-                        type="checkbox"
-                        checked={reset}
-                        onChange={(e) => setReset(e.target.checked)}
-                      />
-                      I understand that changing this post resets approval and
-                      requires a new review.
-                    </label>
-                  )}
                   <button
                     disabled={
                       !dirty || !instant || (s.state === "approved" && !reset)
@@ -1090,13 +1130,16 @@ function SlotPanel({
                   </button>
                 </fieldset>
               </form>
+              </details>
               <div className="slot-review">
                 <h3>Create & review</h3>
+                {canWrite&&s.format==='static'&&s.state!=='cancelled'&&<BrandReferences businessId={business.id} writable={false} selection={referenceIds} onSelectionChange={setReferenceIds} disabled={busy||active||held||dirty}/>}
+
                 <Field label="Feedback or creative direction">
                   {(id) => (
                     <textarea
                       id={id}
-                      maxLength={2000}
+                      maxLength={1600}
                       value={feedback}
                       disabled={busy || (!canWrite && !canReview)}
                       onChange={(e) => setFeedback(e.target.value)}
@@ -1121,6 +1164,7 @@ function SlotPanel({
                       const body = {
                         revision: s.revision,
                         feedback,
+                        reference_ids:referenceIds,
                         reset_approval: reset,
                       };
                       void act(async () => {
@@ -1131,6 +1175,7 @@ function SlotPanel({
                           requestKey(key, body),
                         );
                         key.current = null;
+                        setReferenceIds([]);
                       }, "Creative request queued. The saved result will appear here.");
                     }}
                   >
@@ -1200,13 +1245,13 @@ function SlotPanel({
                       onClick={() => {
                         if (
                           window.confirm(
-                            "Cancel this planned post? Its saved creative and history will be kept. Active publishing requests must be managed in Publishing first.",
+                            "Archive this post? Its creative and history will be kept, and you can restore it as a draft. Active publishing requests must be managed in Publishing first.",
                           )
                         )
                           review("cancelled");
                       }}
                     >
-                      Cancel planned post
+                      Archive post
                     </button>
                   )}
                 </div>
@@ -1222,14 +1267,14 @@ function SlotPanel({
                     <span>
                       {jobText(j)}
                       {j.attachment_status === "needs_attachment"
-                        ? " · Plan changed. Review the saved Canvas draft before attaching it."
+                        ? " · Plan changed. Review the saved creative draft before attaching it."
                         : ""}
                     </span>
                     {j.thread_id && (
                       <a
-                        href={`/b/${business.id}/canvas?thread=${j.thread_id}`}
+                        href={`/b/${business.id}/campaign-post?slot=${s.id}`}
                       >
-                        Open saved Canvas
+                        Open saved creative
                       </a>
                     )}
                     {j.attachment_status === "needs_attachment" &&

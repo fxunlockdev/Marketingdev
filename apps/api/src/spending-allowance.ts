@@ -8,3 +8,8 @@ export function exceedsAllowance(total:number,budget:unknown):boolean {
  const cap=Number(budget);
  return !Number.isSafeInteger(cap)||cap<=0||total>cap;
 }
+
+/** Only our exact database budget exception is safe to expose as a known denial. */
+export function monthlyBudgetExceeded(error:unknown):boolean {
+ return typeof error==='object'&&error!==null&&'code' in error&&error.code==='P0001'&&'message' in error&&error.message==='MONTHLY_GENERATION_BUDGET_EXHAUSTED';
+}

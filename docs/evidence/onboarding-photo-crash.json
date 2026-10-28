@@ -1,0 +1,11 @@
+{
+  "checked_at": "2026-10-25T14:48:25.562Z",
+  "passed": true,
+  "deployment_id": "f5d8f853-695a-42cb-abd2-8b6bb1c9629a",
+  "actual_website_photos_rendered": 12,
+  "missing_metadata_variant_passed": true,
+  "page_errors": [],
+  "customer_mutations": 0,
+  "paid_calls": 0,
+  "scope": "Authenticated deployed onboarding with real saved website photos; read-only browser response variant for missing capture metadata"
+}

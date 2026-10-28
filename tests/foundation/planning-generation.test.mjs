@@ -289,3 +289,101 @@ test('owner business stage and growth targets persist safely and reach mixed sta
  assert.equal(result.strategy.slots.filter(s=>s.format==='video').length,4);
  assert.equal(result.strategy.slots.filter(s=>s.format==='static').length,26);
 });
+
+test('campaign name, reference link and selected channels persist through generation without changing defaults',async()=>{
+ const b=await fresh();await grant(b);transport=standard;
+ const campaign={name:'Clinic launch week',theme:'Help clinics plan their week',cta:'Explore appointments',target_url:'www.example.com/appointments',channels:['instagram'],refinement:{tone:'Warm',references:'Editorial magazines',include:'Approved service details',avoid:'Urgency and discounts'},design:{style:'editorial',font:'classic',creativity:'super_creative'}};
+ const key=randomUUID(),body={starts_on:'2026-11-01',duration_days:7,post_count:7,video_count:0,brief:campaign.theme,campaign};
+ const job=await planning.submit(alice,b.id,body,key);assert.equal((await planning.submit(alice,b.id,body,key)).id,job.id);
+ await assert.rejects(planning.submit(alice,b.id,{...body,campaign:{...campaign,name:'Changed campaign'}},key),/request key/);
+ await handler.run(scope(b,job));assert.equal((await row(job)).status,'succeeded');
+ const saved=(await admin.query('SELECT title,strategy FROM app.content_plans WHERE job_id=$1',[job.id])).rows[0];
+ assert.deepEqual(saved.strategy.campaign.refinement,campaign.refinement);assert.deepEqual(inputs.at(-1).campaign.refinement,campaign.refinement);assert.deepEqual(saved.strategy.campaign.design,campaign.design);assert.deepEqual(inputs.at(-1).campaign.design,campaign.design);assert.equal(saved.title,campaign.name);assert.equal(saved.strategy.campaign.target_url,'https://www.example.com/appointments');
+ const slots=(await admin.query('SELECT DISTINCT channel FROM app.content_slots WHERE plan_id=(SELECT id FROM app.content_plans WHERE job_id=$1)',[job.id])).rows;assert.deepEqual(slots.map(s=>s.channel),['instagram']);
+ const prefs=await businesses.onboarding(alice,b.id);assert.deepEqual(prefs.channels,['linkedin','instagram']);
+ assert.equal(inputs.at(-1).campaign.name,campaign.name);
+});
+
+
+test('daily campaign persists one image each day plus five spaced reels and resumes without duplicates',async()=>{
+ const b=await fresh();await grant(b);
+ transport=async(url,init)=>{calls++;const context=inputFrom(JSON.parse(init.body));const plan=generatedPlan(context);plan.slots.forEach(s=>s.planned_at='2028-02-01T08:00:00Z');return modelResponse(plan);};
+ const job=await planning.submit(alice,b.id,{starts_on:'2028-02-01',duration_days:29,post_count:34,video_count:5,campaign:{name:'Daily February',theme:'A fresh idea daily',cta:'Explore',target_url:'',channels:['instagram']}},randomUUID());
+ try{
+  assert.equal(await handler.run(scope(b,job)),'succeeded');
+  const read=async()=>(await admin.query("SELECT format,planned_at::text FROM app.content_slots WHERE plan_id=(SELECT id FROM app.content_plans WHERE job_id=$1) ORDER BY planned_at",[job.id])).rows;
+  const slots=await read(),images=slots.filter(s=>s.format==='static'),videos=slots.filter(s=>s.format==='video');
+  assert.equal(slots.length,34);assert.equal(images.length,29);assert.equal(videos.length,5);
+  assert.deepEqual(images.map(s=>s.planned_at.slice(0,10)),Array.from({length:29},(_,i)=>`2028-02-${String(i+1).padStart(2,'0')}`));
+  assert.equal(new Set(videos.map(s=>s.planned_at.slice(0,10))).size,5);
+  const before=calls;await handler.run(scope(b,job));assert.equal(calls,before);assert.deepEqual(await read(),slots);
+ }finally{transport=standard;}
+});
+
+test('Facebook campaign persists through planning without changing brand channel defaults',async()=>{
+ const b=await fresh();await grant(b);transport=standard;
+ const campaign={name:'Clinic launch week',theme:'Help clinics plan their week',cta:'Explore appointments',target_url:'www.example.com/appointments',channels:['facebook'],design:{style:'editorial',font:'classic',creativity:'super_creative'}};
+ const key=randomUUID(),body={starts_on:'2026-11-01',duration_days:7,post_count:7,video_count:0,brief:campaign.theme,campaign};
+ const job=await planning.submit(alice,b.id,body,key);assert.equal((await planning.submit(alice,b.id,body,key)).id,job.id);
+ await assert.rejects(planning.submit(alice,b.id,{...body,campaign:{...campaign,name:'Changed campaign'}},key),/request key/);
+ await handler.run(scope(b,job));assert.equal((await row(job)).status,'succeeded');
+ const saved=(await admin.query('SELECT title,strategy FROM app.content_plans WHERE job_id=$1',[job.id])).rows[0];
+ assert.deepEqual(saved.strategy.campaign.design,campaign.design);assert.deepEqual(inputs.at(-1).campaign.design,campaign.design);assert.equal(saved.title,campaign.name);assert.equal(saved.strategy.campaign.target_url,'https://www.example.com/appointments');
+ const slots=(await admin.query('SELECT DISTINCT channel FROM app.content_slots WHERE plan_id=(SELECT id FROM app.content_plans WHERE job_id=$1)',[job.id])).rows;assert.deepEqual(slots.map(s=>s.channel),['facebook']);
+ const prefs=await businesses.onboarding(alice,b.id);assert.deepEqual(prefs.channels,['linkedin','instagram']);
+ assert.equal(inputs.at(-1).campaign.name,campaign.name);
+});
+
+async function approvedPhotoFixture(b,label='TEST approved product'){
+ const asset=randomUUID(),job=randomUUID(),visual=randomUUID(),id=randomUUID(),sha='a'.repeat(64),key=`TEST/${b.id}/${visual}`;
+ // Metadata-only validated-upload fixture. This suite checks selection/persistence,
+ // not raster content; scan/normalization is covered by asset integration tests.
+ await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'TEST.jpg','image/jpeg',100,$5,$6,$7,'ready')",[asset,org.id,b.id,alice,sha,key+'-quarantine',key]);
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind,status) VALUES($1,$2,$3,$4,$5,'asset.validate','succeeded')",[job,org.id,b.id,asset,alice]);
+ await admin.query('INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$7,100,600,400)',[visual,org.id,b.id,asset,job,key,sha]);
+ await admin.query('INSERT INTO app.brand_references(id,organization_id,brand_id,uploaded_visual_id,label,approved_by) VALUES($1,$2,$3,$4,$5,$6)',[id,org.id,b.id,visual,label,alice]);return id;
+}
+test('campaign planning selects approved brand photos and persists choices without leaking storage keys (MOCK provider)',async()=>{
+ const b=await fresh(),other=await fresh();await grant(b);
+ const photo=await approvedPhotoFixture(b),foreign=await approvedPhotoFixture(other);
+ transport=async(url,init)=>{calls++;const wire=JSON.parse(init.body),input=inputFrom(wire);
+  assert.deepEqual(input.references.map(r=>r.id),[photo]);assert.ok(!JSON.stringify(input.references).includes('object_key'));assert.ok(!JSON.stringify(input).includes(foreign));
+  assert.ok(wire.input.some(m=>m.role==='system'&&m.content.includes('reference_ids')));
+  const result=generatedPlan(input);result.slots[0].reference_ids=[photo];return modelResponse(result);
+ };
+ try{const j=await submit(b);
+  await jobs.transaction(scope(b,j),async db=>{
+   assert.deepEqual((await db.query('SELECT id FROM app.brand_references WHERE id=ANY($1::uuid[])',[[photo,foreign]])).rows.map(r=>r.id),[photo]);
+  });
+  assert.equal(await handler.run(scope(b,j)),'succeeded',JSON.stringify(await row(j)));
+  const plan=(await planning.jobs(alice,b.id)).jobs.find(x=>x.id===j.id).output_plan_id;
+  const slots=(await admin.query('SELECT reference_ids FROM app.content_slots WHERE plan_id=$1 ORDER BY strategy_slot_index',[plan])).rows;
+  assert.deepEqual(slots[0].reference_ids,[photo]);assert.ok(slots.slice(1).every(s=>s.reference_ids.length===0));
+ }finally{transport=undefined;}
+});
+test('campaign planning rejects references revoked before spending or while a result is being prepared',async()=>{
+ for(const phase of ['before','during']){
+  const b=await fresh();await grant(b);const photo=await approvedPhotoFixture(b),j=await submit(b),before=calls;
+  const revoke=()=>admin.query('UPDATE app.brand_references SET revoked_at=now() WHERE id=$1',[photo]);
+  if(phase==='before')await revoke();
+  transport=async(url,init)=>{calls++;const result=generatedPlan(inputFrom(JSON.parse(init.body)));result.slots[0].reference_ids=[photo];await revoke();return modelResponse(result);};
+  try{assert.equal(await handler.run(scope(b,j)),'rejected');assert.equal((await row(j)).error_code,'PLAN_REFERENCE_CHANGED');assert.equal(await countPlans(b),0);if(phase==='before')assert.equal(calls,before);}finally{transport=undefined;}
+ }
+});
+
+test('explicit campaign mix persists all five placements with exact counts and immutable scoped specs (MOCK provider)',async()=>{
+ const b=await fresh();await grant(b);transport=standard;
+ const mix=[['static','feed','square',null],['carousel','feed','portrait',4],['static','story','vertical',null],['video','reel','vertical',null],['video','story','vertical',null]].map(([format,placement,aspect,slide_count])=>({channel:'instagram',format,creative_spec:{placement,aspect,slide_count},count:1}));
+ const body={starts_on:'2026-11-01',duration_days:7,content_mix:mix,brief:'Five coordinated formats'},key=randomUUID();
+ assert.throws(()=>planning.submit(alice,b.id,{...body,post_count:6},randomUUID()),/totals/);
+ assert.throws(()=>planning.submit(alice,b.id,{...body,content_mix:[{...mix[3],channel:'linkedin'}]},randomUUID()),/compatible/);
+ const job=await planning.submit(alice,b.id,body,key);assert.equal((await planning.submit(alice,b.id,body,key)).id,job.id);
+ await assert.rejects(planning.submit(alice,b.id,{...body,content_mix:mix.map((r,i)=>i===1?{...r,creative_spec:{...r.creative_spec,slide_count:5}}:r)},key),/request key/);
+ await handler.run(scope(b,job));assert.equal((await row(job)).status,'succeeded',JSON.stringify(await row(job)));
+ assert.deepEqual(inputs.at(-1).content_mix,mix);assert.equal(inputs.at(-1).post_count,5);assert.equal(inputs.at(-1).video_count,2);
+ const saved=(await admin.query('SELECT * FROM app.content_slots WHERE plan_id=(SELECT output_plan_id FROM app.planning_requests WHERE job_id=$1) ORDER BY strategy_slot_index',[job.id])).rows;
+ assert.equal(saved.length,5);assert.deepEqual(saved.map(s=>({channel:s.channel,format:s.format,creative_spec:s.creative_spec,count:1})),mix);
+ assert.ok(saved.every(s=>s.state==='content_needed'&&!s.creative_version_id&&!s.video_version_id&&!s.carousel_version_id));
+ await assert.rejects(plans.list(bob,b.id,range),/not found|access|member/i);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind IN ('creative.generate','creative.video','carousel.generate')",[b.id])).rows[0].n,0);
+});

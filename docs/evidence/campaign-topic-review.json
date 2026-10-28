@@ -1,0 +1,52 @@
+{
+  "status": "verification_in_progress_not_deployed",
+  "implemented": [
+    "Inline saved static-topic editing before generation",
+    "Revision-conflict comparison preserves entered draft",
+    "Plan switching and new planning disabled while a topic editor is open",
+    "Unsaved navigation guard and focus restoration",
+    "Saved up to three approved brand references per static post",
+    "Private image previews load only near the visible area",
+    "Generation defaults to saved references and rechecks approval",
+    "Calendar generation displays saved references and allows explicit clearing",
+    "Saved reference photo previews remain visible below each topic",
+    "Unavailable saved references can be removed from the topic picker",
+    "Readable dark surfaces for Canvas planned-post cards",
+    "Active generation progress excludes future scheduled planning cycles"
+  ],
+  "verified": [
+    "Web TypeScript check passed",
+    "API TypeScript build passed",
+    "Nine planning contracts passed",
+    "Focused campaign review browser flow passed: saved topic/reference preview and selection, persistence, revision-conflict recovery, calendar navigation (mock paid transports).",
+    "Creative foundation: 16/16 passed, actual isolated skill runtime and durable storage; paid image transports mocked. Includes saved references, reference revocation, campaign direction, retries and concurrent-edit preservation.",
+    "Saved image previews after refresh passed the focused browser test when the reference group entered the viewport (session 37381, exit 0).",
+    "Unavailable-reference removal passed in the focused browser journey (session 26600, exit 0).",
+    "Focused browser flow passed after dark Canvas fixes: topic text meets 4.5:1 contrast, future cycles do not show a generating loader, saved previews and revoked-image removal work (session 8762, exit 0)."
+  ],
+  "pending": [],
+  "limitations": [
+    "Video scripts and generated media remain in full post editor",
+    "Stock discovery is unfinished",
+    "Not deployed"
+  ],
+  "test_session": 8762,
+  "test_command": "node scripts/foundation-test.mjs --campaign-review-web",
+  "log": "work/campaign-topic-browser.log",
+  "migration": "064_planned_post_references.sql",
+  "verification_notes": [
+    "Topic editing and saved reference selection passed; rechecking the newly visible saved reference previews.",
+    "Migration 064 now grants the application role permission to update the reference_ids column.",
+    "Saved previews intentionally load near the viewport. Browser recheck now scrolls the saved reference group into view before asserting its image."
+  ],
+  "creative_foundation": {
+    "exit_code": 0,
+    "passed": 16,
+    "log": "work/campaign-design-creative.log",
+    "session": 4002
+  },
+  "test_exit_code": 0,
+  "screenshots": [
+    "work/browser/campaign-saved-references.png"
+  ]
+}

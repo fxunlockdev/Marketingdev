@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { api, type Workspace } from "./api";
 import { Wordmark, Loading, Notice, Field } from "./primitives";
 import {SocialCallbackResult} from "./connections";
+import {PostformeReturn} from "./postforme-return";
 import { BusinessApp } from "./businesses";
 import {useHistoryEditGuard} from "./unsaved";
 import { AuthScreen } from "./auth";
@@ -13,6 +14,7 @@ export function Desvio() {
   useHistoryEditGuard();
   const pathname = usePathname();
   const mode = pathname.split("/")[1];
+  if(pathname==="/connections/postforme/return")return <PostformeReturn/>;
   if(pathname==="/integrations/social/result")return <SocialCallbackResult/>;
   if (
     [

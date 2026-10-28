@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-10-25T13:24:02.653Z",
+  "passed": true,
+  "checks": [
+    {
+      "endpoint": "/api/v1/businesses/:brand/onboarding",
+      "status": 200,
+      "onboarding_step": 3
+    },
+    {
+      "endpoint": "/api/v1/businesses/:brand/canvas/references",
+      "status": 200,
+      "references": 0
+    },
+    {
+      "endpoint": "/api/v1/workspaces/:workspace/generation-usage",
+      "status": 200
+    }
+  ],
+  "paid_calls": 0,
+  "customer_mutations": 0
+}

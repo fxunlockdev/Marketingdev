@@ -1,3 +1,4 @@
+import {normalizeCreativeSpec,creativeSourceSize,creativeDimensions} from "./campaign-formats.js";
 import {approvedLearning} from './learning-context.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
@@ -164,7 +165,7 @@ export class Canvas {
         planning_runs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,r.output_plan_id,r.scheduled_at,r.input->'preferences'->>'starts_on' AS starts_on FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id,threadId])).rows,
         projects: (
           await db.query(
-            "SELECT id,title,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 ORDER BY created_at DESC LIMIT 100",
+            "SELECT id,title,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 AND archived_at IS NULL ORDER BY created_at DESC LIMIT 100",
             [b.organization_id, id, threadId],
           )
         ).rows,
@@ -177,7 +178,7 @@ export class Canvas {
     threadId: string,
     body: unknown,
     requestKey: unknown,
-    scoped?: { db: any; b: any },
+    scoped?: { db: any; b: any; batchJobIds?: string[] },
   ) {
     threadId = uuid(threadId);
     const v = object(body, [
@@ -186,6 +187,7 @@ export class Canvas {
         "channel",
         "size",
         "parent_version_id",
+        "creative_spec",
         "reference_ids",
         "text_provider",
         "max_cost_micros",
@@ -195,12 +197,17 @@ export class Canvas {
       textProvider=creativeTextProvider(v.text_provider);
     if (
       !["static", "ad"].includes(String(v.format)) ||
-      !["linkedin", "instagram"].includes(String(v.channel)) ||
+      !["linkedin", "instagram", "facebook"].includes(String(v.channel)) ||
       !["1024x1024", "1536x1024", "1024x1536"].includes(String(v.size))
     )
       throw new BadRequestException(
         "Choose a supported static image format, channel and size",
       );
+    let creativeSpec=null;
+    if(v.creative_spec!==undefined&&v.creative_spec!==null){
+      try{creativeSpec=normalizeCreativeSpec(v.creative_spec,String(v.format),String(v.channel));}catch{throw new BadRequestException("Choose a compatible post placement and aspect");}
+      if(creativeSourceSize(creativeSpec)!==v.size)throw new BadRequestException("Image source size must match the selected aspect");
+    }
     if(v.max_cost_micros!==undefined&&(!Number.isSafeInteger(v.max_cost_micros)||Number(v.max_cost_micros)<1||Number(v.max_cost_micros)>1000000000))throw new BadRequestException("Use a positive whole-number request budget in microdollars");
     if(v.reference_ids!==undefined&&(!Array.isArray(v.reference_ids)||v.reference_ids.length>3))throw new BadRequestException("Choose up to three approved references");
     const referenceIds=(v.reference_ids??[]).map((r:unknown)=>uuid(String(r)));
@@ -217,6 +224,7 @@ export class Canvas {
           channel: v.channel,
           size: v.size,
           parent,
+          ...(creativeSpec?{creative_spec:creativeSpec}:{}),
           ...(textProvider==='gemini'?{text_provider:textProvider}:{}),
           ...(v.max_cost_micros!==undefined?{max_cost_micros:v.max_cost_micros}:{}),
           ...(referenceIds.length?{reference_ids:referenceIds}:{}),
@@ -251,8 +259,8 @@ export class Canvas {
       if (
         (
           await db.query(
-            "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('creative.generate','carousel.generate') AND status IN ('queued','running','retrying','unknown') LIMIT 1",
-            [b.organization_id, id],
+            "SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('creative.generate','carousel.generate') AND status IN ('queued','running','retrying','unknown') AND NOT(status='queued' AND (id=ANY($3::uuid[]) OR id IN (SELECT generation_job_id FROM app.carousel_children WHERE organization_id=$1 AND brand_id=$2 AND parent_job_id=ANY($3::uuid[])))) LIMIT 1",
+            [b.organization_id, id, scoped?.batchJobIds??[]],
           )
         ).rowCount
       )
@@ -265,7 +273,7 @@ export class Canvas {
             "SELECT count(*)::int AS n FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND created_at>now()-interval '1 day'",
             [b.organization_id, id],
           )
-        ).rows[0].n >= 30
+        ).rows[0].n >= 90
       )
         throw new ConflictException("Daily creative request limit reached");
       const brain = (
@@ -282,17 +290,21 @@ export class Canvas {
       if (parent) {
         const version = (
           await db.query(
-            "SELECT v.project_id,p.latest_version_id,p.thread_id,m.width,m.height FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_media m ON m.id=v.media_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.id=$3",
+            "SELECT v.project_id,p.latest_version_id,p.archived_at,p.thread_id,m.width,m.height,v.skill_manifest FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_media m ON m.id=v.media_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.id=$3",
             [b.organization_id, id, parent],
           )
         ).rows[0];
         if (!version || version.thread_id !== threadId)
           throw new NotFoundException("Creative version not found");
+        if (version.archived_at) throw new ConflictException("Restore the archived creative before editing");
         if (version.latest_version_id !== parent)
           throw new ConflictException(
             "Open the latest version before requesting an image edit",
           );
-        if (`${version.width}x${version.height}` !== v.size)
+        if(version.skill_manifest?.creative_spec&&!creativeSpec)throw new BadRequestException("Keep the saved post format when editing this image");
+        const target=creativeSpec?creativeDimensions(creativeSpec):null;
+        if (creativeSpec && canonicalJSON(version.skill_manifest?.creative_spec??null)!==canonicalJSON(creativeSpec))throw new BadRequestException("Keep the current post placement when editing this image");
+        if (target?version.width!==target.width||version.height!==target.height:`${version.width}x${version.height}` !== v.size)
           throw new BadRequestException(
             "Keep the current dimensions when editing this image",
           );
@@ -319,7 +331,7 @@ export class Canvas {
         [job, b.organization_id, id, user],
       );
       await db.query(
-        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model,memory_context,max_cost_micros) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)",
+        "INSERT INTO app.creative_requests(job_id,organization_id,brand_id,thread_id,project_id,brain_id,parent_version_id,prompt,format,channel,size,request_key,request_hash,text_provider,selected_text_model,memory_context,max_cost_micros,creative_spec) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)",
         [
           job,
           b.organization_id,
@@ -334,7 +346,7 @@ export class Canvas {
           v.size,
           k,
           sha,
-          textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),v.max_cost_micros??null,
+          textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),v.max_cost_micros??null,creativeSpec?JSON.stringify(creativeSpec):null,
         ],
       );
       for(const [position,referenceId] of referenceIds.entries())await db.query('INSERT INTO app.creative_references(organization_id,brand_id,job_id,reference_id,position) VALUES($1,$2,$3,$4,$5)',[b.organization_id,id,job,referenceId,position]);
@@ -361,7 +373,7 @@ export class Canvas {
     return this.scope(user, id, false, async (db, b) => {
       const p = (
         await db.query(
-          "SELECT id,title,thread_id,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+          "SELECT id,title,thread_id,latest_version_id,archived_at,archive_revision FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
           [b.organization_id, id, projectId],
         )
       ).rows[0];
@@ -395,11 +407,12 @@ export class Canvas {
       ]);
       const p = (
         await db.query(
-          "SELECT v.*,p.latest_version_id,m.width,m.height FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_media m ON m.id=v.media_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.project_id=$3 AND v.id=$4",
+          "SELECT v.*,p.latest_version_id,p.archived_at,m.width,m.height FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_media m ON m.id=v.media_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.project_id=$3 AND v.id=$4",
           [b.organization_id, id, projectId, parent],
         )
       ).rows[0];
       if (!p) throw new NotFoundException("Creative not found");
+      if (p.archived_at) throw new ConflictException("Restore the archived creative before editing");
       let design;
       try {
         design = validateDesign(v.design, p.media_id, p.width, p.height);
@@ -474,11 +487,12 @@ export class Canvas {
       ]);
       const version = (
         await db.query(
-          "SELECT v.*,p.latest_version_id FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.id=$3",
+          "SELECT v.*,p.latest_version_id,p.archived_at FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.id=$3",
           [b.organization_id, id, versionId],
         )
       ).rows[0];
       if (!version) throw new NotFoundException("Creative not found");
+      if (version.archived_at) throw new ConflictException("Restore the archived creative before reviewing");
       if (
         v.decision !== "in_review" &&
         !(

@@ -1,3 +1,5 @@
+import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
+import {monthlyBudgetExceeded} from './spending-allowance.js';
 import {assertLearningCurrent} from './learning-context.js';
 import {randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
@@ -19,11 +21,11 @@ export class VideoJobs {
  private async finish(scope:JobScope,status:string,code:string|null){await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]);});await this.references.revoke(scope);return status;}
  private async providerStep(scope:JobScope){const phase=await this.provider.step(scope,async(db,j)=>{await this.references.verifySubmission(db,j);await assertLearningCurrent(db,(await db.query('SELECT memory_context FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0]?.memory_context);await this.checkSlot(db,j);});if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
  private async checkSlot(db:any,j:any){
-  const r=(await db.query('SELECT slot_id,slot_revision FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
+  const r=(await db.query('SELECT slot_id,slot_revision,creative_spec FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
   if(!r?.slot_id)return;
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${j.brand_id}`]);
-  const s=(await db.query('SELECT revision,state FROM app.content_slots WHERE id=$1',[r.slot_id])).rows[0];
-  if(!s||s.revision!==r.slot_revision||['approved','cancelled'].includes(s.state))throw new VideoStateError('VIDEO_CALENDAR_CHANGED');
+  const s=(await db.query('SELECT revision,state,creative_spec FROM app.content_slots WHERE id=$1',[r.slot_id])).rows[0];
+  if(!s||canonicalJSON(s.creative_spec??null)!==canonicalJSON(r.creative_spec??null)||s.revision!==r.slot_revision||['approved','cancelled'].includes(s.state))throw new VideoStateError('VIDEO_CALENDAR_CHANGED');
  }
  async exhausted(scope:JobScope){
   const state=await this.transaction(scope,async(db,j)=>({status:j.status,phase:(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0]?.phase}));
@@ -59,7 +61,7 @@ export class VideoJobs {
      if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new VideoStateError('VIDEO_BRAND_INTEGRITY_FAILED');
      const grant=await this.creative.plannerGrant(db,j,request.text_provider);
      if(!grant)throw new VideoStateError('VIDEO_TEXT_APPROVAL_REQUIRED');
-     const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,learning:request.memory_context,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:request.prompt,channel:request.channel,duration_seconds:request.duration_seconds,reference:{kind:'image',sha256:proof.sha256,width:proof.width,height:proof.height,duration_seconds:null,caption:''}};
+     const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,learning:request.memory_context,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:request.prompt+(request.creative_spec?`\nCompose for ${request.creative_spec.placement}, ${request.creative_spec.aspect} framing. Keep the subject and text within this frame.`:''),channel:request.channel,duration_seconds:request.duration_seconds,reference:{kind:'image',sha256:proof.sha256,width:proof.width,height:proof.height,duration_seconds:null,caption:''}};
      return {input,grant};
     });
     let plan=request.plan;
@@ -96,7 +98,7 @@ export class VideoJobs {
    if(base.manifest.image!==this.renderer.image)throw new VideoStateError('VIDEO_RENDERER_CHANGED');
    const source=await this.jobs.store.read(base.object_key,MAX_CANONICAL_VIDEO_BYTES);
    if(source.length!==base.bytes||digest(source)!==base.sha256)throw new VideoStateError('VIDEO_BASE_INTEGRITY_FAILED');
-   const output=await this.renderer.render(source,request.duration_seconds,request.approved_brief.overlays),prefix=`video/${scope.organizationId}/${scope.brandId}/${scope.jobId}`;
+   const output=await this.renderer.render(source,request.duration_seconds,request.approved_brief.overlays,request.creative_spec?creativeDimensions(normalizeCreativeSpec(request.creative_spec,'video',request.channel)):undefined),prefix=`video/${scope.organizationId}/${scope.brandId}/${scope.jobId}`;
    const key=`${prefix}/render/${output.manifest.video_sha256}`,posterKey=`${prefix}/poster/${output.manifest.poster_sha256}`;
    await this.jobs.store.persist(key,output.video,'video/mp4',output.manifest.video_sha256);
    await this.jobs.store.persist(posterKey,output.poster,'image/png',output.manifest.poster_sha256);
@@ -106,19 +108,20 @@ export class VideoJobs {
     if(!await this.jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${j.brand_id}`]);
     const freshProof=await this.references.verifyTransaction(db,j);
-    const id=randomUUID(),manifest={...output.manifest,learning:request.memory_context,text_provider:request.text_provider,text_model:request.selected_text_model,brain_id:request.brain_id,plan:{...request.plan,brief:request.approved_brief},prompt_approval:{actor:request.approved_by,revision:request.approved_revision},reference:freshProof.brand_reference_id?{kind:'upload',brand_reference_id:freshProof.brand_reference_id,sha256:freshProof.sha256}:{export_id:freshProof.id,sha256:freshProof.sha256,approval_id:freshProof.approval_id}};
+    const id=randomUUID(),manifest={...output.manifest,...(request.creative_spec?{creative_spec:request.creative_spec}:{}),learning:request.memory_context,text_provider:request.text_provider,text_model:request.selected_text_model,brain_id:request.brain_id,plan:{...request.plan,brief:request.approved_brief},prompt_approval:{actor:request.approved_by,revision:request.approved_revision},reference:freshProof.brand_reference_id?{kind:'upload',brand_reference_id:freshProof.brand_reference_id,sha256:freshProof.sha256}:{export_id:freshProof.id,sha256:freshProof.sha256,approval_id:freshProof.approval_id}};
     await db.query('INSERT INTO app.video_versions(id,organization_id,brand_id,project_id,job_id,object_key,sha256,bytes,poster_key,poster_sha256,poster_bytes,caption,overlays,manifest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',[id,j.organization_id,j.brand_id,request.project_id,j.id,key,output.manifest.video_sha256,output.video.length,posterKey,output.manifest.poster_sha256,output.poster.length,request.approved_brief.caption,JSON.stringify(request.approved_brief.overlays),JSON.stringify(manifest)]);
     await db.query('UPDATE app.video_projects SET latest_version_id=$2 WHERE id=$1',[request.project_id,id]);
     await db.query('UPDATE app.video_requests SET output_version_id=$2 WHERE job_id=$1',[j.id,id]);
     if(request.slot_id){
      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${j.brand_id}`]);
-     const attached=(await db.query("UPDATE app.content_slots SET video_version_id=$2,video_sha256=$3,revision=revision+1,state='draft_ready',updated_at=now() WHERE id=$1 AND revision=$4 AND approved_by IS NULL AND state NOT IN ('approved','cancelled') RETURNING *",[request.slot_id,id,output.manifest.video_sha256,request.slot_revision])).rows[0];
-     if(attached)await db.query("INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,video_version_id,video_sha256,feedback,snapshot) VALUES($1,$2,$3,$4,$5,'creative_attached',$6,$7,$8,'',$9)",[randomUUID(),j.organization_id,j.brand_id,attached.id,attached.revision,j.requested_by,id,output.manifest.video_sha256,JSON.stringify({state:attached.state,video_version_id:id,video_sha256:output.manifest.video_sha256,job_id:j.id})]);
+     const attached=(await db.query("UPDATE app.content_slots SET video_version_id=$2,video_sha256=$3,revision=revision+1,state='draft_ready',updated_at=now() WHERE id=$1 AND revision=$4 AND creative_spec IS NOT DISTINCT FROM $5::jsonb AND approved_by IS NULL AND state NOT IN ('approved','cancelled') RETURNING *",[request.slot_id,id,output.manifest.video_sha256,request.slot_revision,request.creative_spec?JSON.stringify(request.creative_spec):null])).rows[0];
+     if(attached)await db.query("INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,video_version_id,video_sha256,feedback,snapshot) VALUES($1,$2,$3,$4,$5,'creative_attached',$6,$7,$8,'',$9)",[randomUUID(),j.organization_id,j.brand_id,attached.id,attached.revision,j.requested_by,id,output.manifest.video_sha256,JSON.stringify({state:attached.state,creative_spec:attached.creative_spec??null,video_version_id:id,video_sha256:output.manifest.video_sha256,job_id:j.id})]);
     }
     await db.query("UPDATE app.jobs SET status='succeeded',error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);return 'succeeded';
    });
    await this.references.revoke(scope);return outcome;
   }catch(error){
+      if(monthlyBudgetExceeded(error))error=new VideoStateError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
    if(error instanceof VideoStateError&&error.code==='VIDEO_CALENDAR_CHANGED'){await this.provider.cancelPrepared(scope,error.code);return this.finish(scope,'canceled',error.code);}
    if(error instanceof CreativeError||error instanceof VideoStateError){const code=error.code;return this.finish(scope,/UNKNOWN|REPLAY/.test(code)?'unknown':'rejected',code);}
    if(error instanceof VideoDownloadError&&error.code!=='VIDEO_DOWNLOAD_FAILED')return this.finish(scope,'rejected',error.code);

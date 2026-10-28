@@ -1,0 +1,35 @@
+{
+  "status": "locally_verified_not_deployed",
+  "scope": "Daily static draft placement for campaigns with one image per day; independent reel spacing when repairing dates; generated slot capacity matches 90-post API limit",
+  "migration": "070_generated_plan_slot_capacity.sql",
+  "checks": {
+    "api_build": "passed",
+    "planning_contracts": {
+      "passed": 11,
+      "failed": 0
+    },
+    "planning_foundation": {
+      "passed": 20,
+      "failed": 0
+    },
+    "diff_check": "passed"
+  },
+  "verified": [
+    "Leap month and DST local-day coverage",
+    "Topics, channels, facts and video concepts retained",
+    "Fabricated facts still rejected",
+    "Sparse and non-campaign valid schedules preserved",
+    "29 daily images plus five reel drafts saved through worker/database",
+    "Job resume preserves saved slots without duplicate model calls or posts"
+  ],
+  "logs": [
+    "work/daily-campaign-scheduling-contracts.log",
+    "work/daily-campaign-scheduling-foundation.log"
+  ],
+  "limitations": [
+    "External model response mocked; real local database, worker and isolated skill runtime",
+    "No paid calls or deployment",
+    "Draft scheduling only, not finished-media generation or publishing",
+    "Monthly quantity quotas remain unfinished"
+  ]
+}

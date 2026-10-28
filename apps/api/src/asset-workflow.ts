@@ -1,5 +1,5 @@
 export {generateVideoWorkflow} from './video-workflow.js';
-import {proxyActivities,sleep} from '@temporalio/workflow';
+import {proxyActivities,sleep,patched} from '@temporalio/workflow';
 import type {JobScope} from './jobs.js';
 type Activities={validate(scope:JobScope):Promise<string>;fail(scope:JobScope):Promise<string>};
 const validation=proxyActivities<Activities>({startToCloseTimeout:'90 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'1 second',maximumInterval:'5 seconds',maximumAttempts:4}});
@@ -16,13 +16,23 @@ export async function extractDocumentWorkflow(scope:JobScope){try{return await d
 type IntakeActivities={processIntake(scope:JobScope):Promise<string>;failIntake(scope:JobScope):Promise<string>};
 const intake=proxyActivities<IntakeActivities>({startToCloseTimeout:"15 minutes",heartbeatTimeout:"5 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"10 seconds",maximumAttempts:3}});
 const intakeFinalization=proxyActivities<IntakeActivities>({startToCloseTimeout:"20 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"1 minute"}});
-export async function processIntakeWorkflow(scope:JobScope){try{return await intake.processIntake(scope);}catch{return await intakeFinalization.failIntake(scope);}}
+export async function processIntakeWorkflow(scope:JobScope){
+ const durable=patched('intake-dependency-v1');
+ try{
+  for(let attempt=0;attempt<(durable?180:1);attempt++){
+   const result=await intake.processIntake(scope);
+   if(result!=='waiting'||!durable)return result;
+   await sleep('30 seconds');
+  }
+  return await intakeFinalization.failIntake(scope);
+ }catch{return await intakeFinalization.failIntake(scope);}
+}
 
 
 type CreativeActivities={generateCreative(scope:JobScope):Promise<string>;failCreative(scope:JobScope):Promise<string>};
 const creative=proxyActivities<CreativeActivities>({startToCloseTimeout:'10 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
 const creativeFinalization=proxyActivities<CreativeActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
-export async function generateCreativeWorkflow(scope:JobScope){try{return await creative.generateCreative(scope);}catch{return await creativeFinalization.failCreative(scope);}}
+export async function generateCreativeWorkflow(scope:JobScope){const durable=patched('higgsfield-image-replacement-v1');try{for(let i=0;i<(durable?180:1);i++){const result=await creative.generateCreative(scope);if(result!=='waiting'||!durable)return result;await sleep('5 seconds');}return await creativeFinalization.failCreative(scope);}catch{return await creativeFinalization.failCreative(scope);}}
 
 
 type PlanningActivities={generatePlan(scope:JobScope):Promise<string>;failPlan(scope:JobScope):Promise<string>};
@@ -44,7 +54,10 @@ export async function syncSocialWorkflow(scope:JobScope){try{return await social
 type OAuthActivities={authorizeSocial(scope:JobScope):Promise<string>;failSocialOAuth(scope:JobScope):Promise<string>};
 const oauth=proxyActivities<OAuthActivities>({startToCloseTimeout:'120 seconds',heartbeatTimeout:'5 seconds',retry:{initialInterval:'30 seconds',maximumInterval:'2 minutes',maximumAttempts:3}});
 const oauthFinalization=proxyActivities<OAuthActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
-export async function authorizeSocialWorkflow(scope:JobScope){try{return await oauth.authorizeSocial(scope);}catch{return await oauthFinalization.failSocialOAuth(scope);}}
+export async function authorizeSocialWorkflow(scope:JobScope){
+ const pageSelection=patched('social-page-selection-v1');
+ try{for(let i=0;i<(pageSelection?120:1);i++){const result=await oauth.authorizeSocial(scope);if(result!=='awaiting_page'||!pageSelection)return result;await sleep('5 seconds');}return await oauthFinalization.failSocialOAuth(scope);}catch{return await oauthFinalization.failSocialOAuth(scope);}
+}
 
 
 type PublicationActivities={publishSocial(scope:JobScope):Promise<string>;reconcileSocial(scope:JobScope):Promise<{state:string;scheduledAt?:string}>;failPublication(scope:JobScope):Promise<string>};

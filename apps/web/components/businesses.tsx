@@ -1,9 +1,13 @@
 "use client";
+import {Strategies} from "./strategies";
+import {GenerationBalance} from "./generation-balance";
 import {AppLink} from "./app-link";
 import {MemoryEvidence,MemorySources} from './memory-evidence';
 import {PerformanceLessons} from './performance-lessons';
 import {Profile} from "./profile";
 import {BusinessTeam} from "./business-team";
+import {BrandReferences} from "./brand-references";
+import {BrandFontChoices,BrandStylePreview} from './brand-style-preview';
 import {VisualReview} from "./visual-review";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
@@ -13,10 +17,17 @@ import { BrandFiles } from "./uploads";
 import { BrandIntake } from "./intake";
 import {ContentWorkspace} from "./content-workspace";
 import {PublishingScreen} from "./publishing";
+import {CampaignsScreen} from "./campaigns";
 import {BusinessOverviewPanel} from "./business-overview";
 import {ConnectionsScreen} from "./connections";
-import {CanvasScreen} from "./canvas";
-import { confirmNavigation, useUnsavedChanges } from "./unsaved";
+import {CampaignBuilder} from "./campaign-builder";
+import {ContentArchive} from "./content-archive";
+import {ContentPreferences} from "./content-preferences";
+import {TimeZoneSelect} from "./time-zone-select";
+import {FirstPlan} from "./first-plan";
+import {CampaignReview} from "./campaign-review";
+import {CampaignPostScreen} from "./campaign-post";
+import { confirmNavigation, hasUnsavedChanges, useUnsavedChanges } from "./unsaved";
 type Business = {
   id: string;
   organization_id: string;
@@ -27,44 +38,51 @@ type Business = {
   revision: number;
 };
 const sections = [
-  ["overview", "Overview", "home"],
+  ["overview", "Home", "home"],
+  ["content-plan", "Calendar", "calendar"],
+  ["campaigns", "Campaigns", "layers"],
+  ["connections", "Integrations", "bolt"],
+  ["brand-kit", "Brand Kit", "orbit"],
+  ["content-preferences", "Content Preferences", "sliders"],
+  ["review", "Approvals", "approval"],
+  ["memory", "Learnings", "memory"],
+  ["publishing", "Insights", "chart"],
+  ["archive", "Archived Posts", "archive"],
   ["brands", "Brands", "brand"],
-  ["content-plan", "Content Plan", "calendar"],
-  ["review", "Review Inbox", "check"],
-  ["canvas", "Canvas", "star"],
-  ["publishing", "Publishing & Analytics", "chart"],
-  ["memory", "Memory", "memory"],
-  ["connections", "Connections", "link"],
   ["team", "Team", "people"],
   ["billing", "Billing", "card"],
   ["profile", "Profile", "person"],
 ];
 const groups: Record<string, string> = {
-  overview: "Home",
-  brands: "Marketing",
-  memory: "Intelligence",
-  connections: "Management",
-  billing: "Account",
+  archive: "Library",
+  brands: "Workspace",
 };
 function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
-    home: "M3 10 12 3l9 7v11h-6v-7H9v7H3Z",
+    home: "M3 10 12 3l9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM8 17h8",
+    layers: "m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5M2 16l10 5 10-5",
+    bolt: "m14 2-9 12h6l-1 8 9-12h-6Z",
+    orbit: "M17 7C23 13 23 19 20 20S10 17 6 13 1 4 4 3s9 0 13 4ZM7 7C1 13 1 19 4 20s10-3 14-7 5-9 2-10-9 0-13 4Z",
+    sliders: "M6 4h12a4 4 0 0 1 0 8H6a4 4 0 0 1 0-8Zm0 12h12a3 3 0 0 1 0 6H6a3 3 0 0 1 0-6ZM7 4v8m10 4v6",
+    approval: "m12 2 3 2 4 1 1 4 2 3-2 3-1 4-4 1-3 2-3-2-4-1-1-4-2-3 2-3 1-4 4-1Zm-4 10 3 3 5-6",
     brand: "M12 3 3 8v8l9 5 9-5V8Zm-9 5 9 5 9-5M12 13v8",
     calendar: "M4 5h16v16H4ZM8 2v6M16 2v6M4 11h16",
     check: "M4 4h16v16H4Zm4 8 3 3 6-7",
     star: "m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z",
-    chart: "M4 20V4M4 20h17M7 15l5-5 4 2 5-7",
-    memory: "m12 3 9 9-9 9-9-9Zm0 5 4 4-4 4-4-4Z",
+    chart: "M3 21V11h5v10M8 21V3h5v18m0 0V8h5v13M2 21h20",
+    memory: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm3 13 8-8M8 8h8v8",
     link: "M9 15l6-6M8 17l-2 2a4 4 0 0 1-5-5l5-5a4 4 0 0 1 6 0M16 7l2-2a4 4 0 0 1 5 5l-5 5a4 4 0 0 1-6 0",
     people:
       "M7 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M1 21v-3a6 6 0 0 1 12 0v3M16 5a4 4 0 0 1 0 8M17 16a5 5 0 0 1 6 5",
+    archive: "M3 3h18v5H3ZM5 8v13h14V8M9 12h6",
     card: "M3 5h18v14H3ZM3 10h18M7 15h4",
     person: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M4 22v-2a8 8 0 0 1 16 0v2",
   };
   return (
     <svg
-      width="18"
-      height="18"
+      className="workspace-icon"
+      width="20"
+      height="20"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
@@ -81,6 +99,8 @@ const scopePath = (b: Business) =>
   `/api/v1/workspaces/${b.organization_id}/brands/${b.id}`;
 export function BusinessApp({ pathname }: { pathname: string }) {
   const initialized=useRef(false),loadedAt=useRef(0);
+  const requestedBusinessId=pathname.split("/")[1]==="b"?pathname.split("/")[2]:undefined;
+  const [verifiedBusinessId,setVerifiedBusinessId]=useState<string>();
   const [workspaceRevision,setWorkspaceRevision]=useState(0);
   useEffect(()=>{const changed=()=>{loadedAt.current=0;setWorkspaceRevision(n=>n+1);},focus=()=>{if(!document.hidden&&Date.now()-loadedAt.current>=30000)setWorkspaceRevision(n=>n+1);};window.addEventListener('desvio-workspace-changed',changed);window.addEventListener('focus',focus);document.addEventListener('visibilitychange',focus);return()=>{window.removeEventListener('desvio-workspace-changed',changed);window.removeEventListener('focus',focus);document.removeEventListener('visibilitychange',focus);};},[]);
   useEffect(()=>{setMenu(false);},[pathname]);
@@ -92,7 +112,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
     [signoutError, setSignoutError] = useState<unknown>(),
     [menu, setMenu] = useState(false);
   useEffect(() => {
-    if(Date.now()-loadedAt.current<30000)return;
+    if(Date.now()-loadedAt.current<30000&&(!requestedBusinessId||businesses?.some(b=>b.id===requestedBusinessId)))return;
     let active = true;
     (async () => {
       try {
@@ -111,6 +131,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           setError(undefined);
           setSession(user);
           setBusinesses(list.businesses);
+          setVerifiedBusinessId(requestedBusinessId);
           setEntitlement(plan);
           loadedAt.current=Date.now();
         }
@@ -145,10 +166,13 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       parts[0] === "b" ? (parts[2] ?? "overview") : (parts[0] ?? "overview"),
     isNew = pathname === "/brands/new",
     label =
-      section === "onboarding"
+      section === "campaign-post" ? "Campaign post" : section === "canvas" ? "Campaigns" : section === "strategies" ? "Strategies" : section === "campaign-review" ? "Campaign" : section === "campaign-new" ? "New campaign" : section === "manage"
+        ? "Manage brand"
+        : section === "onboarding"
         ? "Brand onboarding"
         : sections.find((s) => s[0] === section)?.[1];
-  if ((parts[0] === "b" && !business) || !label)
+  const resolvingBusiness=parts[0]==="b"&&!business&&verifiedBusinessId!==parts[1];
+  if ((parts[0] === "b" && !business && !resolvingBusiness) || !label)
     return (
       <main id="main" className="standalone">
         <Wordmark />
@@ -162,11 +186,37 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       ? `/${key}`
       : business
         ? `/b/${business.id}/${key}`
-        : `/${key}`;
+        : businesses.length === 1 && key !== "overview"
+          ? `/b/${businesses[0].id}/${key}`
+          : `/${key}`;
   return (
     <div className={`v5-shell ${menu ? "menu-open" : ""}`}>
       <aside className="v5-sidebar">
-        <Wordmark />
+        <div className="workspace-switcher"><Wordmark />
+          {businesses.length === 0 ? <span className="workspace-context">Your workspace</span> : <Field label="Business">
+            {(id) => (
+              <select
+                id={id}
+                aria-label="Business"
+                value={business?.id ?? ""}
+                onChange={(e) =>
+                  confirmNavigation() && router.push(
+                    e.target.value
+                      ? `/b/${e.target.value}/${["brands", "billing", "profile"].includes(section) ? "overview" : section}`
+                      : "/overview",
+                  )
+                }
+              >
+                <option value="">All businesses</option>
+                {businesses.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </Field>}
+        </div>
         <button
           className="v5-menu"
           aria-expanded={menu}
@@ -182,8 +232,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
               <AppLink
                 href={href(key)}
                 aria-current={
-                  section === key ||
-                  (section === "onboarding" && key === "brands")
+                  section === key || (["campaign-new","campaign-review","campaign-post"].includes(section) && key === "campaigns") ||
+                  (["onboarding", "manage"].includes(section) && key === "brands")
                     ? "page"
                     : undefined
                 }
@@ -220,47 +270,17 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       </aside>
       <div className="v5-body">
         <header className="v5-topbar">
-          <Field label="Business">
-            {(id) => (
-              <select
-                id={id}
-                aria-label="Business"
-                value={business?.id ?? ""}
-                onChange={(e) =>
-                  confirmNavigation() && router.push(
-                    e.target.value
-                      ? `/b/${e.target.value}/${["brands", "billing", "profile"].includes(section) ? "overview" : section}`
-                      : "/overview",
-                  )
-                }
-              >
-                <option value="" disabled={section !== "overview"}>
-                  {section === "overview"
-                    ? "All businesses"
-                    : "Select a business"}
-                </option>
-                {businesses.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
-            )}
-          </Field>
+          <span className="workspace-page-title">{section === "overview" ? `Welcome back, ${session.user.name.split(" ")[0]}` : label}</span>
           <div className="header-actions">
-            <span className="build-label">Development preview</span>
-            <AppLink className="button" href={href("canvas")}>
-              <Icon name="star" />
-              Create
-            </AppLink>
-            <AppLink className="profile-link" href="/profile">
-              Profile
+            {business&&<GenerationBalance key={business.organization_id} organizationId={business.organization_id}/>}
+            <AppLink className="profile-link workspace-avatar" href="/profile" aria-label="Profile" title="Your profile">
+              {session.user.name.slice(0,1)}
             </AppLink>
           </div>
         </header>
         <main id="main" className="v5-main" key={pathname}>
           <Notice error={error}/>
-          {section === "brands" ? (
+          {resolvingBusiness ? (error ? <button onClick={()=>{loadedAt.current=0;setWorkspaceRevision(n=>n+1);}}>Try again</button> : <div role="status" aria-label="Opening business"><Loading /></div>) : section === "brands" ? (
             isNew ? (
               <NewBusiness entitlement={entitlement} />
             ) : (
@@ -285,12 +305,30 @@ export function BusinessApp({ pathname }: { pathname: string }) {
               section={section}
               title={label!}
             />
+          ) : section === "manage" ? (
+            <><PageTitle eyebrow={business.name} title="Manage brand"/><section className="v5-panel"><AppLink href={`/b/${business.id}/onboarding`}>Edit brand details →</AppLink><ManageBrand business={business}/></section></>
+          ) : section === "brand-kit" ? (
+            <BrandKit key={business.id} business={business}/>
+          ) : section === "content-preferences" ? (
+            <ContentPreferences key={business.id} business={business}/>
           ) : section === "onboarding" ? (
             <BrandOnboarding business={business} />
           ) : ["content-plan","review"].includes(section) ? (
             <ContentWorkspace key={`${business.id}:${section}`} business={business} inbox={section==="review"}/>
+          ) : section === "campaign-review" ? (
+            <CampaignReview key={business.id} business={business}/>
+          ) : section === "strategies" ? (
+            <Strategies key={business.id} business={business}/>
+          ) : section === "campaign-new" ? (
+            <CampaignBuilder key={business.id} business={business}/>
+          ) : section === "campaigns" ? (
+            <CampaignsScreen key={business.id} business={business}/>
+          ) : section === "archive" ? (
+            <ContentArchive key={business.id} business={business}/>
+          ) : section === "campaign-post" ? (
+            <CampaignPostScreen business={business}/>
           ) : section === "canvas" ? (
-            <CanvasScreen business={business}/>
+            <RetiredCanvas businessId={business.id}/>
           ) : section === "publishing" ? (
             <PublishingScreen key={business.id} business={business}/>
           ) : section === "connections" ? (
@@ -306,6 +344,15 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       </div>
     </div>
   );
+}
+function RetiredCanvas({businessId}:{businessId:string}) {
+  const router=useRouter();
+  useEffect(()=>{
+    const source=new URLSearchParams(location.search),query=new URLSearchParams();
+    for(const key of ['slot','thread','project','carousel']){const value=source.get(key);if(value)query.set(key,value);}
+    router.replace(`/b/${businessId}/${query.size?'campaign-post?'+query.toString():'campaigns'}`);
+  },[businessId,router]);
+  return <p role="status">Opening your campaign workspace…</p>;
 }
 function PageTitle({
   eyebrow,
@@ -356,8 +403,25 @@ function BusinessCard({
         {business.has_approved_brand ? "Review brand" : "Continue setup"}{" "}
         <span aria-hidden="true">→</span>
       </AppLink>
+      <AppLink className="brand-manage" href={`/b/${business.id}/manage`}>Manage brand →</AppLink>
     </article>
   );
+}
+function ManageBrand({business}:{business:Business}) {
+  const [confirmation,setConfirmation]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>();
+  const router=useRouter();
+  const confirmationInput=useRef<HTMLInputElement>(null);
+  const [confirmationError,setConfirmationError]=useState(false);
+  return business.role!=='owner'?null:<details className="brand-manage"><summary>Delete brand</summary>
+    {business.role==='owner'&&<form onSubmit={async e=>{e.preventDefault();if(busy)return;if(confirmation.trim()!==business.name){setConfirmationError(true);confirmationInput.current?.focus();return;}setConfirmationError(false);setBusy(true);setError(undefined);try{await api(`/api/v1/businesses/${business.id}`,{organization_id:business.organization_id,name:business.name,revision:business.revision},'DELETE');router.replace('/brands');}catch(e){setError(e);}finally{setBusy(false);}}}>
+      <h2>Delete brand</h2><p>This removes the brand from your workspace and frees its business slot. Saved records are retained for audit; this does not erase stored files or delete posts already published on social platforms.</p>
+      <p>Active jobs and unresolved publications must be finished first.</p>
+      <label htmlFor={`delete-${business.id}`}>Type {business.name} to confirm</label>
+      <input ref={confirmationInput} id={`delete-${business.id}`} value={confirmation} onChange={e=>{setConfirmation(e.target.value);setConfirmationError(false);}} aria-invalid={confirmationError} aria-describedby={`delete-help-${business.id}`} autoComplete="off" disabled={busy}/>
+      <p id={`delete-help-${business.id}`} role={confirmationError?'alert':undefined}>{confirmationError?`Enter “${business.name}” in the field above to confirm deletion.`:'Enter the brand name above, then select Delete brand.'}</p>
+      <Notice error={error}/><button className="danger" type="submit" disabled={busy}>{busy?'Deleting…':'Delete brand'}</button>
+    </form>}
+  </details>;
 }
 function BusinessesIndex({
   businesses,
@@ -431,7 +495,13 @@ function BusinessesIndex({
     </>
   );
 }
+function customerSummary(value: string = "") {
+  // Source IDs stay in the saved evidence, never in customer-facing prose.
+  return value.replace(/(?:\b(?:cited|citations?|sources?|evidence)(?:\s+ids?)?\s*:\s*)?[\[(]?[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}(?:[\s,;]+[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12})*[\])]?\.?/gi, "").replace(/\s+([.,;])/g,"$1").replace(/ {2,}/g," ").trim();
+}
 function NewBusiness({ entitlement }: { entitlement: any }) {
+  const router=useRouter();
+  const [documents,setDocuments]=useState(false),[created,setCreated]=useState<Business>();
   const [name, setName] = useState(""),
     [website, setWebsite] = useState(""),
     [busy, setBusy] = useState(false),
@@ -443,7 +513,10 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
     e.preventDefault();
     setBusy(true);
     setError(undefined);
-    const body = { name, website: website || null },
+    const enteredWebsite = website.trim();
+    const normalizedWebsite = enteredWebsite && !/^[a-z][a-z\d+.-]*:/i.test(enteredWebsite)
+      ? `https://${enteredWebsite.replace(/^\/\//, "")}` : enteredWebsite;
+    const body = { name, website: normalizedWebsite || null },
       serialized = JSON.stringify(body);
     if (serialized !== bodyKey.current) {
       bodyKey.current = serialized;
@@ -451,20 +524,39 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
     }
     try {
       const b = await api("/api/v1/businesses", body, "POST", key.current);
-      location.assign(`/b/${b.id}/onboarding`);
+      window.dispatchEvent(new Event('desvio-workspace-changed'));
+      if(documents)setCreated(b);else router.push(`/b/${b.id}/onboarding`);
     } catch (e) {
       setError(e);
     } finally {
       setBusy(false);
     }
   }
+  async function prepareUploads(){
+    if(!created||busy)return;
+    setBusy(true);setError(undefined);
+    try{
+      const root=scopePath(created),{assets}=await api(root+'/assets');
+      if(assets.some((a:any)=>['awaiting_upload','queued','validating'].includes(a.state)))throw new Error('Your files are still being checked. Continue when the checks finish.');
+      for(const asset of assets.filter((a:any)=>a.state==='ready'&&['application/pdf','application/vnd.openxmlformats-officedocument.presentationml.presentation'].includes(a.content_type))){
+        let job=await api(`${root}/assets/${asset.id}/extract`,{},'POST',`onboarding-document-${asset.id}`);
+        for(let attempt=0;attempt<60&&['queued','running','retrying'].includes(job.status);attempt++){
+          await new Promise(resolve=>setTimeout(resolve,2000));job=await api(`${root}/jobs/${job.id}`);
+        }
+        if(job.status!=='succeeded')throw new Error(job.error_code?`We couldn’t read ${asset.filename}: ${job.error_code}. Your upload is saved.`:`${asset.filename} is still being read. Try continuing again shortly; we’ll check the same request.`);
+      }
+      if(!created.website&&assets.some((a:any)=>a.state==='ready'&&['application/pdf','application/vnd.openxmlformats-officedocument.presentationml.presentation'].includes(a.content_type)))await api(`/api/v1/businesses/${created.id}/intake`,{kind:'brand.analyze'},'POST',`onboarding-documents-${created.id}`);
+      router.push(`/b/${created.id}/onboarding`);
+    }catch(e){setError(e);}finally{setBusy(false);}
+  }
+  if(created)return <div className="brand-onboarding-experience"><PageTitle eyebrow="Add your business" title="Bring your brand along."><p>Upload any logos, product photos or guidelines you have.</p></PageTitle><Steps step={1}/><BrandFiles org={{id:created.organization_id,name:created.name,role:created.role??'owner'}} brandId={created.id}/><Notice error={error}/><button className="primary" disabled={busy} onClick={()=>void prepareUploads()}>{busy?"Reading your documents…":"Continue to brand analysis"}</button></div>;
   return (
-    <>
+    <div className="brand-onboarding-experience business-intro">
       <PageTitle
-        eyebrow="A home for your next idea"
-        title="Let’s meet your business."
+        eyebrow="Add your business"
+        title="Your content. Your brand."
       >
-        <p>Start with the basics. Your brand setup is saved as you go.</p>
+        <p>Let’s turn your website into a marketing plan.</p>
       </PageTitle>
       <Steps step={1} />
       {!entitlement.can_create_business ? (
@@ -478,7 +570,7 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
           <AppLink href="/brands">Back to your businesses</AppLink>
         </section>
       ) : (
-        <form
+        <div className="business-intro-grid"><form
           className="v5-panel onboarding-form"
           onSubmit={save}
           aria-busy={busy}
@@ -502,28 +594,33 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
             {(id, hint) => (
               <input
                 id={id}
-                type="url"
+                type="text"
+                inputMode="url"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
                 aria-describedby={hint}
                 maxLength={2048}
                 value={website}
-                placeholder="https://yourbusiness.com"
+                placeholder="www.yourbusiness.com"
                 onChange={(e) => setWebsite(e.target.value)}
               />
             )}
           </Field>
+          <label className="checkbox-field"><input type="checkbox" checked={documents} onChange={e=>setDocuments(e.target.checked)}/>I have logos, product photos or brand documents to add</label>
           <Notice error={error} />
           <button className="primary" disabled={busy}>
-            {busy ? "Saving your business…" : "Save & continue"}
+            {busy ? "Saving your business…" : "Continue"}
           </button>
-        </form>
+        </form><aside className="business-intro-preview" aria-label="Your business preview"><div className="intro-brand-tile" aria-hidden="true">{name.trim().slice(0,1).toUpperCase()||'d'}<span>·</span></div><p className="eyebrow">Built around your business</p><h2>{name.trim()||'Make it yours.'}</h2><p>{website||'Your identity. Your voice. Your next idea.'}</p><div className="intro-brand-pillars"><span>Brand</span><span>Ideas</span><span>Calendar</span></div></aside></div>
       )}
-    </>
+    </div>
   );
 }
 function Steps({ step }: { step: number }) {
   return (
     <ol className="onboarding-steps" aria-label="Brand onboarding">
-      {["Your business", "Confirm your brand", "Review goals & finish"].map(
+      {["Add your business", "Confirm your brand", "Confirm your first plan"].map(
         (text, i) => (
           <li key={text} aria-current={step === i + 1 ? "step" : undefined}>
             <span>{i + 1}</span>
@@ -654,7 +751,7 @@ function Unavailable({
     "content-plan":
       "Create and revise a 30-day content calendar for this business. Planning and scheduling are still being implemented.",
     review:
-      "Review posts by social channel, approve exact versions, or send feedback to Canvas. The review workflow is still being implemented.",
+      "Review posts by social channel, approve exact versions, or revise a campaign creative. The review workflow is still being implemented.",
     canvas:
       "Create images and videos, then revise them in conversation. Generation, editable projects and saved conversations are still being implemented.",
     publishing:
@@ -691,7 +788,7 @@ function Unavailable({
             </h2>
             <p>Your ideas. Your brand. A space to make them yours.</p>
             <div className="availability-card">
-              <strong>Canvas is not available in this build.</strong>
+              <strong>Open Campaigns to create and manage your posts.</strong>
               <p>No generation request has been sent.</p>
             </div>
           </section>
@@ -745,13 +842,17 @@ function Billing({ entitlement }: { entitlement: any }) {
 }
 export function BrandOnboarding({ business }: { business: Business }) {
   const [state, setState] = useState<any>(),
+    [intakeState,setIntakeState]=useState<any>(),
+    [manualSetup,setManualSetup]=useState(false),
     [brain, setBrain] = useState<any>(),
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false),
     [confirmed, setConfirmed] = useState(false),
     [visualEditing,setVisualEditing] = useState(false),
+    [factSaving,setFactSaving] = useState(false),
     [dirty, setDirty] = useState(false);
-  const path = scopePath(business);
+  const path = scopePath(business), dirtyRef=useRef(false);
+  dirtyRef.current=dirty;
   useUnsavedChanges(dirty && !busy);
   async function load() {
     try {
@@ -759,9 +860,8 @@ export function BrandOnboarding({ business }: { business: Business }) {
         api(`/api/v1/businesses/${business.id}/onboarding`),
         api(path + "/brain"),
       ]);
-      setState(s);
+      if(!dirtyRef.current){setState(s);setDirty(false);}
       setBrain(b);
-      setDirty(false);
       setError(undefined);
     } catch (e) {
       setError(e);
@@ -774,9 +874,12 @@ export function BrandOnboarding({ business }: { business: Business }) {
     setBusy(true);
     setError(undefined);
     try {
-      const direction = dirty
-        ? state
-        : await api(`/api/v1/businesses/${business.id}/onboarding`);
+      const refreshed = dirty ? state : await api(`/api/v1/businesses/${business.id}/onboarding`);
+      // Resolving a missing fact invalidates the recommendation's evidence version,
+      // but must not silently replace the suggestions already shown with defaults.
+      const direction = !dirty && state.prefilled && refreshed.recommendation?.stale && !refreshed.preferences_edited
+        ? {...refreshed,goal:state.goal,cadence:state.cadence,channels:state.channels}
+        : refreshed;
       const fields = {
         revision: state.revision,
         step,
@@ -803,14 +906,32 @@ export function BrandOnboarding({ business }: { business: Business }) {
       if (approve) {
         const current = await api(path + "/brain");
         await api(path + "/brain/approve", { revision: current.revision });
-        setConfirmed(true);
         setBrain(await api(path + "/brain"));
       }
+      return true;
     } catch (e) {
       setError(e);
+      return false;
     } finally {
       setBusy(false);
     }
+  }
+  async function confirmDetails(){
+    if(factSaving || busy || !confirmNavigation())return;
+    setBusy(true);setError(undefined);
+    try{
+      if(!brain)throw new Error('Your profile is still loading. Please try again.');
+      const missing=['brand_name','offering','audience'].filter(field=>!brain.findings.some((f:any)=>f.field===field&&f.status!=='wrong'));
+      if(missing.length)throw new Error(`Complete your ${missing.map(f=>f.replaceAll('_',' ')).join(', ')} before continuing.`);
+      const repeated=brain.findings.find((f:any)=>f.status!=='wrong'&&brain.findings.filter((other:any)=>other.field===f.field&&other.status!=='wrong').length>1);
+      if(repeated)throw new Error(`Choose one ${repeated.field.replaceAll('_',' ')} description and select Correct before continuing.`);
+      const current=await api(path+'/brain');
+      if(current.revision!==brain.revision)throw new Error('Your profile changed. Refresh it and review the latest details.');
+      for(const fact of brain.findings.filter((f:any)=>f.status==='unreviewed'))await api(`${path}/brain/findings/${fact.id}`,{revision:fact.revision,decision:'correct'},'PATCH');
+      for(const direction of (brain.visuals?.directions??[]).filter((d:any)=>!d.review))await api(path+'/brain/visuals',{analysis_job_id:direction.analysis_job_id,index:direction.index,evidence_sha256:direction.evidence_sha256,revision:0,decision:'correct'},'PATCH');
+      setBrain(await api(path+'/brain'));
+      await save(3);
+    }catch(e){setError(e);}finally{setBusy(false);}
   }
   if (!state)
     return (
@@ -828,34 +949,38 @@ export function BrandOnboarding({ business }: { business: Business }) {
       setState({ ...state, [key]: value });
       setDirty(true);
     };
+  const profileReady=!business.website||['brand_name','offering'].every(field=>brain?.findings?.some((f:any)=>(f.field===field||(field==='offering'&&f.field==='products'))&&f.status!=='wrong'));
+  const preparing=!manualSetup&&(intakeState?.jobs.some((j:any)=>['queued','running','retrying'].includes(j.status))||(!!business.website&&(!profileReady||!intakeState||intakeState.jobs.find((j:any)=>j.kind==='brand.analyze')?.status!=='succeeded')));
   return (
-    <>
+    <div className="brand-onboarding-experience">
       <PageTitle
         eyebrow={business.name}
         title={
           confirmed
-            ? "Your brand facts are confirmed."
-            : "Make it unmistakably yours."
+            ? "Your brand is ready."
+            : preparing ? "Your brand starts here." : state.step===2 ? "Does this feel like you?" : "Your first content plan."
         }
       >
-        <p>Confirm your identity and set the direction for your business.</p>
+        <p>{preparing?"We’ll handle the research. You make it yours.":state.step===2?"We’ve prepared the details. Edit anything before continuing.":"Choose your channels and content mix. We’ll build your calendar."}</p>
       </PageTitle>
-      <Steps step={state.step} />
+      <Steps step={preparing?1:state.step} />
       <Notice error={error} />
-      {confirmed ? (
+      {!manualSetup&&<BrandIntake business={business} onboarding profileReady={profileReady} onState={setIntakeState} onManual={()=>setManualSetup(true)} onComplete={()=>void load()} />}
+      {preparing ? null : confirmed ? (
         <section className="v5-panel">
           <h2>Your approved brand profile is saved.</h2>
           <p>
-            Your goals and approved brand evidence are saved. Open Content Plan to prepare your first calendar; AI planning requires a configured model and available budget.
+            Your brand is saved. Open your content plan to start creating.
           </p>
-          <AppLink className="button primary" href={`/b/${business.id}/memory`}>
+          <div className="actions"><AppLink className="button" href={`/b/${business.id}/memory`}>
             View brand memory
           </AppLink>
-          <AppLink className="button" href={`/b/${business.id}/content-plan`}>Open Content Plan</AppLink>
+          <AppLink className="button primary" href={`/b/${business.id}/content-plan`}>Open Content Plan</AppLink></div>
         </section>
       ) : state.step === 2 ? (
         <>
-          <BrandReview business={business} onChange={setBrain} onVisualEditing={setVisualEditing} />
+          <BrandReview business={business} onChange={setBrain} onVisualEditing={setVisualEditing} onSavingChange={setFactSaving} recommendation={state.recommendation?.recommendation} />
+          <details className="onboarding-source-details" open={!business.website}><summary>Add logos, product photos or guidelines</summary>
           <BrandFiles
             org={{
               id: business.organization_id,
@@ -863,17 +988,18 @@ export function BrandOnboarding({ business }: { business: Business }) {
               role: business.role,
             }}
             brandId={business.id}
-          />
+          /></details>
           {visualEditing&&<p role="status">Save or discard your visual edit before continuing to goals.</p>}
+          <p className="hint">Continuing confirms the profile details shown above. Edit or remove anything that isn’t right.</p>
           <div className="wizard-actions">
             <AppLink href="/brands">Your businesses</AppLink>
             {writable && (
               <button
                 className="primary"
-                disabled={busy||visualEditing}
-                onClick={() => void save(3)}
+                disabled={busy||visualEditing||factSaving}
+                onClick={() => void confirmDetails()}
               >
-                Save & continue to goals →
+                Confirm details & continue
               </button>
             )}
           </div>
@@ -886,35 +1012,16 @@ export function BrandOnboarding({ business }: { business: Business }) {
               <>
                 <strong>
                   {state.recommendation.stale
-                    ? "Your evidence changed. Review these earlier suggestions."
-                    : "AI-prepared direction · yours to adjust"}
+                    ? "Your brand changed. Review your suggested direction."
+                    : "Your suggested direction"}
                 </strong>
-                <p>{state.recommendation.recommendation.reason}</p>
+                <p>{customerSummary(state.recommendation.recommendation.reason)}</p>
                 <p>
                   Suggested audience:{" "}
-                  {state.recommendation.recommendation.audience}
+                  {customerSummary(state.recommendation.recommendation.audience)}
                 </p>
-                <details>
-                  <summary>Why these suggestions?</summary>
-                  {state.recommendation.evidence?.map((e: any) => (
-                    <div key={e.id}>
-                      {e.website_url && (
-                        <AppLink
-                          href={e.website_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Source website
-                        </AppLink>
-                      )}
-                      <blockquote>{e.text}</blockquote>
-                    </div>
-                  ))}
-                </details>
-                <p className="hint">
-                  Suggestions based on your saved evidence. Your edits take
-                  priority.
-                </p>
+
+
               </>
             ) : (
               <>
@@ -970,23 +1077,12 @@ export function BrandOnboarding({ business }: { business: Business }) {
               />
             )}
           </Field>
-          <Field
-            label="Time zone"
-            hint="Use a named time zone, such as Asia/Kuala_Lumpur."
-          >
-            {(id, hint) => (
-              <input
-                id={id}
-                aria-describedby={hint}
-                disabled={!writable}
-                value={state.timezone}
-                onChange={(e) => change("timezone", e.target.value)}
-              />
-            )}
+          <Field label="Time zone">
+            {(id) => <TimeZoneSelect id={id} disabled={!writable} value={state.timezone} onChange={value=>change("timezone",value)} />}
           </Field>
           <fieldset>
             <legend>Preferred channels</legend>
-            {["linkedin", "instagram"].map((c) => (
+            {["linkedin", "instagram", "facebook"].map((c) => (
               <label className="checkbox-field" key={c}>
                 <input
                   type="checkbox"
@@ -1001,7 +1097,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
                     )
                   }
                 />
-                {c === "linkedin" ? "LinkedIn" : "Instagram"}
+                {c === "linkedin" ? "LinkedIn" : c === "facebook" ? "Facebook" : "Instagram"}
               </label>
             ))}
           </fieldset>
@@ -1030,59 +1126,84 @@ export function BrandOnboarding({ business }: { business: Business }) {
               <button disabled={busy} onClick={() => void save(3)}>
                 Save goals
               </button>
-              {["owner", "admin"].includes(business.role) && (
-                <button
-                  className="primary"
-                  disabled={busy}
-                  onClick={() => void save(3, true)}
-                >
-                  {busy ? "Saving…" : "Confirm brand profile"}
-                </button>
-              )}
+              {["owner","admin"].includes(business.role)&&<button disabled={busy} onClick={async()=>{if(await save(3,true))setConfirmed(true);}}>Save brand without a plan</button>}
+
             </div>
           )}
-          <p className="availability-note">
-            Saving these settings does not generate a plan. After confirming your brand, you can create one in Content Plan.
-          </p>
+          {["owner","admin"].includes(business.role)&&<FirstPlan businessId={business.id} cadence={state.cadence} timezone={state.timezone} disabled={busy||!state.channels.length} beforeSubmit={()=>save(3,true)} />}
         </section>
       )}
-    </>
+    </div>
   );
 }
+function BrandKit({business}:{business:Business}) {
+ const [tab,setTab]=useState('media'),[brain,setBrain]=useState<any>(),[visualEditing,setVisualEditing]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[saved,setSaved]=useState<number>(),[factSaving,setFactSaving]=useState(false);
+ const org={id:business.organization_id,name:business.name,role:business.role};
+ const writable=['owner','admin','editor'].includes(business.role);
+ async function approve(){
+  if(!brain||visualEditing||factSaving)return;
+  if(hasUnsavedChanges()){setError(new Error("Save or cancel your open edits before approving your brand."));return;}
+  setBusy(true);setError(undefined);
+  try{await api(scopePath(business)+'/brain/approve',{revision:brain.revision});setSaved(brain.revision);window.dispatchEvent(new Event('desvio-workspace-changed'));}
+  catch(e){setError(e);}finally{setBusy(false);}
+ }
+ const tabs=[['media','Media Library'],['style','Brand Style'],['voice','Brand Voice'],['profile','Brand Profile'],['sources','Source Materials']];
+ useEffect(()=>{const id=window.location.hash.slice(1);if(['media','style','voice','profile','sources'].includes(id))setTab(id);},[]);
+ return <section className="brand-kit-screen"><h1 className="sr-only">Brand Kit</h1>
+  <div className="brand-kit-layout"><nav className="brand-kit-navigation" aria-label="Brand Kit sections">{tabs.map(([id,label])=><button key={id} aria-current={tab===id?'page':undefined} disabled={busy||factSaving} onClick={()=>{if(tab!==id&&confirmNavigation()){setTab(id);history.replaceState(history.state,'',`#${id}`);setBrain(undefined);setSaved(undefined);setVisualEditing(false);setError(undefined);}}}>{label}</button>)}</nav>
+  <div className="brand-kit-content"><h2>{tabs.find(([id])=>id===tab)?.[1]}</h2>
+  {tab==='media'?<BrandReferences businessId={business.id} writable={writable} uploadWorkspace={org} visualPicker libraryMode/>:tab==='sources'?<><BrandFiles org={org} brandId={business.id}/><BrandReview section="sources" business={business} onChange={setBrain} onVisualEditing={setVisualEditing}/></>:<>
+   <BrandReview key={tab} section={tab as 'profile'|'voice'|'style'} business={business} onChange={setBrain} onVisualEditing={setVisualEditing} onSavingChange={setFactSaving}/><Notice error={error}/>
+   {['owner','admin'].includes(business.role)&&<div className="brand-kit-save"><button className="primary" disabled={!brain||busy||visualEditing||factSaving} onClick={()=>void approve()}>{busy?'Saving…':'Save approved brand'}</button>{saved===brain?.revision&&<p role="status">Your approved brand is saved.</p>}{visualEditing&&<p>Save or discard your visual edit first.</p>}</div>}
+  </>}
+  </div></div>
+ </section>;
+}
 function BrandReview({
+  section,
   business,
   onChange,
   onVisualEditing,
+  onSavingChange,
+  recommendation,
 }: {
   business: Business;
   onChange: (brain: any) => void;
   onVisualEditing: (editing:boolean) => void;
+  onSavingChange?: (saving:boolean) => void;
+  recommendation?: {audience?:string};
+  section?: 'profile'|'voice'|'style'|'sources';
 }) {
   const [brain, setBrain] = useState<any>(),
     [assets, setAssets] = useState<any[]>([]),
     [error, setError] = useState<unknown>(),
-    [field, setField] = useState("brand_name"),
+    [field, setField] = useState(section==='voice'?'voice':section==='style'?'colors':"brand_name"),
     [value, setValue] = useState(""),
     [busy, setBusy] = useState(false),
     [job, setJob] = useState<any>(),
     manualKey = useRef(""),
-    lastBody = useRef("");
+    lastBody = useRef(""),
+    loadSequence = useRef(0),
+    activeSaves = useRef(0);
+  function saving(active:boolean){activeSaves.current=Math.max(0,activeSaves.current+(active?1:-1));onSavingChange?.(activeSaves.current>0);}
   const path = scopePath(business),
     writable = ['owner','admin','editor'].includes(business.role);
   useUnsavedChanges(!!value && !busy);
   async function load() {
+    const sequence = ++loadSequence.current;
     try {
       const [b, a] = await Promise.all([
         api(path + "/brain"),
         api(path + "/assets"),
       ]);
+      if(sequence !== loadSequence.current)return;
       setBrain(b);
       onChange(b);
       setAssets(a.assets);
       if (b.jobs?.length) setJob(b.jobs[0]);
       setError(undefined);
     } catch (e) {
-      setError(e);
+      if(sequence === loadSequence.current)setError(e);
     }
   }
   useEffect(() => {
@@ -1114,6 +1235,7 @@ function BrandReview({
   async function add(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
+    saving(true);
     setError(undefined);
     const body = { field, value },
       serialized = JSON.stringify(body);
@@ -1123,54 +1245,61 @@ function BrandReview({
     }
     try {
       await api(path + "/brain/findings", body, "POST", manualKey.current);
-      setValue("");
       await load();
+      setValue("");
     } catch (e) {
       setError(e);
     } finally {
       setBusy(false);
+      saving(false);
     }
   }
   return (
     <>
-      <BrandIntake business={business} onComplete={() => void load()} />
-      <VisualReview state={brain?.visuals} path={path} writable={writable} onSaved={load} onEditingChange={onVisualEditing} />
-      <section className="v5-panel">
+      {section!=='sources'&&<section className="v5-panel brand-profile-review">
         <div className="section-heading">
           <div>
-            <h2>Here’s what we know about your brand.</h2>
-            <p>
-              Review each fact. Your decisions become the brand’s approved
-              memory.
-            </p>
+            <h2>{section==='style'?'Colors and typography':section==='voice'?'Your brand voice':'Your brand profile'}</h2>
+            <p>Check the details and make them yours.</p>
           </div>
-          <button onClick={() => void load()}>Refresh evidence</button>
+          <button className="quiet" onClick={()=>void load()}>Refresh profile</button>
         </div>
         <Notice error={error} />
         {!brain ? (
           <Loading />
         ) : (
           <>
-            <div className="finding-grid">
-              {brain.findings.map((f: any) => (
-                <Finding
-                  key={f.id}
-                  finding={f}
+            {[
+              {title:'Your business',description:'What you do and what makes you different.',fields:['brand_name','offering','products','positioning']},
+              {title:'Your audience',description:'The people you want to reach.',fields:['audience']},
+              {title:'Your voice',description:'How your brand sounds and what it stands for.',fields:['voice','cta','prohibited_claims']},
+              {title:'Your visual identity',description:'The colors and typography behind your content.',fields:['colors','fonts']},
+            ].filter(group=>!section||(section==='voice'?group.title==='Your voice':section==='style'?group.title==='Your visual identity':['Your business','Your audience'].includes(group.title))).filter(group=>group.fields.some(field=>brain.findings.some((f:any)=>f.field===field)||['brand_name','offering','audience','voice'].includes(field))).map(group=><section className="brand-profile-section" key={group.title} aria-label={group.title}>
+              <header><h3>{group.title}</h3><p>{group.description}</p></header>
+              <div className="finding-grid">
+              {group.fields.filter(field=>brain.findings.some((f:any)=>f.field===field)).map(field => (
+                <FindingGroup
+                  key={field}
+                  findings={brain.findings.filter((f:any)=>f.field===field)}
                   path={path}
                   writable={writable}
-                  onSaved={() => void load()}
+                  onSaved={load}
+                  onSaving={saving}
                 />
               ))}
+              {group.fields.filter(field=>['brand_name','offering','audience','voice'].includes(field)&&!brain.findings.some((f:any)=>f.field===field&&f.status!=='wrong')).map(field=><MissingBrandDetail key={field} field={field} suggested={field==='audience'?recommendation?.audience:field==='offering'?preferredFinding(brain.findings.filter((f:any)=>f.field==='products'&&f.status!=='wrong'))?.value:undefined} path={path} writable={writable} onSaved={load} onSaving={saving}/>)}
             </div>
+            </section>)}
             {!brain.findings.length && (
               <p>
-                No findings yet. Add facts below or extract them from a
-                validated PDF or PowerPoint file.
+                Add the missing details above to build your brand profile.
               </p>
             )}
           </>
         )}
         {writable && (
+          <details>
+            <summary>Add a detail the website does not cover</summary>
           <form onSubmit={add} className="manual-fact">
             <h3>Add a brand fact</h3>
             <div className="fact-inputs">
@@ -1192,7 +1321,7 @@ function BrandReview({
                       "cta",
                       "fonts",
                       "products",
-                    ].map((f) => (
+                    ].filter(f=>!section||(section==='voice'?['voice','cta','prohibited_claims'].includes(f):section==='style'?['colors','fonts'].includes(f):['brand_name','offering','audience','positioning','products'].includes(f))).map((f) => (
                       <option key={f} value={f}>
                         {f.replaceAll("_", " ")}
                       </option>
@@ -1212,19 +1341,19 @@ function BrandReview({
                 )}
               </Field>
             </div>
+            {field==="fonts"&&<BrandFontChoices value={value} onChange={setValue} disabled={busy}/>}
+            {field==="colors"&&<BrandStylePreview field={field} value={value}/>}
             <button disabled={busy}>
               {busy ? "Saving…" : "Add for review"}
             </button>
           </form>
+          </details>
         )}
-      </section>
-      <section className="v5-panel document-evidence">
-        <h2>Have brand guidelines already?</h2>
-        <p>
-          Upload your files below, wait for validation, then extract their text
-          here. This parser reads embedded PDF/PPTX text; scanned pages, images
-          and visual guidelines still need additional review.
-        </p>
+      </section>}
+      {(!section||section==='style')&&<VisualReview state={brain?.visuals} path={path} writable={writable} onSaved={load} onEditingChange={onVisualEditing} />}
+      {(!section||section==='sources')&&assets.some(a=>a.state==="ready"&&["application/pdf","application/vnd.openxmlformats-officedocument.presentationml.presentation"].includes(a.content_type))&&<details className="onboarding-source-details"><summary>Read additional brand documents</summary><section className="v5-panel document-evidence">
+        <h2>Brand documents</h2>
+        <p>Choose an uploaded guideline to add its information to your profile.</p>
         {assets
           .filter(
             (a) =>
@@ -1278,31 +1407,59 @@ function BrandReview({
           </p>
         )}
         <p className="hint">
-          Refresh evidence after a new file passes validation. Extraction never
-          approves a fact automatically.
+          You’ll review the extracted details before they become part of your brand.
         </p>
-      </section>
+      </section></details>}
     </>
   );
 }
+function MissingBrandDetail({field,suggested,path,writable,onSaved,onSaving}:{field:string;suggested?:string;path:string;writable:boolean;onSaved:()=>Promise<void>;onSaving?:(active:boolean)=>void}) {
+ const [value,setValue]=useState(suggested??''),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>();
+ const request=useRef({body:'',key:''}),previousSuggestion=useRef(suggested??'');
+ useEffect(()=>{const previous=previousSuggestion.current;setValue(current=>current===previous?(suggested??''):current);previousSuggestion.current=suggested??'';},[suggested]);
+ useUnsavedChanges(value!==(suggested??''));
+ async function save(){setBusy(true);onSaving?.(true);setError(undefined);try{const body={field,value:value.trim()},encoded=JSON.stringify(body);if(request.current.body!==encoded)request.current={body:encoded,key:crypto.randomUUID()};await api(path+'/brain/findings',body,'POST',request.current.key);await onSaved();}catch(e){setError(e);}finally{setBusy(false);onSaving?.(false);}}
+ return <article className="missing-brand-detail"><h3>{field.replaceAll('_',' ')}</h3><p className="hint">{suggested?'Suggested from your business. Adjust it, then add it to your profile.':'We couldn’t verify this from your website. Add this detail to complete your profile.'}</p><Field label={field==='audience'?'Who are your customers?':`Your ${field.replaceAll('_',' ')}`}>{id=><textarea id={id} value={value} maxLength={4000} disabled={!writable||busy} onChange={e=>setValue(e.target.value)}/>}</Field><Notice error={error}/>{writable&&<button disabled={busy||!value.trim()} onClick={()=>void save()}>{busy?'Saving…':'Add to my profile'}</button>}</article>;
+}
+function preferredFinding(findings:any[]) {
+  return [...findings].sort((a,b)=>{
+    const rank=(f:any)=>f.status==='edited'?3:f.status==='correct'?2:f.status==='unreviewed'?1:0;
+    return rank(b)-rank(a)||String(b.reviewed_at??'').localeCompare(String(a.reviewed_at??''))||String(a.id).localeCompare(String(b.id));
+  })[0];
+}
+function FindingGroup({findings,path,writable,onSaved,onSaving}:{findings:any[];path:string;writable:boolean;onSaved:()=>Promise<void>;onSaving?:(active:boolean)=>void}) {
+  const active=findings.filter(f=>f.status!=='wrong');
+  const options=active.length?active:findings;
+  const [selected,setSelected]=useState<string>();
+  const chosen=options.find(f=>f.id===selected)??preferredFinding(options);
+  return <div className="finding-group">
+    {options.length>1&&<Field label={`Choose your ${chosen.field.replaceAll('_',' ')} description`}>{id=><select id={id} value={chosen.id} onChange={e=>setSelected(e.target.value)} disabled={!writable}>{options.map((f:any,i:number)=><option key={f.id} value={f.id}>Description {i+1}: {f.value.slice(0,90)}</option>)}</select>}</Field>}
+    <Finding key={chosen.id} finding={chosen} alternatives={active.filter(f=>f.id!==chosen.id)} path={path} writable={writable} onSaved={onSaved} onSaving={onSaving}/>
+  </div>;
+}
 function Finding({
   finding: f,
+  alternatives = [],
   path,
   writable,
   onSaved,
+  onSaving,
 }: {
   finding: any;
+  alternatives?: any[];
   path: string;
   writable: boolean;
-  onSaved: () => void;
+  onSaved: () => Promise<void>;
+  onSaving?: (active:boolean) => void;
 }) {
   const [editing, setEditing] = useState(false),
     [value, setValue] = useState(f.value),
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false);
-  useUnsavedChanges(editing && value !== f.value && !busy);
+  useUnsavedChanges(editing && value !== f.value);
   async function decide(decision: string) {
     setBusy(true);
+    onSaving?.(true);
     setError(undefined);
     try {
       await api(
@@ -1310,26 +1467,30 @@ function Finding({
         {
           revision: f.revision,
           decision,
+          ...(decision!=="wrong"&&alternatives.length?{alternatives:alternatives.map(a=>({id:a.id,revision:a.revision}))}:{}),
           ...(decision === "edited" ? { value } : {}),
         },
         "PATCH",
       );
+      await onSaved();
       setEditing(false);
-      onSaved();
     } catch (e) {
       setError(e);
     } finally {
       setBusy(false);
+      onSaving?.(false);
     }
   }
   return (
     <article className="finding-card">
       <div className="section-heading">
         <h3>{f.field.replaceAll("_", " ")}</h3>
-        <span className="status neutral">
-          {f.status === "unreviewed" ? "Needs review" : f.status}
+        <span className="status neutral" role="status">
+          {busy ? "Saving…" : f.status === "unreviewed" ? "Review" : f.status === "wrong" ? "Excluded" : "Confirmed"}
         </span>
       </div>
+      <BrandStylePreview field={f.field} value={editing?value:f.value}/>
+      {editing&&f.field==="fonts"&&<BrandFontChoices value={value} onChange={setValue} disabled={busy}/>}
       {editing ? (
         <Field label={`Edit ${f.field.replaceAll("_", " ")}`}>
           {(id) => (
@@ -1344,16 +1505,8 @@ function Finding({
       ) : (
         <p>{f.value}</p>
       )}
-      <details>
-        <summary>
-          {f.extraction_type === "ai_suggestion"
-            ? "AI suggestion · supporting evidence"
-            : `Source · page ${f.page}`}
-        </summary>
-        {f.evidence_quote && <blockquote>{f.evidence_quote}</blockquote>}
-        <blockquote>{f.evidence}</blockquote>
-      </details>
       <Notice error={error} />
+      {alternatives.length>0&&<p className="hint">Choose Correct or save an edit to use this description instead of the other versions.</p>}
       {writable && (
         <div className="actions">
           {editing ? (
@@ -1367,10 +1520,10 @@ function Finding({
             </>
           ) : (
             <>
-              <button disabled={busy} onClick={() => void decide("correct")}>
+              <button aria-pressed={f.status==="correct"||f.status==="edited"} disabled={busy} onClick={() => void decide(f.status==="edited"?"edited":"correct")}>
                 Correct
               </button>
-              <button disabled={busy} onClick={() => void decide("wrong")}>
+              <button aria-pressed={f.status==="wrong"} disabled={busy} onClick={() => void decide("wrong")}>
                 Wrong
               </button>
               <button
@@ -1390,58 +1543,26 @@ function Finding({
   );
 }
 function Memory({ business }: { business: Business }) {
-  const [brain, setBrain] = useState<any>(),
-    [error, setError] = useState<unknown>();
-  useEffect(() => {
-    api(scopePath(business) + "/brain")
-      .then(setBrain)
-      .catch(setError);
-  }, [business.id]);
-  return (
-    <>
-      <PageTitle eyebrow={business.name} title="Memory">
-        <p>
-          The facts you’ve confirmed. A foundation for everything you create.
-        </p>
-      </PageTitle>
-      <Notice error={error} />
-      {brain ? (
-        <section className="v5-panel">
-          <h2>Brand knowledge</h2>
-          {brain.active ? (
-            <>
-              <p>
-                Approved{" "}
-                {new Date(brain.active.approved_at).toLocaleDateString()} ·
-                draft revision {brain.active.review_revision}
-              </p>
-              <dl className="memory-facts">
-                {brain.active.snapshot.facts.map((f: any) => (
-                  <div key={f.id}>
-                    <dt>{f.field.replaceAll("_", " ")}</dt>
-                    <dd><span>{f.value}</span><MemoryEvidence fact={f} path={scopePath(business)}/></dd>
-                  </div>
-                ))}
-              </dl>
-            </>
-          ) : (
-            <p>
-              No approved brand profile yet. Confirm your facts to start
-              building this business’s memory.
-            </p>
-          )}
-          <AppLink className="button" href={`/b/${business.id}/onboarding`}>
-            Review brand facts
-          </AppLink>
-          <p className="availability-note">
-            Approved visual directions appear above. Review performance hypotheses separately below; they never replace these facts.
-          </p>
-        </section>
-      ) : (
-        !error && <Loading />
-      )}
-      {brain&&<MemorySources sources={brain.sources} businessId={business.id}/>}
-      <PerformanceLessons key={business.id} businessId={business.id}/>
-    </>
-  );
+  const [brain, setBrain] = useState<any>(), [error, setError] = useState<unknown>();
+  const [view,setView]=useState('facts'),[search,setSearch]=useState(''),[retry,setRetry]=useState(0);
+  useEffect(() => {let alive=true;setError(undefined);setBrain(undefined);
+    api(scopePath(business) + "/brain").then(value=>{if(alive)setBrain(value);}).catch(e=>{if(alive)setError(e);});
+    return()=>{alive=false;};
+  }, [business.id,retry]);
+  const facts=brain?.active?.snapshot.facts??[];
+  return <section className="learnings-workspace">
+    <PageTitle eyebrow={business.name} title="Learnings"><p>Your brand knowledge and what to try next.</p></PageTitle>
+    <div className="workspace-view-switch" role="group" aria-label="Learning views">
+      {[['facts','Brand knowledge'],['lessons','What’s working'],['sources','Sources']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}
+    </div>
+    <Notice error={error}/>{error!==undefined&&<button onClick={()=>setRetry(n=>n+1)}>Try again</button>}
+    {view==='facts'&&(brain?<section className="learning-facts-panel">
+      <div className="heading-row"><div><h2>Brand knowledge</h2><p className="hint">{facts.length} confirmed facts{brain.active&&` · Updated ${new Date(brain.active.approved_at).toLocaleDateString()}`}</p></div><AppLink className="button" href={`/b/${business.id}/onboarding`}>Edit brand facts</AppLink></div>
+      {brain.active?<><label className="learning-search"><span className="sr-only">Search brand knowledge</span><input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your brand knowledge…"/></label>
+      <dl className="memory-facts">{facts.filter((f:any)=>(f.field+' '+f.value).toLowerCase().includes(search.toLowerCase())).map((f:any)=><div key={f.id}><dt>{f.field.replaceAll('_',' ')}</dt><dd><span>{f.value}</span><MemoryEvidence fact={f} path={scopePath(business)}/></dd></div>)}</dl>
+      {!facts.some((f:any)=>(f.field+' '+f.value).toLowerCase().includes(search.toLowerCase()))&&<p className="workspace-empty">No facts match “{search}”.</p>}</>:<p className="workspace-empty">Confirm your brand profile to start building its knowledge.</p>}
+    </section>:!error&&<Loading/>)}
+    {view==='sources'&&brain&&<MemorySources sources={brain.sources} businessId={business.id}/>}
+    {view==='lessons'&&<PerformanceLessons key={business.id} businessId={business.id}/>}
+  </section>;
 }

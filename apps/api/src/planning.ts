@@ -1,3 +1,7 @@
+import {normalizeContentMix,contentMixCounts,type ContentMixItem} from './generation-plan.js';
+import type {PoolClient} from 'pg';
+import {planningReferences} from './planning-references.js';
+import {campaignInput} from './campaign-input.js';
 import {approvedLearning} from './learning-context.js';
 import {addDays,dayStart} from './local-calendar.js';
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
@@ -8,14 +12,20 @@ import {canonicalJSON,hash} from './brand-brain.js';
 import type {PlanningInput} from './planning-contracts.js';
 export class Planning {
  constructor(readonly plans:ContentPlan){}
- submit(user:string,id:string,body:unknown,key:unknown){
-  const v=object(body,['starts_on','brief','duration_days','post_count','video_count','provider','repeat_cycles','loop_budget_micros','confirm_recurring_spend','canvas_thread_id','planning_mode','reference_plan_id']),brief=v.brief??'';
+ submit(user:string,id:string,body:unknown,key:unknown,scoped?:{db:PoolClient;b:{organization_id:string};budgetMicros:number;weeklyIncrease:number}){
+  const v=object(body,['starts_on','brief','duration_days','post_count','video_count','provider','repeat_cycles','loop_budget_micros','confirm_recurring_spend','canvas_thread_id','planning_mode','reference_plan_id','campaign','content_mix']),brief=v.brief??'';
+  const campaign=campaignInput(v.campaign);
+  let mix:ContentMixItem[]|undefined;try{if(v.content_mix!==undefined)mix=normalizeContentMix(v.content_mix);}catch(e){throw new BadRequestException((e as Error).message);}
+  const mixCounts=mix?contentMixCounts(mix):undefined;
+  if(mix&&v.planning_mode==='natural')throw new BadRequestException('Use fixed quantities for your selected content mix');
+  if(mix&&campaign&&(new Set(mix.map(r=>r.channel)).size!==campaign.channels.length||mix.some(r=>!campaign.channels.includes(r.channel))))throw new BadRequestException('Choose content for each selected campaign channel');
+  if(mixCounts&&(v.post_count!==undefined&&v.post_count!==mixCounts.post_count||v.video_count!==undefined&&v.video_count!==mixCounts.video_count))throw new BadRequestException('Post totals must match your content mix');
   if(typeof v.starts_on!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v.starts_on)||!Number.isFinite(Date.parse(v.starts_on))||new Date(v.starts_on).toISOString().slice(0,10)!==v.starts_on||v.starts_on<'2000-01-01'||v.starts_on>'2100-12-01')throw new BadRequestException('Choose a valid start date');
   if(typeof brief!=='string'||brief.length>2000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(brief))throw new BadRequestException('Use a planning brief of at most 2000 characters');
   if(typeof key!=='string'||! /^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('An Idempotency-Key is required');
-  const days=v.duration_days??30,count=v.post_count??days;
+  const days=v.duration_days??30,count=mixCounts?.post_count??v.post_count??days;
   if(!Number.isInteger(days)||Number(days)<1||Number(days)>90||!Number.isInteger(count)||Number(count)<1||Number(count)>90)throw new BadRequestException('Choose 1–90 days and 1–90 posts');
-  const videos=v.video_count??0;
+  const videos=mixCounts?.video_count??v.video_count??0;
   if(!Number.isInteger(videos)||Number(videos)<0||Number(videos)>Math.min(Number(count),30))throw new BadRequestException('Choose up to 30 videos within the total post count');
   const provider=v.provider??'openai';if(provider!=='openai')throw new BadRequestException('Content planning uses OpenAI GPT only');
   if(v.planning_mode!==undefined&&v.planning_mode!=='natural')throw new BadRequestException('Unsupported planning mode');
@@ -26,8 +36,8 @@ export class Planning {
   if(!Number.isInteger(cycles)||Number(cycles)<1||Number(cycles)>12||Number(cycles)*Number(days)>366)throw new BadRequestException('Choose up to 12 cycles within one year');
   if(Number(cycles)>1&&(v.confirm_recurring_spend!==true||!Number.isSafeInteger(v.loop_budget_micros)||Number(v.loop_budget_micros)<1||Number(v.loop_budget_micros)>1000000000))throw new BadRequestException('Confirm recurring planning charges and a total budget');
   if(v.planning_mode==='natural'&&Number(cycles)>1)throw new BadRequestException('Choose fixed days and post counts before authorizing a recurring loop');
-  const requestHash=hash(canonicalJSON({starts_on:v.starts_on,brief,user,...(v.planning_mode?{planning_mode:v.planning_mode}:{}),...(referenceId?{reference_plan_id:referenceId}:{}),...(threadId!==undefined?{canvas_thread_id:threadId}:{}),...(Number(cycles)>1?{repeat_cycles:cycles,loop_budget_micros:v.loop_budget_micros}:{}),...(v.duration_days!==undefined||v.post_count!==undefined?{duration_days:days,post_count:count}:{}),...(v.video_count!==undefined?{video_count:videos}:{}),...(v.provider!==undefined?{provider}:{})}));
-  return this.plans.scope(user,id,true,async(db,b)=>{
+  const requestHash=hash(canonicalJSON({starts_on:v.starts_on,brief,user,...(mix?{content_mix:mix}:{}),...(campaign?{campaign}:{}),...(v.planning_mode?{planning_mode:v.planning_mode}:{}),...(referenceId?{reference_plan_id:referenceId}:{}),...(threadId!==undefined?{canvas_thread_id:threadId}:{}),...(Number(cycles)>1?{repeat_cycles:cycles,loop_budget_micros:v.loop_budget_micros}:{}),...(v.duration_days!==undefined||v.post_count!==undefined?{duration_days:days,post_count:count}:{}),...(v.video_count!==undefined?{video_count:videos}:{}),...(v.provider!==undefined?{provider}:{})}));
+  const action=async(db:PoolClient,b:{organization_id:string})=>{
    const prior=(await db.query('SELECT r.request_hash,j.id,j.status,r.output_plan_id,r.thread_id,r.loop_id FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,key])).rows[0];
    if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another planning request');return {id:prior.id,status:prior.status,output_plan_id:prior.output_plan_id,thread_id:prior.thread_id,loop_id:prior.loop_id};}
    if((await db.query("SELECT j.id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND (j.status='unknown' OR (j.status IN ('queued','running','retrying') AND r.scheduled_at<=now() AND (r.loop_id IS NULL OR EXISTS(SELECT 1 FROM app.planning_loops l WHERE l.id=r.loop_id AND l.stopped_at IS NULL))))",[b.organization_id,id])).rowCount)throw new ConflictException('A plan is running or its uncertain provider result needs reconciliation');
@@ -38,12 +48,13 @@ export class Planning {
    if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
    const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
    if(!prefs||prefs.step!==3||!prefs.channels.length)throw new ConflictException('Finish your brand goals and choose content channels before planning');
-   const input:PlanningInput={task:'content_plan',brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(v.video_count!==undefined?{video_count:Number(videos)}:{})};
+   const input:PlanningInput={...(scoped?{max_posts_per_day:2}:{}),task:'content_plan',references:await planningReferences(db,b.organization_id,id),brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:mix?[...new Set(mix.map(r=>r.channel))]:campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(mix||v.video_count!==undefined?{video_count:Number(videos)}:{}),...(mix?{content_mix:mix}:{})};
+   if(campaign)input.campaign=campaign;
    if(v.planning_mode==='natural')input.planning_mode='natural';
    if(referenceId){
     const plan=(await db.query('SELECT id,title,duration_days,starts_on::text,timezone FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,referenceId])).rows[0];
     if(!plan)throw new NotFoundException('Reference plan not found');
-    const slots=(await db.query('SELECT id,revision,channel,planned_at::text,format,brief,pillar,hook,cta,video_draft FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND plan_id=$3 ORDER BY planned_at,id LIMIT 121',[b.organization_id,id,referenceId])).rows;
+    const slots=(await db.query('SELECT id,revision,channel,planned_at::text,format,brief,pillar,hook,cta,video_draft,creative_spec FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND plan_id=$3 ORDER BY planned_at,id LIMIT 121',[b.organization_id,id,referenceId])).rows;
     const snapshot={...plan,slots};if(slots.length>120||Buffer.byteLength(JSON.stringify(snapshot))>120000)throw new ConflictException('This reference plan exceeds the planning context limit');
     input.reference_plan={...snapshot,sha256:hash(canonicalJSON(snapshot))};
    }
@@ -57,12 +68,12 @@ export class Planning {
     if((await db.query('SELECT count(*)::int AS n FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0].n>=100)throw new ConflictException('This business has reached its conversation limit');
     conversation=randomUUID();await db.query('INSERT INTO app.canvas_threads(id,organization_id,brand_id,title,created_by,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7)',[conversation,b.organization_id,id,brief.trim().slice(0,140)||'Content planning',user,`plan:${key}`,requestHash]);
    }
-   const loop=Number(cycles)>1?randomUUID():null;
-   if(loop)await db.query('INSERT INTO app.planning_loops(id,organization_id,brand_id,created_by,cycles,budget_micros) VALUES($1,$2,$3,$4,$5,$6)',[loop,b.organization_id,id,user,cycles,v.loop_budget_micros]);
+   const loop=Number(cycles)>1||scoped?randomUUID():null;
+   if(loop)await db.query('INSERT INTO app.planning_loops(id,organization_id,brand_id,created_by,cycles,budget_micros) VALUES($1,$2,$3,$4,$5,$6)',[loop,b.organization_id,id,user,cycles,scoped?.budgetMicros??v.loop_budget_micros]);
    let first='';
    for(let cycle=0;cycle<Number(cycles);cycle++){
    const job=randomUUID();if(!first)first=job;
-   const cycleInput={...input,preferences:{...input.preferences,starts_on:addDays(input.preferences.starts_on,cycle*Number(days))}};
+   const cycleInput={...input,...(scoped?{post_count:Math.min(14,Number(count)+Math.floor(cycle/4)*scoped.weeklyIncrease)}:{}),preferences:{...input.preferences,starts_on:addDays(input.preferences.starts_on,cycle*Number(days))}};
    const due=cycle===0?new Date().toISOString():dayStart(cycleInput.preferences.starts_on,input.preferences.timezone);
    if(cycleInput.preferences.starts_on>'2100-12-01'||(cycle>0&&Date.parse(due)<=Date.now()))throw new BadRequestException('Future loop cycles must start in the future');
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);
@@ -72,7 +83,7 @@ export class Planning {
    if(conversation&&cycle===0)await db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",[randomUUID(),b.organization_id,id,conversation,job,`${brief.trim()||'Plan content for this business.'}\n${v.planning_mode==='natural'?`AI chooses the plan length and mix from this request, starting ${v.starts_on}.`:`${count} posts over ${days} days, starting ${v.starts_on}; ${videos} videos. ${cycles} planning cycle(s).`}${input.reference_plan?`\nContext: ${input.reference_plan.title}. Create a new draft plan.`:''}`]);
    }
    return {id:first,status:'queued',output_plan_id:null,loop_id:loop,thread_id:conversation??null};
-  });
+  };return scoped?action(scoped.db,scoped.b):this.plans.scope(user,id,true,action);
  }
  loops(user:string,id:string){return this.plans.scope(user,id,false,async(db,b)=>({loops:(await db.query(`SELECT l.id,l.cycles,l.budget_micros::text,l.stopped_at,l.created_at,count(*) FILTER(WHERE j.status='succeeded')::int AS completed,count(*) FILTER(WHERE j.status IN ('failed','rejected','unknown'))::int AS needs_attention,min(r.scheduled_at) FILTER(WHERE j.status='queued') AS next_at FROM app.planning_loops l JOIN app.planning_requests r ON r.loop_id=l.id JOIN app.jobs j ON j.id=r.job_id WHERE l.organization_id=$1 AND l.brand_id=$2 GROUP BY l.id ORDER BY l.created_at DESC LIMIT 30`,[b.organization_id,id])).rows}));}
  stopLoop(user:string,id:string,loopId:string){loopId=uuid(loopId);return this.plans.scope(user,id,true,async(db,b)=>{

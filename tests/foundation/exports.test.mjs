@@ -148,6 +148,13 @@ test('concurrent exports reserve bounded private storage before accepting work',
  for(const r of accepted){await exports.cancel(alice.id,brand.id,r.value.id);assert.equal(await handler.run(scope(r.value)),'finished');}
 });
 
+const campaignRefinement={tone:'Warm',references:'Editorial magazines',include:'Approved service details',avoid:'Urgency and discounts'};
+async function attachRefinement(planId){
+ const job=randomUUID(),brain=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1 ORDER BY approved_at DESC LIMIT 1',[brand.id])).rows[0];
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'plan.generate','succeeded')",[job,org.id,brand.id,alice.id]);
+ await admin.query("UPDATE app.content_plans SET origin='generated',job_id=$2,brain_id=$3,strategy=$4,skill_manifest=$5 WHERE id=$1",[planId,job,brain.id,{campaign:{refinement:campaignRefinement}},{test_fixture:true}]);
+}
+
 test('approved export to original video skills, durable provider stage, actual media rendering and private version (MOCK providers)',async()=>{
  const [{VideoReferences},{VideoCanvas},{VideoJobs},{VideoProviderJobs},{VideoRenderer},{CreativeJobs},{CreativeProvider},{SkillRuntime},{VideoDownload},{prepareVideoImage},{prepareSkillImage},{execFileSync},{default:OpenAI}]=await Promise.all([
   import('../../dist/video-references.js'),import('../../dist/video-canvas.js'),import('../../dist/video-jobs.js'),import('../../dist/video-provider-jobs.js'),import('../../dist/video-renderer.js'),import('../../dist/creative-jobs.js'),import('../../dist/creative-provider.js'),import('../../dist/skill-runtime.js'),import('../../dist/video-download.js'),import('../../scripts/video-runtime-image.mjs'),import('../../scripts/skill-test-image.mjs'),import('node:child_process'),import('openai')]);
@@ -159,10 +166,12 @@ test('approved export to original video skills, durable provider stage, actual m
  const thread=(await admin.query('SELECT thread_id FROM app.creative_projects WHERE id=$1',[v.project_id])).rows[0].thread_id;
  const linkedPlan=await plans.create(alice.id,brand.id,{title:'Linked video plan',objective:'Generate into this plan',starts_on:'2027-01-01',timezone:'UTC',slots:[{channel:'instagram',format:'video',brief:'TEST planned video',planned_at:'2027-01-06T08:00:00Z'}]},randomUUID());
  const linkedRange={start:'2027-01-01T00:00:00Z',end:'2027-02-01T00:00:00Z',plan_id:linkedPlan.id},linkedSlot=(await plans.list(alice.id,brand.id,linkedRange)).slots[0];
+ await attachRefinement(linkedPlan.id);
  const body={prompt:'Animate our approved creative',slot_id:linkedSlot.id,slot_revision:linkedSlot.revision,channel:'instagram',duration_seconds:3,reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
  await assert.rejects(service.submit(viewer.id,brand.id,thread,body,randomUUID()));await assert.rejects(service.submit(bob.id,brand.id,thread,body,randomUUID()));
  await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour',budget_micros=10000000",[org.id,brand.id]);
  const requestKey=randomUUID(),j=await service.submit(alice.id,brand.id,thread,body,requestKey);
+ assert.match((await admin.query('SELECT prompt FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0].prompt,/Urgency and discounts/);
  assert.equal((await service.submit(alice.id,brand.id,thread,body,requestKey)).id,j.id);
  await assert.rejects(service.submit(alice.id,brand.id,thread,{...body,prompt:'Different'},requestKey),/different video/);
 
@@ -331,11 +340,15 @@ test('carousel generation reserves ordered children once, isolates tenants and c
  const {CreativeProvider}=await import('../../dist/creative-provider.js');
  await admin.query("UPDATE app.jobs SET created_at=now()-interval '2 days' WHERE brand_id=$1",[brand.id]);
  const service=new CarouselGeneration(canvas,renderer.image);
- const body={prompt:'TEST FIXTURE: coordinated three-slide story',slide_count:3,channel:'linkedin',size:'1024x1024',text_provider:'openai'},key=randomUUID();
+ const refinementPlan=await plans.create(alice.id,brand.id,{title:'Carousel preferences',objective:'A story',starts_on:'2027-01-01',timezone:'UTC',slots:[{channel:'linkedin',format:'static',brief:'Story',planned_at:'2027-01-06T08:00:00Z'}]},randomUUID());await attachRefinement(refinementPlan.id);
+ const body={campaign_plan_id:refinementPlan.id,prompt:'TEST FIXTURE: coordinated three-slide story',slide_count:3,channel:'linkedin',size:'1024x1024',text_provider:'openai'},key=randomUUID();
  await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true",[org.id,brand.id]);
  await assert.rejects(service.submit(viewer.id,brand.id,body,randomUUID()));
  await assert.rejects(service.submit(bob.id,brand.id,body,randomUUID()));
+ await assert.rejects(service.submit(alice.id,sibling.id,body,randomUUID()),/Campaign not found/);
  const j=await service.submit(alice.id,brand.id,body,key);
+ assert.match((await admin.query('SELECT input FROM app.carousel_requests WHERE job_id=$1',[j.id])).rows[0].input.prompt,/Urgency and discounts/);
+ const childPrompts=(await admin.query('SELECT r.prompt FROM app.creative_requests r JOIN app.carousel_children c ON c.generation_job_id=r.job_id WHERE c.parent_job_id=$1',[j.id])).rows;assert.equal(childPrompts.length,3);assert.ok(childPrompts.every(row=>row.prompt.includes('Urgency and discounts')));
  assert.equal((await service.submit(alice.id,brand.id,body,key)).id,j.id);
  await assert.rejects(service.submit(alice.id,brand.id,{...body,slide_count:4},key));
  const read=await service.read(alice.id,brand.id),children=read.slides.filter(s=>s.parent_job_id===j.id);
@@ -368,7 +381,14 @@ test('durable carousel uses one actual isolated plan, sequential MOCK images and
   return Response.json({created:1,data:[{b64_json:png.toString('base64')}],usage:{input_tokens:50,output_tokens:100,total_tokens:150}});
  }}));
  const creative=new CreativeJobs(jobs,new SkillRuntime(prepareSkillImage()),provider),coordinator=new CarouselJobs(jobs,creative,handler),service=new CarouselGeneration(canvas,renderer.image);
- const j=await service.submit(alice.id,brand.id,{prompt:'TEST FIXTURE: a connected two-slide story',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID());
+ const creativeSpec={placement:'feed',aspect:'square',slide_count:2};
+ const campaign=await plans.create(alice.id,brand.id,{title:'Bound carousel',objective:'Coordinated story',starts_on:'2027-01-01',timezone:'UTC',slots:[{channel:'instagram',format:'carousel',brief:'Story',planned_at:'2027-01-06T08:00:00Z',creative_spec:creativeSpec}]},randomUUID());
+ const boundSlot=(await admin.query('SELECT * FROM app.content_slots WHERE plan_id=$1',[campaign.id])).rows[0];
+ const requestBody={prompt:'TEST FIXTURE: a connected two-slide story',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai',campaign_plan_id:campaign.id,slot_id:boundSlot.id,slot_revision:boundSlot.revision,creative_spec:creativeSpec,max_cost_micros:3000000,planning_cost_micros:1000000};
+ await assert.rejects(service.submit(alice.id,brand.id,{...requestBody,slot_revision:boundSlot.revision+1},randomUUID()),/changed/);
+ const j=await service.submit(alice.id,brand.id,requestBody,randomUUID());
+ assert.equal(Number((await admin.query('SELECT max_cost_micros FROM app.carousel_requests WHERE job_id=$1',[j.id])).rows[0].max_cost_micros),1000000);
+
  const native=await NativeConnection.connect({address:config.jobs.address}),connection=await Connection.connect({address:config.jobs.address}),taskQueue='carousel-'+randomUUID();
  const beat=fn=>async(...args)=>{const ctx=Context.current(),timer=setInterval(()=>ctx.heartbeat(),1000);try{return await fn(...args);}finally{clearInterval(timer);}};
  const temporal=await Worker.create({connection:native,namespace:config.jobs.namespace,taskQueue,workflowsPath:fileURLToPath(new URL('../../dist/asset-workflow.js',import.meta.url)),activities:{planCarousel:beat(s=>coordinator.plan(s)),prepareCarouselExport:beat((s,p)=>coordinator.prepareExport(s,p)),checkCarouselExport:beat((s,p)=>coordinator.checkExport(s,p)),completeCarousel:beat(s=>coordinator.complete(s)),failCarousel:beat(s=>coordinator.fail(s)),generateCreative:beat(s=>creative.run(s)),failCreative:s=>creative.fail(s),exportCreative:beat(s=>handler.run(s)),failExport:s=>handler.fail(s)}});
@@ -376,8 +396,16 @@ test('durable carousel uses one actual isolated plan, sequential MOCK images and
  assert.equal(planning,1);assert.equal(images,2);
  const read=await service.read(alice.id,brand.id),run=read.runs.find(r=>r.id===j.id);assert.ok(run.output_version_id);
  const saved=(await admin.query('SELECT * FROM app.carousel_versions WHERE id=$1',[run.output_version_id])).rows[0];assert.equal(saved.status,'draft');assert.equal(saved.reviewed_by,null);
+ const attached=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[boundSlot.id])).rows[0];assert.equal(attached.carousel_version_id,saved.id);assert.equal(attached.revision,boundSlot.revision+1);assert.equal(attached.state,'draft_ready');assert.equal(attached.approved_by,null);assert.deepEqual(attached.creative_spec,creativeSpec);
+ assert.equal((await admin.query('SELECT attachment_status FROM app.content_slot_carousel_generations WHERE job_id=$1',[j.id])).rows[0].attachment_status,'attached');
  assert.equal((await admin.query('SELECT * FROM app.carousel_pages WHERE carousel_version_id=$1',[saved.id])).rowCount,2);
+ const explicitChild=(await admin.query('SELECT v.id,p.thread_id FROM app.carousel_pages cp JOIN app.creative_versions v ON v.id=cp.creative_version_id JOIN app.creative_projects p ON p.id=v.project_id WHERE cp.carousel_version_id=$1 ORDER BY cp.position LIMIT 1',[saved.id])).rows[0];
+ const jobsBeforeOmittedSpec=Number((await admin.query('SELECT count(*) AS n FROM app.jobs WHERE brand_id=$1',[brand.id])).rows[0].n);
+ await assert.rejects(canvas.submit(alice.id,brand.id,explicitChild.thread_id,{prompt:'TEST preserve explicit placement on edit',format:'static',channel:'instagram',size:'1024x1024',parent_version_id:explicitChild.id},randomUUID()),/placement|format/i);
+ assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.jobs WHERE brand_id=$1',[brand.id])).rows[0].n),jobsBeforeOmittedSpec,'Omitting an explicit parent format must reject before creating a job');
  assert.equal((await coordinator.plan(scope(j))).state,'succeeded');assert.equal(await coordinator.complete(scope(j)),'succeeded');assert.equal(planning,1);assert.equal(images,2);
+ const capped=await service.submit(alice.id,brand.id,{prompt:'TEST FIXTURE: insufficient parent planning cap',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai',max_cost_micros:3,planning_cost_micros:1},randomUUID());
+ assert.equal((await coordinator.plan(scope(capped))).state,'rejected');assert.equal(planning,1);assert.equal(images,2);
  uncertainAt=4;
  const partial=await service.submit(alice.id,brand.id,{prompt:'TEST FIXTURE: preserve an uncertain partial result',slide_count:3,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID());
  const ready=await coordinator.plan(scope(partial));assert.equal(ready.state,'ready');
@@ -479,4 +507,33 @@ test('uploaded product photo video consent is scoped, hash-bound, replay-safe an
  assert.equal((await admin.query('SELECT state FROM app.video_reference_leases WHERE job_id=$1',[videoJob])).rows[0].state,'revoked');
  assert.equal(digest(await store.read(upload.object_key)),upload.sha256);
  await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[videoJob]);
+});
+
+test('Higgsfield replacement is durable, tenant-scoped and saves a new editable draft without duplicate paid submission',async()=>{
+ const [{HiggsfieldReplacements},{HiggsfieldReplacementJobs},{HiggsfieldImageClient},{ImageReplacementVault}]=await Promise.all([import('../../dist/higgsfield-replacements.js'),import('../../dist/higgsfield-replacement-jobs.js'),import('../../dist/higgsfield-image-client.js'),import('../../dist/image-replacement-vault.js')]);
+ await admin.query("INSERT INTO app.higgsfield_image_grants(organization_id,brand_id,enabled,budget_micros,max_request_micros,expires_at,approved_by) VALUES($1,$2,true,100000,10000,now()+interval '1 hour','TEST')",[org.id,brand.id]);
+ const source=await fixture(),service=new HiggsfieldReplacements(canvas,true),remote=randomUUID();let submits=0,polls=0,estimatedUSD='0.005700',onEstimate=async()=>{};
+ const provider=new HiggsfieldImageClient({mode:'test',credentials:'fixture'},async(url,init)=>{
+  assert.equal(new URL(url).origin,'https://api.higgsfield.ai');assert.equal(init.redirect,'error');assert.equal(init.headers.Authorization,'Key fixture');
+  if(new URL(url).pathname.startsWith('/estimate/')){await onEstimate();return Response.json({usd:estimatedUSD});}
+  if(new URL(url).pathname.endsWith('/status')){polls++;return Response.json({request_id:remote,status:'completed',images:[{url:'https://public.example/generated.png'}]});}
+  submits++;return Response.json({request_id:remote,status:'queued'});
+ });
+ const engine=new HiggsfieldReplacementJobs(jobs,provider,new ImageReplacementVault('b'.repeat(64)),{fetch:async()=>({status:200,headers:{'content-type':'image/png'},bytes:png})});
+ const campaign=await plans.create(alice.id,brand.id,{title:'Replacement campaign',objective:'Awareness',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',format:'static',planned_at:'2026-11-01T10:00:00Z',brief:'TEST replacement',creative_version_id:source.id}]},randomUUID()),range={start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:campaign.id};
+ const body={parent_id:source.id,prompt:'TEST warm office',channel:'instagram',credit_cap:1},key=randomUUID();
+ await assert.rejects(service.submit(viewer.id,brand.id,source.project_id,body,key));await assert.rejects(service.submit(bob.id,brand.id,source.project_id,body,key));await assert.rejects(service.submit(alice.id,sibling.id,source.project_id,body,key));
+ const [a,b]=await Promise.all([service.submit(alice.id,brand.id,source.project_id,body,key),service.submit(alice.id,brand.id,source.project_id,body,key)]);assert.equal(a.id,b.id);
+ await assert.rejects(service.submit(alice.id,brand.id,source.project_id,{...body,prompt:'different'},key));
+ assert.equal(await engine.step(scope(a)),'waiting');assert.equal(await engine.step(scope(a)),'waiting');assert.equal(submits,1);
+ assert.equal(await engine.step(scope(a)),'waiting');assert.equal(polls,1);assert.equal(await engine.step(scope(a)),'succeeded');assert.equal(await engine.step(scope(a)),'succeeded');assert.equal(submits,1);
+ const run=(await service.status(alice.id,brand.id,source.project_id)).run;assert.ok(run.output_version_id);const result=(await admin.query('SELECT * FROM app.creative_versions WHERE id=$1',[run.output_version_id])).rows[0];assert.equal(result.parent_id,source.id);assert.equal(result.status,'draft');assert.equal(result.reviewed_by,null);assert.equal(result.caption,source.caption);assert.deepEqual(result.design.layers,source.design.layers);assert.equal(result.skill_manifest.replacement.kind,'generated_image');
+ const savedPost=(await plans.list(alice.id,brand.id,range)).slots[0];assert.equal(savedPost.creative_version_id,source.id,'Generation must not silently change the scheduled post');assert.equal(savedPost.has_newer_version,true);const attached=await plans.edit(alice.id,brand.id,savedPost.id,{revision:savedPost.revision,creative_version_id:result.id});assert.equal(attached.state,'draft_ready');assert.equal((await plans.list(alice.id,brand.id,range)).slots[0].creative_version_id,result.id,'Explicitly attached replacement survives reload');
+ const usage=(await admin.query('SELECT provider,reserved_micros,status FROM app.creative_calls WHERE job_id=$1',[a.id])).rows[0];assert.equal(usage.provider,'higgsfield');assert.equal(Number(usage.reserved_micros),10000);assert.equal(usage.status,'succeeded');
+ estimatedUSD='0.020000';const overSource=await fixture(),over=await service.submit(alice.id,brand.id,overSource.project_id,{...body,parent_id:overSource.id},randomUUID());assert.equal(await engine.step(scope(over)),'waiting');assert.equal(await engine.step(scope(over)),'waiting');assert.equal((await service.status(alice.id,brand.id,overSource.project_id)).run.status,'rejected');assert.equal(submits,1,'An estimate above the reviewed cap must not submit');estimatedUSD='0.005700';
+ const revokedSource=await fixture(),revoked=await service.submit(alice.id,brand.id,revokedSource.project_id,{...body,parent_id:revokedSource.id},randomUUID());await engine.step(scope(revoked));onEstimate=async()=>{await admin.query('UPDATE app.higgsfield_image_grants SET budget_micros=1 WHERE brand_id=$1',[brand.id]);};await engine.step(scope(revoked));assert.equal((await service.status(alice.id,brand.id,revokedSource.project_id)).run.status,'rejected');assert.equal(submits,1,'Grant reduced during estimate must prevent dispatch');onEstimate=async()=>{};await admin.query('UPDATE app.higgsfield_image_grants SET budget_micros=100000 WHERE brand_id=$1',[brand.id]);
+ const canceledSource=await fixture(),canceled=await service.submit(alice.id,brand.id,canceledSource.project_id,{...body,parent_id:canceledSource.id},randomUUID());await engine.step(scope(canceled));await canvas.cancel(alice.id,brand.id,canceled.id);assert.equal(await engine.step(scope(canceled)),'canceled');assert.equal(submits,1,'Cancel before dispatch must not submit');
+ const exhaustedSource=await fixture(),exhausted=await service.submit(alice.id,brand.id,exhaustedSource.project_id,{...body,parent_id:exhaustedSource.id},randomUUID());await engine.step(scope(exhausted));await engine.step(scope(exhausted));await engine.step(scope(exhausted));await admin.query('UPDATE app.higgsfield_image_operations SET download_attempts=3 WHERE job_id=$1',[exhausted.id]);assert.equal(await engine.step(scope(exhausted)),'unknown');assert.equal((await service.status(alice.id,brand.id,exhaustedSource.project_id)).run.error_code,'HIGGSFIELD_DOWNLOAD_RECONCILIATION_REQUIRED');await admin.query("UPDATE app.jobs SET status='failed' WHERE id=$1",[exhausted.id]);const priorSubmits=submits;
+ const next=await fixture(),uncertain=await service.submit(alice.id,brand.id,next.project_id,{...body,parent_id:next.id},randomUUID());await engine.step(scope(uncertain));
+ await admin.query("UPDATE app.higgsfield_image_operations SET phase='submitting' WHERE job_id=$1",[uncertain.id]);assert.equal(await engine.step(scope(uncertain)),'unknown');assert.equal(submits,priorSubmits,'Crash after intent dispatch cannot repeat paid submission');
 });

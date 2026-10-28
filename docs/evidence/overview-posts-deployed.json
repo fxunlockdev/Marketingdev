@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-10-24T15:11:40.087Z",
+  "passed": true,
+  "scope": "Authenticated read-only deployed overview matches persisted upcoming posts; create route and honest empty state verified",
+  "upcoming_count": 0,
+  "paid_calls": 0,
+  "customer_mutations": 0
+}

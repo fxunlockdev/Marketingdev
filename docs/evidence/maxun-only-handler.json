@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-24T10:32:05.038519+00:00",
+  "deployed": false,
+  "contracts_passed": 173,
+  "storage_and_restart_passed": 12,
+  "provider_responses": "mocked",
+  "paid_calls": false,
+  "remaining": "Remove unused legacy modules/dependencies and deploy rebuilt worker."
+}

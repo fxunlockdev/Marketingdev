@@ -5,7 +5,7 @@ import sharp from 'sharp';
 import {digest,MAX_CANONICAL_VIDEO_BYTES} from './object-store.js';
 import {VideoStateError} from './video-vault.js';
 import type {VideoBrief} from './video-planning.js';
-export const VIDEO_RENDER_VERSION='desvio-video-render-v2/ffmpeg-7.1.5';
+export const VIDEO_RENDER_VERSION='desvio-video-render-v3/ffmpeg-7.1.5';
 export function validateVideoOverlays(overlays:VideoBrief['overlays'],duration:number){
  if(!Number.isInteger(duration)||duration<3||duration>15||!Array.isArray(overlays)||overlays.length>3)throw new VideoStateError('VIDEO_OVERLAY_INVALID');
  for(const o of overlays){
@@ -22,9 +22,10 @@ function decode(value:any,mime:string,max:number){
 export class VideoRenderer {
  constructor(readonly image?:string){}
  get configured(){return !!this.image&&/^sha256:[a-f0-9]{64}$/.test(this.image);}
- async render(bytes:Buffer,duration:number,overlays:VideoBrief['overlays']=[]){
+ async render(bytes:Buffer,duration:number,overlays:VideoBrief['overlays']=[],target?:{width:number;height:number}){
   if(!this.configured)throw new VideoStateError('VIDEO_RENDERER_NOT_CONFIGURED');
   validateVideoOverlays(overlays,duration);
+  if(target&&(!["1024x1024","1024x1536","1536x1024","1080x1920"].includes(`${target.width}x${target.height}`)||Object.keys(target).sort().join(',')!=='height,width'))throw new VideoStateError('VIDEO_TARGET_INVALID');
   if(!Buffer.isBuffer(bytes)||bytes.length<24||bytes.length>MAX_CANONICAL_VIDEO_BYTES||bytes.subarray(4,8).toString()!=='ftyp')throw new VideoStateError('VIDEO_MEDIA_INPUT_INVALID');
   const name=`desvio-video-render-${randomUUID()}`,inputHash=digest(bytes);
   try{
@@ -36,16 +37,17 @@ export class VideoRenderer {
     child.on('error',()=>finish(new VideoStateError('VIDEO_RENDERER_UNAVAILABLE')));child.stdin.on('error',()=>{});child.stderr.resume();
     child.stdout.on('data',(chunk:Buffer)=>{total+=chunk.length;if(total>94*1024*1024)return finish(new VideoStateError('VIDEO_RENDER_OUTPUT_LIMIT'));chunks.push(chunk);});
     child.on('close',code=>{try{const v=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(v.type==='error')return finish(new VideoStateError(typeof v.code==='string'&&/^VIDEO_[A-Z_]{1,80}$/.test(v.code)?v.code:'VIDEO_RENDER_FAILED'));if(code!==0)return finish(new VideoStateError('VIDEO_RENDER_FAILED'));finish(undefined,v);}catch{finish(new VideoStateError('VIDEO_RENDER_FAILED'));}});
-    child.stdin.end(JSON.stringify({version:1,input_base64:bytes.toString('base64'),input_sha256:inputHash,expected_duration_seconds:duration,overlays}));
+    child.stdin.end(JSON.stringify({version:1,input_base64:bytes.toString('base64'),input_sha256:inputHash,expected_duration_seconds:duration,overlays,...(target?{target}:{})}));
    });
    const m=value?.metadata;
    if(value?.type!=='result'||value.version!==VIDEO_RENDER_VERSION||value.input_sha256!==inputHash||JSON.stringify(value.overlays)!==JSON.stringify(overlays)||!m||m.codec!=='h264'||typeof m.audio!=='boolean'||![m.width,m.height,m.duration_ms].every(Number.isSafeInteger)||m.width<64||m.height<64||Math.max(m.width,m.height)>1920||Math.min(m.width,m.height)>1080||m.width%2||m.height%2||Math.abs(m.duration_ms-duration*1000)>250)throw new VideoStateError('VIDEO_RENDER_OUTPUT_INVALID');
+   if(target&&(m.width!==target.width||m.height!==target.height||value.target?.width!==target.width||value.target?.height!==target.height))throw new VideoStateError('VIDEO_RENDER_OUTPUT_INVALID');
    const video=decode(value.video,'video/mp4',MAX_CANONICAL_VIDEO_BYTES),poster=decode(value.poster,'image/png',2*1024*1024);
    if(video.subarray(4,8).toString()!=='ftyp')throw new VideoStateError('VIDEO_RENDER_OUTPUT_INVALID');
    const pm=await sharp(poster,{limitInputPixels:640*640}).metadata();
    if(pm.format!=='png'||!pm.width||!pm.height||pm.width>640||pm.height>640||Math.abs(pm.width*m.height-pm.height*m.width)>Math.max(m.width,m.height))throw new VideoStateError('VIDEO_RENDER_OUTPUT_INVALID');
    await sharp(poster,{limitInputPixels:640*640}).raw().toBuffer();
-   return {video,poster,metadata:m,manifest:{version:value.version,image:this.image,input_sha256:inputHash,video_sha256:value.video.sha256,poster_sha256:value.poster.sha256,metadata:{codec:m.codec,audio:m.audio,width:m.width,height:m.height,duration_ms:m.duration_ms},overlays}};
+   return {video,poster,metadata:m,manifest:{version:value.version,image:this.image,input_sha256:inputHash,video_sha256:value.video.sha256,poster_sha256:value.poster.sha256,metadata:{codec:m.codec,audio:m.audio,width:m.width,height:m.height,duration_ms:m.duration_ms},overlays,...(target?{target,framing:'contain'}:{})}};
   }finally{await promisify(execFile)('docker',['rm','-f',name],{timeout:10000}).catch(()=>{});}
  }
 }

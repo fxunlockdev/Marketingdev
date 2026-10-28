@@ -1,19 +1,14 @@
-import {exceedsAllowance} from "./spending-allowance.js";
+type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string):Promise<{
+ pages:WebsitePage[];captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture['snapshots'][number]}[]}>;
+ visualErrors:{url:string;code:string}[];coverage:Record<string,any>;
+}>};
+import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
-import {
-  VisualCrawler,
-  type VisualCapture,
-  VISUAL_VERSION,
-} from "./visual-crawler.js";
+import type {WebsitePage,VisualCapture} from "./website-evidence.js";
 import { digest } from "./object-store.js";
 import { AssetJobs, type JobScope } from "./jobs.js";
-import { WebsiteReader, IntakeError } from "./safe-web.js";
-import {
-  WebsiteParser,
-  type WebsitePage,
-  WEBSITE_PARSER_VERSION,
-} from "./website-parser.js";
+import { IntakeError } from "./safe-web.js";
 import {
   BrandAnalyzer,
   analysisRequest,
@@ -31,10 +26,8 @@ const terminal = new Set([
 export class IntakeJobs {
   constructor(
     readonly jobs: AssetJobs,
-    readonly parser: WebsiteParser,
     readonly analyzer: BrandAnalyzer,
-    readonly reader = new WebsiteReader(),
-    readonly visual?: VisualCrawler,
+    readonly websiteIntake?: WebsiteIntake,
   ) {}
   private finish(
     db: any,
@@ -58,6 +51,16 @@ export class IntakeJobs {
         await this.finish(db, j, "canceled", "ACCESS_REVOKED_OR_CANCELED");
         return null;
       }
+      if (j.kind === "brand.analyze") {
+        const parent = (await db.query("SELECT p.status,p.cancel_requested FROM app.intake_dependencies d JOIN app.jobs p ON p.id=d.capture_job_id WHERE d.analysis_job_id=$1", [j.id])).rows[0];
+        if (parent) {
+          if (parent.cancel_requested || (terminal.has(parent.status) && parent.status !== "succeeded")) {
+            await this.finish(db,j,"canceled","WEBSITE_PREREQUISITE_FAILED");
+            return null;
+          }
+          if (parent.status !== "succeeded") return { waiting: true };
+        }
+      }
       await db.query(
         "UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",
         [j.id],
@@ -65,11 +68,13 @@ export class IntakeJobs {
       return j;
     });
     if (!job) return "finished";
+    if (job.waiting) return "waiting";
     try {
       return job.kind === "website.extract"
         ? await this.crawl(scope)
         : await this.analyze(scope);
     } catch (error) {
+      if(monthlyBudgetExceeded(error))error=new IntakeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
       if (!(error instanceof IntakeError)) throw error;
       // Crawl transport/parse failures can be explicitly retried. AI submission ambiguity is handled separately below.
       return this.jobs.transaction(scope, async (db, j) => {
@@ -77,7 +82,7 @@ export class IntakeJobs {
         return this.finish(
           db,
           j,
-          "rejected",
+          ["MAXUN_SUBMISSION_UNKNOWN","AI_RESEARCH_SUBMISSION_UNKNOWN"].includes(error.code) ? "unknown" : "rejected",
           error instanceof IntakeError
             ? error.code
             : "INTAKE_SERVICE_UNAVAILABLE",
@@ -96,83 +101,13 @@ export class IntakeJobs {
           )
         ).rows[0],
     );
-    const pages: WebsitePage[] = [],
-      captures = new Map<
-        string,
-        {
-          capture: VisualCapture;
-          objects: {
-            key: string;
-            bytes: number;
-            shot: VisualCapture["snapshots"][number];
-          }[];
-        }
-      >(),
-      visualErrors: { url: string; code: string }[] = [];
-    const coverage = await this.reader.read(
-      input.website_url,
-      async (url, html) => {
-        const page = await this.parser.parse(url, html);
-        if (this.visual) {
-          try {
-            const capture = await this.visual.capture(url, html),
-              observed = capture.snapshots[0].observations;
-            const design = JSON.stringify({
-              kind: "Observed website design, not approved brand guidelines",
-              colors: observed.colors,
-              typography: observed.typography,
-              renderedFonts: observed.renderedFonts,
-              structuredData: observed.structuredData,
-            });
-            const content = (observed.text + "\n" + design)
-              .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "")
-              .slice(0, 40000);
-            page.chunks = Array.from(
-              { length: Math.ceil(content.length / 8000) },
-              (_, i) => ({
-                text: content.slice(i * 8000, (i + 1) * 8000),
-                anchor: `rendered:${i * 8000}`,
-              }),
-            );
-            page.links = observed.links.filter(
-              (x: any) => typeof x === "string" && x.length <= 2048,
-            );
-            page.parserVersion = VISUAL_VERSION;
-            page.sha256 = digest(
-              Buffer.from(
-                JSON.stringify({
-                  html: page.sha256,
-                  images: capture.snapshots.map((s) => s.sha256),
-                  content,
-                }),
-              ),
-            );
-            page.coverage = "rendered_desktop_mobile";
-            page.truncated =
-              observed.text.length + design.length > 40000 ||
-              capture.snapshots.some((s) => s.truncated);
-            captures.set(url, { capture, objects: [] });
-          } catch (error) {
-            visualErrors.push({
-              url,
-              code:
-                error instanceof IntakeError
-                  ? error.code
-                  : "WEBSITE_VISUAL_CAPTURE_FAILED",
-            });
-          }
-        } else
-          visualErrors.push({ url, code: "WEBSITE_VISUAL_NOT_CONFIGURED" });
-        pages.push(page);
-        return page.links;
-      },
-      async () => {
-        await this.jobs.transaction(scope, async (db, j) => {
-          if (!(await this.jobs.permitted(db, j)))
-            throw new IntakeError("ACCESS_REVOKED_OR_CANCELED");
-        });
-      },
-    );
+    if(this.websiteIntake){
+      const captured=await this.websiteIntake.capture(this.jobs,scope,input.website_url);
+      return this.persistWebsite(scope,captured.pages,captured.captures,captured.visualErrors,captured.coverage);
+    }
+    throw new IntakeError("AI_NOT_CONFIGURED");
+  }
+  private async persistWebsite(scope:JobScope,pages:WebsitePage[],captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture["snapshots"][number]}[]}>,visualErrors:{url:string;code:string}[],coverage:any){
     const newBytes = [...captures.values()].reduce(
       (n, c) =>
         n +
@@ -247,9 +182,11 @@ export class IntakeJobs {
               type: page.coverage,
               truncated: page.truncated,
               warning:
-                page.coverage === "server_html_only"
+                page.coverage === "ai_web_research"
+                  ? "AI-written research with cited website sources; not a verbatim website capture or approved brand identity."
+                  : page.coverage === "server_html_only"
                   ? "Visual capture unavailable; server HTML only."
-                  : "Observed public website, not approved brand identity. Screenshots capped at 16000 pixels high; authenticated pages and embedded frames excluded.",
+                  : "Observed public website, not approved brand identity. Capture limitations are recorded separately.",
             }),
             page.url,
           ],
@@ -277,8 +214,8 @@ export class IntakeJobs {
                 j.brand_id,
                 source,
                 j.id,
-                item.shot.viewport.width === 1440 ? "desktop" : "mobile",
-                VISUAL_VERSION,
+                item.shot.label ?? (item.shot.viewport.width === 1440 ? "desktop" : "mobile"),
+                captured.capture.version,
                 item.key,
                 item.shot.sha256,
                 item.bytes,
@@ -308,8 +245,10 @@ export class IntakeJobs {
           JSON.stringify({
             ...coverage,
             coverage:
-              captures.size === pages.length
-                ? "rendered_desktop_mobile"
+              coverage.method === "web_research" ? "ai_web_research" : coverage.provider === "self_hosted_browser"
+                ? coverage.screenshotsAvailable ? "rendered_provider" : captures.size ? "partial_visual" : "server_html_only"
+                : captures.size === pages.length && !visualErrors.length
+                ? coverage.provider === "maxun" ? "rendered_provider" : "rendered_desktop_mobile"
                 : captures.size
                   ? "partial_visual"
                   : "server_html_only",
@@ -341,7 +280,7 @@ export class IntakeJobs {
       const rows = (
         await db.query(
           `SELECT v.*,s.website_url FROM app.website_visuals v JOIN app.brand_sources s ON s.id=v.source_id
-        WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.job_id=(SELECT x.job_id FROM app.website_visuals x WHERE x.organization_id=$1 AND x.brand_id=$2 ORDER BY x.captured_at DESC LIMIT 1)
+        WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.viewport<>'photo' AND v.job_id=(SELECT x.job_id FROM app.website_visuals x WHERE x.organization_id=$1 AND x.brand_id=$2 AND x.viewport<>'photo' ORDER BY x.captured_at DESC LIMIT 1)
         ORDER BY s.captured_at,v.source_id,v.viewport LIMIT 10`,
           [j.organization_id, j.brand_id],
         )
@@ -480,6 +419,7 @@ export class IntakeJobs {
           prepared.maxTokensPerImage,
         );
       } catch (error) {
+      if(monthlyBudgetExceeded(error))error=new IntakeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
         const known =
           error instanceof IntakeError ||
           (error instanceof OpenAI.APIError &&
@@ -613,6 +553,10 @@ export class IntakeJobs {
       if (!["website.extract", "brand.analyze"].includes(j.kind))
         throw new Error("JOB_KIND_DENIED");
       if (terminal.has(j.status)) return j.status;
+      if (j.kind === "brand.analyze" && j.attempt === 0 &&
+          (await db.query("SELECT analysis_job_id FROM app.intake_dependencies WHERE analysis_job_id=$1", [j.id])).rowCount) {
+        return this.finish(db,j,"failed","WEBSITE_PREREQUISITE_TIMEOUT");
+      }
       return this.finish(
         db,
         j,

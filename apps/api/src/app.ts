@@ -1,3 +1,12 @@
+import {CampaignBlogs} from './campaign-blogs.js';
+import {CreativeProvider} from './creative-provider.js';
+import {Postforme} from './postforme.js';
+import {HiggsfieldReplacements} from './higgsfield-replacements.js';
+import {Strategies} from './strategies.js';
+import {StockMedia} from './stock-media.js';
+import {StockProvider} from './stock-provider.js';
+import {GenerationNotifications} from './generation-notifications.js';
+import {ProjectArchive} from './project-archive.js';
 import {Readable} from 'node:stream';
 import {StreamableFile} from '@nestjs/common';
 import {CarouselGeneration} from './carousel-generation.js';
@@ -18,7 +27,7 @@ import {Canvas} from "./canvas.js";
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ExpressAdapter } from '@nestjs/platform-express';
-import { Body, Catch, Controller, Get, Headers, HttpException, Inject, Injectable, Module, Param, Patch,
+import { Body, Catch, Controller, Delete, Get, Headers, HttpException, Inject, Injectable, Module, Param, Patch,
   Post, Query, Req, UnauthorizedException, UseGuards, type ArgumentsHost, type CanActivate, type ExceptionFilter, type ExecutionContext } from '@nestjs/common';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -36,7 +45,7 @@ import {BrandBrain} from './brand-brain.js';
 import {Assets} from './assets.js';
 import {ObjectStore} from './object-store.js';
 
-type AuthRequest = Request & { actorId: string; sessionId: string; traceId: string };
+type AuthRequest = Request & { actorId: string; actorEmail: string; sessionId: string; traceId: string };
 const AUTH = Symbol('auth');
 
 @Injectable()
@@ -47,9 +56,70 @@ class SessionGuard implements CanActivate {
     const session = await this.auth.api.getSession({ headers: fromNodeHeaders(request.headers), query: { disableCookieCache: true } });
     if (!session || !session.user.emailVerified) throw new UnauthorizedException('Sign in with a verified email to continue');
     request.actorId = session.user.id;
+    request.actorEmail = session.user.email;
     request.sessionId = session.session.id;
     return true;
   }
+}
+
+@Controller('api/v1/businesses/:id/generation-notifications')
+@UseGuards(SessionGuard)
+class StandaloneGenerationNotificationsController {
+ constructor(@Inject(GenerationNotifications) readonly service:GenerationNotifications){}
+ @Get() read(@Req() r:AuthRequest,@Param('id') id:string){return this.service.read(r.actorId,id,null);}
+ @Post() subscribe(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.subscribe(r.actorId,r.actorEmail,id,null,body);}
+ @Post(':notification/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('notification') notification:string){return this.service.cancel(r.actorId,id,null,notification);}
+}
+
+@Controller('api/v1/businesses/:id/content-plans/:plan/notifications')
+@UseGuards(SessionGuard)
+class GenerationNotificationsController {
+ constructor(@Inject(GenerationNotifications) readonly service:GenerationNotifications){}
+ @Get() read(@Req() r:AuthRequest,@Param('id') id:string,@Param('plan') plan:string){return this.service.read(r.actorId,id,plan);}
+ @Post() subscribe(@Req() r:AuthRequest,@Param('id') id:string,@Param('plan') plan:string,@Body() body:unknown){return this.service.subscribe(r.actorId,r.actorEmail,id,plan,body);}
+ @Post(':notification/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('plan') plan:string,@Param('notification') notification:string){return this.service.cancel(r.actorId,id,plan,notification);}
+}
+
+@Controller('api/v1/businesses/:id')
+@UseGuards(SessionGuard)
+class ProjectArchiveController {
+ @Post('canvas-projects/:kind/:project/archive') archiveKind(@Req() r:AuthRequest,@Param('id') id:string,@Param('kind') kind:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,true,kind);}
+ @Post('canvas-projects/:kind/:project/restore') restoreKind(@Req() r:AuthRequest,@Param('id') id:string,@Param('kind') kind:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,false,kind);}
+ constructor(@Inject(ProjectArchive) readonly service:ProjectArchive){}
+ @Get('creative-project-archive') list(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query);}
+ @Post('creative-projects/:project/archive') archive(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,true);}
+ @Post('creative-projects/:project/restore') restore(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,false);}
+}
+
+@Controller('api/v1/businesses/:id/strategies')
+@UseGuards(SessionGuard)
+class StrategiesController {
+ constructor(@Inject(Strategies) readonly service:Strategies){}
+ @Get() list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Post() create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.create(r.actorId,id,body,key);}
+ @Post(':strategy/stop') stop(@Req() r:AuthRequest,@Param('id') id:string,@Param('strategy') strategy:string){return this.service.stop(r.actorId,id,strategy);}
+ @Post(':strategy/campaigns/:plan/images') images(@Req() r:AuthRequest,@Param('id') id:string,@Param('strategy') strategy:string,@Param('plan') plan:string){return this.service.generate(r.actorId,id,strategy,plan);}
+}
+
+@Controller('api/v1/businesses/:id/higgsfield-images')
+@UseGuards(SessionGuard)
+class HiggsfieldReplacementsController {
+ constructor(@Inject(HiggsfieldReplacements) readonly service:HiggsfieldReplacements){}
+ @Get('quote') quote(@Req() r:AuthRequest,@Param('id') id:string){return this.service.quote(r.actorId,id);}
+ @Get('projects/:project') status(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string){return this.service.status(r.actorId,id,project);}
+ @Post('projects/:project') submit(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,project,body,key);}
+}
+
+@Controller('api/v1/businesses/:id/stock')
+@UseGuards(SessionGuard)
+class StockMediaController {
+ constructor(@Inject(StockMedia) readonly service:StockMedia){}
+ @Get('capabilities') capabilities(@Req() r:AuthRequest,@Param('id') id:string){return this.service.capabilities(r.actorId,id);}
+ @Get() search(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.search(r.actorId,id,query);}
+ @Get('photos/:photo/preview') async preview(@Req() r:AuthRequest,@Param('id') id:string,@Param('photo') photo:string){const result=await this.service.preview(r.actorId,id,photo);return new StreamableFile(result.bytes,{type:result.type,length:result.bytes.length,disposition:'inline'});}
+ @Post('imports') importPhoto(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.import(r.actorId,id,body,key);}
+ @Get('imports/:key') status(@Req() r:AuthRequest,@Param('id') id:string,@Param('key') key:string){return this.service.status(r.actorId,id,key);}
+ @Post('projects/:project/replace') replace(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown){return this.service.replace(r.actorId,id,project,body);}
 }
 
 @Catch()
@@ -96,6 +166,41 @@ class InsightsController {
  @Post(':job/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(r.actorId,id,job);}
 }
 
+@Controller('api/v1/businesses/:id')
+@UseGuards(SessionGuard)
+class CampaignBlogsController {
+ constructor(@Inject(CampaignBlogs) private readonly service:CampaignBlogs){}
+ @Get('content-plans/:plan/blogs') list(@Req() r:AuthRequest,@Param('id') id:string,@Param('plan') p:string){return this.service.list(r.actorId,id,p);}
+ @Post('content-plans/:plan/blogs') create(@Req() r:AuthRequest,@Param('id') id:string,@Param('plan') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,id,p,body,key);}
+ @Get('campaign-blogs/:blog') detail(@Req() r:AuthRequest,@Param('id') id:string,@Param('blog') blog:string){return this.service.detail(r.actorId,id,blog);}
+ @Patch('campaign-blogs/:blog') save(@Req() r:AuthRequest,@Param('id') id:string,@Param('blog') blog:string,@Body() body:unknown){return this.service.save(r.actorId,id,blog,body);}
+ @Post('campaign-blogs/:blog/generate') generate(@Req() r:AuthRequest,@Param('id') id:string,@Param('blog') blog:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.generate(r.actorId,id,blog,body,key);}
+}
+
+@Controller('api/v1/postforme')
+@UseGuards(SessionGuard)
+class PostformeReturnController {
+ constructor(@Inject(Postforme) private readonly service:Postforme){}
+ @Get('return') finish(@Req() r:AuthRequest){return this.service.returnAttempt(r.actorId,r.sessionId);}
+}
+
+@Controller('api/v1/businesses/:id/postforme')
+@UseGuards(SessionGuard)
+class PostformeController {
+ constructor(@Inject(Postforme) private readonly service:Postforme){}
+ @Get('connections') read(@Req() r:AuthRequest,@Param('id') id:string){return this.service.read(r.actorId,id,r.sessionId);}
+ @Post('connections/authorize') authorize(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown){return this.service.authorize(r.actorId,r.sessionId,id,b);}
+ @Post('connections/finish') finish(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown){return this.service.finish(r.actorId,r.sessionId,id,b);}
+ @Post('connections/refresh') refresh(@Req() r:AuthRequest,@Param('id') id:string){return this.service.refresh(r.actorId,id,r.sessionId);}
+ @Post('connections/:account/disconnect') disconnect(@Req() r:AuthRequest,@Param('id') id:string,@Param('account') account:string){return this.service.disconnect(r.actorId,id,account,r.sessionId);}
+ @Get('analytics') analytics(@Req() r:AuthRequest,@Param('id') id:string){return this.service.analytics(r.actorId,id);}
+ @Post('analytics/refresh') analyticsRefresh(@Req() r:AuthRequest,@Param('id') id:string){return this.service.refreshAnalytics(r.actorId,id);}
+ @Get('publications') publications(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Get('publications/ready') ready(@Req() r:AuthRequest,@Param('id') id:string){return this.service.ready(r.actorId,id);}
+ @Post('publications') submit(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,b,key);}
+ @Post('publications/:post/reconcile') reconcile(@Req() r:AuthRequest,@Param('id') id:string,@Param('post') post:string){return this.service.reconcile(r.actorId,id,post);}
+}
+
 @Controller('api/v1/businesses/:id/analytics')
 @UseGuards(SessionGuard)
 class AnalyticsController {
@@ -125,6 +230,8 @@ class SocialController {
  @Post('oauth/:provider') start(@Req() req:AuthRequest,@Param('id') id:string,@Param('provider') provider:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.oauth.start(req.actorId,req.sessionId,id,key,body,provider);}
  @Get('oauth/:attempt') authorization(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.read(req.actorId,req.sessionId,id,attempt);}
  @Post('oauth/:attempt/callback') callback(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.callback(req.actorId,req.sessionId,id,attempt,body);}
+ @Post('oauth/:attempt/cancel') cancelPageSelection(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.cancelPageSelection(req.actorId,req.sessionId,id,attempt);}
+ @Post('oauth/:attempt/page') selectPage(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.selectPage(req.actorId,req.sessionId,id,attempt,body);}
  @Get() read(@Req() req:AuthRequest,@Param('id') id:string){return this.service.read(req.actorId,id,req.sessionId);}
  @Post('channels/:channel/disconnect') disconnect(@Req() req:AuthRequest,@Param('id') id:string,@Param('channel') channel:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.service.disconnect(req.actorId,id,channel,key,body);}
  @Post('refresh') refresh(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.service.refresh(req.actorId,id,key);}
@@ -149,6 +256,7 @@ class BusinessController {
  @Post('businesses') create(@Req() r:AuthRequest,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,body,key);}
  @Get('businesses/:id/onboarding') onboarding(@Req() r:AuthRequest,@Param('id') id:string){return this.service.onboarding(r.actorId,id);}
  @Patch('businesses/:id/onboarding') saveOnboarding(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.onboarding(r.actorId,id,body);}
+ @Delete('businesses/:id') removeBusiness(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.remove(r.actorId,id,body);}
  @Get('businesses/:id') resolve(@Req() r:AuthRequest,@Param('id') id:string){return this.service.resolve(r.actorId,id);}
 }
 
@@ -188,15 +296,20 @@ class ContentPlanController {
  @Post('content-plan/generate') generate(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.planning.submit(r.actorId,id,body,key);}
  @Get('content-plan/jobs') jobs(@Req() r:AuthRequest,@Param('id') id:string){return this.planning.jobs(r.actorId,id);}
  @Get('content-plans') catalog(@Req() r:AuthRequest,@Param('id') id:string){return this.service.catalog(r.actorId,id);}
+ @Post('content-plans/:planId/posts') addPost(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addPost(r.actorId,id,p,body,key);}
  @Post('content-plans/:planId/carousels') addCarousel(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addCarousel(r.actorId,id,p,body,key);}
  @Post('content-plans/:planId/videos') addVideo(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addVideo(r.actorId,id,p,body,key);}
  @Get('content-plans/:planId') detail(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string){return this.planning.detail(r.actorId,id,p);}
  @Post('planning-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.planning.cancel(r.actorId,id,j);}
  @Post('content-plans') create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,id,body,key);}
  @Get('content-plan/export') export(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.export(r.actorId,id,query);}
+ @Get('content-archive') archive(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.archive(r.actorId,id,query);}
+ @Post('content-slots/:slotId/restore') restore(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown){return this.service.restore(r.actorId,id,slot,body);}
  @Get('content-plan') list(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query);}
  @Get('review-inbox') inbox(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query,true);}
  @Get('content-slots/:slotId') slot(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string){return this.creatives.detail(r.actorId,id,slot);}
+ @Get('content-plans/:planId/image-batch') imageBatch(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') plan:string){return this.creatives.batchStatus(r.actorId,id,plan);}
+ @Post('content-plans/:planId/generate-images') batchImages(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') plan:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.creatives.generateBatch(r.actorId,id,plan,body,key);}
  @Post('content-slots/:slotId/generate-creative') creative(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.creatives.generate(r.actorId,id,slot,body,key);}
  @Patch('content-slots/:slotId') edit(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string,@Body() body:unknown){return this.service.edit(r.actorId,id,slot,body);}
  @Get('content-slots/:slotId/history') history(@Req() r:AuthRequest,@Param('id') id:string,@Param('slotId') slot:string){return this.service.history(r.actorId,id,slot);}
@@ -230,6 +343,7 @@ class WorkspaceController {
   constructor(@Inject(Workspaces) private readonly service: Workspaces,@Inject(Team) private readonly team:Team) {}
   @Get() list(@Req() req: AuthRequest) { return this.service.list(req.actorId); }
   @Post() create(@Req() req: AuthRequest, @Body() body: unknown) { return this.service.create(req.actorId, body); }
+  @Get(':org/generation-usage') generationUsage(@Req() req:AuthRequest,@Param('org') org:string){return this.service.generationUsage(req.actorId,org);}
   @Get(':org/brands') brands(@Req() req: AuthRequest, @Param('org') org: string) { return this.service.brands(req.actorId, org); }
   @Post(':org/brands') createBrand(@Req() req: AuthRequest, @Param('org') org: string, @Body() body: unknown, @Headers('idempotency-key') key: unknown) {
     return this.service.createBrand(req.actorId, org, body, key);
@@ -341,11 +455,17 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+ {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},
+ {provide:Strategies,useValue:new Strategies(new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage)),new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)))},
+ {provide:HiggsfieldReplacements,useFactory:(canvas:Canvas)=>new HiggsfieldReplacements(canvas,config.higgsfieldImagesEnabled),inject:[Canvas]},
+ {provide:StockMedia,useValue:new StockMedia(new Businesses(database,workspaces),new Assets(database,store),new StockProvider(config.pexelsApiKey))},
+ {provide:GenerationNotifications,useValue:new GenerationNotifications(new ContentPlan(new Businesses(database,workspaces),config.renderImage),mail)},
+ {provide:ProjectArchive,useValue:new ProjectArchive(new Canvas(new Businesses(database,workspaces),store))},
  {provide:VideoCanvas,useFactory:()=>{const canvas=new Canvas(new Businesses(database,workspaces),store);return new VideoCanvas(canvas,new VideoReferenceBindings(canvas,config.renderImage),config.videoEnabled===true);}},
       {provide:CarouselGeneration,useValue:new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},
       {provide:Carousels,useValue:new Carousels(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},
-      {provide:Insights,useValue:new Insights(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Publication,useValue:new Publication(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),config.publishingEnabled===true,config.videoRenderImage)},{provide:SocialProvisioning,useValue:new SocialProvisioning(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialProvisioningEnabled===true)},{provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialAuthorizationEnabled===true?config.oauthEncryptionKey:undefined)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true,{provisioning:config.socialProvisioningEnabled===true,authorization:config.socialAuthorizationEnabled===true&&!!config.oauthEncryptionKey})},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces),config.renderImage)},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
+      {provide:Insights,useValue:new Insights(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Postforme,useValue:new Postforme(new SocialConnections(new Businesses(database,workspaces),true),new Publication(new SocialConnections(new Businesses(database,workspaces),true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),true,config.videoRenderImage),config.postformeApiKey,config.postformePublishingEnabled===true)},{provide:Publication,useValue:new Publication(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),config.publishingEnabled===true,config.videoRenderImage)},{provide:SocialProvisioning,useValue:new SocialProvisioning(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialProvisioningEnabled===true)},{provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialAuthorizationEnabled===true?config.oauthEncryptionKey:undefined)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true,{provisioning:config.socialProvisioningEnabled===true,authorization:config.socialAuthorizationEnabled===true&&!!config.oauthEncryptionKey})},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces),config.renderImage)},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());

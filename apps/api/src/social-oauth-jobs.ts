@@ -1,3 +1,4 @@
+import {facebookPageConfirmed} from './facebook-connection-state.js';
 import {randomBytes,randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
 import {PostizClient,PostizError} from './postiz-client.js';
@@ -9,11 +10,14 @@ const terminal=new Set(['succeeded','failed','rejected','canceled']);
 export class SocialOAuthJobs {
  #credentials?:PostizVault;#secrets?:OAuthSecrets;#permissions:SocialJobs;
  constructor(readonly jobs:AssetJobs,readonly config?:SocialWorkerConfig,secretKey?:string){if(config)this.#credentials=new PostizVault(config.encryptionKey);if(secretKey)this.#secrets=new OAuthSecrets(secretKey);this.#permissions=new SocialJobs(jobs,config);}
- private async records(db:any,j:any){const callback=j.kind==='social.connect'?(await db.query('SELECT * FROM app.social_callbacks WHERE job_id=$1',[j.id])).rows[0]:null;const authorization=(await db.query('SELECT * FROM app.social_authorizations WHERE id=$1',[callback?.authorization_id??j.id])).rows[0];return {callback,authorization};}
+ private async records(db:any,j:any){const callback=j.kind==='social.connect'?(await db.query('SELECT * FROM app.social_callbacks WHERE job_id=$1',[j.id])).rows[0]:null;const authorization=(await db.query('SELECT * FROM app.social_authorizations WHERE id=$1',[callback?.authorization_id??j.id])).rows[0];if(callback)callback.selected_page=(await db.query('SELECT page_id FROM app.social_page_selections WHERE job_id=$1',[j.id])).rows[0]?.page_id;return {callback,authorization};}
  private async permitted(db:any,j:any,a:any){return !!a&&await this.#permissions.permitted(db,j)&&(await db.query('SELECT app.oauth_session_live($1) AS live',[a.session_id])).rows[0].live;}
  private async finish(db:any,j:any,phase:string,code:string|null=null){
   const {callback,authorization}=await this.records(db,j);if(authorization)await db.query('UPDATE app.social_authorizations SET phase=$2,authorization_url=NULL,encrypted_state=NULL WHERE id=$1',[authorization.id,phase]);
-  if(callback)await db.query('UPDATE app.social_callbacks SET phase=$2,encrypted_code=NULL WHERE job_id=$1',[j.id,phase]);
+  if(authorization?.provider==='facebook'&&callback?.phase==='awaiting_page'&&['rejected','canceled'].includes(phase)){
+   await db.query("UPDATE app.facebook_connection_observations SET phase='abandoned',settled_at=COALESCE(settled_at,clock_timestamp()) WHERE job_id=$1 AND remote_id IS NOT NULL AND phase='pending'",[j.id]);
+  }
+  if(callback)await db.query("UPDATE app.social_callbacks SET phase=$2,encrypted_code=NULL,page_choices='[]' WHERE job_id=$1",[j.id,phase]);
   const status=phase==='unknown'?'failed':phase;await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]);return phase;
  }
  private async check(db:any,j:any,a:any){
@@ -27,15 +31,20 @@ export class SocialOAuthJobs {
    if(!['social.authorize','social.connect'].includes(j.kind))throw new Error('JOB_KIND_DENIED');if(terminal.has(j.status))return null;
    const {authorization:a,callback:c}=await this.records(db,j);const account=await this.check(db,j,a);if(!account)return null;
    // A prior activity may have reached Postiz. Never repeat an uncertain mutation.
-   if(a.phase==='starting'||c?.phase==='exchanging'){await this.finish(db,j,'unknown','SOCIAL_AUTHORIZATION_OUTCOME_UNKNOWN');return null;}
+   if(a.phase==='starting'||['exchanging','selecting_page'].includes(c?.phase)){await this.finish(db,j,'unknown','SOCIAL_AUTHORIZATION_OUTCOME_UNKNOWN');return null;}
    if(c?.phase!=='verifying'&&new Date(a.expires_at).getTime()<=Date.now()){await this.finish(db,j,'rejected','SOCIAL_AUTHORIZATION_EXPIRED');return null;}
    if(c?.denied){await this.finish(db,j,'canceled','SOCIAL_CONSENT_DECLINED');return null;}
-   if(j.kind==='social.authorize'&&a.phase!=='queued'||j.kind==='social.connect'&&(!c||!['queued','verifying'].includes(c.phase)||a.phase!=='awaiting_consent')){await this.finish(db,j,'rejected','SOCIAL_AUTHORIZATION_INVALID');return null;}
+   if(j.kind==='social.authorize'&&a.phase!=='queued'||j.kind==='social.connect'&&(!c||!['queued','awaiting_page','verifying'].includes(c.phase)||a.phase!=='awaiting_consent')){await this.finish(db,j,'rejected','SOCIAL_AUTHORIZATION_INVALID');return null;}
+   if(c?.phase==='awaiting_page'&&!c.selected_page)return {waiting:true as const};
    await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);
    if(j.kind==='social.authorize')await db.query("UPDATE app.social_authorizations SET phase='starting' WHERE id=$1",[a.id]);
-   else if(c.phase==='queued')await db.query("UPDATE app.social_callbacks SET phase='exchanging' WHERE job_id=$1",[j.id]);
+   else if(c.phase==='awaiting_page')await db.query("UPDATE app.social_callbacks SET phase='selecting_page' WHERE job_id=$1",[j.id]);
+   else if(c.phase==='queued'){
+    await db.query("UPDATE app.social_callbacks SET phase='exchanging' WHERE job_id=$1",[j.id]);
+    if(a.provider==='facebook'){await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`social:${j.brand_id}`]);await db.query("UPDATE app.social_channels SET observed_state='unconfirmed',last_job_id=$1 WHERE provider='facebook'",[j.id]);await db.query('INSERT INTO app.facebook_connection_observations(job_id,organization_id,brand_id,account_revision) VALUES($1,$2,$3,$4)',[j.id,j.organization_id,j.brand_id,account.revision]);}
+   }
    return {j,a,c,account};
-  });if(!input)return 'finished';
+  });if(!input)return 'finished';if('waiting' in input)return 'awaiting_page';
   const {j,a,c,account}=input,secretScope=`${scope.organizationId}:${scope.brandId}:${a.id}`;
   try{
    const client=this.client(scope,account);
@@ -47,7 +56,21 @@ export class SocialOAuthJobs {
     });
    }
    let remoteId=c.remote_id,internalId=c.internal_id;
-   if(c.phase!=='verifying'){
+   if(a.provider==='facebook'&&c.phase==='queued'){
+    const result=await client.exchangeFacebookAuthorization(this.#secrets!.open(secretScope,'state',a.encrypted_state),this.#secrets!.open(secretScope,'code',c.encrypted_code),c.timezone);
+    return await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return current.status;if(!await this.check(db,current,a))return 'finished';
+     await db.query('UPDATE app.facebook_connection_observations SET remote_id=$2,settled_at=clock_timestamp() WHERE job_id=$1',[j.id,result.integrationId]);
+     if(new Date(a.expires_at).getTime()<=Date.now())return this.finish(db,current,'rejected','SOCIAL_AUTHORIZATION_EXPIRED');
+     await db.query("UPDATE app.social_callbacks SET phase='awaiting_page',remote_id=$2,internal_id=$3,page_choices=$4,encrypted_code=NULL WHERE job_id=$1",[j.id,result.integrationId,result.internalId,JSON.stringify(result.pages)]);
+     return 'awaiting_page';
+    });
+   }
+   if(a.provider==='facebook'&&c.phase==='awaiting_page'){
+    const selected=await client.selectFacebookPage({integrationId:remoteId,state:this.#secrets!.open(secretScope,'state',a.encrypted_state),pageId:c.selected_page,availablePageIds:c.page_choices.map((p:any)=>p.id)});
+    internalId=selected.pageId;
+    const recorded=await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return false;if(!await this.check(db,current,a))return false;await db.query("UPDATE app.social_callbacks SET phase='verifying',internal_id=$2,page_choices='[]' WHERE job_id=$1",[j.id,internalId]);return true;});if(!recorded)return 'finished';
+   }else if(c.phase!=='verifying'){
+
     const result=await client.completeAuthorization(a.provider,this.#secrets!.open(secretScope,'state',a.encrypted_state),this.#secrets!.open(secretScope,'code',c.encrypted_code),c.timezone);remoteId=result.id;internalId=result.internalId;
     if(a.target_remote_id&&(remoteId!==a.target_remote_id||internalId!==a.target_internal_id))throw new PostizError('POSTIZ_RECONNECT_IDENTITY_MISMATCH','unknown');
     // Persist the actual returned identity before any retryable read. A crash
@@ -58,9 +81,14 @@ export class SocialOAuthJobs {
    if(!channel)throw new PostizError('POSTIZ_AUTHORIZED_ACCOUNT_UNCONFIRMED','unknown');
    return await this.jobs.transaction(scope,async(db,current)=>{if(terminal.has(current.status))return current.status;
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`social:${scope.brandId}`]);if(!await this.check(db,current,a))return 'finished';
-    await db.query(`INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,profile,picture,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id,internal_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'available',now(),now(),$9,$10,$11)
-     ON CONFLICT(remote_id) DO UPDATE SET provider=EXCLUDED.provider,name=EXCLUDED.name,profile=EXCLUDED.profile,picture=EXCLUDED.picture,observed_state=EXCLUDED.observed_state,last_seen_at=EXCLUDED.last_seen_at,last_checked_at=EXCLUDED.last_checked_at,account_revision=EXCLUDED.account_revision,last_job_id=EXCLUDED.last_job_id,internal_id=EXCLUDED.internal_id,publishing_held=false`,[randomUUID(),scope.organizationId,scope.brandId,channel.id,channel.provider,channel.name,channel.profile,channel.picture,account.revision,j.id,internalId]);
-    return this.finish(db,current,'succeeded');
+    let observed='available';
+    if(a.provider==='facebook'){
+     await db.query("UPDATE app.facebook_connection_observations SET remote_id=$2,page_id=$3,phase='verified',settled_at=clock_timestamp() WHERE job_id=$1",[j.id,remoteId,internalId]);
+     if(!await facebookPageConfirmed(db,remoteId,account.revision,internalId))observed='unconfirmed';
+    }
+    await db.query(`INSERT INTO app.social_channels(id,organization_id,brand_id,remote_id,provider,name,profile,picture,observed_state,last_seen_at,last_checked_at,account_revision,last_job_id,internal_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$12,now(),now(),$9,$10,$11)
+     ON CONFLICT(remote_id) DO UPDATE SET provider=EXCLUDED.provider,name=EXCLUDED.name,profile=EXCLUDED.profile,picture=EXCLUDED.picture,observed_state=EXCLUDED.observed_state,last_seen_at=EXCLUDED.last_seen_at,last_checked_at=EXCLUDED.last_checked_at,account_revision=EXCLUDED.account_revision,last_job_id=EXCLUDED.last_job_id,internal_id=EXCLUDED.internal_id,publishing_held=false`,[randomUUID(),scope.organizationId,scope.brandId,channel.id,channel.provider,channel.name,channel.profile,channel.picture,account.revision,j.id,internalId,observed]);
+    return observed==='unconfirmed'?this.finish(db,current,'unknown','SOCIAL_OTHER_AUTHORIZATION_UNRESOLVED'):this.finish(db,current,'succeeded');
    });
   }catch(error){
    if(!(error instanceof PostizError))throw error;
@@ -70,5 +98,5 @@ export class SocialOAuthJobs {
    }).then(result=>{if(result==='retrying')throw new SocialReadRetry(error.retryAfterSeconds??30);return result;});
   }
  }
- fail(scope:JobScope){return this.jobs.transaction(scope,async(db,j)=>{if(!['social.authorize','social.connect'].includes(j.kind))throw new Error('JOB_KIND_DENIED');if(terminal.has(j.status))return j.status;const {authorization:a,callback:c}=await this.records(db,j);return this.finish(db,j,a?.phase==='starting'||c?.phase==='exchanging'||c?.phase==='verifying'?'unknown':'rejected','SOCIAL_AUTHORIZATION_UNRESOLVED');});}
+ fail(scope:JobScope){return this.jobs.transaction(scope,async(db,j)=>{if(!['social.authorize','social.connect'].includes(j.kind))throw new Error('JOB_KIND_DENIED');if(terminal.has(j.status))return j.status;const {authorization:a,callback:c}=await this.records(db,j);return this.finish(db,j,a?.phase==='starting'||['exchanging','selecting_page'].includes(c?.phase)||c?.phase==='verifying'?'unknown':'rejected','SOCIAL_AUTHORIZATION_UNRESOLVED');});}
 }

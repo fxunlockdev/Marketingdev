@@ -1,0 +1,26 @@
+{
+  "status": "locally_verified_not_deployed",
+  "change": "Group AI website research paragraphs by source URL; preserve unique cited chunks and content hashes, prevent repeated citations consuming source capacity; accurately label AI research provenance",
+  "checks": {
+    "api_build": "passed",
+    "research_contracts": {
+      "passed": 6,
+      "failed": 0
+    },
+    "intake_storage_foundation": {
+      "passed": 15,
+      "failed": 0
+    }
+  },
+  "logs": [
+    "work/website-source-contracts.log",
+    "work/website-source-foundation.log"
+  ],
+  "limitations": [
+    "External research/model/capture transports mocked",
+    "No new paid API calls",
+    "Does not add website photo extraction",
+    "Not deployed"
+  ],
+  "initial_failed_attempt": "--intake omits required storage service; rerun with --intake-storage passed"
+}

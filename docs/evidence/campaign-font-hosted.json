@@ -1,0 +1,29 @@
+{
+  "checked_at": "2026-10-25T14:02:59.795Z",
+  "passed": true,
+  "image": "sha256:97791e768b717299f53d95a4bfc5c55a650b8344e19a21355533d1d9c8fa87cb",
+  "fonts": {
+    "DM Sans": {
+      "name": "DM Sans",
+      "sha256": "8cd08d97e89c24d0aa92edd2f0f4c8ee6195eee9b7c9f154865a58b02f0c1c0d"
+    },
+    "DM Serif Display": {
+      "name": "DM Serif Display",
+      "sha256": "8cc3643535edf039aa5d95440a8542735e9197e4f4b8d9303e980fefbf5ab616"
+    },
+    "Arial": {
+      "name": "Liberation Sans",
+      "sha256": "8d91388f1d3604b3b8ae0e3ee2d140e50cd6122f9214514f4aca772540a4076d"
+    },
+    "Georgia": {
+      "name": "Liberation Serif",
+      "sha256": "29d12439831b7f59194efec85872f24f54eff05738933f9a860220d2abff88ba"
+    },
+    "Verdana": {
+      "name": "DejaVu Sans",
+      "sha256": "abdc775b21b1bc470d50c97e790d276f2054b7504e56e5bd3e64f48d68582322"
+    }
+  },
+  "scope": "Deployed worker pin and actual isolated renderer font binary hashes match browser assets",
+  "paid_calls": 0
+}
