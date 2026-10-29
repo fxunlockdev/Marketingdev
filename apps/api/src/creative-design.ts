@@ -1,3 +1,4 @@
+import type {PostArtwork} from './post-artwork.js';
 import { CreativeError, type CreativeBrief } from "./creative-contracts.js";
 import {DESIGN_FONT_FAMILIES,designFontWeights,resolveBrandTypography,type BrandFontPreset,type BrandTypography,type DesignFontFamily,type FontWeight} from "./brand-typography.js";
 export type Design = {
@@ -30,55 +31,56 @@ export function createDesign(
   height: number,
   brief: CreativeBrief,
   font?: BrandFontPreset | BrandTypography,
+  artwork?: PostArtwork,
 ): Design {
-  const typography=resolveBrandTypography(font);
+  const typography=resolveBrandTypography(artwork?.typography??font);
   if(font!==undefined&&!typography)throw new CreativeError("CREATIVE_DESIGN_INVALID");
   return {
     schema_version: 1,
     width,
     height,
     background_media_id: mediaId,
-    layers: [
+    layers: artwork?.text==='none'?[]:[
       {
         id: "headline",
         type: "text",
-        text: brief.headline,
+        text: brief.headline.trim().length<=90?brief.headline.trim():'',
         x: width * 0.07,
         y: height * 0.07,
         width: width * 0.86,
-        fontSize: 56,
-        fontFamily: typography?.headline.family??"Arial",
+        fontSize: Math.round(Math.min(width,height)*0.055),
+        fontFamily: typography?.headline.family??"DM Sans",
         fill: "#ffffff",
         fontWeight: typography?.headline.weight??700,
-        backing: { fill: "#111111", opacity: 0.88, padding: 16 },
+        backing: { fill: "#111111", opacity: 0.96, padding: 16 },
         align: "left",
       },
       {
         id: "body",
         type: "text",
-        text: visualBody(brief.body),
+        text: "",
         x: width * 0.07,
         y: height * 0.68,
         width: width * 0.86,
         fontSize: 28,
-        fontFamily: typography?.body.family??"Arial",
+        fontFamily: typography?.body.family??"DM Sans",
         fill: "#ffffff",
         fontWeight: typography?.body.weight??700,
-        backing: { fill: "#111111", opacity: 0.88, padding: 16 },
+        backing: { fill: "#111111", opacity: 0.96, padding: 16 },
         align: "left",
       },
       {
         id: "cta",
         type: "text",
-        text: visualCta(brief.cta),
+        text: "",
         x: width * 0.07,
         y: height * 0.82,
         width: width * 0.86,
         fontSize: 32,
-        fontFamily: typography?.body.family??"Arial",
+        fontFamily: typography?.body.family??"DM Sans",
         fill: "#ffffff",
         fontWeight: typography?.body.weight??700,
-        backing: { fill: "#111111", opacity: 0.88, padding: 16 },
+        backing: { fill: "#111111", opacity: 0.96, padding: 16 },
         align: "left",
       },
     ],
@@ -152,7 +154,12 @@ export function reviseDesign(
     background_media_id: mediaId,
     layers: parent.layers.map((layer) => ({
       ...layer,
-      text: copy[layer.id] ?? layer.text,
+      text: layer.text.trim()?copy[layer.id] ?? layer.text:layer.text,
     })),
   };
+}
+
+/** Explicit editor action: readable contrast without changing the photo or font family. */
+export function readableDesign(design:Design):Design{
+ return {...design,layers:design.layers.map(layer=>({...layer,fill:'#ffffff',backing:{fill:'#111111',opacity:0.96,padding:Math.max(0,Math.min(16,layer.x,layer.y,design.width-layer.x-layer.width))}}))};
 }

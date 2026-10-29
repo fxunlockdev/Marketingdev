@@ -1,4 +1,5 @@
 "use client";
+import "./post-details-spacing.css";
 import {useRouter} from 'next/navigation';
 import {postFormatLabel} from './post-format';
 import {directedPrompt,type Creativity} from './creative-direction';

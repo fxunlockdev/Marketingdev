@@ -1,4 +1,5 @@
 "use client";
+import {readableDesign} from '../../api/src/creative-design';
 import { useEffect, useRef, useState } from "react";
 import { Canvas, FabricImage, Textbox, Rect } from "fabric";
 import type { Design } from "../../api/src/creative-design";
@@ -281,7 +282,7 @@ export function CreativeEditor({
         </p>
       </section>
       {!previewOnly && <fieldset className="creative-layer-controls" disabled={readOnly}>
-        <legend>Text layers</legend>
+        <legend>Text layers</legend><div className="creative-text-actions"><button type="button" disabled={!design.layers.some(l=>l.text.trim())} onClick={()=>onChange(readableDesign(design))}>Improve text contrast</button><button type="button" disabled={!design.layers.length} onClick={()=>onChange({...design,layers:[]})}>Remove all image text</button></div><p className="hint">Use a short headline or leave the image clean. Save your changes to update the post.</p>
         <Field label="Selected layer">
           {(id) => (
             <select

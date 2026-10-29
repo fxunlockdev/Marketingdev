@@ -11,3 +11,13 @@ test('campaign specification rejects incompatible channels, dimensions, slide co
  const invalid=[[null,'static','instagram'],[spec('story','vertical'),'static','linkedin'],[spec('reel','vertical'),'static','instagram'],[spec('story','portrait'),'video','instagram'],[spec('feed','vertical'),'static','instagram'],[spec('feed','square',1),'carousel','instagram'],[spec('feed','square',2.5),'carousel','instagram'],[spec('feed','square',11),'carousel','instagram'],[spec('feed','square',2),'static','instagram'],[{...spec(),extra:true},'static','instagram'],[spec(),'static','youtube']];
  for(const args of invalid)assert.throws(()=>normalizeCreativeSpec(...args),{code:'CAMPAIGN_FORMAT_INVALID'});
 });
+
+
+test('post artwork persists exact font choices and rejects unrenderable or unknown configuration',()=>{
+ const typography={headline:{family:'Playfair Display',weight:600},body:{family:'Montserrat',weight:500}};
+ for(const artwork of [{text:'none'},{text:'headline',typography}]){
+  const input={...spec(),artwork};assert.deepEqual(normalizeCreativeSpec(input,'static','instagram'),input);
+  assert.throws(()=>normalizeCreativeSpec(input,'video','instagram'),{code:'CAMPAIGN_FORMAT_INVALID'});
+ }
+ for(const artwork of [null,{}, {text:'other'},{text:'headline',extra:true},{text:'headline',typography:{...typography,extra:true}},{text:'headline',typography:{...typography,headline:{family:'Lora',weight:900}}},{text:'headline',typography:{...typography,headline:{family:'Lora',weight:600,url:'https://example.com/font'}}}])assert.throws(()=>normalizeCreativeSpec({...spec(),artwork},'static','instagram'),{code:'CAMPAIGN_FORMAT_INVALID'});
+});

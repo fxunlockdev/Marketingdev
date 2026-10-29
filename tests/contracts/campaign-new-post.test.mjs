@@ -23,3 +23,11 @@ test('Add Context reaches LLM image regeneration with original parent version an
  assert.match(submitted.prompt,/"user_feedback":"Change the sky to sunset; preserve the building"/);
  assert.ok(captured.some(q=>q.sql.startsWith('INSERT INTO app.content_slot_generations')&&q.args[5]==='Change the sky to sunset; preserve the building'));
 });
+
+
+test('new posts retain per-post typography in the stored generation specification',async()=>{
+ const {service,queries}=fixture();const artwork={text:'headline',typography:{headline:{family:'Playfair Display',weight:600},body:{family:'Montserrat',weight:500}}};
+ await service.addPost(user,brand,plan,{...body,creative_spec:{...body.creative_spec,artwork}},'post-artwork-123');
+ const insert=queries.find(q=>q.sql.includes('INSERT INTO app.content_slots'));
+ assert.deepEqual(JSON.parse(insert.args[8]).artwork,artwork);
+});

@@ -78,3 +78,16 @@ section.brand-media-library .brand-media-tile .private-visual-presentation{heigh
 .desvio-redesign .brand-media-collection .reference-management[open]{grid-column:1/-1}
 .desvio-redesign .brand-media-collection li:has(.reference-management[open]){grid-column:1/-1;max-width:360px}
 .desvio-redesign .brand-media-collection .reference-management button{font-size:12px;padding:8px;white-space:normal;margin-top:8px}
+
+/* Shared reference selection: clear hit target, bounded preview and readable filenames. */
+.desvio-redesign .reference-selection:not(.brand-media-library){padding:16px;margin:0;background:var(--surface-soft,#f7f6fa);border-radius:16px}
+.reference-selection>summary{font-weight:600;cursor:pointer}
+.reference-selection>p{font-size:13px;line-height:1.5;margin:12px 0 16px;color:var(--muted,#6e6e78)}
+.desvio-redesign .reference-selection .reference-list{list-style:none;padding:0;margin:0;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(200px,100%),1fr))}
+.desvio-redesign .reference-selection .reference-list>li{padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;border-radius:14px}
+.desvio-redesign .reference-selection .reference-choice{display:flex;align-items:flex-start;gap:10px;margin:0;min-height:24px;font-size:14px;line-height:1.5;cursor:pointer}
+.desvio-redesign .reference-selection .reference-choice input{flex:0 0 18px;width:18px;height:18px;min-height:18px;margin:2px 0 0;padding:0;accent-color:var(--ink,#17171a)}
+.reference-selection .reference-choice span{min-width:0;overflow-wrap:anywhere}
+.desvio-redesign .reference-selection .reference-list [role=region]{margin:0!important;max-height:180px!important;border-radius:10px;background:#f4f3f8}
+.desvio-redesign .reference-selection .reference-list img{width:100%!important;height:160px!important;object-fit:contain!important;display:block}
+.reference-selection .reference-list button{font-size:13px;white-space:normal;overflow-wrap:anywhere}

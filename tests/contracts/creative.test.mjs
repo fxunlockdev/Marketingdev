@@ -166,7 +166,7 @@ test('multiple image references preserve ordered multipart bytes and reject inva
  assert.equal(calls,1);
 });
 
-test('campaign fonts are actual editable layer fonts, while older designs retain Arial',async()=>{
+test('campaign fonts are actual editable layer fonts with a bundled default',async()=>{
  const {reviseDesign}=await import('../../dist/creative-design.js');
  for(const font of ['modern','classic','contrast']){
   const d=createDesign('media',1024,1024,brief,font);
@@ -175,7 +175,7 @@ test('campaign fonts are actual editable layer fonts, while older designs retain
   assert.deepEqual(validateDesign(d,'media',1024,1024),d);
   assert.equal(reviseDesign(d,'revised',brief).layers[0].fontFamily,d.layers[0].fontFamily);
  }
- assert.equal(createDesign('media',1024,1024,brief).layers[0].fontFamily,'Arial');
+ assert.equal(createDesign('media',1024,1024,brief).layers[0].fontFamily,'DM Sans');
 });
 
 test('campaign font reads only the saved request envelope and rejects unsupported values',async()=>{
@@ -207,8 +207,8 @@ test('generated designs keep long explanations out of the image while preserving
  assert.equal(design.layers[0].text,brief.headline);
  const short={...brief,body:'Made for everyday living.',cta:'Explore the collection'};
  const revised=reviseDesign(design,'new-media',short);
- assert.equal(revised.layers.find(l=>l.id==='body').text,short.body);
- assert.equal(revised.layers.find(l=>l.id==='cta').text,short.cta);
+ assert.equal(revised.layers.find(l=>l.id==='body').text,'');
+ assert.equal(revised.layers.find(l=>l.id==='cta').text,'');
  assert.equal(reviseDesign(revised,'third-media',long).layers.find(l=>l.id==='body').text,'');
 });
 
@@ -256,4 +256,22 @@ test('brand campaign font delegates to the approved brand while explicit choices
  assert.equal(brandDesign.layers[0].fontFamily,'Lora');assert.equal(brandDesign.layers[1].fontFamily,'Montserrat');
  const explicit=createDesign('media',1024,1024,brief,saved('impact')??approvedBrandFont(facts));
  assert.equal(explicit.layers[0].fontFamily,'Oswald');
+});
+
+
+test('post typography overrides defaults and clean artwork stays text-free through revisions',async()=>{
+ const {reviseDesign,readableDesign}=await import('../../dist/creative-design.js');
+ const typography={headline:{family:'Lora',weight:600},body:{family:'Montserrat',weight:500}};
+ const design=createDesign('media',1024,1024,brief,'modern',{text:'headline',typography});
+ assert.equal(design.layers[0].fontFamily,'Lora');assert.equal(design.layers[0].fontWeight,600);
+ assert.equal(design.layers[0].fill,'#ffffff');assert.equal(design.layers[0].backing.opacity,.96);
+ assert.equal(design.layers.filter(l=>l.text).length,1);
+ const clean=createDesign('media',1024,1024,brief,'modern',{text:'none',typography});
+ assert.deepEqual(clean.layers,[]);assert.deepEqual(reviseDesign(clean,'new',brief).layers,[]);
+ const old=structuredClone(design);old.layers[0].fill='#888888';delete old.layers[0].backing;
+ const fixed=readableDesign(old);assert.equal(old.layers[0].fill,'#888888');
+ assert.equal(fixed.layers[0].fill,'#ffffff');assert.equal(fixed.layers[0].fontFamily,'Lora');
+ assert.equal(validateDesign(fixed,'media',1024,1024),fixed);
+ const long=createDesign('media',1024,1024,{...brief,headline:'Too much text '.repeat(20)});
+ assert.equal(long.layers[0].text,'');
 });
