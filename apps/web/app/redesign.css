@@ -163,3 +163,44 @@
 .desvio-redesign .insights-summary dt{font-size:13px;color:#514b5b}
 .desvio-redesign .insights-summary dd{font-family:'Desvio Serif',Georgia,serif;font-size:56px;line-height:1.1;font-weight:400;margin-top:18px}
 @media(max-width:760px){.desvio-redesign .content-preferences .preference-section{padding:20px;gap:16px}.desvio-redesign .insights-summary>div{padding:18px;min-height:130px}.desvio-redesign .insights-summary dd{font-size:44px}}
+/* Home follows the supplied export: a two-by-two welcome tile in a flowing card grid. */
+.desvio-redesign .reference-home-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-flow:dense;gap:12px}
+.desvio-redesign .reference-home-grid>.redesign-welcome{grid-column:span 2;grid-row:span 2;min-width:0;min-height:312px;margin:0;padding:28px;display:flex;flex-direction:column;justify-content:space-between}
+.desvio-redesign .reference-home-grid .redesign-welcome>div{display:flex;flex-direction:column;justify-content:space-between;gap:24px;flex:1;width:100%}
+.desvio-redesign .reference-home-grid .redesign-welcome h2{max-width:340px;font-size:56px;line-height:1;margin:0 auto auto 0}
+.desvio-redesign .reference-home-grid .overview-metrics{display:contents}
+.desvio-redesign .reference-home-grid .overview-metric{min-height:150px;margin:0;padding:22px;display:flex;flex-direction:column;justify-content:space-between;border:0;gap:20px;color:#17171a}
+.desvio-redesign .reference-home-grid .overview-metric>span{display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:600}
+.desvio-redesign .reference-home-grid .overview-metric strong{font-size:68px;line-height:.9}
+.desvio-redesign .reference-home-grid .metric-arrow{display:grid;place-items:center;width:30px;height:30px;border-radius:50%;background:#ffffffa6}
+.desvio-redesign .reference-home-grid .overview-upcoming,.desvio-redesign .reference-home-grid .upcoming-grid,.desvio-redesign .reference-home-grid .upcoming-grid>li{display:contents}
+.desvio-redesign .reference-home-grid .overview-upcoming>.section-heading{display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;min-height:150px;padding:22px;margin:0;border-radius:28px;background:#fff;gap:24px}
+.desvio-redesign .reference-home-grid .overview-upcoming h2{font-family:inherit;font-size:14px;font-weight:600;margin:0}
+.desvio-redesign .reference-home-grid .overview-upcoming>.section-heading .button{background:#6a5cff;color:#fff;border:0;min-height:38px}
+.desvio-redesign .reference-home-grid .upcoming-post{border:0;border-radius:28px;background:#fff;padding:10px 10px 18px;overflow:hidden;min-width:0}
+.desvio-redesign .reference-home-grid .post-thumbnail{border-radius:20px;overflow:hidden}
+.desvio-redesign .reference-home-grid>.overview-campaigns,.desvio-redesign .reference-home-grid>.overview-details,.desvio-redesign .reference-home-grid>.notice,.desvio-redesign .reference-home-grid .overview-content-empty{grid-column:1/-1}
+.desvio-redesign .reference-business-chooser{display:grid;gap:20px}
+.desvio-redesign .reference-business-chooser .page-title{padding:8px 6px}
+.desvio-redesign .reference-business-choices{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(260px,100%),1fr));gap:12px}
+.desvio-redesign .reference-business-choice{display:flex;flex-direction:column;gap:22px;padding:22px;border-radius:28px;color:#17171a;text-decoration:none;min-width:0}
+.desvio-redesign .reference-business-choice>span{width:48px;height:48px;display:grid;place-items:center;border-radius:16px;background:#fff;font:22px 'Desvio Serif',Georgia,serif}
+.desvio-redesign .reference-business-choice h2{font-size:24px;margin:0 0 2px}
+.desvio-redesign .reference-business-choice p{font-size:13.5px;color:#3a3a44;margin:0;overflow-wrap:anywhere}
+@media(max-width:760px){.desvio-redesign .reference-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.desvio-redesign .reference-home-grid .redesign-welcome h2{font-size:44px}.desvio-redesign .reference-home-grid .overview-metric{padding:18px}.desvio-redesign .reference-home-grid .overview-metric strong{font-size:52px}.desvio-redesign .reference-home-grid .upcoming-post{grid-column:1/-1}}
+@media(max-width:360px){.desvio-redesign .reference-home-grid{grid-template-columns:minmax(0,1fr)}.desvio-redesign .reference-home-grid>.redesign-welcome{grid-column:1;grid-row:auto}}
+
+/* Keep the welcome/summary rows independent of the visual card heights. */
+@media(min-width:761px) and (max-width:1199px){.desvio-redesign .reference-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.desvio-redesign .learnings-workspace>.workspace-view-switch{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-start;padding:0;margin:0 0 12px;border:0;overflow:visible}
+.desvio-redesign .learnings-workspace>.workspace-view-switch button{border:1px solid transparent;border-radius:999px;background:#fff;color:var(--ink);min-height:42px;padding:10px 18px;line-height:1.3;margin:0}
+.desvio-redesign .learnings-workspace>.workspace-view-switch button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.desvio-redesign .learnings-workspace .heading-row{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:20px}
+.desvio-redesign .learnings-workspace .heading-row h2{margin:0 0 8px}
+.desvio-redesign .learnings-workspace .heading-row p{margin:0}
+.desvio-redesign .learnings-workspace .learning-search{display:block;margin-bottom:24px}
+.desvio-redesign .learnings-workspace .performance-lessons>header{margin-bottom:20px}
+.desvio-redesign .learnings-workspace .performance-lessons button{margin-block:4px}
+.desvio-redesign .v5-business-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px;max-width:1200px}
+.desvio-redesign .v5-business-card,.desvio-redesign .v5-add-card{min-width:0}
+@media(max-width:480px){.desvio-redesign .learnings-workspace>.workspace-view-switch{gap:6px}.desvio-redesign .learnings-workspace>.workspace-view-switch button{padding:10px 12px;font-size:13px}}

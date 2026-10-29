@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useRef, useState, type FormEvent } from "react";
+import "./settings-layout.css";
 import { api, type Workspace } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 type Member = {
@@ -89,7 +90,7 @@ export function TeamScreen({
     }
   }
   return (
-    <div className="page">
+    <div className="page settings-page account-team-page">
       <div className="page-heading">
         <div>
           <span className="eyebrow">{org.name} / TEAM</span>

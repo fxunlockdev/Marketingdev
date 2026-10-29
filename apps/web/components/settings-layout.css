@@ -1,0 +1,37 @@
+/* Account surfaces use the same card rhythm as the supplied app design. */
+.desvio-redesign .settings-page{display:grid;grid-template-columns:minmax(0,1fr);gap:20px;width:100%;max-width:1200px;align-items:start}
+.desvio-redesign .settings-page>.v5-page-title,.desvio-redesign .settings-page>.heading-row,.desvio-redesign .settings-page>.page-heading,.desvio-redesign .settings-page>.notice{grid-column:1/-1;margin-bottom:0}
+.desvio-redesign .settings-page>.heading-row{align-items:center;gap:20px;flex-wrap:wrap}
+.desvio-redesign .settings-page>.heading-row .v5-page-title{margin-bottom:0}
+.desvio-redesign .settings-page>.v5-panel{margin:0;min-width:0;width:100%;max-width:none;padding:28px}
+.desvio-redesign .settings-page .v5-panel>h2{margin:0 0 12px;font-size:28px}
+.desvio-redesign .settings-page .v5-panel>p{margin:0 0 20px;line-height:1.55}
+.desvio-redesign .settings-page .v5-panel>p:last-child{margin-bottom:0}
+.desvio-redesign .settings-page form{margin-top:20px;min-width:0}
+.desvio-redesign .settings-page fieldset{min-width:0}
+.desvio-redesign .settings-page :is(.actions,.publication-record-actions){display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.desvio-redesign .settings-page :is(button,.button){max-width:100%;white-space:normal;min-height:42px}
+.desvio-redesign .settings-page .notice>button{margin:4px 8px 4px 0}
+.desvio-redesign .settings-page .member-list{padding:0;margin:12px 0 0;list-style:none}
+.desvio-redesign .settings-page .member-row{padding:16px 0;gap:12px}
+.desvio-redesign .settings-page .member-info{min-width:min(180px,100%);overflow-wrap:anywhere}
+.desvio-redesign .settings-page .member-row>.hint{margin:0}
+.desvio-redesign .settings-page .member-edit{max-width:none;margin-top:8px}
+.desvio-redesign .team-invite-panel{grid-column:1/-1}
+.desvio-redesign .team-invite-form>fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px}
+.desvio-redesign .team-invite-form .field{margin:0}
+.desvio-redesign .team-invite-form .team-business-access{grid-column:1/-1;border:1px solid var(--line);border-radius:18px;background:#f8f7fb;padding:16px 18px;margin:0}
+.desvio-redesign .team-business-access legend{font-size:13px;font-weight:600;padding:0 6px}
+.desvio-redesign .team-business-access .publication-consent{margin:0;padding:8px 0;gap:10px}
+.desvio-redesign .team-invite-form>fieldset>.hint{grid-column:1/-1;margin:0;max-width:75ch}
+.desvio-redesign .team-invite-form>fieldset>button{justify-self:start;grid-column:1/-1}
+.desvio-redesign .billing-page{width:100%;max-width:1200px}
+.desvio-redesign .billing-page .billing-summary{width:100%;max-width:960px;padding:28px}
+.desvio-redesign .billing-summary>h2{margin:16px 0;font-size:32px}
+.desvio-redesign .billing-summary>p{max-width:70ch;line-height:1.6;margin:0 0 18px}
+.desvio-redesign .billing-summary>.button{margin-top:6px}
+.desvio-redesign .account-team-page>section{padding:28px;background:#fff;border-radius:28px;min-width:0;margin:0}
+@media(min-width:1200px){.desvio-redesign .profile-page,.desvio-redesign .team-page{grid-template-columns:repeat(2,minmax(0,1fr))}.desvio-redesign .profile-page>.profile-sessions{grid-column:1/-1}}
+@media(max-width:760px){.desvio-redesign .settings-page{gap:16px}.desvio-redesign .settings-page>.v5-panel,.desvio-redesign .billing-page .billing-summary,.desvio-redesign .account-team-page>section{padding:20px;border-radius:22px}.desvio-redesign .team-invite-form>fieldset{grid-template-columns:minmax(0,1fr);gap:18px}.desvio-redesign .settings-page .v5-panel>h2{font-size:25px}.desvio-redesign .settings-page>.heading-row{align-items:flex-start}.desvio-redesign .account-team-page .invite-form{grid-template-columns:minmax(0,1fr);gap:18px}.desvio-redesign .account-team-page .invite-form>button{justify-self:start}}
+
+.desvio-redesign .settings-page .v5-panel>form+p{margin-top:16px}

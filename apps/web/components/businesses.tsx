@@ -134,6 +134,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           setError(undefined);
           setSession(user);
           setBusinesses(list.businesses);
+          if(pathname==="/"&&list.businesses.length===1)router.replace(`/b/${list.businesses[0].id}/overview`);
           setVerifiedBusinessId(requestedBusinessId);
           setEntitlement(plan);
           loadedAt.current=Date.now();
@@ -434,7 +435,7 @@ function BusinessesIndex({
   entitlement: any;
 }) {
   return (
-    <>
+    <div className="brands-page">
       <div className="heading-row">
         <PageTitle eyebrow="Manage your businesses" title="Your brands">
           <p>
@@ -495,7 +496,7 @@ function BusinessesIndex({
           </li>
         </ol>
       </div>
-    </>
+    </div>
   );
 }
 function customerSummary(value: string = "") {
@@ -644,67 +645,12 @@ function Overview({
   name: string;
 }) {
   if(business)return <BusinessOverviewPanel key={business.id} business={business} name={name}/>;
-  const rows = businesses;
-  return (
-    <>
-      <PageTitle
-        eyebrow="Your marketing, together"
-        title={`Welcome, ${name.split(" ")[0]}.`}
-      >
-        <p>
-          {rows.length
-            ? "A clear place for every business you’re building."
-            : "Your first brand is one step away."}
-        </p>
-      </PageTitle>
-      <section className="v5-overview-hero">
-        <div>
-          <span className="eyebrow">Start with what makes you, you</span>
-          <h2>
-            Good marketing starts
-            <br />
-            with knowing your brand.
-          </h2>
-          <p>
-            Bring in your business details and brand guidelines. Confirm the
-            facts, set your direction, and keep every business’s work separate.
-          </p>
-          <AppLink
-            className="button primary"
-            href="/brands"
-          >
-            {rows.length ? "Continue brand setup" : "Add your first business"}{" "}
-            <span aria-hidden="true">→</span>
-          </AppLink>
-        </div>
-        <div className="brand-orbit" aria-hidden="true">
-          <span className="orbit-center">
-            d<span>·</span>
-          </span>
-          <span className="orbit-label orbit-one">Your voice</span>
-          <span className="orbit-label orbit-two">Your story</span>
-          <span className="orbit-label orbit-three">Your audience</span>
-        </div>
-      </section>
-      {!!rows.length && (
-        <>
-          <div className="section-heading">
-            <h2>Your businesses</h2>
-            <AppLink href="/brands">Manage brands →</AppLink>
-          </div>
-          <div className="v5-business-grid">
-            {rows.map((b, i) => (
-              <BusinessCard key={b.id} business={b} index={i} />
-            ))}
-          </div>
-        </>
-      )}
-      <p className="availability-note">
-        Select a business to see its saved reviews, creative work and publishing activity.
-      </p>
-    </>
-  );
+  return <section className="reference-business-chooser">
+    <PageTitle eyebrow="Home" title={businesses.length?"Choose a business":"Add your first business"}><p>{businesses.length?"Pick which business to open.":"Create your business to start your workspace."}</p></PageTitle>
+    {businesses.length?<div className="reference-business-choices">{businesses.map((b,i)=><AppLink key={b.id} href={`/b/${b.id}/overview`} className="reference-business-choice" style={{background:['#FFD9C7','#CFE6C8','#DDD6FF'][i%3]}}><span aria-hidden="true">{b.name.slice(0,1)}</span><div><h2>{b.name}</h2><p>{b.website?b.website.replace(/^https?:\/\//,'').replace(/\/$/,''):'Your business, in one place.'}</p></div></AppLink>)}</div>:<AppLink className="button primary" href="/brands/new">Add business</AppLink>}
+  </section>;
 }
+
 function ChooseBusiness({
   businesses,
   section,
@@ -821,11 +767,11 @@ function Unavailable({
 }
 function Billing({ entitlement }: { entitlement: any }) {
   return (
-    <>
+    <div className="billing-page">
       <PageTitle eyebrow="Your account" title="Billing">
         <p>A clear view of your business allowance.</p>
       </PageTitle>
-      <section className="v5-panel narrow">
+      <section className="v5-panel billing-summary">
         <span className="eyebrow">Configured allowance</span>
         <h2>
           {entitlement.active_businesses} of {entitlement.max_active_businesses}{" "}
@@ -840,7 +786,7 @@ function Billing({ entitlement }: { entitlement: any }) {
           Manage businesses
         </AppLink>
       </section>
-    </>
+    </div>
   );
 }
 export function BrandOnboarding({ business }: { business: Business }) {

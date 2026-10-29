@@ -12,9 +12,9 @@ export function BusinessOverviewPanel({business,name}:{name?:string;business:{id
  const [data,setData]=useState<Snapshot>(),[error,setError]=useState<unknown>(),[retry,setRetry]=useState(0);
  useEffect(()=>{setData(undefined);setError(undefined);let active=true,timer:ReturnType<typeof setTimeout>;let failures=0;const poll=async()=>{try{if(document.hidden)return;const value=await api<Snapshot>(`/api/v1/businesses/${business.id}/overview`);if(active){failures=0;setData(value);setError(undefined);}}catch(e){failures++;if(active)setError(e);}finally{if(active)timer=setTimeout(poll,Math.min(120000,30000*2**failures));}};void poll();return()=>{active=false;clearTimeout(timer);};},[business.id,retry]);
  const link=(section:string)=>`/b/${business.id}/${section}`;
- return <><h1 className="sr-only">Your content, at a glance.</h1><Notice error={error}/>{!data?(error?<button onClick={()=>setRetry(n=>n+1)}>Try again</button>:<Loading/>):<>
-  <section className="redesign-welcome" aria-label="Your creative workspace"><div><span className="eyebrow">{new Intl.DateTimeFormat(undefined,{weekday:'long',month:'long',day:'numeric'}).format(new Date())}</span><h2>Welcome<br/>back{name?`, ${name.split(' ')[0]}`:''}</h2><div className="actions"><AppLink className="button" href={link(business.has_approved_brand?'campaign-new':'onboarding')}>{business.has_approved_brand?'＋ Create a campaign':'Finish brand setup'}</AppLink><AppLink className="button welcome-secondary" href={link('review')}>Open approvals</AppLink></div></div></section>
-  <div className="overview-metrics">{[['Awaiting review',data.counts.awaiting_review,'review'],['Scheduled posts',data.counts.scheduled_posts,'publishing'],['Published posts',data.counts.published_posts,'publishing']].map(([label,value,section])=><AppLink className="v5-panel overview-metric" href={link(String(section))} key={label}><span>{label}</span><strong>{value}</strong><span className="hint">View →</span></AppLink>)}</div>
+ return <><h1 className="sr-only">Your content, at a glance.</h1><Notice error={error}/>{!data?(error?<button onClick={()=>setRetry(n=>n+1)}>Try again</button>:<Loading/>):<div className="reference-home-grid">
+  <section className="redesign-welcome" aria-label="Your creative workspace"><div><span className="eyebrow">{new Intl.DateTimeFormat(undefined,{weekday:'long',month:'long',day:'numeric'}).format(new Date())}</span><h2>Welcome back{name?`, ${name.split(' ')[0]}`:''}</h2><div className="actions"><AppLink className="button" href={link(business.has_approved_brand?'campaign-new':'onboarding')}>{business.has_approved_brand?'＋ Create a campaign':'Finish brand setup'}</AppLink><AppLink className="button welcome-secondary" href={link('review')}>Open approvals</AppLink></div></div></section>
+  <div className="overview-metrics">{[['Awaiting review',data.counts.awaiting_review,'review'],['Scheduled posts',data.counts.scheduled_posts,'publishing'],['Published posts',data.counts.published_posts,'publishing']].map(([label,value,section])=><AppLink className="v5-panel overview-metric" href={link(String(section))} key={label}><span>{label}<span className="metric-arrow" aria-hidden="true">↗</span></span><strong>{value}</strong></AppLink>)}</div>
   {!business.has_approved_brand&&<section className="notice"><h2>Start with your brand</h2><p>Review the extracted details so every new creative starts with approved brand knowledge.</p><AppLink href={link('onboarding')}>Finish brand setup →</AppLink></section>}
   <section className="overview-upcoming" aria-labelledby="upcoming-heading">
     <div className="section-heading"><h2 id="upcoming-heading">Upcoming posts</h2><div className="actions"><AppLink className="button" href={link('content-plan')}>View calendar</AppLink></div></div>
@@ -51,7 +51,7 @@ export function BusinessOverviewPanel({business,name}:{name?:string;business:{id
    {data.generation_activity.length?<ul>{data.generation_activity.map(item=><li key={item.kind}>{labels[item.kind]}: {item.requested} requested · {item.completed} completed{item.uncertain>0?` · ${item.uncertain} need reconciliation`:''}</li>)}</ul>:<p>No generation requests in this period.</p>}<p className="hint">Counts represent saved requests, not credits or billing charges.</p>
   </section>
   </div></details>
- </>}</>;
+ </div>}</>;
 }
 
 function postProgress(post:UpcomingPost){
