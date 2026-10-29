@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-10-28T17:31:04.690Z",
+  "checked_at": "2026-10-29T14:21:21.934050+00:00",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:8fa0514ef86598ce463997df56b014756eb2cb66ea6fdcacc0f9d6e5ccaa618b",
+      "image_id": "sha256:3a5ecc00851b953ae55801a3a4295457e6f50cc37f5cff1403aeb513313f6a52",
       "architecture": "amd64",
       "user": "node"
     },
@@ -21,7 +21,7 @@
     },
     {
       "role": "static_renderer",
-      "image_id": "sha256:60d6e8ad5728739ba78c6ddf70a93975097eedbf0c42f63b8df89f069c6bf0d4",
+      "image_id": "sha256:bc22d228dbba08934b773df45d8c54934bb81636f41aa2bcfa29ff7df22d61ae",
       "architecture": "amd64",
       "user": "65534:65534"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Frozen088 worker image; host activation must be checked separately"
+  "scope": "Current-source brand typography worker and renderer; 3 actual isolated renderer tests passed including six distinct families and actual weight pixel differences. Host activation must be checked separately."
 }

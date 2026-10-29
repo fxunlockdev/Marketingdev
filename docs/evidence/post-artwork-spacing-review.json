@@ -1,0 +1,130 @@
+{
+  "checked_at": "2026-10-29T17:00:45.030787+00:00",
+  "scope": "Per-post typography, clean image mode, explicit contrast cleanup, and shared post-details/reference spacing.",
+  "commit": "2b9fc17",
+  "contracts": {
+    "passed": 330,
+    "failed": 0
+  },
+  "font_loader_tests": 5,
+  "browser_local": {
+    "screens": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 924,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "blocked": [
+      {
+        "method": "POST",
+        "path": "/api/v1/businesses/77ab73a3-67c7-447c-a339-d2f9b160042b/content-plans/f330eff3-6bb1-4eaf-ad3c-28f50b116da8/ideas"
+      }
+    ],
+    "checked_at": "2026-10-29T16:43:41.299Z",
+    "clean_text_action": true,
+    "saved_existing_posts": false
+  },
+  "post_details_local": {
+    "screens": [
+      {
+        "width": 1440,
+        "overflow": false,
+        "toolbar_to_art": 16
+      },
+      {
+        "width": 924,
+        "overflow": false,
+        "toolbar_to_art": 16
+      },
+      {
+        "width": 390,
+        "overflow": false,
+        "toolbar_to_art": 16
+      }
+    ],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-29T16:54:47.767Z"
+  },
+  "hosted_renderer": {
+    "checked_at": "2026-10-29T16:48:16.299Z",
+    "passed": true,
+    "results": [
+      {
+        "family": "Playfair Display",
+        "sha256": "41aec34fa792e969ee290b2c8622c3488ddd69ea55d1dd6d06c11667f3cb1116"
+      },
+      {
+        "family": "Montserrat",
+        "sha256": "384c240fbcc2cd71d4d960076caad7dd9c25592853b18ad430e57d4c6608b04b"
+      },
+      {
+        "family": "Lora",
+        "sha256": "492b0734566b8a6551c0e21eafc2df3fd41b08102809d70bf330e2d8a075ecd9"
+      },
+      {
+        "family": "Oswald",
+        "sha256": "1cca50d2e954990959d6ae7a598a6945bff67ed4cbf0b1ec6ce0c9fd79f08cdf"
+      }
+    ],
+    "scope": "Actual deployed isolated renderer, synthetic background; no customer writes or provider calls"
+  },
+  "migration": {
+    "passed": true,
+    "migration": "086_post_artwork.sql",
+    "checksums_verified": 86
+  },
+  "worker": {
+    "checked_at": "2026-10-29T16:57:50.189Z",
+    "passed": true,
+    "image": "sha256:3a5ecc00851b953ae55801a3a4295457e6f50cc37f5cff1403aeb513313f6a52",
+    "backup_container": "desvio-worker-rollback-20261030-artwork",
+    "paid_calls": false,
+    "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+  },
+  "api_deployment": "55036a5f-d549-4f12-8cdc-8a39f4409896",
+  "web_deployment": "77383513-98d3-4fc8-aba6-da005e07523d",
+  "existing_posts_modified": false,
+  "paid_provider_calls": 0,
+  "limitations": [
+    "Existing images retain their saved designs until explicitly edited and saved.",
+    "Local emulated renderer tests timed out; actual hosted renderer exports passed for four selected fonts.",
+    "Local new-post ideas calls were intentionally blocked to avoid paid generation; no fake ideas were returned.",
+    "No new paid image or video provider generation in this verification run."
+  ],
+  "browser_live": {
+    "screens": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 924,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-29T17:01:29.687Z",
+    "clean_text_action": true,
+    "saved_existing_posts": false
+  },
+  "deployment_status": {
+    "api": "SUCCESS",
+    "web": "SUCCESS",
+    "worker": "REGISTERED"
+  }
+}
