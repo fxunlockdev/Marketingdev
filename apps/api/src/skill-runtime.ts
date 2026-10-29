@@ -23,7 +23,7 @@ export class SkillRuntime {
   }
   contentPlan(input:PlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<PlanningResult> {
     // Daily placement limits belong to the application, not the isolated model input.
-    const {max_posts_per_day,...providerInput}=input;
+    const {max_posts_per_day,post_ideas,...providerInput}=input;
     return this.run(providerInput,model,value=>validatePlanningResult({...value,plan:scheduleGeneratedPlan(value.plan,input)},input));
   }
   videoPlan(input:VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<VideoPlanningResult> {

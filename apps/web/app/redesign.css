@@ -14,7 +14,7 @@
 .desvio-redesign ::selection{background:#dcd6ff;color:#17171a}
 .desvio-redesign .v5-shell{grid-template-columns:248px minmax(0,1fr);padding:12px;gap:12px;min-height:100dvh}
 .desvio-redesign .v5-sidebar{top:12px;height:calc(100dvh - 24px);padding:22px 12px 14px;border:0;border-radius:28px;background:white;gap:14px}
-.desvio-redesign .workspace-switcher{display:flex;flex-direction:column;align-items:stretch;gap:20px;padding:0 8px 8px;border:0}
+.desvio-redesign .workspace-switcher{flex-shrink:0;display:flex;flex-direction:column;align-items:stretch;gap:20px;padding:0 8px 8px;border:0}
 .desvio-redesign .workspace-switcher .wordmark{display:flex;align-self:flex-start;width:auto;margin:0;padding:0 8px;font-size:30px;font-weight:400;letter-spacing:-.7px;font-family:'Desvio Serif',Georgia,serif;gap:0}
 .desvio-redesign .wordmark .brand-mark{display:none}
 .desvio-redesign .wordmark-dot{display:inline;color:#6a5cff}
@@ -94,3 +94,59 @@
 @media(prefers-reduced-motion:reduce){.desvio-redesign *{scroll-behavior:auto;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .desvio-redesign .wordmark-dot{margin-left:1px}
 .desvio-redesign .workspace-switcher .field>label{position:static;width:auto;height:auto;overflow:visible;clip-path:none;white-space:normal}
+
+/* Keep the switcher and navigation in normal flow when the sidebar scrolls. */
+.desvio-redesign .v5-sidebar>nav,.desvio-redesign .v5-sidebar>.v5-account{flex-shrink:0}
+
+/* Supplied Desvio App shell: compact switcher, grouped navigation, open header. */
+.desvio-redesign .v5-shell{grid-template-columns:256px minmax(0,1fr)}
+.desvio-redesign .v5-sidebar{padding:20px 12px 14px;gap:18px}
+.desvio-redesign .workspace-switcher{gap:18px;margin:0;padding:0;min-height:0}
+.desvio-redesign .workspace-business{display:flex;align-items:center;gap:10px;background:#f4f3f8;border-radius:16px;padding:7px 12px 7px 7px;min-height:46px}
+.desvio-redesign .workspace-business-initial{display:grid;place-items:center;width:32px;height:32px;flex:none;border-radius:10px;background:#ffd9c7;font-size:14px;font-weight:600}
+.desvio-redesign .workspace-switcher .field{flex:1;min-width:0;padding:0;background:transparent}
+.desvio-redesign .workspace-switcher .field>label{margin:0;font-weight:400;line-height:14px}
+.desvio-redesign .v5-sidebar .workspace-switcher .workspace-business .field select{min-height:22px;height:22px;padding:0 20px 0 0;border:0;border-radius:0;background:transparent;font-size:14px;line-height:22px}
+.desvio-redesign .v5-sidebar nav{padding-top:0}
+.desvio-redesign .v5-sidebar nav a{min-height:38px;padding:8px 12px;border:0;border-radius:12px;margin:2px 0;gap:12px}
+.desvio-redesign .v5-sidebar nav svg{width:17px;height:17px;stroke-width:2}
+.desvio-redesign .v5-sidebar nav a[aria-current]{background:#17171a;color:#fff;font-weight:500}
+.desvio-redesign .v5-sidebar .nav-group{font-size:11px;font-weight:500;text-transform:none;letter-spacing:normal;color:#777581;margin:20px 12px 8px}
+.desvio-redesign .v5-sidebar nav>div:first-child .nav-group{margin-top:0}
+.desvio-redesign .v5-topbar{background:transparent;border-radius:0;padding:12px 8px;min-height:60px;gap:12px}
+.desvio-redesign .workspace-page-title{display:flex;align-items:center;gap:12px;font-size:14px;min-width:0}
+.desvio-redesign .workspace-breadcrumb{font-weight:400;color:#777581;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desvio-redesign .workspace-separator{font-weight:400;color:#c4c1cf}
+.desvio-redesign .v5-main{max-width:1240px;padding:4px 0 64px}
+@media(max-width:1100px) and (min-width:761px){.desvio-redesign .v5-shell{grid-template-columns:210px minmax(0,1fr)}}
+@media(max-width:760px){.desvio-redesign .workspace-switcher{max-width:calc(100% - 78px)}.desvio-redesign .v5-topbar{padding:12px 8px}.desvio-redesign .workspace-breadcrumb{max-width:130px}.desvio-redesign .v5-main{padding:12px 0 40px}}
+
+.desvio-redesign .redesign-welcome{padding:28px;min-height:312px;align-items:flex-start}
+.desvio-redesign .redesign-welcome h2{font-size:clamp(40px,5vw,56px);line-height:1;margin:16px 0 72px;font-weight:400;max-width:520px}
+.desvio-redesign .redesign-welcome .eyebrow{font-size:13px;text-transform:none;letter-spacing:normal;color:#a7a7b1}
+.desvio-redesign .redesign-welcome:after{width:200px;height:200px;right:-60px;top:55px}
+.desvio-redesign .redesign-welcome:before{width:84px;height:84px;right:40px;top:-28px;bottom:auto}
+.desvio-redesign .redesign-welcome .welcome-secondary{background:#26262b;color:#fff;border-color:#26262b}
+.desvio-redesign .overview-metrics{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-block:12px}
+.desvio-redesign .overview-metric{display:flex;flex-direction:column;gap:18px;min-height:168px;padding:22px;border-radius:28px}
+.desvio-redesign .overview-metric strong{font-size:64px;line-height:1}
+@media(max-width:760px){.desvio-redesign .redesign-welcome h2{font-size:40px;margin-bottom:56px}.desvio-redesign .redesign-welcome{min-height:280px;padding:24px}.desvio-redesign .redesign-welcome:after{right:-120px}.desvio-redesign .redesign-welcome .actions{flex-wrap:wrap}}
+
+.desvio-redesign .preference-goals{border:0;padding:0;margin:0 0 18px;min-width:0}
+.desvio-redesign .preference-goals legend{font-size:13px;font-weight:600;margin-bottom:8px}
+.desvio-redesign .preference-goals>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.desvio-redesign .preference-goals button{border:0;border-radius:14px;background:#f4f3f8;padding:10px 16px;text-align:left;font-size:13px;min-height:48px}
+.desvio-redesign .preference-goals button[aria-pressed=true]{background:#17171a;color:#fff}
+.desvio-redesign .preference-step{border-radius:14px;font-family:'Desvio Serif',Georgia,serif;width:44px;height:44px}
+
+.desvio-redesign .learnings-workspace[data-view=facts]{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;align-items:start}
+.desvio-redesign .learnings-workspace>.v5-page-title,.desvio-redesign .learnings-workspace>.workspace-view-switch,.desvio-redesign .learnings-workspace>.notice{grid-column:1/-1}
+.desvio-redesign .learning-proposals{min-width:0}
+.desvio-redesign .learning-proposals .performance-lessons{background:#ddd7fb;border-radius:28px;padding:24px}
+.desvio-redesign .learning-facts-panel{background:#fff;border:0;border-radius:28px;padding:24px;min-width:0}
+.desvio-redesign .learning-facts-panel .memory-facts{display:grid;grid-template-columns:1fr;gap:10px}
+.desvio-redesign .learning-facts-panel .memory-facts>div{background:#f8f7fb;border:0;border-radius:14px;padding:14px}
+.desvio-redesign .learning-facts-panel .memory-facts dt{font-size:12px;color:#777581}
+.desvio-redesign .learning-facts-panel .memory-facts dd{font-size:14px;margin:4px 0 0}
+.desvio-redesign .learning-proposals .creative-review{background:#eeeaff;border:0;border-radius:20px;padding:20px}
+@media(max-width:960px){.desvio-redesign .learnings-workspace[data-view=facts]{grid-template-columns:minmax(0,1fr)}}

@@ -41,10 +41,10 @@ const sections = [
   ["overview", "Home", "home"],
   ["content-plan", "Calendar", "calendar"],
   ["campaigns", "Campaigns", "layers"],
-  ["connections", "Integrations", "bolt"],
+  ["review", "Approvals", "approval"],
   ["brand-kit", "Brand Kit", "orbit"],
   ["content-preferences", "Content Preferences", "sliders"],
-  ["review", "Approvals", "approval"],
+  ["connections", "Integrations", "bolt"],
   ["memory", "Learnings", "memory"],
   ["publishing", "Insights", "chart"],
   ["archive", "Archived Posts", "archive"],
@@ -54,6 +54,9 @@ const sections = [
   ["profile", "Profile", "person"],
 ];
 const groups: Record<string, string> = {
+  overview: "Plan & create",
+  "brand-kit": "Brand",
+  memory: "Results",
   archive: "Library",
   brands: "Workspace",
 };
@@ -61,16 +64,16 @@ function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     home: "M3 10 12 3l9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM8 17h8",
     layers: "m12 3 10 5-10 5L2 8Zm-10 9 10 5 10-5M2 16l10 5 10-5",
-    bolt: "m14 2-9 12h6l-1 8 9-12h-6Z",
-    orbit: "M17 7C23 13 23 19 20 20S10 17 6 13 1 4 4 3s9 0 13 4ZM7 7C1 13 1 19 4 20s10-3 14-7 5-9 2-10-9 0-13 4Z",
-    sliders: "M6 4h12a4 4 0 0 1 0 8H6a4 4 0 0 1 0-8Zm0 12h12a3 3 0 0 1 0 6H6a3 3 0 0 1 0-6ZM7 4v8m10 4v6",
-    approval: "m12 2 3 2 4 1 1 4 2 3-2 3-1 4-4 1-3 2-3-2-4-1-1-4-2-3 2-3 1-4 4-1Zm-4 10 3 3 5-6",
+    bolt: "M9 2v6m6-6v6M7 8h10v5a5 5 0 0 1-10 0Zm5 10v4",
+    orbit: "M12 3a9 9 0 1 0 0 18h1a2 2 0 0 0 1-3.7 1.7 1.7 0 0 1 1-3.3h2a4 4 0 0 0 4-4c0-4-4-7-9-7ZM7 9h.01M10 6h.01M15 7h.01M6 14h.01",
+    sliders: "M3 6h7m4 0h7M3 12h3m4 0h11M3 18h11m4 0h3M10 3v6M6 9v6M14 15v6",
+    approval: "M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM8 12l3 3 5-6",
     brand: "M12 3 3 8v8l9 5 9-5V8Zm-9 5 9 5 9-5M12 13v8",
     calendar: "M4 5h16v16H4ZM8 2v6M16 2v6M4 11h16",
     check: "M4 4h16v16H4Zm4 8 3 3 6-7",
     star: "m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3Z",
     chart: "M3 21V11h5v10M8 21V3h5v18m0 0V8h5v13M2 21h20",
-    memory: "M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm3 13 8-8M8 8h8v8",
+    memory: "M9 18h6m-6 3h6M8 15a7 7 0 1 1 8 0c-1 .7-1 1-1 3H9c0-2 0-2.3-1-3Z",
     link: "M9 15l6-6M8 17l-2 2a4 4 0 0 1-5-5l5-5a4 4 0 0 1 6 0M16 7l2-2a4 4 0 0 1 5 5l-5 5a4 4 0 0 1-6 0",
     people:
       "M7 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8M1 21v-3a6 6 0 0 1 12 0v3M16 5a4 4 0 0 1 0 8M17 16a5 5 0 0 1 6 5",
@@ -193,7 +196,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
     <div className={`v5-shell ${menu ? "menu-open" : ""}`}>
       <aside className="v5-sidebar">
         <div className="workspace-switcher"><Wordmark />
-          {businesses.length === 0 ? <span className="workspace-context">Your workspace</span> : <Field label="Business">
+          {businesses.length === 0 ? <span className="workspace-context">Your workspace</span> : <div className="workspace-business"><span className="workspace-business-initial" aria-hidden="true">{(business?.name??"All").slice(0,1)}</span><Field label="Business">
             {(id) => (
               <select
                 id={id}
@@ -215,7 +218,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
                 ))}
               </select>
             )}
-          </Field>}
+          </Field></div>}
         </div>
         <button
           className="v5-menu"
@@ -270,7 +273,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       </aside>
       <div className="v5-body">
         <header className="v5-topbar">
-          <span className="workspace-page-title">{section === "overview" ? `Welcome back, ${session.user.name.split(" ")[0]}` : label}</span>
+          <span className="workspace-page-title">{business&&<><span className="workspace-breadcrumb">{business.name}</span><span className="workspace-separator" aria-hidden="true">/</span></>}{label}</span>
           <div className="header-actions">
             {business&&<GenerationBalance key={business.organization_id} organizationId={business.organization_id}/>}
             <AppLink className="profile-link workspace-avatar" href="/profile" aria-label="Profile" title="Your profile">
@@ -640,7 +643,7 @@ function Overview({
   business?: Business;
   name: string;
 }) {
-  if(business)return <BusinessOverviewPanel key={business.id} business={business}/>;
+  if(business)return <BusinessOverviewPanel key={business.id} business={business} name={name}/>;
   const rows = businesses;
   return (
     <>
@@ -1550,12 +1553,13 @@ function Memory({ business }: { business: Business }) {
     return()=>{alive=false;};
   }, [business.id,retry]);
   const facts=brain?.active?.snapshot.facts??[];
-  return <section className="learnings-workspace">
+  return <section className="learnings-workspace" data-view={view}>
     <PageTitle eyebrow={business.name} title="Learnings"><p>Your brand knowledge and what to try next.</p></PageTitle>
     <div className="workspace-view-switch" role="group" aria-label="Learning views">
       {[['facts','Brand knowledge'],['lessons','What’s working'],['sources','Sources']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}
     </div>
     <Notice error={error}/>{error!==undefined&&<button onClick={()=>setRetry(n=>n+1)}>Try again</button>}
+    {view==='facts'&&<div className="learning-proposals"><PerformanceLessons key={business.id} businessId={business.id}/></div>}
     {view==='facts'&&(brain?<section className="learning-facts-panel">
       <div className="heading-row"><div><h2>Brand knowledge</h2><p className="hint">{facts.length} confirmed facts{brain.active&&` · Updated ${new Date(brain.active.approved_at).toLocaleDateString()}`}</p></div><AppLink className="button" href={`/b/${business.id}/onboarding`}>Edit brand facts</AppLink></div>
       {brain.active?<><label className="learning-search"><span className="sr-only">Search brand knowledge</span><input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your brand knowledge…"/></label>

@@ -1,3 +1,4 @@
+import {CampaignIdeas} from './campaign-ideas.js';
 import {CampaignBlogs} from './campaign-blogs.js';
 import {CreativeProvider} from './creative-provider.js';
 import {Postforme} from './postforme.js';
@@ -299,6 +300,8 @@ class ContentPlanController {
  @Post('content-plans/:planId/posts') addPost(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addPost(r.actorId,id,p,body,key);}
  @Post('content-plans/:planId/carousels') addCarousel(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addCarousel(r.actorId,id,p,body,key);}
  @Post('content-plans/:planId/videos') addVideo(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.addVideo(r.actorId,id,p,body,key);}
+ @Get('content-plans/:planId/ideas') ideas(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Query() query:unknown){return new CampaignIdeas(this.planning).latest(r.actorId,id,p,query);}
+ @Post('content-plans/:planId/ideas') generateIdeas(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return new CampaignIdeas(this.planning).generate(r.actorId,id,p,body,key);}
  @Get('content-plans/:planId') detail(@Req() r:AuthRequest,@Param('id') id:string,@Param('planId') p:string){return this.planning.detail(r.actorId,id,p);}
  @Post('planning-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.planning.cancel(r.actorId,id,j);}
  @Post('content-plans') create(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.create(r.actorId,id,body,key);}

@@ -387,3 +387,22 @@ test('explicit campaign mix persists all five placements with exact counts and i
  await assert.rejects(plans.list(bob,b.id,range),/not found|access|member/i);
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind IN ('creative.generate','creative.video','carousel.generate')",[b.id])).rows[0].n,0);
 });
+
+test('campaign ideas use approved brand, preferences and feedback with scoped durable storage and no new posts',async()=>{
+ const {CampaignIdeas}=await import('../../dist/campaign-ideas.js');
+ const ideas=new CampaignIdeas(planning),b=await fresh();await grant(b);
+ const p=await plans.create(alice,b.id,{title:'Garden inspiration',objective:'Education',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'instagram',planned_at:'2026-11-01T08:00:00Z',format:'static',brief:'Existing introduction'}]},randomUUID());
+ await admin.query("UPDATE app.content_slot_events SET feedback='Prefer practical tips, not hype' WHERE brand_id=$1",[b.id]);
+ const path=`/api/v1/businesses/${b.id}/content-plans/${p.id}/ideas`,selection={format:'video',channel:'instagram'};
+ assert.equal((await api(path+'?format=video&channel=instagram',{auth:false})).status,401);
+ await assert.rejects(ideas.latest(bob,b.id,p.id,selection),/not found/i);
+ const beforePlans=await countPlans(b),beforeCalls=calls;
+ const reply=await api(path,{method:'POST',body:selection,key:randomUUID()});assert.equal(reply.status,201,JSON.stringify(reply.body));
+ const again=await api(path,{method:'POST',body:selection,key:randomUUID()});assert.equal(again.body.id,reply.body.id);
+ transport=async(url,init)=>{calls++;const body=JSON.parse(init.body);assert.equal(body.max_output_tokens,4000);const input=inputFrom(body);assert.equal(input.post_ideas,undefined);assert.equal(input.brand.facts.length,3);assert.equal(input.preferences.must_avoid,'No unsupported medical claims');assert.equal(input.reference_plan.title,'Garden inspiration');assert.equal(input.reference_plan.recent_feedback[0].feedback,'Prefer practical tips, not hype');assert.equal(input.reference_plan.slots[0].brief,'Existing introduction');return modelResponse(generatedPlan(input));};
+ try{assert.equal(await handler.run(scope(b,reply.body)),'succeeded');}finally{transport=undefined;}
+ const result=await api(path+'?format=video&channel=instagram');assert.equal(result.body.status,'succeeded');assert.equal(result.body.ideas.length,3);assert.equal(await countPlans(b),beforePlans);assert.equal(calls,beforeCalls+1);
+ assert.equal((await plans.list(alice,b.id,{...range,plan_id:p.id})).total,1);
+ assert.equal((await planning.jobs(alice,b.id)).jobs.length,0,'suggestions must not appear as unfinished campaigns');
+ const reopen=await api(path,{method:'POST',body:selection,key:randomUUID()});assert.equal(reopen.body.id,reply.body.id);assert.equal(reopen.body.ideas.length,3);assert.equal(calls,beforeCalls+1);
+});

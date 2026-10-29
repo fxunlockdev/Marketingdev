@@ -23,3 +23,28 @@ dialog.campaign-new-post{width:min(760px,calc(100vw - 32px));max-width:760px;max
 @media(prefers-reduced-motion:reduce){:is(.campaigns-screen,.campaign-builder,.campaign-review-screen,.campaign-post-screen,.campaign-new-post) :is(button,.button){transition:none}}
 .campaign-review-screen .campaign-media-dialog{border:0;border-radius:28px;background:#fff;color:#17171a;padding:24px;box-shadow:0 30px 80px #17171a40}.campaign-review-screen .campaign-media-dialog::backdrop{background:#17171a66}.campaign-review-screen .campaign-media-dialog>header{gap:16px;padding-bottom:16px}.campaign-review-screen .campaign-media-dialog img,.campaign-review-screen .campaign-media-dialog video{border-radius:18px}.campaign-review-screen .campaign-media-dialog .actions{align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
 dialog.campaign-new-post>header>button[aria-label="Close new post"]{display:grid;place-items:center;width:40px;height:40px;min-height:40px;font-size:24px;line-height:1;background:#f4f3f8;border:0;padding:0}
+
+/* Reference campaign cards retain actual media and all review actions. */
+.desvio-redesign .campaign-review-screen .campaign-preview-grid{grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.desvio-redesign .campaign-review-screen .campaign-preview-grid>li{border-radius:28px;padding:10px 10px 14px;display:flex;flex-direction:column;gap:12px}
+.desvio-redesign .campaign-review-screen .campaign-card-top{padding:4px 6px 0;font-size:12.5px;font-weight:400;color:#6e6e78}
+.desvio-redesign .campaign-review-screen .campaign-card-image{border-radius:20px;overflow:hidden}
+.desvio-redesign .campaign-review-screen .campaign-card-body{padding:0 6px;flex:1;gap:12px}
+.desvio-redesign .campaign-review-screen .campaign-card-body>.button.primary{width:100%;justify-content:center;min-height:40px;margin-top:auto}
+.desvio-redesign .campaign-review-heading{align-items:flex-end;gap:20px;padding:4px 6px}
+.desvio-redesign :is(.campaigns-screen>.heading-row,.campaign-review-heading) .primary:first-of-type:not(a){background:#fff;color:#17171a;border-color:transparent}
+.desvio-redesign .campaign-post-screen>.heading-row>a{display:inline-flex;background:#fff;border-radius:999px;text-decoration:none;padding:10px 16px;font-size:14px;max-width:100%;overflow-wrap:anywhere}
+.desvio-redesign .campaign-post-screen{display:grid;gap:16px}
+@media(max-width:480px){.desvio-redesign .campaign-review-screen .campaign-preview-grid{grid-template-columns:minmax(0,1fr)}}
+
+.desvio-redesign .campaigns-screen .overview-campaign-list a{display:grid;grid-template-columns:88px minmax(0,1fr) auto auto;align-items:center;gap:14px;padding:10px 14px 10px 10px;margin:0 -10px;background:#fff;border:0;border-radius:18px}
+.desvio-redesign .campaigns-screen .overview-campaign-list a:hover{background:#f8f7fc}
+.campaign-preview-stack{display:block;position:relative;width:88px;height:58px}
+.campaign-preview-stack>span{position:absolute;top:5px;left:0;width:48px;height:48px;overflow:hidden;border-radius:10px;background:#f4f3f8;border:2px solid #fff;transform:rotate(-6deg)}
+.campaign-preview-stack>span:nth-child(2){left:18px;transform:rotate(2deg)}
+.campaign-preview-stack>span:nth-child(3){left:36px;transform:rotate(8deg)}
+.campaign-preview-stack .post-thumbnail{display:block;width:100%;height:100%;aspect-ratio:1!important;border-radius:0}
+.campaign-preview-stack .post-thumbnail :is(svg,img){width:100%;height:100%;object-fit:cover}
+.campaign-preview-empty{display:grid;place-items:center;color:#777581}.campaign-preview-empty>svg{width:24px;height:24px}
+@media(max-width:600px){.desvio-redesign .campaigns-screen .overview-campaign-list a{grid-template-columns:64px minmax(0,1fr) auto}.campaign-preview-stack{width:64px}.campaign-preview-stack>span:nth-child(3){left:16px}.desvio-redesign .campaigns-screen .overview-campaign-list a>span:not([aria-hidden]){display:none}}
+.desvio-redesign .campaign-review-screen .campaign-card-body{display:flex;flex-direction:column}

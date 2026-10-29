@@ -318,7 +318,7 @@ export function ContentWorkspace({
   </div>;
   return (
     <div className={`content-workspace ${inbox ? "approval-workspace" : "calendar-workspace"}`}>
-      {inbox?<div className="section-heading"><div><h1 ref={calendarHeading} tabIndex={-1}>Approvals</h1><p>Review your posts, make adjustments, and approve the versions you love.</p></div></div>:<h1 className="sr-only" ref={calendarHeading} tabIndex={-1}>Calendar</h1>}
+      <header className="section-heading calendar-page-heading"><div><p className="calendar-business-name">{business.name}</p><h1 ref={calendarHeading} tabIndex={-1}>{inbox?'Approvals':'Calendar'}</h1>{inbox&&<p>{data?`${data.total} ${data.total===1?'post is':'posts are'} in your review queue.`:'Review your posts, make adjustments, and approve the versions you love.'}</p>}</div><div className="actions"><button onClick={()=>setReload(n=>n+1)}>Refresh posts</button>{!inbox&&canWrite&&<button className="primary" aria-expanded={generate} aria-controls="plan-generator" onClick={()=>setGenerate(v=>!v)}>Create content plan</button>}</div></header>
       <Notice error={error} />
       {message && <p role="status">{message}</p>}
       {generate && (
@@ -430,12 +430,13 @@ export function ContentWorkspace({
         aria-label={inbox ? "Review queue" : "Content calendar"}
       >
         <div className="plan-toolbar">
-          {!inbox&&canWrite&&<button className="primary calendar-create-plan" aria-expanded={generate} aria-controls="plan-generator" onClick={()=>setGenerate(v=>!v)}>Create content plan</button>}
           <div className="calendar-period" role="group" aria-label="Calendar navigation">
             <button aria-label={view==='day'?'Previous day':'Previous period'} disabled={!first || first<='2000-01-01'} onClick={()=>movePeriod(-1)}>‹</button>
             <button disabled={!prefs} onClick={()=>filter(()=>setAnchor(localMinute(Date.now(),prefs.timezone).slice(0,10)))}>Today</button>
             <button aria-label={view==='day'?'Next day':'Next period'} disabled={!last || last>'2100-12-01'} onClick={()=>movePeriod(1)}>›</button>
           </div>
+          {first&&last&&<h2 className="calendar-period-title">{new Intl.DateTimeFormat(undefined,{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(first+'T12:00:00Z'))} – {new Intl.DateTimeFormat(undefined,{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'}).format(new Date(addDays(last,-1)+'T12:00:00Z'))}</h2>}
+          <details className="calendar-more-options"><summary>{inbox?'Review options':'Calendar options'}{channel||state?' · Active':''}</summary><div className="calendar-options-content">
           {campaign&&<button onClick={()=>{filter(()=>setCampaign(''));const url=new URL(location.href);url.searchParams.delete('plan');history.replaceState(history.state,'',url);}}>Show all campaigns</button>}
           <Field label={inbox ? "Review from" : "Calendar date"}>
             {(id) => (
@@ -521,9 +522,10 @@ export function ContentWorkspace({
             {(channel || state) && <button onClick={()=>filter(()=>{setChannel('');setState('');})}>Clear filters</button>}
             </div>
           </details>
-          <button onClick={() => setReload((n) => n + 1)}>Refresh posts</button>
           {!inbox && canWrite && view !== 'list' && <button onClick={() => filter(() => setView('list'))}>Select drafts for review</button>}
+          </div></details>
         </div>
+        {!inbox&&<div className="calendar-view-toggle" role="group" aria-label="Calendar display"><button aria-pressed={view!=='list'} onClick={()=>filter(()=>setView('week'))}>Calendar</button><button aria-pressed={view==='list'} onClick={()=>filter(()=>setView('list'))}>List</button></div>}
         {!inbox&&canWrite&&['month','week'].includes(view)&&<p className="calendar-board-hint">Open a post to edit · Drag to reschedule</p>}
         {!inbox && view==='day' && anchor && <DateStrip date={anchor} counts={dateCounts} onSelect={date=>filter(()=>setAnchor(date))} />}
         <p className="hint">
@@ -625,7 +627,7 @@ export function ContentWorkspace({
                   ))}
                 </div>
               ) : (
-                <ul className="plan-post-list">
+                <ul className={`plan-post-list ${inbox?"approval-post-grid":"calendar-post-rows"}`}>
                   {data.slots.map((s: any) => (
                     <li key={s.id}>
                       {(inbox ? canReview && s.state === "pending_review" : canWrite && ['draft_ready','changes_requested'].includes(s.state)) &&
@@ -651,12 +653,10 @@ export function ContentWorkspace({
                         className="plan-list-card"
                         onClick={() => selectPost(s.id)}
                       >
-                        <span>
-                          {name(s.channel)} · {when(s)} ({s.timezone})
-                        </span>
-                        <span>{postFormatLabel(s)}</span>
+                        <span className="list-post-meta">{name(s.channel)} · {when(s)} ({s.timezone})</span>
+                        <span className="list-post-format">{postFormatLabel(s)}</span>
                             <PostThumbnail businessId={business.id} post={s}/><strong>{s.hook || s.brief}</strong>
-                        <span>{s.caption || s.brief}</span>
+                        <span className="list-post-caption">{s.caption || s.brief}</span>
                         <span className={`plan-state state-${s.state}`}>
                           {labels[s.state]}
                           {s.has_newer_version

@@ -1,0 +1,28 @@
+/* Supplied Post details reference: a 520px panel, twelve pixels from the viewport. */
+dialog.campaign-post-drawer{position:fixed;inset:12px 12px 12px auto;margin:0;width:520px;max-width:calc(100vw - 24px);height:calc(100dvh - 24px);max-height:calc(100dvh - 24px);border:0;border-radius:28px;padding:0;background:#fff;color:#17171a;box-shadow:0 30px 80px #17171a40;overflow:hidden}
+dialog.campaign-post-drawer[open]{display:flex;flex-direction:column}
+.campaign-post-drawer::backdrop{background:rgba(23,23,26,.28);backdrop-filter:blur(3px)}
+.campaign-post-drawer-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 18px 12px 24px;flex:none}
+.campaign-post-drawer-header h2{margin:0;font-family:'Desvio Serif','DM Serif Display',Georgia,serif;font-size:26px;font-weight:400;line-height:1.2}
+.campaign-post-drawer .campaign-post-drawer-header button{display:grid;place-items:center;width:38px;height:38px;min-height:38px;border:0;border-radius:50%;padding:0;background:#f4f3f8;font-size:24px;font-weight:400;line-height:1}
+.campaign-post-drawer-content{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1;padding:0 24px 24px}
+.campaign-post-drawer .campaign-post-screen{width:100%;min-width:0;margin:0}
+.campaign-post-drawer .slot-panel{padding:0!important;border:0;border-radius:0;background:transparent}
+.campaign-post-drawer .slot-panel>.section-heading{display:none}
+.campaign-post-drawer .slot-columns{display:flex;flex-direction:column;gap:20px;margin-top:16px}
+.campaign-post-drawer .slot-columns>div{width:100%;min-width:0}
+.campaign-post-drawer .slot-heading{font-size:13px;margin:12px 0;gap:8px}
+.campaign-post-drawer .slot-panel>p{font-size:13px;color:#6e6e78}
+.campaign-post-drawer .creative-preview,.campaign-post-drawer .creative-surface{border-radius:20px;overflow:hidden;max-width:100%}
+.campaign-post-drawer .slot-caption{background:#f4f3f8;border-radius:18px;padding:16px;font-size:14.5px;line-height:1.55}
+.campaign-post-drawer .post-review-controls{border:0;padding:0}
+.campaign-post-drawer .slot-panel h3,.campaign-post-drawer .slot-panel legend{font-family:inherit;font-size:15px;font-weight:600}
+.campaign-post-drawer details{border:0;border-radius:18px;background:#f4f3f8;padding:14px 16px;margin:12px 0}
+.campaign-post-drawer summary{font-size:14px;font-weight:600;cursor:pointer}
+.campaign-post-drawer :is(input,select,textarea){max-width:100%;min-width:0}
+.campaign-post-drawer .actions,.campaign-post-drawer .post-design-actions{display:flex;flex-wrap:wrap;gap:8px}
+.campaign-post-drawer .campaign-video-reference-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:540px){dialog.campaign-post-drawer{inset:8px;width:calc(100vw - 16px);max-width:calc(100vw - 16px);height:calc(100dvh - 16px);max-height:calc(100dvh - 16px);border-radius:24px}.campaign-post-drawer-header{padding:16px}.campaign-post-drawer-content{padding:0 16px 20px}}
+/* Keep Fabric's intrinsic artboard size from widening the drawer's grid item. */
+.campaign-post-drawer .slot-panel,.campaign-post-drawer .creative-editor,.campaign-post-drawer .creative-artboard{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.campaign-post-drawer .creative-surface{width:100%;min-width:0;box-sizing:border-box}

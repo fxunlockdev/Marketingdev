@@ -15,9 +15,9 @@ const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class PlanningJobs {
  constructor(readonly jobs:AssetJobs,readonly runtime:SkillRuntime,readonly provider:CreativeProvider,readonly gemini:GeminiPlanner=new GeminiPlanner()){}
  finish(db:any,j:any,status:string,code:string|null=null){return db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]).then(()=>status);}
- async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai'){
+ async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:4000|16000=16000){
   const provider=providerName==='gemini'?this.gemini:this.provider;
-  const wire=provider.plannerRequest(message,model,16000);
+  const wire=provider.plannerRequest(message,model,maxOutputTokens);
   const prepared=await this.jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='plan.generate')throw new Error('JOB_KIND_DENIED');
    if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
@@ -51,7 +51,7 @@ export class PlanningJobs {
   if('cached' in prepared)return prepared.cached;
   if('blocked' in prepared)throw new CreativeError(prepared.blocked!);
   let result;
-  try{result=await provider.plan(message,model,16000);}catch(error){
+  try{result=await provider.plan(message,model,maxOutputTokens);}catch(error){
    const known=error instanceof CreativeError||((error instanceof OpenAI.APIError||error instanceof GeminiAPIError)&&[400,401,403,404,422,429].includes(error.status??0));
    await this.jobs.transaction(scope,async(db,j)=>{await db.query('UPDATE app.planning_calls SET status=$3 WHERE job_id=$1 AND step=$2',[j.id,message.step,known?'rejected':'unknown']);});
    throw new CreativeError(known?(error instanceof CreativeError?error.code:'PLAN_PROVIDER_REJECTED'):'PLAN_SUBMISSION_UNKNOWN');
@@ -99,7 +99,7 @@ export class PlanningJobs {
    const {request,input,model}=prepared;
    let result:PlanningResult=request.output;
    if(!result){
-    result=await this.runtime.contentPlan(input,message=>this.call(scope,message,model,request.provider));
+    result=await this.runtime.contentPlan(input,message=>this.call(scope,message,model,request.provider,input.post_ideas?4000:16000));
     await this.jobs.transaction(scope,async(db,j)=>{
      if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(result)]);
@@ -110,6 +110,8 @@ export class PlanningJobs {
    return await this.jobs.transaction(scope,async(db,j)=>{
     if(terminal.has(j.status))return j.status;
     if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
+    // Suggestions are saved on the durable request only: never create/schedule posts.
+    if(input.post_ideas)return this.finish(db,j,'succeeded');
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${j.brand_id}`]);
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${j.brand_id}`]);
     const prior=(await db.query('SELECT id FROM app.content_plans WHERE job_id=$1',[j.id])).rows[0];

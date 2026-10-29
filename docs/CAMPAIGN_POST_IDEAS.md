@@ -1,0 +1,9 @@
+# Campaign post ideas
+
+The New Post composer requests three real AI topic suggestions below Topic. Selecting one fills the topic; it does not create or publish a post. Suggestions use the selected campaign, existing topics, approved brand knowledge, saved content preferences, explicit recent feedback, and the planning pipeline's approved learning. Approval is context, not a claim of audience performance or personal liking.
+
+GET/POST `/api/v1/businesses/:id/content-plans/:planId/ideas` require authenticated, scoped campaign access. POST reuses saved suggestions for the campaign/format/channel until the user asks for new ideas. Queued, running, retrying and uncertain requests cannot be duplicated by refresh. The existing planning workflow handles durable provider calls, reservations, credit accounting and unknown outcomes. Idea requests use a 4,000 output-token ceiling and a separate daily request limit; they never insert campaigns or calendar slots.
+
+No migration or new provider key is required. Deploy the updated trusted worker before the API, then the web app. The existing isolated skills image stays pinned: the trusted boundary strips the internal `post_ideas` marker before invoking the skill.
+
+Verification: 324 contract tests passed, plus the focused foundation test (`node scripts/foundation-test.mjs --campaign-ideas`) using real PostgreSQL auth/scoping and the isolated skill runtime with a mocked provider. The test verifies grounding inputs, tenant rejection, cached reuse, output-token bounds and absence of newly created campaigns/posts. An isolated browser check verifies selection into Topic and preserves reference uploads/context. These tests do not constitute live AI, video or publishing acceptance.

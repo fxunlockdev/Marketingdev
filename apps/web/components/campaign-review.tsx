@@ -6,6 +6,7 @@ import {AppLink} from './app-link';
 import {Loading,Notice} from './primitives';
 import {CampaignBlogsList} from './campaign-blog';
 import {CampaignNewPost} from './campaign-new-post';
+import {CampaignPostDrawer} from './campaign-post';
 import {CampaignMediaPreview} from './campaign-media-preview';
 import {postFormatLabel} from './post-format';
 import {PostThumbnail} from './post-thumbnail';
@@ -17,10 +18,11 @@ import {creativeDimensions} from '../../api/src/campaign-formats';
 import {addDays,dayStart} from '../../api/src/local-calendar';
 
 /** Campaign creation returns here, independently of the conversational workspace. */
-export function CampaignReview({business}:{business:{id:string;name:string;role:string}}){
+export function CampaignReview({business}:{business:{id:string;name:string;role:string;organization_id:string;has_approved_brand:boolean}}){
  const router=useRouter(),query=useSearchParams(),planId=query.get('plan'),thread=query.get('thread');
  const root=`/api/v1/businesses/${business.id}`;
  const [plan,setPlan]=useState<any>(),[slots,setSlots]=useState<any[]>([]),[error,setError]=useState<unknown>(),[revision,setRevision]=useState(0),[editing,setEditing]=useState<Set<string>>(new Set()),[status,setStatus]=useState('queued'),[reconnecting,setReconnecting]=useState(false),[generationStates,setGenerationStates]=useState<string[]>([]),[generationJobs,setGenerationJobs]=useState<{slot_id:string;status:string}[]>([]);
+ const [selectedPost,setSelectedPost]=useState<string>();
  const writable=['owner','admin','editor'].includes(business.role);
  useEffect(()=>{setPlan(undefined);setSlots([]);setEditing(new Set());setError(undefined);setStatus('queued');setGenerationStates([]);setGenerationJobs([]);},[root,planId,thread]);
  const track=useCallback((id:string,open:boolean)=>setEditing(current=>{const next=new Set(current);open?next.add(id):next.delete(id);return next;}),[]);
@@ -45,11 +47,12 @@ export function CampaignReview({business}:{business:{id:string;name:string;role:
  <ol className="campaign-preview-grid" aria-label="Campaign posts">{slots.map(s=>{const progress=campaignPostProgress(generationJobs.find(j=>j.slot_id===s.id)?.status);return <li key={s.id}>
  <div className="campaign-card-top"><span>{postFormatLabel(s)}</span><time dateTime={s.planned_at}>{new Intl.DateTimeFormat(undefined,{timeZone:plan.timezone,month:'short',day:'numeric'}).format(new Date(s.planned_at))}</time></div>
  <div className="campaign-card-image" style={s.creative_spec?{aspectRatio:`${creativeDimensions(s.creative_spec).width} / ${creativeDimensions(s.creative_spec).height}`}:{}}>{!s.creative_version_id&&!s.video_version_id&&!s.carousel_version_id&&s.reference_ids?.length?<><SavedReferencePreviews businessId={business.id} ids={s.reference_ids.slice(0,1)}/><span className="reference-preview-label">Reference image</span></>:!s.creative_version_id&&!s.video_version_id&&!s.carousel_version_id&&progress?<div className={`campaign-generation-placeholder ${progress.tone}`} role="status"><strong>{progress.label}</strong><p>{progress.description}</p></div>:<PostThumbnail businessId={business.id} post={s}/>}</div>
- <div className="campaign-card-body">{progress&&<div className={`campaign-post-progress ${progress.tone}`}><strong>{progress.label}</strong>{progress.recover&&<AppLink className="button" href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Open post to resolve</AppLink>}</div>}<CampaignMediaPreview business={business} post={s}/><PlannedTopic showReferencePreview={false} businessId={business.id} slot={s} writable={writable} onEditing={track} onSaved={updated=>setSlots(current=>current.map(item=>item.id===updated.id?{...item,...updated}:item))}/>{!s.video_version_id&&s.format==='video'&&<AppLink className="button" href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Review script and framing</AppLink>}{(s.creative_version_id||s.video_version_id||s.carousel_version_id)&&<AppLink className="button primary" href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Review post</AppLink>}</div>
+ <div className="campaign-card-body">{progress&&<div className={`campaign-post-progress ${progress.tone}`}><strong>{progress.label}</strong>{progress.recover&&<button className="button" onClick={()=>setSelectedPost(s.id)}>Open post to resolve</button>}</div>}<CampaignMediaPreview business={business} post={s}/><PlannedTopic showReferencePreview={false} businessId={business.id} slot={s} writable={writable} onEditing={track} onSaved={updated=>setSlots(current=>current.map(item=>item.id===updated.id?{...item,...updated}:item))}/>{!s.video_version_id&&s.format==='video'&&<button className="button" onClick={()=>setSelectedPost(s.id)}>Review script and framing</button>}{(s.creative_version_id||s.video_version_id||s.carousel_version_id)&&<button className="button primary" onClick={()=>setSelectedPost(s.id)}>Review post</button>}</div>
  </li>;})}</ol>
  <CampaignBlogsList businessId={business.id} planId={plan.id}/>
  <footer className="campaign-review-footer"><CampaignImages automatic reviewed onStates={setGenerationStates} onJobs={setGenerationJobs} businessId={business.id} planId={plan.id} slots={slots} disabled={!writable||editing.size>0} onRefresh={()=>setRevision(n=>n+1)} onStarted={()=>{router.replace(`/b/${business.id}/campaign-review?plan=${plan.id}&stage=generating`);setRevision(n=>n+1);window.scrollTo({top:0,behavior:'auto'});}}/></footer>
  
  </>}
+ {selectedPost&&<CampaignPostDrawer key={selectedPost} business={business} slotId={selectedPost} onClose={()=>{setSelectedPost(undefined);setRevision(n=>n+1);}}/>}
  </section>;
 }
