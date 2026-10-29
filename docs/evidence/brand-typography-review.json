@@ -1,0 +1,227 @@
+{
+  "source_commit": "10b0be3",
+  "scope": "Brand and design typography; interface typography unchanged",
+  "browser": {
+    "screens": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 924,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-29T13:48:57.769Z",
+    "fonts": [
+      {
+        "family": "DM Sans",
+        "loaded": 1
+      },
+      {
+        "family": "DM Serif Display",
+        "loaded": 1
+      },
+      {
+        "family": "Playfair Display",
+        "loaded": 1
+      },
+      {
+        "family": "Montserrat",
+        "loaded": 1
+      },
+      {
+        "family": "Lora",
+        "loaded": 1
+      },
+      {
+        "family": "Oswald",
+        "loaded": 1
+      }
+    ],
+    "preview": {
+      "headline": "\"Playfair Display\"",
+      "weight": "600",
+      "body": "Montserrat"
+    }
+  },
+  "editor": {
+    "screens": [],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-29T13:48:45.022Z",
+    "editor_font": "Playfair Display",
+    "editor_weight": "600",
+    "canvas": 9282
+  },
+  "hosted_renderer": {
+    "checked_at": "2026-10-29T14:27:23.624Z",
+    "passed": true,
+    "image": "sha256:bc22d228dbba08934b773df45d8c54934bb81636f41aa2bcfa29ff7df22d61ae",
+    "fonts": {
+      "DM Sans": {
+        "name": "DM Sans",
+        "sha256": "8cd08d97e89c24d0aa92edd2f0f4c8ee6195eee9b7c9f154865a58b02f0c1c0d",
+        "faces": {
+          "100": "99391d0a17a51920a105c4933a0b00e048fc89d03655711bc667b87b308c1364",
+          "200": "f2029eff944bf27e458463d735d9aeebaff22afc4c9637571e0c6377bef6a740",
+          "300": "a92701a29048efbb564b6a04aafd254c2c35cc9ea4e11ff8905906dedfdb897b",
+          "400": "754c27ce20e06a607362ec093dbaf65f71157f9a1fc384890496a596a14012b0",
+          "500": "6782a3a488c7cbfd953371b400fc3ab0e9f26ff26a0456da630413ce0f5bc9d2",
+          "600": "c39677faf155e13fda6f983853ff1c00d2e5dc834031e63d16490098f387df5d",
+          "700": "c4b7320ae758fd8603bbc46aabf7ab4d246a54a94506d837e430e81cc3147299",
+          "800": "253288eb83ba4fa123b2ff9554fbc36e3c53c6e62b2d78bb8f270f7256cbe3df",
+          "900": "540a4d185bf12c75ef29f4893b4029067ec2b9956b0535143d2a3cfa5711e930"
+        }
+      },
+      "DM Serif Display": {
+        "name": "DM Serif Display",
+        "sha256": "8cc3643535edf039aa5d95440a8542735e9197e4f4b8d9303e980fefbf5ab616",
+        "faces": {}
+      },
+      "Playfair Display": {
+        "name": "Playfair Display",
+        "sha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
+        "faces": {
+          "400": "78ad0a53801e10d608044bcf922667185eb2b72c80f104665440ebcea62fe8c9",
+          "500": "5a5b8b5c0f7432e31b3e3f04115760215e6b973a5559dea5fc0fd80f90e657f3",
+          "600": "1f4f50c86fa610d537d9ed9f0757a86fcba5a9eeffe4c570db67e866badae856",
+          "700": "1d6e1e1c3d372a4fe9a58eb36025f744d317c863a2c30cc00d5b3438551ecb85",
+          "800": "1ba0ed9b79d0b5c53270b2c0b5974a47a52f04d4fddb23e3046a03ae72325ebf",
+          "900": "c0c29af4688ea90b1e8c671201a3980c61a0f0e3d233e370738411e2f5d88dc4"
+        }
+      },
+      "Montserrat": {
+        "name": "Montserrat",
+        "sha256": "0f7b311b2f3279e4eef9b2f968bcdbab6e28f4daeb1f049f4f278a902bcd82f7",
+        "faces": {
+          "100": "389346bf34696ae567d75065aa10d58d151e8f3e25b83f9e2fef4197113c8022",
+          "200": "dc1f57fc94a919556bc8c96ff51890258468f061ab50cded8b732cbe748f0f5e",
+          "300": "d7b1fa472c7d6075767580f94b38038b6032b356b98ec68617f3b07886d799df",
+          "400": "0a03868155f80cd36122046ca045937cdf38d548600e3937e767233bae018a6d",
+          "500": "98e8ec0e138fd98318de73e8f7e2a88a5d9adcea12ab1a99caf99f1d0ef5da62",
+          "600": "e8ea7caefaeeb47ff672e927053aae847113d6c353a55959ffc7a3ae563b7683",
+          "700": "2ff688a5a49cc3251ee78e0c280f748609669b31010e3a773b338995fa0276c7",
+          "800": "72c6e2094a849edad0faeef557aa7680cdabf2a1ebd2c5b9a4a9edb81585b4c0",
+          "900": "9aa5a82114b22e1c2acf4217cf4b6f2703ab26eea8dc0f2ca6b8ecf20a318f32"
+        }
+      },
+      "Lora": {
+        "name": "Lora",
+        "sha256": "822a6621ccbe8d97d20ac88c1c41f5615c9c2c202eaa75f272cd452aac6475a7",
+        "faces": {
+          "400": "51eb3259cd1783dc44f78431b9e0a64028a4e3a5219b1d834946808bb741a9b8",
+          "500": "1c540686adac0280dd021cee09fec5fa15577a61555eb73a691892b5817ef780",
+          "600": "98a1c0f7f2c4acdfdae6d541409e4444a9e0f24d8db419736a6729120fa4a56d",
+          "700": "495ca4a35cebe28191f803bbbe7792ecf1ecb7427fad9779f0921a88cd2db35a"
+        }
+      },
+      "Oswald": {
+        "name": "Oswald",
+        "sha256": "5b38c246e255a12f5712d640d56bcced0472466fc68983d2d0410ec0457c2817",
+        "faces": {
+          "200": "280da9cd9865afb8e2a04241df26ba6e5309bc412c54bd7a2245518ed5da373f",
+          "300": "f7e4c4e2b0d2a651f381c9e260e78deafa715a050149beda5a6dd3b78544e7e5",
+          "400": "fd2286e2170ecab98a17e77bbfeca790576d329b0488dca1cb392f2b84200ec3",
+          "500": "2a320dbce0f3c192fbc16f5984d411815839ea62c11c75379a8eae6a9d99e24e",
+          "600": "c72a36257421653d5179a1faf37273e67c8c562d4d5a5719160ac952dd457ba0",
+          "700": "3ae4fe8d3f532ca6494532fc76410268f446023d651a91eb37f35055926fd961"
+        }
+      },
+      "Arial": {
+        "name": "Liberation Sans",
+        "sha256": "8d91388f1d3604b3b8ae0e3ee2d140e50cd6122f9214514f4aca772540a4076d",
+        "faces": {}
+      },
+      "Georgia": {
+        "name": "Liberation Serif",
+        "sha256": "29d12439831b7f59194efec85872f24f54eff05738933f9a860220d2abff88ba",
+        "faces": {}
+      },
+      "Verdana": {
+        "name": "DejaVu Sans",
+        "sha256": "abdc775b21b1bc470d50c97e790d276f2054b7504e56e5bd3e64f48d68582322",
+        "faces": {}
+      }
+    },
+    "scope": "Deployed worker pin and actual isolated renderer font binary hashes match browser assets",
+    "paid_calls": 0
+  },
+  "contract_and_loader_tests": 16,
+  "isolated_renderer_tests": 3,
+  "paid_generation_calls": 0,
+  "limitations": [
+    "No custom font upload added",
+    "Existing designs retain their saved fonts; choose a new family in Edit design to change them"
+  ],
+  "live_browser": {
+    "screens": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 924,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-29T14:28:54.482Z",
+    "fonts": [
+      {
+        "family": "DM Sans",
+        "loaded": 1
+      },
+      {
+        "family": "DM Serif Display",
+        "loaded": 1
+      },
+      {
+        "family": "Playfair Display",
+        "loaded": 1
+      },
+      {
+        "family": "Montserrat",
+        "loaded": 1
+      },
+      {
+        "family": "Lora",
+        "loaded": 1
+      },
+      {
+        "family": "Oswald",
+        "loaded": 1
+      }
+    ],
+    "preview": {
+      "headline": "\"Playfair Display\"",
+      "weight": "600",
+      "body": "Montserrat"
+    }
+  },
+  "live_editor": {
+    "screens": [],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-29T14:29:11.351Z",
+    "editor_font": "Playfair Display",
+    "editor_weight": "600",
+    "canvas": 9282
+  },
+  "deployments": {
+    "api": "dc3d76e5-23a2-474c-95a0-c13d04a36f3e",
+    "web": "899bd1c3-6d90-460e-be46-2e2b9160616a",
+    "status": "SUCCESS"
+  }
+}
