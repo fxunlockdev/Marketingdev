@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Canvas, FabricImage, Textbox, Rect } from "fabric";
 import type { Design } from "../../api/src/creative-design";
-import { api } from "./api";
+import { loadPrivateImage } from "./load-private-image";
 import { Field, Notice } from "./primitives";
 export type { Design };
 
@@ -95,22 +95,9 @@ export function CreativeEditor({
     });
     (async () => {
       try {
-        await Promise.all(['DM Sans','DM Serif Display'].map(font=>document.fonts.load(`16px "${font}"`)));
-        if (!active) return;
-        const grant = await api(
-          `/api/v1/businesses/${businessId}/creative-media/${design.background_media_id}`,
-        );
-        if (!active) return;
-        const response = await fetch(grant.url, {
-          credentials: "omit",
-          cache: "no-store",
-          signal: controller.signal,
-        });
-        if (!response.ok)
-          throw new Error("The private image could not be loaded. Try again.");
-        const blob = await response.blob();
-        if (blob.type !== "image/png" || blob.size > 20 * 1024 * 1024)
-          throw new Error("This image could not be opened safely.");
+        // Font rendering must not block the photo. Repaint when fonts settle.
+        void Promise.all(['DM Sans','DM Serif Display'].map(font=>document.fonts.load(`16px "${font}"`))).then(()=>{if(active)c.requestRenderAll();}).catch(()=>{});
+        const blob = await loadPrivateImage(`/api/v1/businesses/${businessId}/creative-media/${design.background_media_id}`,controller.signal);
         if (!active) return;
         url = URL.createObjectURL(blob);
         const image = await FabricImage.fromURL(url, {

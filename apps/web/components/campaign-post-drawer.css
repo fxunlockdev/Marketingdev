@@ -26,3 +26,9 @@ dialog.campaign-post-drawer[open]{display:flex;flex-direction:column}
 /* Keep Fabric's intrinsic artboard size from widening the drawer's grid item. */
 .campaign-post-drawer .slot-panel,.campaign-post-drawer .creative-editor,.campaign-post-drawer .creative-artboard{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
 .campaign-post-drawer .creative-surface{width:100%;min-width:0;box-sizing:border-box}
+/* Keep the full panel and long campaign text inside the visible viewport. */
+dialog.campaign-post-drawer{box-sizing:border-box;max-inline-size:calc(100vw - 24px)}
+.campaign-post-drawer-content{min-width:0;overflow-wrap:anywhere}
+.campaign-post-drawer .slot-heading,.campaign-post-drawer .slot-panel>p{white-space:normal;overflow-wrap:anywhere}
+.campaign-post-drawer .post-design-actions{margin-bottom:12px}
+@media(max-width:540px){dialog.campaign-post-drawer{max-inline-size:calc(100vw - 16px)}}

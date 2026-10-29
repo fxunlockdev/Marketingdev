@@ -2,6 +2,7 @@
 import {useCallback,useEffect,useId,useRef,useState} from 'react';
 import {VideoRequest} from './video-canvas';
 import {api} from './api';
+import {loadPrivateImage} from './load-private-image';
 import {Notice} from './primitives';
 type SavedImage={format:'png'|'instagram-jpeg';id:string;sha256:string;source_sha256:string;renderer_image:string;manifest:{warnings?:string[]}};
 type ExportState={configured:boolean;renderer_image:string|null;exports:SavedImage[];jobs:{format:'png'|'instagram-jpeg';id:string;status:string;cancel_requested:boolean;error_code:string|null}[];approvals:{id:string;export_id:string;context_type:string;context_id:string;context_revision:number}[]};
@@ -19,13 +20,10 @@ export function CreativeExportPanel({format='png',threadId,business,versionId,so
  useEffect(()=>{
   setPreview('');setLoaded(false);let canceled=false,url='';const controller=new AbortController();
   if(saved)void(async()=>{
-   const grant=await api(`${root}/creative-exports/${saved.id}/download`);
-   const response=await fetch(grant.url,{signal:controller.signal,cache:'no-store'});
-   if(!response.ok)throw new Error('Could not load the saved image. Reload and try again.');
-   const bytes=await response.arrayBuffer();
-   if(bytes.byteLength>20*1024*1024||bytes.byteLength!==grant.bytes)throw new Error('The saved image failed its integrity check.');
+   const blob=await loadPrivateImage(`${root}/creative-exports/${saved.id}/download`,controller.signal);
+   const bytes=await blob.arrayBuffer();
    const sha=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(x=>x.toString(16).padStart(2,'0')).join('');
-   if(sha!==saved.sha256||sha!==grant.sha256)throw new Error('The saved image failed its integrity check.');
+   if(sha!==saved.sha256)throw new Error('The saved image failed its integrity check.');
    if(!canceled){url=URL.createObjectURL(new Blob([bytes],{type:saved.format==='png'?'image/png':'image/jpeg'}));setPreview(url);}
   })().catch(e=>{if(!canceled)setError(e);});
   return()=>{canceled=true;controller.abort();if(url)URL.revokeObjectURL(url);};

@@ -16,7 +16,7 @@ export function PrivateVisual({businessId,visualId,label,alt,crop,autoLoad=false
   try{
    const grant=await api<{url:string;bytes:number;sha256:string}>(`/api/v1/businesses/${businessId}/visuals/${visualId}`);
    if(!Number.isSafeInteger(grant.bytes)||grant.bytes<1||grant.bytes>6*1024*1024||!/^[a-f0-9]{64}$/.test(grant.sha256))throw new Error('The visual reference could not be verified.');
-   const response=await fetch(grant.url,{cache:'no-store',signal:controller.signal});
+   const response=await fetch(grant.url,{cache:'no-store',signal:AbortSignal.any([controller.signal,AbortSignal.timeout(30000)])});
    if(!response.ok||!response.body)throw new Error('The visual reference could not be loaded. Please try again.');
    const reader=response.body.getReader(),chunks:Uint8Array[]=[];let size=0;
    try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>grant.bytes)throw new Error('The visual reference failed its size check.');chunks.push(value);}}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
