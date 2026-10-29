@@ -1,0 +1,22 @@
+@font-face{font-family:'Playfair Display';src:url('/fonts/playfairdisplay.ttf') format('truetype');font-weight:400 900;font-display:swap}
+@font-face{font-family:'Montserrat';src:url('/fonts/montserrat.ttf') format('truetype');font-weight:100 900;font-display:swap}
+@font-face{font-family:'Lora';src:url('/fonts/lora.ttf') format('truetype');font-weight:400 700;font-display:swap}
+@font-face{font-family:'Oswald';src:url('/fonts/oswald.ttf') format('truetype');font-weight:200 700;font-display:swap}
+.brand-type-controls{border:0;padding:0;margin:24px 0;min-width:0}
+.brand-type-controls>legend{font-size:18px;font-weight:600;padding:0}
+.brand-type-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;margin:20px 0}
+.brand-type-role{display:grid;gap:8px;min-width:0}
+.brand-type-role>label{font-size:13px;font-weight:600;margin-top:8px}
+.brand-type-role select{width:100%;min-width:0}
+.brand-type-live{border-radius:20px;background:#f4f1ea;padding:clamp(22px,3vw,36px);margin:20px 0;display:grid;gap:18px;color:#17171a}
+.brand-type-live>strong{font-size:clamp(28px,3vw,42px);line-height:1.15;overflow-wrap:anywhere}
+.brand-type-live>p{font-size:16px;line-height:1.6;margin:0;max-width:50ch}
+.brand-type-live>small{font-size:12px;color:#646470}
+.brand-type-kicker{font-size:11px;font-weight:600;letter-spacing:.1em}
+.brand-type-presets{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px}
+.desvio-redesign .brand-type-presets>button{display:grid;gap:10px;text-align:left;border:1px solid var(--line);border-radius:16px;padding:16px;background:#fff;white-space:normal;min-width:0;color:var(--ink)}
+.desvio-redesign .brand-type-presets>button[aria-pressed=true]{border-color:#6a5cff;box-shadow:inset 0 0 0 1px #6a5cff;background:#f7f5ff}
+.brand-type-presets strong{font-size:38px;line-height:1.2}
+.brand-type-presets span{font-size:12px;font-weight:600}
+.brand-type-presets small{font-size:11px;color:#646470}
+@media(max-width:540px){.brand-type-fields{grid-template-columns:minmax(0,1fr);gap:12px}.brand-type-presets{grid-template-columns:repeat(2,minmax(0,1fr))}}

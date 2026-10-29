@@ -1278,7 +1278,7 @@ function BrandReview({
                   </select>
                 )}
               </Field>
-              <Field label="Fact">
+              {field!=="fonts"&&<Field label="Fact">
                 {(id) => (
                   <textarea
                     id={id}
@@ -1288,11 +1288,11 @@ function BrandReview({
                     onChange={(e) => setValue(e.target.value)}
                   />
                 )}
-              </Field>
+              </Field>}
             </div>
             {field==="fonts"&&<BrandFontChoices value={value} onChange={setValue} disabled={busy}/>}
             {field==="colors"&&<BrandStylePreview field={field} value={value}/>}
-            <button disabled={busy}>
+            <button disabled={busy||!value.trim()}>
               {busy ? "Saving…" : "Add for review"}
             </button>
           </form>
@@ -1440,7 +1440,7 @@ function Finding({
       </div>
       <BrandStylePreview field={f.field} value={editing?value:f.value}/>
       {editing&&f.field==="fonts"&&<BrandFontChoices value={value} onChange={setValue} disabled={busy}/>}
-      {editing ? (
+      {editing && f.field!=="fonts" ? (
         <Field label={`Edit ${f.field.replaceAll("_", " ")}`}>
           {(id) => (
             <textarea
@@ -1451,9 +1451,9 @@ function Finding({
             />
           )}
         </Field>
-      ) : (
+      ) : !editing ? (
         <p>{f.value}</p>
-      )}
+      ) : null}
       <Notice error={error} />
       {alternatives.length>0&&<p className="hint">Choose Correct or save an edit to use this description instead of the other versions.</p>}
       {writable && (

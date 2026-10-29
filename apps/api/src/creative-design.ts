@@ -1,4 +1,5 @@
 import { CreativeError, type CreativeBrief } from "./creative-contracts.js";
+import {DESIGN_FONT_FAMILIES,designFontWeights,resolveBrandTypography,type BrandFontPreset,type BrandTypography,type DesignFontFamily,type FontWeight} from "./brand-typography.js";
 export type Design = {
   schema_version: 1;
   width: number;
@@ -12,9 +13,9 @@ export type Design = {
     y: number;
     width: number;
     fontSize: number;
-    fontFamily: "Arial" | "Georgia" | "Verdana" | "DM Sans" | "DM Serif Display";
+    fontFamily: DesignFontFamily;
     fill: string;
-    fontWeight?: 400 | 700;
+    fontWeight?: FontWeight;
     backing?: { fill: string; opacity: number; padding: number };
     align: "left" | "center" | "right";
   }[];
@@ -28,8 +29,10 @@ export function createDesign(
   width: number,
   height: number,
   brief: CreativeBrief,
-  font?: "modern" | "classic" | "contrast",
+  font?: BrandFontPreset | BrandTypography,
 ): Design {
+  const typography=resolveBrandTypography(font);
+  if(font!==undefined&&!typography)throw new CreativeError("CREATIVE_DESIGN_INVALID");
   return {
     schema_version: 1,
     width,
@@ -44,9 +47,9 @@ export function createDesign(
         y: height * 0.07,
         width: width * 0.86,
         fontSize: 56,
-        fontFamily: font === "classic" ? "DM Serif Display" : font ? "DM Sans" : "Arial",
+        fontFamily: typography?.headline.family??"Arial",
         fill: "#ffffff",
-        fontWeight: 700,
+        fontWeight: typography?.headline.weight??700,
         backing: { fill: "#111111", opacity: 0.88, padding: 16 },
         align: "left",
       },
@@ -58,9 +61,9 @@ export function createDesign(
         y: height * 0.68,
         width: width * 0.86,
         fontSize: 28,
-        fontFamily: font ? "DM Sans" : "Arial",
+        fontFamily: typography?.body.family??"Arial",
         fill: "#ffffff",
-        fontWeight: 700,
+        fontWeight: typography?.body.weight??700,
         backing: { fill: "#111111", opacity: 0.88, padding: 16 },
         align: "left",
       },
@@ -72,9 +75,9 @@ export function createDesign(
         y: height * 0.82,
         width: width * 0.86,
         fontSize: 32,
-        fontFamily: font ? "DM Sans" : "Arial",
+        fontFamily: typography?.body.family??"Arial",
         fill: "#ffffff",
-        fontWeight: 700,
+        fontWeight: typography?.body.weight??700,
         backing: { fill: "#111111", opacity: 0.88, padding: 16 },
         align: "left",
       },
@@ -108,12 +111,12 @@ export function validateDesign(
         "align,fill,fontFamily,fontSize,id,text,type,width,x,y" ||
       !/^[-a-z0-9]{1,40}$/.test(l.id) ||
       seen.has(l.id) ||
-      (l.fontWeight !== undefined && ![400, 700].includes(l.fontWeight)) ||
+      (l.fontWeight !== undefined && !designFontWeights(l.fontFamily).includes(l.fontWeight)) ||
       (l.backing !== undefined && (!l.backing || Object.keys(l.backing).sort().join(",") !== "fill,opacity,padding" || !/^#[a-f0-9]{6}$/i.test(l.backing.fill) || !Number.isFinite(l.backing.opacity) || l.backing.opacity < 0 || l.backing.opacity > 1 || !Number.isFinite(l.backing.padding) || l.backing.padding < 0 || l.backing.padding > 48 || l.x < l.backing.padding || l.y < l.backing.padding || l.x + l.width + l.backing.padding > width)) ||
       l.type !== "text" ||
       typeof l.text !== "string" ||
       l.text.length > 1000 ||
-      !["Arial", "Georgia", "Verdana", "DM Sans", "DM Serif Display"].includes(l.fontFamily) ||
+      !(DESIGN_FONT_FAMILIES as readonly string[]).includes(l.fontFamily) ||
       !["left", "center", "right"].includes(l.align) ||
       !/^#[a-f0-9]{6}$/i.test(l.fill) ||
       ![l.x, l.y, l.width, l.fontSize].every(Number.isFinite) ||

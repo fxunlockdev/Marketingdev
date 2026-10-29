@@ -211,3 +211,49 @@ test('generated designs keep long explanations out of the image while preserving
  assert.equal(revised.layers.find(l=>l.id==='cta').text,short.cta);
  assert.equal(reviseDesign(revised,'third-media',long).layers.find(l=>l.id==='body').text,'');
 });
+
+test('custom brand typography maps independent family and weight to editable layers',async()=>{
+ const {parseBrandTypography,serializeBrandTypography,approvedBrandFont}=await import('../../dist/brand-typography.js');
+ const value='Headlines: Playfair Display, weight 600. Body: Montserrat, weight 500.';
+ const typography=parseBrandTypography(value);
+ assert.deepEqual(typography,{headline:{family:'Playfair Display',weight:600},body:{family:'Montserrat',weight:500}});
+ assert.equal(serializeBrandTypography(typography),value);
+ const approved=approvedBrandFont([{field:'fonts',value}]);
+ const design=createDesign('media',1024,1024,brief,approved);
+ assert.equal(design.layers[0].fontFamily,'Playfair Display');
+ assert.equal(design.layers[0].fontWeight,600);
+ for(const layer of design.layers.slice(1)){
+  assert.equal(layer.fontFamily,'Montserrat');assert.equal(layer.fontWeight,500);
+ }
+ assert.equal(validateDesign(design,'media',1024,1024),design);
+ const {reviseDesign}=await import('../../dist/creative-design.js');
+ assert.deepEqual(reviseDesign(design,'next',brief).layers.map(l=>[l.fontFamily,l.fontWeight]),design.layers.map(l=>[l.fontFamily,l.fontWeight]));
+});
+
+test('font catalog rejects unknown sources and unsupported weights without changing legacy documents',async()=>{
+ const {parseBrandTypography,serializeBrandTypography,BRAND_FONT_PAIRINGS}=await import('../../dist/brand-typography.js');
+ for(const value of [
+  'Headlines: Remote Font, weight 400. Body: DM Sans, weight 400.',
+  'Headlines: DM Serif Display, weight 700. Body: DM Sans, weight 400.',
+  'Headlines: Lora, weight 900. Body: DM Sans, weight 400.',
+  'Headlines: Oswald, weight 600. Body: DM Sans, weight 401.',
+  'Headlines: Playfair Display, weight 600. Body: DM Sans, weight 400. Load https://evil/font.ttf',
+ ])assert.equal(parseBrandTypography(value),undefined);
+ assert.throws(()=>serializeBrandTypography({headline:{family:'Lora',weight:900},body:{family:'DM Sans',weight:400}}));
+ for(const pair of BRAND_FONT_PAIRINGS){const design=createDesign('media',1024,1024,brief,pair.id);assert.equal(validateDesign(design,'media',1024,1024),design);}
+ const invalid=createDesign('media',1024,1024,brief,'impact');invalid.layers[0].fontWeight=900;assert.throws(()=>validateDesign(invalid,'media',1024,1024));
+ const legacy=createDesign('media',1024,1024,brief);legacy.layers[0].fontFamily='DM Serif Display';legacy.layers[0].fontWeight=700;assert.equal(validateDesign(legacy,'media',1024,1024),legacy);
+});
+
+
+test('brand campaign font delegates to the approved brand while explicit choices override it',async()=>{
+ const {savedCampaignFont,CAMPAIGN_CREATIVE_PREFIX}=await import('../../dist/campaign-design.js');
+ const {approvedBrandFont}=await import('../../dist/brand-typography.js');
+ const facts=[{field:'fonts',value:'Headlines: Lora, weight 600. Body: Montserrat, weight 500.'}];
+ const saved=font=>savedCampaignFont(CAMPAIGN_CREATIVE_PREFIX+JSON.stringify({campaign_design:{font}}));
+ assert.equal(saved('brand'),undefined);
+ const brandDesign=createDesign('media',1024,1024,brief,saved('brand')??approvedBrandFont(facts));
+ assert.equal(brandDesign.layers[0].fontFamily,'Lora');assert.equal(brandDesign.layers[1].fontFamily,'Montserrat');
+ const explicit=createDesign('media',1024,1024,brief,saved('impact')??approvedBrandFont(facts));
+ assert.equal(explicit.layers[0].fontFamily,'Oswald');
+});

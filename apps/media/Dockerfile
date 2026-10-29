@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
  && rm -rf /var/lib/apt/lists/* /root/.npm \
  && dpkg-query -W > /opt/render/system-packages.txt
 COPY apps/web/public/fonts/ /opt/render/fonts/
+COPY apps/media/fonts/ /opt/render/fonts/
 COPY apps/media/runtime.mjs ./runtime.mjs
 USER 65534:65534
 WORKDIR /tmp

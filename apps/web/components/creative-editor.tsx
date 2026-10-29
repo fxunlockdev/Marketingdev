@@ -2,6 +2,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Canvas, FabricImage, Textbox, Rect } from "fabric";
 import type { Design } from "../../api/src/creative-design";
+import { DESIGN_FONT_FAMILIES, designFontWeights, type FontWeight } from "../../api/src/brand-typography";
+import { loadDesignFonts } from "./design-font-loader";
 import { loadPrivateImage } from "./load-private-image";
 import { Field, Notice } from "./primitives";
 export type { Design };
@@ -29,6 +31,9 @@ export function CreativeEditor({
     [selected, setSelected] = useState(design.layers[0]?.id ?? ""),
     [error, setError] = useState<unknown>(),
     [ready, setReady] = useState(false),
+    [fontsLoading, setFontsLoading] = useState(false),
+    [fontError, setFontError] = useState<unknown>(),
+    [fontRetry, setFontRetry] = useState(0),
     [retry, setRetry] = useState(0);
   current.current = { design, onChange, readOnly };
   const exportRef = useRef(onExportReady);
@@ -95,8 +100,6 @@ export function CreativeEditor({
     });
     (async () => {
       try {
-        // Font rendering must not block the photo. Repaint when fonts settle.
-        void Promise.all(['DM Sans','DM Serif Display'].map(font=>document.fonts.load(`16px "${font}"`))).then(()=>{if(active)c.requestRenderAll();}).catch(()=>{});
         const blob = await loadPrivateImage(`/api/v1/businesses/${businessId}/creative-media/${design.background_media_id}`,controller.signal);
         if (!active) return;
         url = URL.createObjectURL(blob);
@@ -111,16 +114,6 @@ export function CreativeEditor({
         c.backgroundImage = image;
         c.requestRenderAll();
         setReady(true);
-        exportRef.current(() => {
-          const link = document.createElement("a");
-          link.download = "desvio-creative.png";
-          link.href = c.toDataURL({
-            format: "png",
-            multiplier: 1,
-            enableRetinaScaling: false,
-          });
-          link.click();
-        });
       } catch (e) {
         if (active) setError(e);
       }
@@ -143,57 +136,81 @@ export function CreativeEditor({
   ]);
   useEffect(() => {
     const c = canvas.current;
-    if (!c || !ready) return;
-    const ids = new Set(design.layers.map((l) => l.id));
-    for (const o of [...c.getObjects()])
-      if ((o as any).backingId || !ids.has((o as any).layerId)) c.remove(o);
-    for (const l of design.layers) {
-      let text = c.getObjects().find((o) => (o as any).layerId === l.id) as
-        | Textbox
-        | undefined;
-      if (!text) {
-        text = new Textbox(l.text, {
-          originX: "left",
-          originY: "top",
-          editable: false,
-          hasControls: false,
-          lockScalingX: true,
-          lockScalingY: true,
-          lockRotation: true,
+    if (!c || !ready || !c.backgroundImage) return;
+    let active = true;
+    exportRef.current(null);
+    setFontsLoading(true);
+    setFontError(undefined);
+    void loadDesignFonts(design.layers).then(() => {
+      if (!active) return;
+      const ids = new Set(design.layers.map((l) => l.id));
+      for (const o of [...c.getObjects()])
+        if ((o as any).backingId || !ids.has((o as any).layerId)) c.remove(o);
+      for (const l of design.layers) {
+        let text = c.getObjects().find((o) => (o as any).layerId === l.id) as
+          | Textbox
+          | undefined;
+        if (!text) {
+          text = new Textbox(l.text, {
+            originX: "left",
+            originY: "top",
+            editable: false,
+            hasControls: false,
+            lockScalingX: true,
+            lockScalingY: true,
+            lockRotation: true,
+            splitByGrapheme: !l.backing,
+            strokeWidth: 0,
+            padding: 4,
+          });
+          (text as any).layerId = l.id;
+          c.add(text);
+        }
+        text.set({
+          text: l.text,
+          left: l.x,
+          top: l.y,
+          width: l.width,
+          fontSize: l.fontSize,
+          fontWeight: l.fontWeight ?? 400,
           splitByGrapheme: !l.backing,
-          strokeWidth: 0,
-          padding: 4,
+          fontFamily: l.fontFamily,
+          fill: l.fill,
+          textAlign: l.align,
+          selectable: !readOnly,
+          evented: !readOnly,
+          lockMovementX: readOnly,
+          lockMovementY: readOnly,
         });
-        (text as any).layerId = l.id;
-        c.add(text);
+        text.initDimensions();
+        if (l.text.trim() && l.backing) {
+          const b = l.backing;
+          const backing = new Rect({ originX:'left', originY:'top', left:l.x-b.padding, top:l.y-b.padding, width:l.width+2*b.padding, height:text.height+2*b.padding, fill:b.fill, opacity:b.opacity, strokeWidth:0, selectable:false, evented:false });
+          (backing as any).backingId = l.id;
+          c.add(backing);
+        }
+        c.bringObjectToFront(text);
+        text.setCoords();
       }
-      text.set({
-        text: l.text,
-        left: l.x,
-        top: l.y,
-        width: l.width,
-        fontSize: l.fontSize,
-        fontWeight: l.fontWeight ?? 400,
-        splitByGrapheme: !l.backing,
-        fontFamily: l.fontFamily,
-        fill: l.fill,
-        textAlign: l.align,
-        selectable: !readOnly,
-        evented: !readOnly,
-        lockMovementX: readOnly,
-        lockMovementY: readOnly,
+      c.requestRenderAll();
+      // Export only the exact measured design, never a stale or fallback-font frame.
+      c.renderAll();
+      setFontsLoading(false);
+      exportRef.current(() => {
+        if (!active || current.current.design !== design) return;
+        const link = document.createElement("a");
+        link.download = "desvio-creative.png";
+        link.href = c.toDataURL({format:"png",multiplier:1,enableRetinaScaling:false});
+        link.click();
       });
-      if (l.text.trim() && l.backing) {
-        const b = l.backing;
-        const backing = new Rect({ originX:'left', originY:'top', left:l.x-b.padding, top:l.y-b.padding, width:l.width+2*b.padding, height:text.height+2*b.padding, fill:b.fill, opacity:b.opacity, strokeWidth:0, selectable:false, evented:false });
-        (backing as any).backingId = l.id;
-        c.add(backing);
-      }
-      c.bringObjectToFront(text);
-      text.setCoords();
-    }
-    c.requestRenderAll();
-  }, [design, readOnly, retry, ready]);
+    }).catch(error => {
+      if (!active) return;
+      setFontsLoading(false);
+      setFontError(error);
+      exportRef.current(null);
+    });
+    return () => { active = false; exportRef.current(null); };
+  }, [design, readOnly, retry, ready, fontRetry]);
   const layer =
     design.layers.find((l) => l.id === selected) ?? design.layers[0];
   function update(values: Partial<Design["layers"][number]>) {
@@ -241,7 +258,7 @@ export function CreativeEditor({
         <div
           ref={host}
           className="creative-surface"
-          aria-busy={!ready && !error}
+          aria-busy={(!ready && !error) || fontsLoading}
         >
           <canvas
             ref={element}
@@ -249,6 +266,9 @@ export function CreativeEditor({
           />
         </div>
         {!ready && !error && <p role="status">Loading your private image…</p>}
+        {ready && fontsLoading && <p role="status">Loading your design fonts…</p>}
+        <Notice error={fontError} />
+        {!!fontError && <button type="button" onClick={() => setFontRetry(n => n + 1)}>Retry fonts</button>}
         <Notice error={error} />
         {!!error && (
           <button onClick={() => setRetry((n) => n + 1)}>Reload image</button>
@@ -306,10 +326,10 @@ export function CreativeEditor({
                     id={id}
                     value={layer.fontFamily}
                     onChange={(e) =>
-                      update({ fontFamily: e.target.value as any })
+                      update({ fontFamily: e.target.value as Design["layers"][number]["fontFamily"], fontWeight: designFontWeights(e.target.value).includes(layer.fontWeight ?? 400) ? layer.fontWeight ?? 400 : 400 })
                     }
                   >
-                    {["DM Sans", "DM Serif Display", "Arial", "Georgia", "Verdana"].map((f) => (
+                    {DESIGN_FONT_FAMILIES.map((f) => (
                       <option key={f}>{f}</option>
                     ))}
                   </select>
@@ -318,7 +338,7 @@ export function CreativeEditor({
               {number("Font size", layer.fontSize, 8, 200, (n) =>
                 update({ fontSize: n }),
               )}
-              <Field label="Text weight">{id => <select id={id} value={layer.fontWeight ?? 400} onChange={e=>update({fontWeight:Number(e.target.value) as 400|700})}><option value={400}>Regular</option><option value={700}>Bold</option></select>}</Field>
+              <Field label="Text weight">{id => <select id={id} value={layer.fontWeight ?? 400} onChange={e=>update({fontWeight:Number(e.target.value) as FontWeight})}>{designFontWeights(layer.fontFamily).map(weight=><option key={weight} value={weight}>{({100:"Thin",200:"Extra light",300:"Light",400:"Regular",500:"Medium",600:"Semibold",700:"Bold",800:"Extra bold",900:"Black"})[weight]}</option>)}</select>}</Field>
               <Field label="Contrast backing">{id => <input id={id} type="checkbox" checked={!!layer.backing} onChange={e=>update({backing:e.target.checked?{fill:'#111111',opacity:0.88,padding:Math.min(16,layer.x,layer.y,design.width-layer.x-layer.width)}:undefined})}/>}</Field>
               {layer.backing && <>
                 <Field label="Backing color">{id => <input id={id} type="color" value={layer.backing!.fill} onChange={e=>update({backing:{...layer.backing!,fill:e.target.value}})}/>}</Field>
@@ -396,7 +416,8 @@ export function CreativeEditor({
                   y: Math.round(design.height * 0.4),
                   width: Math.round(design.width * 0.86),
                   fontSize: 40,
-                  fontFamily: "Arial",
+                  fontFamily: layer?.fontFamily ?? "DM Sans",
+                  fontWeight: layer?.fontWeight ?? 400,
                   fill: "#201e1d",
                   align: "left",
                 },

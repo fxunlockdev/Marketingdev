@@ -34,3 +34,19 @@ test('text backing is rendered behind editable text and included in overflow val
  const old=await renderer.render(legacy,png),oldPixel=await sharp(old.bytes).extract({left:90,top:90,width:1,height:1}).raw().toBuffer();assert.equal(oldPixel[0],255,'legacy design receives no implicit backing');
  await assert.rejects(()=>renderer.render({...design,layers:[{...layer,y:970}]},png),/EXPORT_TEXT_OVERFLOW/);
 });
+
+test('bundled brand fonts render distinct families and requested weights in saved exports',async()=>{
+ const png=await sharp({create:{width:1024,height:1024,channels:3,background:'#ffffff'}}).png().toBuffer();
+ const renderer=new StaticRenderer(image),fingerprints=new Set();
+ for(const family of ['DM Sans','DM Serif Display','Playfair Display','Montserrat','Lora','Oswald']){
+  const layer={id:'headline',type:'text',text:'Brand Typography Aa 123',fontFamily:family,fontSize:64,fontWeight:400,fill:'#111111',align:'left',width:900,x:50,y:100};
+  const design={schema_version:1,background_media_id:randomUUID(),width:1024,height:1024,layers:[layer]};
+  const regular=await renderer.render(design,png);fingerprints.add(regular.sha256);
+  assert.match(regular.manifest.fonts[family].sha256,/^[a-f0-9]{64}$/);
+  if(family!=='DM Serif Display'){
+   const bold=await renderer.render({...design,layers:[{...layer,fontWeight:700}]},png);
+   assert.notEqual(regular.sha256,bold.sha256,`${family} weight must alter actual exported pixels`);
+  }
+ }
+ assert.equal(fingerprints.size,6,'font families must produce genuinely different artwork');
+});

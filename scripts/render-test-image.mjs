@@ -20,7 +20,16 @@ export function prepareRenderImage() {
       "apps/web/public/fonts/dm-serif-display.ttf",
       "apps/web/public/fonts/dmsans-OFL.txt",
       "apps/web/public/fonts/dmserifdisplay-OFL.txt",
+      "apps/web/public/fonts/playfairdisplay.ttf",
+      "apps/web/public/fonts/montserrat.ttf",
+      "apps/web/public/fonts/lora.ttf",
+      "apps/web/public/fonts/oswald.ttf",
+      "apps/web/public/fonts/playfairdisplay-OFL.txt",
+      "apps/web/public/fonts/montserrat-OFL.txt",
+      "apps/web/public/fonts/lora-OFL.txt",
+      "apps/web/public/fonts/oswald-OFL.txt",
       "apps/web/public/fonts/sources.json",
+      ...Object.entries({'dm-sans':[100,200,300,400,500,600,700,800,900],playfairdisplay:[400,500,600,700,800,900],montserrat:[100,200,300,400,500,600,700,800,900],lora:[400,500,600,700],oswald:[200,300,400,500,600,700]}).flatMap(([name,weights])=>weights.map(weight=>`apps/media/fonts/${name}-${weight}.ttf`)),
     ]) {
       const target = join(context, relative);
       mkdirSync(dirname(target), { recursive: true });
