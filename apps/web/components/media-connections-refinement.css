@@ -63,7 +63,8 @@ section.brand-media-library .brand-media-tile .private-visual-presentation{heigh
 .desvio-redesign .brand-media-library .media-library-controls button{font-size:12px;padding:8px 12px;min-height:36px}
 @media(max-width:900px){.desvio-redesign .brand-kit-layout{grid-template-columns:190px minmax(0,1fr)}.desvio-redesign .brand-kit-content{padding:22px}}
 @media(max-width:760px){.desvio-redesign .brand-kit-layout{grid-template-columns:minmax(0,1fr)}.desvio-redesign .brand-kit-navigation{position:static;display:flex;flex-direction:row;overflow-x:auto;margin:0;max-width:100%;border-radius:22px}.desvio-redesign .brand-kit-navigation button{flex:none}.desvio-redesign .brand-kit-heading h1{font-size:36px}.desvio-redesign .brand-media-collection{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.desvio-redesign .brand-media-collection{grid-template-columns:repeat(4,minmax(0,1fr))}
+.desvio-redesign .brand-media-collection{grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr))}
+.desvio-redesign .brand-media-library .media-library-search{flex:1 1 160px}
 .desvio-redesign .brand-media-collection .reference-list img,.desvio-redesign .brand-media-collection .brand-media-tile summary img{height:auto!important;aspect-ratio:1!important;object-fit:contain!important;width:100%}
 .desvio-redesign .brand-media-collection .brand-media-tile .private-visual-presentation{height:auto;aspect-ratio:1}
 .desvio-redesign .brand-media-collection .reference-list>li>strong,.desvio-redesign .brand-media-collection .brand-media-tile>summary{font-size:12px}
