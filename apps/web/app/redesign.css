@@ -150,3 +150,16 @@
 .desvio-redesign .learning-facts-panel .memory-facts dd{font-size:14px;margin:4px 0 0}
 .desvio-redesign .learning-proposals .creative-review{background:#eeeaff;border:0;border-radius:20px;padding:20px}
 @media(max-width:960px){.desvio-redesign .learnings-workspace[data-view=facts]{grid-template-columns:minmax(0,1fr)}}
+
+/* Oil UI reference audit: keep page hierarchy consistent across workspace screens. */
+.desvio-redesign :is(.content-preferences,.learnings-workspace,.insights-workspace) h1{font-family:'Desvio Serif',Georgia,serif;font-size:clamp(34px,3.5vw,48px);line-height:1.1;font-weight:400}
+.desvio-redesign .content-preferences .preference-section{border:0;border-radius:28px;padding:28px;gap:28px}
+.desvio-redesign .insights-workspace .v5-panel{border:0;border-radius:28px;padding:24px}
+.desvio-redesign .insights-summary{gap:12px}
+.desvio-redesign .insights-summary>div{border:0;border-radius:28px;padding:22px;background:#ffe1d2;min-height:150px}
+.desvio-redesign .insights-summary>div:nth-child(2){background:#e0ecd8}
+.desvio-redesign .insights-summary>div:nth-child(3){background:#ddd7fb}
+.desvio-redesign .insights-summary>div:nth-child(4){background:#fff0b8}
+.desvio-redesign .insights-summary dt{font-size:13px;color:#514b5b}
+.desvio-redesign .insights-summary dd{font-family:'Desvio Serif',Georgia,serif;font-size:56px;line-height:1.1;font-weight:400;margin-top:18px}
+@media(max-width:760px){.desvio-redesign .content-preferences .preference-section{padding:20px;gap:16px}.desvio-redesign .insights-summary>div{padding:18px;min-height:130px}.desvio-redesign .insights-summary dd{font-size:44px}}

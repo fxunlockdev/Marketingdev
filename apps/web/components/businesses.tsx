@@ -1152,7 +1152,7 @@ function BrandKit({business}:{business:Business}) {
  }
  const tabs=[['media','Media Library'],['style','Brand Style'],['voice','Brand Voice'],['profile','Brand Profile'],['sources','Source Materials']];
  useEffect(()=>{const id=window.location.hash.slice(1);if(['media','style','voice','profile','sources'].includes(id))setTab(id);},[]);
- return <section className="brand-kit-screen"><h1 className="sr-only">Brand Kit</h1>
+ return <section className="brand-kit-screen"><header className="brand-kit-heading"><p>{business.name}</p><h1>Brand Kit</h1></header>
   <div className="brand-kit-layout"><nav className="brand-kit-navigation" aria-label="Brand Kit sections">{tabs.map(([id,label])=><button key={id} aria-current={tab===id?'page':undefined} disabled={busy||factSaving} onClick={()=>{if(tab!==id&&confirmNavigation()){setTab(id);history.replaceState(history.state,'',`#${id}`);setBrain(undefined);setSaved(undefined);setVisualEditing(false);setError(undefined);}}}>{label}</button>)}</nav>
   <div className="brand-kit-content"><h2>{tabs.find(([id])=>id===tab)?.[1]}</h2>
   {tab==='media'?<BrandReferences businessId={business.id} writable={writable} uploadWorkspace={org} visualPicker libraryMode/>:tab==='sources'?<><BrandFiles org={org} brandId={business.id}/><BrandReview section="sources" business={business} onChange={setBrain} onVisualEditing={setVisualEditing}/></>:<>

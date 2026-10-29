@@ -267,7 +267,7 @@ export function ContentWorkspace({
       filter(() => setAnchor(start));
       setReload((n) => n + 1);
       setMessage(
-        "Plan request saved. Follow its progress in Plan activity below.",
+        "Plan request saved. Follow its progress in Calendar options → Plan activity.",
       );
     } catch (e) {
       setError(e);
@@ -384,6 +384,18 @@ export function ContentWorkspace({
           )}
         </section>
       )}
+      <section
+        className="v5-panel plan-main"
+        aria-label={inbox ? "Review queue" : "Content calendar"}
+      >
+        <div className="plan-toolbar">
+          <div className="calendar-period" role="group" aria-label="Calendar navigation">
+            <button aria-label={view==='day'?'Previous day':'Previous period'} disabled={!first || first<='2000-01-01'} onClick={()=>movePeriod(-1)}>‹</button>
+            <button disabled={!prefs} onClick={()=>filter(()=>setAnchor(localMinute(Date.now(),prefs.timezone).slice(0,10)))}>Today</button>
+            <button aria-label={view==='day'?'Next day':'Next period'} disabled={!last || last>'2100-12-01'} onClick={()=>movePeriod(1)}>›</button>
+          </div>
+          {first&&last&&<h2 className="calendar-period-title">{new Intl.DateTimeFormat(undefined,{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(first+'T12:00:00Z'))} – {new Intl.DateTimeFormat(undefined,{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'}).format(new Date(addDays(last,-1)+'T12:00:00Z'))}</h2>}
+          <details className="calendar-more-options"><summary>{inbox?'Review options':'Calendar options'}{channel||state?' · Active':''}</summary><div className="calendar-options-content">
       {jobs.length > 0 && !inbox && (
         <details className="calendar-activity">
           <summary>Plan activity{jobs.some(j=>running(j)&&!j.cancel_requested) ? ` · ${jobs.filter(j=>running(j)&&!j.cancel_requested).length} in progress` : jobs.some(j=>["failed","rejected","unknown"].includes(j.status)) ? " · Needs attention" : ""}</summary>
@@ -425,18 +437,7 @@ export function ContentWorkspace({
           </ul>
         </details>
       )}
-      <section
-        className="v5-panel plan-main"
-        aria-label={inbox ? "Review queue" : "Content calendar"}
-      >
-        <div className="plan-toolbar">
-          <div className="calendar-period" role="group" aria-label="Calendar navigation">
-            <button aria-label={view==='day'?'Previous day':'Previous period'} disabled={!first || first<='2000-01-01'} onClick={()=>movePeriod(-1)}>‹</button>
-            <button disabled={!prefs} onClick={()=>filter(()=>setAnchor(localMinute(Date.now(),prefs.timezone).slice(0,10)))}>Today</button>
-            <button aria-label={view==='day'?'Next day':'Next period'} disabled={!last || last>'2100-12-01'} onClick={()=>movePeriod(1)}>›</button>
-          </div>
-          {first&&last&&<h2 className="calendar-period-title">{new Intl.DateTimeFormat(undefined,{timeZone:'UTC',month:'short',day:'numeric'}).format(new Date(first+'T12:00:00Z'))} – {new Intl.DateTimeFormat(undefined,{timeZone:'UTC',month:'short',day:'numeric',year:'numeric'}).format(new Date(addDays(last,-1)+'T12:00:00Z'))}</h2>}
-          <details className="calendar-more-options"><summary>{inbox?'Review options':'Calendar options'}{channel||state?' · Active':''}</summary><div className="calendar-options-content">
+
           {campaign&&<button onClick={()=>{filter(()=>setCampaign(''));const url=new URL(location.href);url.searchParams.delete('plan');history.replaceState(history.state,'',url);}}>Show all campaigns</button>}
           <Field label={inbox ? "Review from" : "Calendar date"}>
             {(id) => (
@@ -528,7 +529,7 @@ export function ContentWorkspace({
         {!inbox&&<div className="calendar-view-toggle" role="group" aria-label="Calendar display"><button aria-pressed={view!=='list'} onClick={()=>filter(()=>setView('week'))}>Calendar</button><button aria-pressed={view==='list'} onClick={()=>filter(()=>setView('list'))}>List</button></div>}
         {!inbox&&canWrite&&['month','week'].includes(view)&&<p className="calendar-board-hint">Open a post to edit · Drag to reschedule</p>}
         {!inbox && view==='day' && anchor && <DateStrip date={anchor} counts={dateCounts} onSelect={date=>filter(()=>setAnchor(date))} />}
-        <p className="hint">
+        <p className="hint calendar-secondary-copy">
           {prefs?.timezone ?? "Loading time zone…"}
         </p>
         {!data && !error ? (
@@ -583,7 +584,7 @@ export function ContentWorkspace({
                   aria-label="Days in this view"
                 >
                   {calendarDays.map((day) => (
-                    <section key={day} role="listitem" className="plan-day" data-calendar-day={day}
+                    <section key={day} role="listitem" className={`plan-day ${prefs&&day===localMinute(Date.now(),prefs.timezone).slice(0,10)?"is-today":""}`} data-calendar-day={day}
                       onDragOver={e=>{if(canWrite&&dragged.current)e.preventDefault();}}
                       onDrop={e=>{e.preventDefault();const id=dragged.current;dragged.current=null;
                         if(canWrite&&id&&data.slots.some((s:any)=>s.id===id&&s.state!=='cancelled'))selectPost(id,day);
@@ -1152,7 +1153,7 @@ export function SlotPanel({
                 )}
                 {canWrite && !["video","carousel"].includes(s.format) && s.state !== "cancelled" && (
                   <button
-                    className="primary"
+                    className={s.creative_version_id ? undefined : "primary"}
                     disabled={
                       busy ||
                       dirty ||
@@ -1185,77 +1186,7 @@ export function SlotPanel({
                       : "Create creative"}
                   </button>
                 )}
-                <div className="plan-actions">
-                  {["draft_ready", "changes_requested"].includes(s.state) &&
-                    canWrite && (
-                      <button
-                        disabled={
-                          busy ||
-                          dirty ||
-                          active ||
-                          s.has_newer_version ||
-                          !ready
-                        }
-                        onClick={() => review("pending_review")}
-                      >
-                        Send for review
-                      </button>
-                    )}
-                  {s.state === "pending_review" && canReview && (
-                    <>
-                      <button
-                        className="primary"
-                        disabled={
-                          busy || dirty || s.has_newer_version || !ready || (s.format==='carousel'&&s.carousel_status!=='approved')
-                        }
-                        onClick={() => review("approved")}
-                      >
-                        Approve post
-                      </button>
-                      <button
-                        disabled={
-                          busy ||
-                          dirty ||
-                          !feedback.trim() ||
-                          s.has_newer_version
-                        }
-                        onClick={() => review("changes_requested")}
-                      >
-                        Request changes
-                      </button>
-                      <button
-                        disabled={
-                          busy ||
-                          dirty ||
-                          !feedback.trim() ||
-                          s.has_newer_version
-                        }
-                        onClick={() => review("rejected")}
-                      >
-                        Reject post
-                      </button>
-                      <p className="hint">
-                        Include feedback to request changes or reject.
-                      </p>
-                    </>
-                  )}
-                  {canReview&&['approved','rejected','changes_requested'].includes(s.state)&&<button disabled={busy||dirty} onClick={()=>review('reopen')}>Reopen review</button>}
-                  {canWrite && s.state !== "cancelled" && (
-                    <button
-                      disabled={busy || dirty}
-                      onClick={() => {
-                        if (
-                          window.confirm(
-                            "Archive this post? Its creative and history will be kept, and you can restore it as a draft. Active publishing requests must be managed in Publishing first.",
-                          )
-                        )
-                          review("cancelled");
-                      }}
-                    >
-                      Archive post
-                    </button>
-                  )}
-                </div>
+
               </div>
             </div>
           </div>
@@ -1329,6 +1260,78 @@ export function SlotPanel({
             </div>
           )}
           {s.creative_version_id&&<CreativeExportPanel format={s.channel==='instagram'?'instagram-jpeg':'png'} key={business.id+s.id+s.creative_version_id+s.channel} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
+                <div className="plan-actions">
+                  {["draft_ready", "changes_requested"].includes(s.state) &&
+                    canWrite && (
+                      <button
+                        className="primary"
+                        disabled={
+                          busy ||
+                          dirty ||
+                          active ||
+                          s.has_newer_version ||
+                          !ready
+                        }
+                        onClick={() => review("pending_review")}
+                      >
+                        Send for review
+                      </button>
+                    )}
+                  {s.state === "pending_review" && canReview && (
+                    <>
+                      <button
+                        className="primary"
+                        disabled={
+                          busy || dirty || s.has_newer_version || !ready || (s.format==='carousel'&&s.carousel_status!=='approved')
+                        }
+                        onClick={() => review("approved")}
+                      >
+                        Approve post
+                      </button>
+                      <button
+                        disabled={
+                          busy ||
+                          dirty ||
+                          !feedback.trim() ||
+                          s.has_newer_version
+                        }
+                        onClick={() => review("changes_requested")}
+                      >
+                        Request changes
+                      </button>
+                      <button
+                        disabled={
+                          busy ||
+                          dirty ||
+                          !feedback.trim() ||
+                          s.has_newer_version
+                        }
+                        onClick={() => review("rejected")}
+                      >
+                        Reject post
+                      </button>
+                      <p className="hint">
+                        Include feedback to request changes or reject.
+                      </p>
+                    </>
+                  )}
+                  {canReview&&['approved','rejected','changes_requested'].includes(s.state)&&<button disabled={busy||dirty} onClick={()=>review('reopen')}>Reopen review</button>}
+                  {canWrite && s.state !== "cancelled" && (
+                    <button
+                      disabled={busy || dirty}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Archive this post? Its creative and history will be kept, and you can restore it as a draft. Active publishing requests must be managed in Publishing first.",
+                          )
+                        )
+                          review("cancelled");
+                      }}
+                    >
+                      Archive post
+                    </button>
+                  )}
+                </div>
           <details className="slot-activity">
             <summary>Version & decision history ({data.events.length})</summary>
             <ol>

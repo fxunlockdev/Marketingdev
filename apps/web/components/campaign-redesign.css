@@ -32,7 +32,7 @@ dialog.campaign-new-post>header>button[aria-label="Close new post"]{display:grid
 .desvio-redesign .campaign-review-screen .campaign-card-body{padding:0 6px;flex:1;gap:12px}
 .desvio-redesign .campaign-review-screen .campaign-card-body>.button.primary{width:100%;justify-content:center;min-height:40px;margin-top:auto}
 .desvio-redesign .campaign-review-heading{align-items:flex-end;gap:20px;padding:4px 6px}
-.desvio-redesign :is(.campaigns-screen>.heading-row,.campaign-review-heading) .primary:first-of-type:not(a){background:#fff;color:#17171a;border-color:transparent}
+.desvio-redesign :is(.campaigns-screen>.heading-row,.campaign-review-heading)>.actions>button.primary:first-of-type{background:#fff;color:#17171a;border-color:transparent}
 .desvio-redesign .campaign-post-screen>.heading-row>a{display:inline-flex;background:#fff;border-radius:999px;text-decoration:none;padding:10px 16px;font-size:14px;max-width:100%;overflow-wrap:anywhere}
 .desvio-redesign .campaign-post-screen{display:grid;gap:16px}
 @media(max-width:480px){.desvio-redesign .campaign-review-screen .campaign-preview-grid{grid-template-columns:minmax(0,1fr)}}

@@ -24,9 +24,8 @@ export function CampaignPostIdeas({businessId,planId,format,channel,onChoose}:{b
  },[result.id,result.status,path,format,channel]);
  const working=sending||pending(result.status)||result.status==='loading',unknown=result.status==='unknown',failed=['failed','rejected','canceled'].includes(result.status);
  return <section className="campaign-post-ideas" aria-label="AI post ideas" aria-busy={working}>
-  <div className="campaign-ideas-heading"><strong>Ideas for your campaign</strong><button type="button" disabled={working||unknown} onClick={()=>{if(result.status==='succeeded'||failed)requestKey.current=crypto.randomUUID();void generate(true);}}>{working?'Thinking…':result.ideas.length?'New ideas':'Try again'}</button></div>
-  <small>Shaped by your brand, campaign and saved feedback.</small>
-  <div role="status" aria-live="polite">{working&&'Finding fresh angles for you…'}{unknown&&'Your ideas are awaiting confirmation. We won’t submit another request while the result is uncertain.'}{failed&&'We couldn’t finish these ideas. You can try again or write your own topic.'}</div>
+  <div className="campaign-ideas-heading"><strong>Ideas for your campaign</strong><button type="button" disabled={working||unknown} onClick={()=>{if(result.status==='succeeded'||failed)requestKey.current=crypto.randomUUID();void generate(true);}}>{working?'Finding ideas…':result.ideas.length?'New ideas':'Try again'}</button></div>
+  <div role="status" aria-live="polite">{unknown&&'Your ideas are awaiting confirmation. We won’t submit another request while the result is uncertain.'}{failed&&'We couldn’t finish these ideas. You can try again or write your own topic.'}</div>
   <Notice error={error}/>
   {!!result.ideas.length&&<ul>{result.ideas.map((idea,i)=><li key={i}><button type="button" onClick={()=>{onChoose(idea.topic);document.getElementById('campaign-topic')?.focus();}}><span>{idea.title}</span><small>{idea.topic}</small></button></li>)}</ul>}
  </section>;

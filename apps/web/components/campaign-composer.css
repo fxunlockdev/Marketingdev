@@ -1,0 +1,48 @@
+/* Composer uses the supplied compact dialog language; only its content scrolls. */
+.desvio-redesign dialog.campaign-new-post{width:min(880px,calc(100vw - 32px));max-width:880px;max-height:calc(100dvh - 32px);padding:0;overflow:hidden;border-radius:28px}
+.desvio-redesign dialog.campaign-new-post[open]{display:flex;flex-direction:column}
+.desvio-redesign .campaign-new-post>header{flex:none;padding:22px 24px 14px;margin:0;gap:12px;grid-template-columns:auto minmax(0,1fr) 36px}
+.desvio-redesign .campaign-new-post>header h2{font-size:30px}
+.desvio-redesign .campaign-new-post>header>label{grid-column:2;grid-row:1;display:grid;gap:4px;font-size:12px;padding:0 8px}
+.desvio-redesign .campaign-new-post>header>button{grid-column:3;grid-row:1;align-self:start}
+.desvio-redesign .campaign-new-post>.campaign-compose-intro{flex:none;margin:0;padding:0 24px 12px;font-size:14px}
+.desvio-redesign .campaign-new-post>fieldset{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;margin:0;padding:8px 24px 20px}
+.desvio-redesign .campaign-new-post>.notice{margin:0 24px 12px}
+.desvio-redesign .campaign-new-post .campaign-compose-row{grid-template-columns:144px minmax(0,1fr);gap:20px}
+.desvio-redesign .campaign-new-post .campaign-compose-fields{gap:10px;align-content:start}
+.desvio-redesign .campaign-new-post .campaign-compose-options{display:grid;grid-template-columns:1fr 1.45fr 1fr;gap:12px;align-items:end}
+.desvio-redesign .campaign-new-post .campaign-compose-options>label{min-width:0;display:grid;gap:6px;align-content:end;margin:0;font-size:13px;font-weight:500}
+.desvio-redesign .campaign-new-post .campaign-compose-options>label:nth-child(2){order:3}
+.desvio-redesign .campaign-new-post .campaign-compose-options>label:nth-child(3){order:2}
+.desvio-redesign .campaign-new-post .campaign-compose-options{grid-template-columns:1fr 1fr 1.5fr}
+.desvio-redesign dialog.campaign-new-post :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),select,textarea){width:100%;min-width:0;max-width:100%;height:auto;min-height:42px;padding:9px 12px;font-size:14px;font-weight:400;line-height:22px;border:1px solid #e5e2ed;border-radius:12px;background:#f8f7fb}
+.desvio-redesign dialog.campaign-new-post textarea{height:auto;min-height:88px;resize:vertical}
+.desvio-redesign .campaign-new-post .campaign-compose-timezone{margin-top:-2px;font-size:12px;color:#64616f}
+.desvio-redesign .campaign-new-post .campaign-post-ideas{padding:2px 0 8px}
+.desvio-redesign .campaign-new-post .campaign-post-ideas ul{margin:6px 0 0}
+.desvio-redesign .campaign-new-post .campaign-post-ideas li button{padding:10px;gap:4px}
+.desvio-redesign .campaign-new-post .campaign-post-ideas li small{-webkit-line-clamp:2}
+.desvio-redesign .campaign-new-post .campaign-reference-picker{margin-top:18px;padding-top:16px}
+.desvio-redesign .campaign-new-post>footer{flex:none;position:relative;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:16px;margin:0;padding:14px 24px;border-top:1px solid #eeedf3;background:#fff}
+.desvio-redesign .campaign-new-post>footer>span{font-size:13px;color:#64616f}
+.desvio-redesign .campaign-new-post>footer>button{flex:none;min-height:42px;padding:10px 22px}
+@media(max-width:650px){
+.desvio-redesign dialog.campaign-new-post{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:24px}
+.desvio-redesign .campaign-new-post>header{padding:18px 18px 12px;grid-template-columns:1fr 36px}
+.desvio-redesign .campaign-new-post>header h2{font-size:28px}
+.desvio-redesign .campaign-new-post>header>button{grid-column:2}
+.desvio-redesign .campaign-new-post>header>label{grid-column:1/-1;grid-row:2;padding:0}
+.desvio-redesign .campaign-new-post>.campaign-compose-intro{padding-inline:18px}
+.desvio-redesign .campaign-new-post>fieldset{padding:4px 18px 18px}
+.desvio-redesign .campaign-new-post .campaign-compose-row{grid-template-columns:minmax(0,1fr);gap:12px}
+.desvio-redesign .campaign-new-post .campaign-compose-visual{display:none}
+.desvio-redesign .campaign-new-post .campaign-compose-options{grid-template-columns:1fr 1fr;gap:12px}
+.desvio-redesign .campaign-new-post .campaign-compose-options>label:nth-child(2){grid-column:1/-1}
+.desvio-redesign dialog.campaign-new-post :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),select,textarea){font-size:16px}
+.desvio-redesign .campaign-new-post>footer{padding:12px 18px;gap:12px}
+.desvio-redesign .campaign-new-post>footer>span{max-width:180px;font-size:12px}
+}
+
+.desvio-redesign .campaign-new-post>footer>span{flex:1;min-width:0}
+.desvio-redesign .campaign-new-post>footer>button.primary{width:auto;flex:none;background:#17171a;color:#fff}
+.desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row{display:flex;flex-direction:row;align-items:center;justify-content:space-between;width:100%}
