@@ -1,0 +1,28 @@
+{
+  "recorded_at": "2026-10-31T12:11:02.134796+00:00",
+  "passed": true,
+  "tests": 1,
+  "exit_code": 0,
+  "scope": "Current automatic campaign browser journey with real local jobs/storage/rendering, mocked provider responses",
+  "test_sha256": "d12c66cc3c918258600b4e40095a50f0b7879eab5ea84ceb8c645f44e5812d4f",
+  "product_source_commit": "e0776a2",
+  "log": "work/automatic-campaign-browser.log",
+  "verified": [
+    "Automatic missing-image request on opening campaign",
+    "Interrupted response reconciles with one persisted batch and no duplicate submission",
+    "Private preview image bytes decode",
+    "Saved images persist across reload",
+    "Mixed carousel and vertical image generation",
+    "Carousel dialog keyboard close, focus restore and mobile bounds",
+    "Video jobs do not start without approval"
+  ],
+  "not_verified": [
+    "Live paid generation",
+    "Full browser suite",
+    "Production readiness"
+  ],
+  "screenshots_reviewed": [
+    "work/isolated-campaign-check/work/browser/canvas-latest-check.png",
+    "work/isolated-campaign-check/work/browser/reviewed-mixed-formats.png"
+  ]
+}
