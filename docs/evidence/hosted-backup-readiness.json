@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-10-31T10:02:56.000674+00:00",
+  "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+  "service_id": "758bf0c1-56b5-452f-be8d-fe67af927267",
+  "cli_version": "5.71.0",
+  "pitr_enabled": false,
+  "archive_bucket_wired": false,
+  "backup_schedules": [],
+  "backups": [],
+  "attempted_schedule": [
+    "daily",
+    "weekly"
+  ],
+  "schedule_result": "Rejected: Manual backups and backup schedules are only available for Pro workspaces",
+  "schedule_created": false,
+  "plan_changed": false,
+  "live_restore_attempted": false,
+  "status": "BLOCKED_BY_WORKSPACE_PLAN",
+  "scope": "Actual CLI state inspection and rejected schedule mutation; not backup or recovery certification"
+}

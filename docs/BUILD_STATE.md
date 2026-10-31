@@ -1,3 +1,9 @@
+GitHub recovery follow-up run41191042719 completed SUCCESS on7c40668. Downloaded artifacts confirm passing unchanged-source recovery evidence, with86 migrations and543 policies restored. Offline/contracts, web build/proxy, load and dependency audit also passed.
+
+## Hosted backup gap confirmed — 31 October 2026
+
+Read-only Railway CLI5.71.0 queries against the exact dev PostgreSQL service returned PITR disabled, no archive bucket, no scheduled backups and no backups. Attempted daily+weekly schedule was rejected by Railway: manual backups and schedules require a Pro workspace. No schedule or manual backup was created, no live restore was attempted, and no plan was upgraded. Evidence: hosted-backup-readiness.json. This is a concrete hosted recovery gap, not a successful configuration. An operator plan decision or separately validated backup implementation is needed; other product work can continue.
+
 ## Recovery CI follow-up — 31 October 2026
 
 GitHub run41190771067 completed the restore assertions (86 migrations, 543 policies, tenant isolation) but failed during FORCE-drop cleanup with an asynchronous connection-termination error. Removed the redundant FORCE-drop: the existing harness owns disposal of the entire isolated container and data directory. Local `make verify-recovery` passes again. Hosted CLI read-only inspection confirms Postgres-Rh6A in dev has PITR disabled and no archive bucket wired; scheduled backups are being inspected separately. No live database mutation.
