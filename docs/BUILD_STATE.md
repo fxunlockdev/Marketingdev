@@ -1,3 +1,9 @@
+## Right-side canvas inspector — 1 November 2026
+
+Moved Text layers beside the artwork when the canvas container has at least 760px available. The 320px inspector scrolls independently; artwork and metadata remain in the left column. Smaller canvas areas retain the stacked layout. This is CSS-only; saving, export and permissions are unchanged.
+
+Read-only authenticated hosted-data/local-UI checks pass at 1920, 1440, 1366 and 1280 widths with the inspector on the right, and at 1024, 924, 390 and 320 with stacked controls. Verified no overlap/overflow, artwork remains still while inspector scrolls, Save is reachable, unsaved guards/discard and Post details work. Screenshots inspected. No paid generation or hosted content mutation. Evidence: chat-inspector-local.json. Deployment pending.
+
 ## Match the conversational canvas surface — 1 November 2026
 
 Separated the chat canvas render branch from the full post editor. The conversational surface contains only the artwork, metadata strip and Text layers card. Removed the redundant Your creative heading, caption, version selector, archive/replacement, review, provenance and final-image preparation forms from this surface. A guarded Post details button opens the existing saved-media page with those working controls intact. The layer card has paired Add text layer/Download PNG actions; Save/Discard only appear for unsaved changes. Metadata has visible separators, and fields use the supplied borderless lavender treatment.
