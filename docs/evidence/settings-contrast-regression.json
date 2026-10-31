@@ -1,0 +1,22 @@
+{
+  "recorded_at": "2026-10-31T11:17:19.844877+00:00",
+  "scope": "Focused local settings regression; not full browser acceptance or deployed verification",
+  "passed": true,
+  "tests": 3,
+  "contracts_passed": 332,
+  "log": "work/settings-regression-fixed.log",
+  "initial_failure_log": "work/settings-regression.log",
+  "source_sha256": {
+    "apps/web/app/redesign.css": "63139266ccf08ded478eeba4fb6abf9246287f1c7d1fbbf1e5969d08ac6d766a",
+    "tests/browser/customer.test.mjs": "17ac66029e5c72a3741756fdf8d2b7af33a330a85651147dab84553be2d02501",
+    "tests/browser/canvas.test.mjs": "162afff1026919afea4ecf0d8c9b5bfd5548c217fa02a706104bc6e0151d1ba0",
+    "tests/browser/connections.test.mjs": "2153d299a91e334de8911d5a30c914710ad265e21b6cbef56c33387eb54aabf0",
+    "tests/browser/publishing.test.mjs": "b47088ef1d38308a69128adfb29045d124855456afbc51c03f76f2c06c58b315"
+  },
+  "external_providers": "No paid generation or social publishing; local SMTP only",
+  "screenshots_reviewed": [
+    "work/browser/content-preferences-mobile.png",
+    "work/browser/learnings-refined-desktop.png"
+  ],
+  "remaining": "Full browser suite still requires navigation updates and rerun; live deployment unchanged."
+}

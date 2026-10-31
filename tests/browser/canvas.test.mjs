@@ -370,7 +370,7 @@ before(async () => {
     .getByLabel("Password", { exact: true })
     .fill("canvas-browser-test-password");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /^Welcome,/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^(Add your first business|Choose a business|Your content, at a glance\.)$/ })).toBeVisible();
   actor = (
     await admin.query('SELECT id FROM auth."user" WHERE email=$1', [
       "canvas-browser@example.test",

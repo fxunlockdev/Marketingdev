@@ -1,8 +1,14 @@
+## Browser regression repair — 31 October 2026
+
+Owner decisions remain invite-only/manual approved testers, deferred email, and no live social publishing/analytics test. The full browser run failed 63 of 68 checks, primarily obsolete Home/Canvas expectations, with real contrast failures also confirmed. Updated signed-in Home assertions and current navigation; time-zone selection now exercises city search instead of the removed select.
+
+Darkened eyebrow/breadcrumb text and Learnings fact labels, improved muted text on lavender cards, and removed the selected-tab colour transition that briefly made its label unreadable. Focused settings run passes 3/3 with actual local database/storage/onboarding, local test mail, persisted preferences and stale-save protection, plus mobile Axe checks and Learnings navigation. Desktop Learnings and mobile preferences screenshots inspected. 332 contracts pass. No paid provider calls or social publication. These fixes are local pending deployment; the broader current browser suite remains failed and must be repaired and rerun, not represented by this focused pass.
+
 ## Current saved campaign readback — 31 October 2026
 
 Authenticated hosted customer API checks retrieved all five saved campaign images, validated available hashes and decoded1024×1024 pixels. This confirms the saved assets remain accessible; it does not prove new generation or visual quality. The video API reports configured=true but this business has zero video projects/versions/runs. Social is configured with zero connected accounts; live publication remains explicitly deferred. Higgsfield image replacement remains unconfigured. No content mutation, generation, approval or publication was performed. Evidence: saved-campaign-readback.json.
 
-Full current-source browser regression started through `make verify-browser` (real local database/storage/jobs, MOCK external generation). It is still running; do not use the older browser.json as current-source acceptance. Log: work/production-journey-browser.log. Prior goal turn was verified progress: recovery cleanup fixed, Linux CI passed and hosted backup plan limitation recorded.
+Full current-source browser regression completed with 5/68 passing (real local database/storage/jobs, MOCK external generation). Most failures stop at obsolete Home/Canvas selectors; confirmed contrast failures also require correction. The failed browser.json is current evidence; this is not release acceptance. Log: work/production-journey-browser.log. Prior goal turn was verified progress: recovery cleanup fixed, Linux CI passed and hosted backup plan limitation recorded.
 
 GitHub recovery follow-up run41191042719 completed SUCCESS on7c40668. Downloaded artifacts confirm passing unchanged-source recovery evidence, with86 migrations and543 policies restored. Offline/contracts, web build/proxy, load and dependency audit also passed.
 

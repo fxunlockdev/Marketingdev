@@ -65,7 +65,7 @@ async function signin(page, address = email, pass = password) {
   await page.getByLabel("Email address").fill(address);
   await page.getByLabel("Password", { exact: true }).fill(pass);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /^Welcome,/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^(Add your first business|Choose a business|Your content, at a glance\.)$/ })).toBeVisible();
 }
 async function signup(page, address, name) {
   await page.goto(base + "/sign-up");
@@ -252,9 +252,9 @@ test("V5 signup and real email verification lead to zero businesses and exact na
   await expect(alice.locator('.workspace-context')).toHaveText('Your workspace');
   await expect(alice.getByRole('link',{name:'Create',exact:true})).toHaveCount(0);
   await expect(
-    alice.getByRole("link", { name: "Add your first business" }),
+    alice.getByRole("link", { name: "Add business", exact: true }),
   ).toBeVisible();
-  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Campaigns','Integrations','Brand Kit','Content Preferences','Approvals','Learnings','Insights','Canvas','Archived Posts','Brands','Team','Billing','Profile']);  await alice.goto(base + "/brands");
+  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Campaigns','Approvals','Brand Kit','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);  await alice.goto(base + "/brands");
   await expect(
     alice.getByText("0 of 3 owned businesses", { exact: false }),
   ).toBeVisible();
@@ -321,9 +321,9 @@ test("three-step manual fallback saves evidence, corrections, goals and immutabl
     }),
   ).toBeVisible();
   await alice.getByLabel("Primary goal").selectOption("leads");
-  await alice
-    .getByLabel("Time zone", { exact: true })
-    .selectOption("Asia/Kuala_Lumpur");
+  await alice.getByLabel("Time zone", { exact: true }).fill("Kuala Lumpur");
+  await alice.getByRole("button", { name: "Kuala Lumpur Asia/Kuala Lumpur", exact: true }).click();
+  await expect(alice.locator(".time-zone-selection")).toContainText("Asia/Kuala Lumpur");
   await alice.getByRole("button", { name: "Save goals", exact: true }).click();
   await alice.reload();
   await expect(alice.getByLabel("Primary goal")).toHaveValue("leads");
@@ -997,7 +997,7 @@ test('business Team invites through real email, accepts selected access, changes
  await alice.goto(base+`/b/${firstBusiness}/team`);await expect(alice.getByRole('heading',{name:'Team',exact:true})).toBeVisible();
  await alice.getByLabel('Teammate’s email').fill('browser-bob@example.test');await alice.getByLabel('Business role',{exact:true}).selectOption('viewer');await alice.getByRole('button',{name:'Send invitation',exact:true}).click();
  await expect(alice.getByText('Invitation saved and email queued.',{exact:false})).toBeVisible();const link=await emailLink('browser-bob@example.test','Your Desvio client invitation');
- await bob.goto(link);await bob.getByRole('button',{name:'Accept invitation',exact:true}).click();await expect(bob.getByRole('heading',{name:/^Welcome,/})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(2);
+ await bob.goto(link);await bob.getByRole('button',{name:'Accept invitation',exact:true}).click();await expect(bob.getByRole('heading',{name:/^(Add your first business|Choose a business|Your content, at a glance\.)$/})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(2);
  await alice.getByRole('button',{name:'Refresh team',exact:true}).click();await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption('editor');await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByText('Business role saved.',{exact:true})).toBeVisible();
  await alice.reload();await expect(alice.getByRole('region',{name:'People with access'}).getByText('editor',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-desktop.png',fullPage:true});
  await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-mobile.png',fullPage:true});
@@ -1051,8 +1051,8 @@ test('Profile authenticator setup → gated sign-in → recovery code → replac
  try{
   await signIn();assert.equal(await(await loginPage.request.get(base+'/api/auth/get-session')).json(),null);assert.equal((await loginPage.request.get(base+'/api/v1/businesses')).status(),401);
   assert.deepEqual((await new AxeBuilder({page:loginPage}).analyze()).violations,[]);await loginPage.screenshot({path:'work/browser/mfa-sign-in.png',fullPage:true});
-  await loginPage.getByLabel('Authenticator code',{exact:true}).fill(await otp.totp());await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^Welcome,/})).toBeVisible();
-  await loginPage.request.post(base+'/api/auth/sign-out',{headers:{origin:base},data:{}});await admin.query('DELETE FROM auth."rateLimit"');await signIn();await loginPage.getByRole('button',{name:'Use a recovery code',exact:true}).click();await loginPage.getByLabel('Recovery code',{exact:true}).fill(codes[0]);await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^Welcome,/})).toBeVisible();
+  await loginPage.getByLabel('Authenticator code',{exact:true}).fill(await otp.totp());await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^(Add your first business|Choose a business|Your content, at a glance\.)$/})).toBeVisible();
+  await loginPage.request.post(base+'/api/auth/sign-out',{headers:{origin:base},data:{}});await admin.query('DELETE FROM auth."rateLimit"');await signIn();await loginPage.getByRole('button',{name:'Use a recovery code',exact:true}).click();await loginPage.getByLabel('Recovery code',{exact:true}).fill(codes[0]);await loginPage.getByRole('button',{name:'Verify and sign in',exact:true}).click();await expect(loginPage.getByRole('heading',{name:/^(Add your first business|Choose a business|Your content, at a glance\.)$/})).toBeVisible();
   await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('checkbox',{name:/I understand replacing codes/}).check();await panel.getByRole('button',{name:'Replace recovery codes',exact:true}).click();await expect(panel.getByRole('heading',{name:'Recovery codes',exact:true})).toBeVisible();const replacements=await panel.getByRole('list',{name:'Recovery codes',exact:true}).getByRole('listitem').allTextContents();assert.equal(replacements.length,10);assert.ok(replacements.every(c=>!codes.includes(c)));await panel.getByRole('button',{name:'I saved my new recovery codes',exact:true}).click();
   await panel.getByLabel('Password for security changes').fill(password+'-profile');await panel.getByRole('checkbox',{name:/I understand replacing codes/}).check();await panel.getByRole('button',{name:'Disable two-factor authentication',exact:true}).click();await expect(panel.getByText('Not enabled',{exact:true})).toBeVisible();
   assert.deepEqual(await alice.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});

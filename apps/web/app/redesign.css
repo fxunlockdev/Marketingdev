@@ -35,7 +35,7 @@
 .desvio-redesign .v5-main{max-width:none;padding:24px 4px 56px;margin:0;min-width:0}
 .desvio-redesign .v5-page-title{margin:0 0 24px;padding:4px 12px}
 .desvio-redesign .v5-page-title h1{margin:8px 0 12px}
-.desvio-redesign .eyebrow{color:#716b83;font-size:11px;letter-spacing:1.3px}
+.desvio-redesign .eyebrow{color:#676176;font-size:11px;letter-spacing:1.3px}
 .desvio-redesign :is(.v5-panel,.v5-business-card,.v5-add-card,.overview-upcoming,.overview-campaigns,.overview-details,.postforme-social,.brand-profile-review){background:white;border:1px solid transparent;border-radius:28px;box-shadow:none}
 .desvio-redesign .v5-panel{padding:28px}
 .desvio-redesign :is(button,.button){border-radius:999px;border-color:var(--line);font-size:14px;line-height:1.35;font-weight:600;min-height:42px;padding:10px 18px;background:#fff;color:var(--ink);box-shadow:none}
@@ -115,7 +115,7 @@
 .desvio-redesign .v5-sidebar nav>div:first-child .nav-group{margin-top:0}
 .desvio-redesign .v5-topbar{background:transparent;border-radius:0;padding:12px 8px;min-height:60px;gap:12px}
 .desvio-redesign .workspace-page-title{display:flex;align-items:center;gap:12px;font-size:14px;min-width:0}
-.desvio-redesign .workspace-breadcrumb{font-weight:400;color:#777581;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.desvio-redesign .workspace-breadcrumb{font-weight:400;color:#676176;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .desvio-redesign .workspace-separator{font-weight:400;color:#c4c1cf}
 .desvio-redesign .v5-main{max-width:1240px;padding:4px 0 64px}
 @media(max-width:1100px) and (min-width:761px){.desvio-redesign .v5-shell{grid-template-columns:210px minmax(0,1fr)}}
@@ -142,11 +142,11 @@
 .desvio-redesign .learnings-workspace[data-view=facts]{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;align-items:start}
 .desvio-redesign .learnings-workspace>.v5-page-title,.desvio-redesign .learnings-workspace>.workspace-view-switch,.desvio-redesign .learnings-workspace>.notice{grid-column:1/-1}
 .desvio-redesign .learning-proposals{min-width:0}
-.desvio-redesign .learning-proposals .performance-lessons{background:#ddd7fb;border-radius:28px;padding:24px}
+.desvio-redesign .learning-proposals .performance-lessons{--muted:#595965;background:#ddd7fb;border-radius:28px;padding:24px}
 .desvio-redesign .learning-facts-panel{background:#fff;border:0;border-radius:28px;padding:24px;min-width:0}
 .desvio-redesign .learning-facts-panel .memory-facts{display:grid;grid-template-columns:1fr;gap:10px}
 .desvio-redesign .learning-facts-panel .memory-facts>div{background:#f8f7fb;border:0;border-radius:14px;padding:14px}
-.desvio-redesign .learning-facts-panel .memory-facts dt{font-size:12px;color:#777581}
+.desvio-redesign .learning-facts-panel .memory-facts dt{font-size:12px;color:#676176}
 .desvio-redesign .learning-facts-panel .memory-facts dd{font-size:14px;margin:4px 0 0}
 .desvio-redesign .learning-proposals .creative-review{background:#eeeaff;border:0;border-radius:20px;padding:20px}
 @media(max-width:960px){.desvio-redesign .learnings-workspace[data-view=facts]{grid-template-columns:minmax(0,1fr)}}
@@ -193,7 +193,7 @@
 /* Keep the welcome/summary rows independent of the visual card heights. */
 @media(min-width:761px) and (max-width:1199px){.desvio-redesign .reference-home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .desvio-redesign .learnings-workspace>.workspace-view-switch{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:flex-start;padding:0;margin:0 0 12px;border:0;overflow:visible}
-.desvio-redesign .learnings-workspace>.workspace-view-switch button{border:1px solid transparent;border-radius:999px;background:#fff;color:var(--ink);min-height:42px;padding:10px 18px;line-height:1.3;margin:0}
+.desvio-redesign .learnings-workspace>.workspace-view-switch button{transition:none;border:1px solid transparent;border-radius:999px;background:#fff;color:var(--ink);min-height:42px;padding:10px 18px;line-height:1.3;margin:0}
 .desvio-redesign .learnings-workspace>.workspace-view-switch button[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
 .desvio-redesign .learnings-workspace .heading-row{display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:20px}
 .desvio-redesign .learnings-workspace .heading-row h2{margin:0 0 8px}
