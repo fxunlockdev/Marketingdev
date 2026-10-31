@@ -1,3 +1,4 @@
+import {validIngressSecret} from './auth-ingress.js';
 import {mailConfig} from './mail-config.js';
 import type {SocialWorkerConfig} from './social-jobs.js';
 export type StorageConfig={endpoint:string;region:string;bucket:string;accessKeyId:string;secretAccessKey:string};
@@ -7,6 +8,7 @@ export type Config = {
   mode: 'development' | 'test' | 'staging' | 'production';
   origin: string;
   authSecret: string;
+  authIngressSecret?: string;
   authDatabaseUrl: string;
   appDatabaseUrl: string;
   mailDatabaseUrl: string;
@@ -54,6 +56,8 @@ export function configFromEnv(env = process.env): Config {
   const secret = required('AUTH_SECRET');
   if (secret.length < 32) throw new Error('AUTH_SECRET must have at least 32 characters');
   if(mode==='production') throw new Error('Production launch blocked pending the complete release gate');
+  const authIngressSecret=env.AUTH_INGRESS_SECRET;
+  if(authIngressSecret!==undefined&&(!validIngressSecret(authIngressSecret)||authIngressSecret===secret))throw new Error('AUTH_INGRESS_SECRET must be a separate 32-byte hex secret');
   const mailEncryptionKey=required('MAIL_ENCRYPTION_KEY');
   if(!/^[a-f0-9]{64}$/i.test(mailEncryptionKey)) throw new Error('MAIL_ENCRYPTION_KEY must be 32 random bytes as hex');
   const smtp=mailConfig(env,mode!);
@@ -63,7 +67,7 @@ export function configFromEnv(env = process.env): Config {
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(env.POSTIZ_PROVISIONING_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_PROVISIONING_ENABLED))throw new Error('POSTIZ_PROVISIONING_ENABLED must be true or false');
   const videoRenderImage=env.VIDEO_RUNTIME_IMAGE;if(videoRenderImage&&!/^sha256:[a-f0-9]{64}$/.test(videoRenderImage))throw new Error('VIDEO_RUNTIME_IMAGE must be an exact local image digest');
-  return {openaiApiKey:env.OPENAI_API_KEY?.trim()||undefined,postformeApiKey:env.POSTFORME_ENABLED==='true'?env.POSTFORME_API_KEY?.trim():undefined,postformePublishingEnabled:env.POSTFORME_PUBLISHING_ENABLED==='true',higgsfieldImagesEnabled:env.HIGGSFIELD_IMAGES_ENABLED==='true',pexelsApiKey:env.PEXELS_API_KEY?.trim()||undefined,socialAuthorizationEnabled:socialAuthorizationFromEnv(env),videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret,
+  return {openaiApiKey:env.OPENAI_API_KEY?.trim()||undefined,postformeApiKey:env.POSTFORME_ENABLED==='true'?env.POSTFORME_API_KEY?.trim():undefined,postformePublishingEnabled:env.POSTFORME_PUBLISHING_ENABLED==='true',higgsfieldImagesEnabled:env.HIGGSFIELD_IMAGES_ENABLED==='true',pexelsApiKey:env.PEXELS_API_KEY?.trim()||undefined,socialAuthorizationEnabled:socialAuthorizationFromEnv(env),videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret, authIngressSecret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }

@@ -1,3 +1,4 @@
+import {resolveIngressAddress} from './auth-ingress.js';
 import {CampaignIdeas} from './campaign-ideas.js';
 import {CampaignBlogs} from './campaign-blogs.js';
 import {CreativeProvider} from './creative-provider.js';
@@ -421,7 +422,7 @@ export async function createApplication(config: Config) {
     server.use((req: Request, res: Response, next: NextFunction) => {
       (req as AuthRequest).traceId = randomUUID();
       req.headers['x-desvio-trace-id']=(req as AuthRequest).traceId;
-      req.headers['x-desvio-peer-ip'] = req.socket.remoteAddress ?? '127.0.0.1';
+      req.headers['x-desvio-peer-ip'] = resolveIngressAddress(req.headers,req.socket.remoteAddress ?? '127.0.0.1',req.method,req.path,config.authIngressSecret);
       res.setHeader('X-Request-Id', (req as AuthRequest).traceId);
       res.setHeader('Cache-Control', 'no-store');
       res.setHeader('X-Content-Type-Options', 'nosniff');

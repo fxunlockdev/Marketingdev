@@ -61,3 +61,10 @@ With owner authorization, staging can explicitly set `MAIL_PROVIDER=disabled`. O
 ### Dev provider credential location
 
 In Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12`, environment **dev**, open **desvio-dev-worker-settings → Variables**. Add `OPENAI_API_KEY`, optionally `GEMINI_API_KEY`, and `HIGGSFIELD_CREDENTIALS` (`API_KEY:API_SECRET`). This is a settings-only service; credentials are read by the private worker deployment script, never the web service. Adding a variable does not automatically restart the sandbox worker. Apply via a controlled worker rollout; `start-dev.mjs` refuses an existing worker with different configuration. Video enablement/output origins/encryption and expiring business provider grants are separate prerequisites. Live calls and social publishing remain off until explicitly authorized. Owner has deferred adding credentials and will perform live tests later.
+
+
+### Authenticated web ingress (private beta)
+
+For the web service reached only through Railway HTTP ingress, set `TRUST_RAILWAY_EDGE=true` and a separate random 32-byte hex `AUTH_INGRESS_SECRET`. Set the same secret on API only; never use a `NEXT_PUBLIC_` variable or reuse authentication/provider keys. The web proxy removes caller-supplied Desvio proofs, signs Railway's `X-Real-IP`, method and pathname, and forwards the proof privately. API accepts it for 30 seconds, otherwise it uses the socket peer. Query values are deliberately excluded because Next normalizes query encoding. The proof is only a rate-limit address assertion, never user authorization.
+
+Railway documents `X-Real-IP` as the client remote IP: https://docs.railway.com/networking/public-networking/specs-and-limits. Before widening access, verify that spoofed headers are replaced at the deployed edge; do not expose the web listener directly to untrusted networks. Requests missing a valid edge address fail closed with 503 in this mode. For other hosting, leave the flag unset until its trusted ingress adapter exists. Deploy API recognition first, then enable web signing. Remove the web flag to roll back; this retains the conservative shared socket limiter.

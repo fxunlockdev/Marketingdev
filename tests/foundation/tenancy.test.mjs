@@ -578,3 +578,22 @@ test('dev without email accepts an existing verified password account but denies
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE brand_id=$1 AND action='brand.removed'",[b.id])).rows[0].n,1);
  const appPool=new Pool({connectionString:config.appDatabaseUrl});try{const db=new TenantDatabase(appPool);await db.transaction(owner.id,b.organization_id,false,async c=>{assert.equal((await c.query('SELECT id FROM app.jobs WHERE brand_id=$1',[b.id])).rowCount,0);});}finally{await appPool.end();}
  });
+
+test('signed web visitors have independent login limits and forged forwarding cannot rotate a bucket',async()=>{
+ const {signIngressAddress}=await import('../../dist/auth-ingress.js');
+ const secret='fa'.repeat(32),path='/api/auth/sign-in/email',isolated=await createApplication({...config,authIngressSecret:secret});
+ try {
+  await isolated.app.listen(0,'127.0.0.1');const address=await isolated.app.getUrl();
+  const login=async(headers,password='wrong-password')=>{
+   const r=await fetch(address+path,{method:'POST',headers:{origin:config.origin,'content-type':'application/json',...headers},body:JSON.stringify({email:alice.email,password})});
+   await r.body?.cancel();return r.status;
+  };
+  const visitor=ip=>signIngressAddress(secret,ip,'POST',path);
+  for(let n=0;n<3;n++)assert.equal(await login(visitor('198.51.100.10')),401);
+  assert.equal(await login(visitor('198.51.100.10')),429);
+  assert.equal(await login(visitor('198.51.100.11'),'a-strong-test-password-2026'),200,'One visitor must not consume another visitor’s login allowance');
+  for(let n=0;n<3;n++)assert.equal(await login({'x-real-ip':`198.51.100.${20+n}`,'x-desvio-peer-ip':`198.51.100.${30+n}`,'x-desvio-client-ip':`198.51.100.${40+n}`}),401);
+  assert.equal(await login({'x-forwarded-for':'198.51.100.99','x-desvio-client-signature':'0'.repeat(64)}),429,'Forged forwarding stays in the socket bucket');
+  assert.equal(await login(visitor('2001:db8::15'),'a-strong-test-password-2026'),200);
+ } finally { await isolated.close(); }
+});

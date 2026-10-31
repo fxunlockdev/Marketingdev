@@ -30,6 +30,8 @@ jobs:
       - run: mkdir -p work
       - run: make verify-offline
       - run: make verify-contracts
+      - run: npm run build:web
+      - run: node --test tests/runtime/web-ingress.test.mjs
       - run: make verify-load
       - run: npm audit --omit=dev --audit-level=moderate
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

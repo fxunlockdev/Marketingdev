@@ -23,7 +23,8 @@ export function authOptions(pool: Pool, config: Config, mail?: MailQueue) {
     session: { expiresIn: 60 * 60 * 24, updateAge: 60 * 60, cookieCache: { enabled: false } },
     rateLimit: { enabled: true, storage: 'database' as const, window: 60, max: 60 },
     advanced: { useSecureCookies: config.origin.startsWith('https:'),
-      // Set by our ingress from the socket, overwriting any caller-supplied value.
+      // Set by our ingress from a short-lived signed web proof or the socket.
+      // Raw caller-supplied forwarding headers are never trusted here.
       ipAddress: { ipAddressHeaders: ['x-desvio-peer-ip'] },
       defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' as const },
       database: { generateId: 'uuid' as const } },

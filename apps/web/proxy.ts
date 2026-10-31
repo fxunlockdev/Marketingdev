@@ -1,5 +1,22 @@
+import {INGRESS_HEADERS,signIngressAddress,validIngressSecret} from "../api/src/auth-ingress.js";
 import { NextResponse, type NextRequest } from "next/server";
 export function proxy(request: NextRequest) {
+  if(request.nextUrl.pathname.startsWith('/api/')) {
+    const headers=new Headers(request.headers);
+    for(const key of [...INGRESS_HEADERS,'x-desvio-peer-ip'])headers.delete(key);
+    if(process.env.TRUST_RAILWAY_EDGE==='true') {
+      const secret=process.env.AUTH_INGRESS_SECRET;
+      if(!validIngressSecret(secret))return NextResponse.json({error:'Sign-in service unavailable'},{status:503});
+      // Enable only for a web service reached through Railway's HTTP edge.
+      // Never select an arbitrary first X-Forwarded-For entry.
+      const ip=request.headers.get('x-real-ip');
+      try {
+        const proof=signIngressAddress(secret,ip??'',request.method,request.nextUrl.pathname);
+        for(const [key,value] of Object.entries(proof))headers.set(key,value);
+      } catch { return NextResponse.json({error:'Sign-in service unavailable'},{status:503}); }
+    }
+    return NextResponse.next({request:{headers}});
+  }
   const nonce = Buffer.from(crypto.randomUUID()).toString("base64");
   const storage = process.env.S3_BROWSER_ORIGIN
     ? new URL(process.env.S3_BROWSER_ORIGIN).origin
@@ -13,5 +30,5 @@ export function proxy(request: NextRequest) {
   return response;
 }
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
 };
