@@ -204,3 +204,5 @@
 .desvio-redesign .v5-business-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px;max-width:1200px}
 .desvio-redesign .v5-business-card,.desvio-redesign .v5-add-card{min-width:0}
 @media(max-width:480px){.desvio-redesign .learnings-workspace>.workspace-view-switch{gap:6px}.desvio-redesign .learnings-workspace>.workspace-view-switch button{padding:10px 12px;font-size:13px}}
+
+.desvio-redesign .header-actions .header-create{background:#17171a;color:#fff;border:0;border-radius:999px;min-height:40px;display:inline-flex;gap:8px;align-items:center;padding:0 18px;font-size:14px}.desvio-redesign .header-actions .header-create:hover{background:#6a5cff;color:white}

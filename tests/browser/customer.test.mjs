@@ -1414,6 +1414,12 @@ test('Create chat persists author answers and denies another tenant (real databa
  bob=await(await browser.newContext()).newPage();
  await signup(bob,'chat-outsider@example.test','Chat Outsider');await signin(bob,'chat-outsider@example.test');
  firstBusiness=await createBusiness('Chat review brand');
+ await alice.goto(base+`/b/${firstBusiness}/overview`);
+ const home=alice.getByRole('region',{name:'Create with Desvio'});
+ await expect(home.getByRole('textbox',{name:'Ask Desvio'})).toBeVisible();
+ await home.getByRole('textbox',{name:'Ask Desvio'}).fill('A post about our new collection');
+ await expect(alice).toHaveURL(base+`/b/${firstBusiness}/overview`);
+ for(const width of [1440,390]){await alice.setViewportSize({width,height:1000});assert.equal(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await alice.screenshot({path:`work/browser/home-chat-${width}.png`,fullPage:true});}
  await alice.goto(base+`/b/${firstBusiness}/create`);
  await expect(alice.getByRole('heading',{name:'Your idea lands here.'})).toBeVisible();
  await alice.setViewportSize({width:924,height:540});

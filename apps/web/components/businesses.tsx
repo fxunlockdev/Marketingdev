@@ -278,8 +278,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         <header className="v5-topbar">
           <span className="workspace-page-title">{business&&<><span className="workspace-breadcrumb">{business.name}</span><span className="workspace-separator" aria-hidden="true">/</span></>}{label}</span>
           <div className="header-actions">
-            {business&&["owner","admin","editor"].includes(business.role)&&<AppLink className="button" href={`/b/${business.id}/create`}>Create with chat</AppLink>}
             {business&&<GenerationBalance key={business.organization_id} organizationId={business.organization_id}/>}
+            {business&&["owner","admin","editor"].includes(business.role)&&<AppLink className="button header-create" href={`/b/${business.id}/create`}><span aria-hidden="true">✳</span> Create</AppLink>}
             <AppLink className="profile-link workspace-avatar" href="/profile" aria-label="Profile" title="Your profile">
               {session.user.name.slice(0,1)}
             </AppLink>
