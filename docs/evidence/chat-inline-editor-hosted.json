@@ -1,0 +1,47 @@
+{
+  "screens": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 924,
+      "height": 600,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "overflow": false,
+      "card": 264
+    }
+  ],
+  "errors": [],
+  "blocked": [],
+  "checked_at": "2026-10-31T16:51:48.902Z",
+  "inline_controls": true,
+  "unsaved_guards": true,
+  "discard": true,
+  "source_commit": "ed34b34",
+  "web_deployment": "c9057be4-0e27-45f5-92a6-47ae528d2396",
+  "deployment_status": "SUCCESS",
+  "csp_bypassed": false,
+  "paid_generation": false,
+  "hosted_content_mutated": false,
+  "api_worker_changed": false
+}
