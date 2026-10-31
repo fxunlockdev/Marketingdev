@@ -1,4 +1,6 @@
 "use client";
+import {paintCurvedText} from '../lib/curved-text.mjs';
+import {TextCurveControls} from './text-curve-controls';
 import {ChatLayerControls} from './chat-layer-controls';
 import type {ReactNode,CSSProperties} from 'react';
 import {readableDesign} from '../../api/src/creative-design';
@@ -152,48 +154,23 @@ export function CreativeEditor({
     setFontError(undefined);
     void loadDesignFonts(design.layers).then(() => {
       if (!active) return;
-      const ids = new Set(design.layers.map((l) => l.id));
-      for (const o of [...c.getObjects()])
-        if ((o as any).backingId || !ids.has((o as any).layerId)) c.remove(o);
+      const activeId = (c.getActiveObject() as any)?.layerId;
+      c.discardActiveObject();
+      for (const o of [...c.getObjects()]) { c.remove(o); o.dispose(); }
       for (const l of design.layers) {
-        let text = c.getObjects().find((o) => (o as any).layerId === l.id) as
-          | Textbox
-          | undefined;
-        if (!text) {
-          text = new Textbox(l.text, {
-            originX: "left",
-            originY: "top",
-            editable: false,
-            hasControls: false,
-            lockScalingX: true,
-            lockScalingY: true,
-            lockRotation: true,
-            splitByGrapheme: !l.backing,
-            strokeWidth: 0,
-            padding: 4,
-            borderColor: "#6a5cff",
-            borderDashArray: [6,4],
-          });
-          (text as any).layerId = l.id;
-          c.add(text);
-        }
-        text.set({
-          text: l.text,
-          left: l.x,
-          top: l.y,
-          width: l.width,
-          fontSize: l.fontSize,
-          fontWeight: l.fontWeight ?? 400,
-          splitByGrapheme: !l.backing,
-          fontFamily: l.fontFamily,
-          fill: l.fill,
-          textAlign: l.align,
-          selectable: !readOnly,
-          evented: !readOnly,
-          lockMovementX: readOnly,
-          lockMovementY: readOnly,
-        });
-        text.initDimensions();
+        const interaction = {
+          originX: "left" as const, originY: "top" as const,
+          left:l.x, top:l.y, hasControls:false, lockScalingX:true, lockScalingY:true,
+          lockRotation:true, strokeWidth:0, padding:4, borderColor:"#6a5cff", borderDashArray:[6,4],
+          selectable:!readOnly,evented:!readOnly,lockMovementX:readOnly,lockMovementY:readOnly,
+        };
+        const text = l.curvature
+          ? new FabricImage(paintCurvedText(document.createElement('canvas'),l),interaction)
+          : new Textbox(l.text,{...interaction,editable:false,width:l.width,fontSize:l.fontSize,
+              fontWeight:l.fontWeight??400,splitByGrapheme:!l.backing,fontFamily:l.fontFamily,
+              fill:l.fill,textAlign:l.align});
+        (text as any).layerId=l.id;
+        c.add(text);
         if (l.text.trim() && l.backing) {
           const b = l.backing;
           const backing = new Rect({ originX:'left', originY:'top', left:l.x-b.padding, top:l.y-b.padding, width:l.width+2*b.padding, height:text.height+2*b.padding, fill:b.fill, opacity:b.opacity, strokeWidth:0, selectable:false, evented:false });
@@ -203,6 +180,9 @@ export function CreativeEditor({
         c.bringObjectToFront(text);
         text.setCoords();
       }
+      const selectedId = chatControls ? (design.layers.find(l=>l.id===selected)??design.layers[0])?.id : activeId;
+      const selection = c.getObjects().find(o=>(o as any).layerId===selectedId);
+      if (selection && !readOnly) c.setActiveObject(selection);
       c.requestRenderAll();
       // Export only the exact measured design, never a stale or fallback-font frame.
       c.renderAll();
@@ -285,8 +265,10 @@ export function CreativeEditor({
         </div>
         {!ready && !error && <p role="status">Loading your private image…</p>}
         {ready && fontsLoading && <p role="status">Loading your design fonts…</p>}
-        <Notice error={fontError} />
-        {!!fontError && <button type="button" onClick={() => setFontRetry(n => n + 1)}>Retry fonts</button>}
+        {fontError instanceof Error && fontError.message==='EXPORT_TEXT_OVERFLOW'
+          ? <p className="notice error" role="alert">This text is too tall for the image. Shorten it, reduce the font size, or use fewer lines.</p>
+          : <Notice error={fontError} />}
+        {!!fontError && !(fontError instanceof Error && fontError.message==='EXPORT_TEXT_OVERFLOW') && <button type="button" onClick={() => setFontRetry(n => n + 1)}>Retry fonts</button>}
         <Notice error={error} />
         {!!error && (
           <button onClick={() => setRetry((n) => n + 1)}>Reload image</button>
@@ -339,6 +321,7 @@ export function CreativeEditor({
                 />
               )}
             </Field>
+            <TextCurveControls layer={layer} update={update}/>
             <div className="creative-fields">
               <Field label="Font">
                 {(id) => (

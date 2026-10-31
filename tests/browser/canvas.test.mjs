@@ -1569,6 +1569,8 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await page.getByRole('button',{name:'White text',exact:true}).click();
  await page.getByRole('button',{name:'Align center',exact:true}).click();
  await page.getByRole('switch',{name:'Contrast backing',exact:true}).check();
+ await page.getByRole('button',{name:'Curve',exact:true}).click();
+ await page.getByLabel('Bend',{exact:false}).fill('-65');
  await expect(page.getByRole('button',{name:'Download PNG',exact:true})).toBeDisabled();
  await page.getByRole('button',{name:'Save changes',exact:true}).click();
  await expect(page.getByText('Saved as a new draft version.',{exact:true})).toBeVisible();
@@ -1577,6 +1579,8 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await expect(page.getByLabel('Font',{exact:true})).toHaveValue('Lora');
  await expect(page.getByLabel('Text weight',{exact:true})).toHaveValue('600');
  await expect(page.getByRole('switch',{name:'Contrast backing',exact:true})).toBeChecked();
+ await expect(page.getByLabel('Bend',{exact:false})).toHaveValue('-65');
+ await expect(page.getByRole('button',{name:'Curve',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.getByRole('button',{name:'Align center',exact:true})).toHaveAttribute('aria-pressed','true');
  const pngDownload=page.waitForEvent('download');
  await page.getByRole('button',{name:'Download PNG',exact:true}).click();

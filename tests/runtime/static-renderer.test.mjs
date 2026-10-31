@@ -50,3 +50,20 @@ test('bundled brand fonts render distinct families and requested weights in save
  }
  assert.equal(fingerprints.size,6,'font families must produce genuinely different artwork');
 });
+
+test('curved text produces distinct up/down PNGs and JPEGs with font, backing and overflow protection',async()=>{
+ const png=await sharp({create:{width:1024,height:1024,channels:3,background:'#eeeeee'}}).png().toBuffer();
+ const layer={id:'headline',type:'text',text:'A home for every chapter',fontFamily:'Lora',fontSize:64,fontWeight:600,fill:'#ffffff',align:'center',width:800,x:100,y:100,backing:{fill:'#111111',opacity:.88,padding:12}};
+ const design={schema_version:1,background_media_id:randomUUID(),width:1024,height:1024,layers:[layer]},renderer=new StaticRenderer(image),hashes=new Set();
+ for(const curvature of [-100,0,100]){
+  const curved={...design,layers:[{...layer,curvature}]};
+  const result=await renderer.render(curved,png);hashes.add(result.sha256);
+  assert.match(result.manifest.curved_text_sha256,/^[a-f0-9]{64}$/);
+  const pixel=await sharp(result.bytes).extract({left:90,top:90,width:1,height:1}).raw().toBuffer();assert.ok(pixel[0]<60);
+  const jpeg=await renderer.render(curved,png,'instagram-jpeg');assert.equal((await sharp(jpeg.bytes).metadata()).format,'jpeg');
+ }
+ assert.equal(hashes.size,3,'straight and both bends must change actual pixels');
+ await assert.rejects(()=>renderer.render({...design,layers:[{...layer,curvature:100,y:970}]},png),/EXPORT_TEXT_OVERFLOW/);
+ await assert.rejects(()=>renderer.render({...design,layers:[{...layer,text:'X\n'.repeat(500),curvature:100}]},png),/EXPORT_TEXT_OVERFLOW/);
+ const multiline=await renderer.render({...design,layers:[{...layer,text:'First line\nSecond line',curvature:50}]},png);assert.ok(multiline.bytes.length>1000);
+});

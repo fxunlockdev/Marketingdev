@@ -129,3 +129,9 @@
  .desvio-redesign .chat-creative-project .conversation-canvas-strip{grid-area:metadata;align-self:start;justify-self:center}
  .desvio-redesign .chat-creative-project .chat-layer-card{grid-area:controls;align-self:start;max-height:calc(100dvh - 160px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#d9d5e7 transparent}
 }
+
+.text-curve-controls {display:grid;gap:12px;min-width:0}
+.text-curve-controls label {display:flex;justify-content:space-between;gap:12px}
+.text-curve-controls output {font-variant-numeric:tabular-nums;color:#615b79}
+.text-curve-controls input[type=range] {width:100%;min-height:32px;padding:0;accent-color:#6a5cff;background:transparent;cursor:pointer}
+.text-curve-controls .hint {margin:0;font-size:12px;line-height:1.5;color:#757184}

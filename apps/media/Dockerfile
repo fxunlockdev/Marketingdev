@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends python3 make g+
 COPY apps/web/public/fonts/ /opt/render/fonts/
 COPY apps/media/fonts/ /opt/render/fonts/
 COPY apps/media/runtime.mjs ./runtime.mjs
+COPY apps/web/lib/curved-text.mjs ./curved-text.mjs
 USER 65534:65534
 WORKDIR /tmp
 ENTRYPOINT ["node","/opt/render/runtime.mjs"]

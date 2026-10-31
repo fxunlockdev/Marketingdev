@@ -16,6 +16,7 @@ export type Design = {
     fontSize: number;
     fontFamily: DesignFontFamily;
     fill: string;
+    curvature?: number;
     fontWeight?: FontWeight;
     backing?: { fill: string; opacity: number; padding: number };
     align: "left" | "center" | "right";
@@ -109,10 +110,11 @@ export function validateDesign(
   for (const l of v.layers) {
     if (
       !l ||
-      Object.keys(l).filter(k => !["fontWeight", "backing"].includes(k)).sort().join(",") !==
+      Object.keys(l).filter(k => !["fontWeight", "backing", "curvature"].includes(k)).sort().join(",") !==
         "align,fill,fontFamily,fontSize,id,text,type,width,x,y" ||
       !/^[-a-z0-9]{1,40}$/.test(l.id) ||
       seen.has(l.id) ||
+      (l.curvature !== undefined && (!Number.isFinite(l.curvature) || l.curvature < -100 || l.curvature > 100)) ||
       (l.fontWeight !== undefined && !designFontWeights(l.fontFamily).includes(l.fontWeight)) ||
       (l.backing !== undefined && (!l.backing || Object.keys(l.backing).sort().join(",") !== "fill,opacity,padding" || !/^#[a-f0-9]{6}$/i.test(l.backing.fill) || !Number.isFinite(l.backing.opacity) || l.backing.opacity < 0 || l.backing.opacity > 1 || !Number.isFinite(l.backing.padding) || l.backing.padding < 0 || l.backing.padding > 48 || l.x < l.backing.padding || l.y < l.backing.padding || l.x + l.width + l.backing.padding > width)) ||
       l.type !== "text" ||
