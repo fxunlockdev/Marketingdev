@@ -1,0 +1,43 @@
+{
+  "checked_at": "2026-10-31T15:58:22.707Z",
+  "scope": "Read-only local web using authenticated dev data. No generation or content mutation.",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 924,
+      "height": 600,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "overflow": false,
+      "choices_clipped": false
+    }
+  ],
+  "history_resume": true,
+  "carousel_handoff": true,
+  "choice_prompts": true,
+  "image_options": true,
+  "page_errors": [],
+  "unexpected_writes": [],
+  "typecheck": "passed"
+}

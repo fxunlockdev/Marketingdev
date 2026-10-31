@@ -1,3 +1,9 @@
+## Chat welcome spacing — 31 October 2026
+
+Removed automatic promotion of the latest conversation from the welcome screen; saved conversations remain accessible through History. Shortened the greeting and aligned the five creation choices in a deliberate three/two grid. Choice selection now focuses the composer and exposes its selected state. Existing Image options and guided Carousel routing remain intact.
+
+Validation: web TypeScript check passes. Read-only authenticated browser checks pass at 1440×1000, 1024×768, 924×600, 390×844 and 320×640, with no horizontal overflow or clipped choices. History reopens a saved creative; prompt choices, focus, image options and Carousel handoff pass. Desktop and mobile screenshots inspected. No content mutation or paid generation. Evidence: chat-welcome-ui.json. Dev web deployment pending.
+
 ## Canvas preview, progress and image planning — 31 October 2026
 
 Restored the supplied chat design's pastel empty canvas, creation chips, centered private-image preview and compact metadata strip. Image options cover aspect, lettering and channel before sending; Carousel opens its working guided flow. Detailed editor opens on demand. Portrait previews fit the available desktop height; mobile resumes at the latest message and keeps the canvas scrollable. Shared post export/review actions have measured spacing, as do archive and image-replacement controls.

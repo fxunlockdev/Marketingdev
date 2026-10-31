@@ -19,8 +19,9 @@
 .desvio-redesign .conversation-artwork>.creative-editor{grid-template-columns:minmax(0,1fr)}
 .desvio-redesign .conversation-artwork .creative-artboard{margin-inline:auto;width:100%;max-width:680px}
 @media(max-width:760px){.desvio-redesign .conversation-artwork h1{font-size:26px}.desvio-redesign .conversation-artwork>header>button{white-space:nowrap;flex-shrink:0}}
-.desvio-redesign .conversation-screen .conversation-choices{margin:0 0 20px;gap:10px}
-.desvio-redesign .conversation-resume{margin:0 0 20px 40px;font-size:14px}.desvio-redesign .conversation-resume p{margin:0 0 8px}.desvio-redesign .conversation-resume button{max-width:100%;white-space:normal;text-align:left}
+.desvio-redesign .conversation-screen .conversation-choices{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin:18px 0 24px;padding-left:40px;gap:10px}
+.desvio-redesign .conversation-screen .conversation-choices button{grid-column:span 2;min-width:0;min-height:44px;padding:10px 8px;white-space:nowrap}
+.desvio-redesign .conversation-screen .conversation-choices button:nth-last-child(-n+2){grid-column:span 3}
 .desvio-redesign .conversation-options{padding:0 8px 12px;flex-shrink:0}.desvio-redesign .conversation-options>button{min-height:36px;margin:0;padding:6px 12px;background:#f4f3f8;font-size:13px}
 .desvio-redesign .conversation-option-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px;max-height:190px;overflow:auto;padding:4px}
 .desvio-redesign .conversation-option-fields label{display:grid;gap:6px;font-size:12px}.desvio-redesign .conversation-option-fields select{min-width:0;width:100%;font-size:13px;min-height:40px;padding:8px!important;margin:0}
