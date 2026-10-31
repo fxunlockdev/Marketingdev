@@ -1,0 +1,48 @@
+{
+  "screens": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 924,
+      "height": 600,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "overflow": false,
+      "card": 264
+    }
+  ],
+  "errors": [],
+  "blocked": [],
+  "checked_at": "2026-10-31T17:09:37.301Z",
+  "post_details": true,
+  "no_legacy_canvas_form": true,
+  "inline_controls": true,
+  "unsaved_guards": true,
+  "discard": true,
+  "source_commit": "292d3de",
+  "web_deployment": "9fb2636d-b12b-477f-b00a-0d02f34545fe",
+  "deployment_status": "SUCCESS",
+  "csp_bypassed": false,
+  "hosted_content_mutated": false,
+  "paid_generation": false
+}
