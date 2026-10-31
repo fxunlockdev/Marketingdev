@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-10-31T09:50:04.888924+00:00",
+  "commit": "c25c85756cb1b169de238a2e7de727b65ca1a227",
+  "api_deployment": "36f3b8fd-3772-4774-a853-d25772a8658b",
+  "web_deployment": "9d4d6dcb-9166-4c65-a809-7dee55db2576",
+  "deployment_status": "SUCCESS",
+  "ci_url": "https://github.com/fxunlockdev/Marketingdev/actions/runs/41190012864",
+  "ci_conclusion": "success",
+  "scope": "Signed Railway web ingress and account limits; not full production release acceptance",
+  "local_account_tests": 31,
+  "local_contract_tests": 332,
+  "built_proxy_test_passed": true,
+  "live": {
+    "checked_at": "2026-10-31T09:48:36.071Z",
+    "scope": "Own verified account sign-in through deployed edge; no content or social actions",
+    "checks": [
+      "verified_account_signin",
+      "session_uses_public_client_address",
+      "forged_headers_do_not_change_address"
+    ],
+    "passed": true
+  },
+  "hosted_editor": {
+    "screens": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 924,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-31T09:49:14.761Z",
+    "clean_text_action": true,
+    "saved_existing_posts": false
+  },
+  "ci_load": {
+    "scope": "local authenticated API, not hosted capacity or provider throughput",
+    "accounts": 8,
+    "concurrency": 24,
+    "requests": 480,
+    "passed": true,
+    "duration_ms": 1436,
+    "latency_ms": {
+      "p50": 64,
+      "p95": 117,
+      "p99": 237
+    },
+    "requests_per_second": 334.26,
+    "failed_requests": 0
+  },
+  "paid_generation": false,
+  "social_publication": false,
+  "public_signup_enabled": false
+}
