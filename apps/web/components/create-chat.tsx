@@ -46,7 +46,7 @@ export function CreateChat({business}:{business:{id:string;name:string;role:stri
   if(done){const next={...draft,data:{...draft.data,direction:value},messages:[...draft.messages,{role:'user' as const,text:value},{role:'assistant' as const,text:'Updated your image direction. Review the brief before creating.'}]};setDraft(next);setInput('');return;}
   const limits:Record<string,number>={name:140,theme:1200,cta:120,topic:1200,direction:1200};if(value.length>(limits[field]??2048)){setError(new Error(`Keep this answer under ${limits[field]??2048} characters.`));return;}
   if(field==='start'&&!/^\d{4}-\d{2}-\d{2}$/.test(value)){setError(new Error('Choose a valid start date.'));return;}if(field==='date'&&localCandidates(value,prefs.timezone).length!==1){setError(new Error('Choose a valid posting time in '+prefs.timezone+'.'));return;}
-  const nextStep=draft.step+1;setDraft({...draft,step:nextStep,composer:'',data:{...draft.data,[field]:value},messages:[...draft.messages,{role:'user',text:value},{role:'assistant',text:nextStep>=fields.length?'That’s the whole plan. Review your brief and create when you’re ready.':questions[fields[nextStep]]}]});setInput('');setMulti([]);
+  const nextStep=draft.mode==='post'&&field==='direction'&&draft.data.format?draft.step+2:draft.step+1;setDraft({...draft,step:nextStep,composer:'',data:{...draft.data,[field]:value},messages:[...draft.messages,{role:'user',text:value},{role:'assistant',text:nextStep>=fields.length?'That’s the whole plan. Review your brief and create when you’re ready.':questions[fields[nextStep]]}]});setInput('');setMulti([]);
  }
  async function submit(){if(locked.current||current.current.thread||!writable)return;locked.current=true;setBusy(true);setError(undefined);try{
   let next=current.current;
