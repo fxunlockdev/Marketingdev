@@ -13,7 +13,7 @@
 .desvio-redesign .content-workspace .plan-date-strip{gap:8px;padding:4px 0 16px}
 .desvio-redesign .content-workspace .plan-date-strip button{border:0;border-radius:18px;background:#f4f3f8;color:#55556a;min-height:86px}
 .desvio-redesign .content-workspace .plan-date-strip button.active,.desvio-redesign .content-workspace .plan-date-strip button[aria-pressed="true"]{background:#6a5cff;color:#fff}
-.desvio-redesign .content-workspace .plan-results,.desvio-redesign .content-workspace .calendar-board-hint{font-size:12px;color:#6e6e78}
+.desvio-redesign .content-workspace .plan-results,.desvio-redesign .content-workspace .calendar-board-hint{font-size:12px;color:#646470}
 .desvio-redesign .content-workspace .plan-grid{gap:8px}
 .desvio-redesign .content-workspace .plan-day{background:#f8f7fc;border:0;border-radius:18px;padding:10px;min-width:0}
 .desvio-redesign .content-workspace .plan-day>h2{font-size:13px;color:#55556a;font-weight:600;margin:4px 2px 14px;font-variant-numeric:tabular-nums}
@@ -76,7 +76,7 @@
 .desvio-redesign .calendar-page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:4px 6px;margin:0}
 .desvio-redesign .calendar-page-heading h1{font-size:48px;line-height:1.05;margin:8px 0}
 .desvio-redesign .calendar-page-heading p{font-size:14px;color:#6e6e78;margin:0}
-.desvio-redesign .calendar-page-heading .calendar-business-name{font-size:13px;margin-bottom:8px}
+.desvio-redesign .calendar-page-heading .calendar-business-name{font-size:13px;margin-bottom:8px;color:#646470}
 .desvio-redesign .content-workspace .calendar-period-title{font-family:'Desvio Serif',Georgia,serif;font-size:24px;line-height:1.2;margin:0 6px;font-weight:400;flex:1;min-width:180px}
 .desvio-redesign .content-workspace .plan-toolbar{align-items:center;flex-wrap:wrap;padding-bottom:12px;gap:10px}
 .desvio-redesign .content-workspace .calendar-period button{padding:8px 12px;min-height:36px}

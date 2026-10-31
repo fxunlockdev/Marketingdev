@@ -48,3 +48,6 @@ dialog.campaign-new-post>header>button[aria-label="Close new post"]{display:grid
 .campaign-preview-empty{display:grid;place-items:center;color:#777581}.campaign-preview-empty>svg{width:24px;height:24px}
 @media(max-width:600px){.desvio-redesign .campaigns-screen .overview-campaign-list a{grid-template-columns:64px minmax(0,1fr) auto}.campaign-preview-stack{width:64px}.campaign-preview-stack>span:nth-child(3){left:16px}.desvio-redesign .campaigns-screen .overview-campaign-list a>span:not([aria-hidden]){display:none}}
 .desvio-redesign .campaign-review-screen .campaign-card-body{display:flex;flex-direction:column}
+
+/* Keep supporting copy readable on the selected lavender option. */
+.campaign-builder .campaign-design-choice.selected :is(.design-font-family,.design-choice-description){color:#514b66}

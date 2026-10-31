@@ -43,7 +43,7 @@ section.brand-media-library .brand-media-tile .private-visual-presentation{heigh
 /* Authoritative Brand Kit export: one heading, quiet rounded navigation, one media surface. */
 .desvio-redesign .brand-kit-screen{display:grid;gap:20px;min-width:0}
 .desvio-redesign .brand-kit-heading{padding:4px 6px}
-.desvio-redesign .brand-kit-heading p{font-size:13px;color:#6e6e78;margin:0 0 10px}
+.desvio-redesign .brand-kit-heading p{font-size:13px;color:#646470;margin:0 0 10px}
 .desvio-redesign .brand-kit-heading h1{font-family:'Desvio Serif',Georgia,serif;font-size:48px;line-height:1.05;font-weight:400;margin:0}
 .desvio-redesign .brand-kit-layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:12px;align-items:start}
 .desvio-redesign .brand-kit-navigation{position:sticky;top:12px;background:#fff;border:0;border-radius:28px;padding:10px;gap:2px}

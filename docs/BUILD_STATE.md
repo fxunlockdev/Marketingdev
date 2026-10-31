@@ -1,3 +1,9 @@
+## Customer redesign regression — 31 October 2026
+
+All 24 current customer browser scenarios pass with a clean process exit (work/customer-final-regression-7.log). Actual local database, storage, scanner and workers; local SMTP and mocked external generation. Updated obsolete Home/Canvas navigation expectations to campaign flows without removing permissions, saved-font, private-upload, stale-save, approval, filtering or request-idempotency assertions. Fixed contrast in selected design options, Brand Kit and calendar supporting text; removed unreadable channel-selector color interpolation; named reference checkboxes clearly. Drained the final mocked intake handler before browser disposal to fix teardown failures. Brand typography and daily calendar screenshots inspected. Evidence: customer-redesign-regression.json.
+
+These changes are not deployed. Broader browser suites and hosted recovery readiness remain open; this is not production acceptance. Owner scope remains invite-only/manual approved testers, deferred email setup, and no live social publishing/analytics test. No paid provider calls or social publication.
+
 ## Browser regression repair — 31 October 2026
 
 Owner decisions remain invite-only/manual approved testers, deferred email, and no live social publishing/analytics test. The full browser run failed 63 of 68 checks, primarily obsolete Home/Canvas expectations, with real contrast failures also confirmed. Updated signed-in Home assertions and current navigation; time-zone selection now exercises city search instead of the removed select.

@@ -1,0 +1,23 @@
+{
+  "recorded_at": "2026-10-31T11:49:14.958280+00:00",
+  "scope": "Local customer browser regression, not full release acceptance or deployed verification",
+  "passed": true,
+  "tests": 24,
+  "failures": 0,
+  "exit_code": 0,
+  "log": "work/customer-final-regression-7.log",
+  "source_sha256": {
+    "apps/web/components/calendar-connections-redesign.css": "6382fbd0908f463087d6d2c61eadbc455ae4ef2f319834ca9c354742e0f7898b",
+    "apps/web/components/campaign-post-references.tsx": "97e86640f188a9648c16c53ad01205b5b73607bc7211cbb8220c547bc0ebd159",
+    "apps/web/components/campaign-redesign.css": "0eeba46c3414724acd6617559fb23f6477780cd96142bcc25e8e5003b568b432",
+    "apps/web/components/campaign-mix-picker.module.css": "efe27f0a70940f1bc98cc5704b50a1ce8d9ef900160572a9e188efec527961ab",
+    "apps/web/components/media-connections-refinement.css": "8b2fbd2f948c76a2ec5733bda310354d51bc204b37bc01638eb390a53ecce30b",
+    "tests/browser/customer.test.mjs": "fc40669a110ed462f3a4cfc3b78c8492bd93fe3604fb44d4402824c15cb8bb1a"
+  },
+  "external_providers": "Mock generation and local SMTP; no paid providers or social publication",
+  "screenshots_reviewed": [
+    "work/browser/brand-kit-typography.png",
+    "work/browser/daily-content-plan.png"
+  ],
+  "remaining": "Broader browser suites, hosted acceptance and recovery readiness remain open. Invite-only/manual testers and deferred live social acceptance retained."
+}
