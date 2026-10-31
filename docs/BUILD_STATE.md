@@ -2,7 +2,7 @@
 
 Removed automatic promotion of the latest conversation from the welcome screen; saved conversations remain accessible through History. Shortened the greeting and aligned the five creation choices in a deliberate three/two grid. Choice selection now focuses the composer and exposes its selected state. Existing Image options and guided Carousel routing remain intact. History rows have compact two-line titles; legacy verification correlation prefixes are omitted from displayed messages and reference labels without changing stored transcripts.
 
-Validation: web TypeScript check passes. Read-only authenticated browser checks pass at 1440×1000, 1024×768, 924×600, 390×844 and 320×640, with no horizontal overflow or clipped choices. History reopens a saved creative; prompt choices, focus, image options and Carousel handoff pass. Desktop and mobile screenshots inspected. No content mutation or paid generation. Evidence: chat-welcome-ui.json. Dev web deployment pending.
+Validation: web TypeScript check passes. Read-only authenticated browser checks pass at 1440×1000, 1024×768, 924×600, 390×844 and 320×640, with no horizontal overflow or clipped choices. History reopens a saved creative; prompt choices, focus, image options and Carousel handoff pass. Desktop and mobile screenshots inspected. No content mutation or paid generation. Evidence: chat-welcome-ui.json and chat-welcome-hosted.json. Pushed dev source 10c6158; exact dev web deployment f529c17e-720a-4662-b131-509d4db95cec reached SUCCESS. Authenticated hosted checks repeated the viewport, History resume, cleaned verification labels, choice prompts, image options and Carousel handoff checks successfully. API and worker unchanged.
 
 ## Canvas preview, progress and image planning — 31 October 2026
 

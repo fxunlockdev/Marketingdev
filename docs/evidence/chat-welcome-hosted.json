@@ -1,0 +1,47 @@
+{
+  "checked_at": "2026-10-31T16:06:30.318Z",
+  "source_commit": "10c6158",
+  "deployment_id": "f529c17e-720a-4662-b131-509d4db95cec",
+  "deployment_status": "SUCCESS",
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "scope": "Authenticated hosted browser checks, read-only content access. No generation or publication.",
+  "viewports": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 924,
+      "height": 600,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "choices_clipped": false
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "overflow": false,
+      "choices_clipped": false
+    }
+  ],
+  "history_resume": true,
+  "verification_markers_omitted": true,
+  "carousel_handoff": true,
+  "choice_prompts": true,
+  "image_options": true,
+  "errors": [],
+  "blocked": []
+}
