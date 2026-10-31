@@ -1408,3 +1408,66 @@ test('onboarding renders website photos and incomplete capture metadata without 
     assert.deepEqual(failures,[]);
   } finally {await alice.unrouteAll({behavior:'wait'});alice.off('pageerror',onError);}
 });
+
+test('Create chat persists author answers and denies another tenant (real database)',async()=>{
+ await signup(alice,'chat-author@example.test','Chat Author');await signin(alice,'chat-author@example.test');
+ bob=await(await browser.newContext()).newPage();
+ await signup(bob,'chat-outsider@example.test','Chat Outsider');await signin(bob,'chat-outsider@example.test');
+ firstBusiness=await createBusiness('Chat review brand');
+ await alice.goto(base+`/b/${firstBusiness}/create`);
+ await expect(alice.getByRole('heading',{name:'Your idea lands here.'})).toBeVisible();
+ await alice.setViewportSize({width:924,height:540});
+ await alice.screenshot({path:'work/browser/create-chat-start.png'});
+ await alice.locator('.create-start-tiles button.campaign').click();
+ await alice.getByRole('textbox').fill('Autumn stories');
+ await alice.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(alice.locator('.create-brief-card h1')).toHaveText('Autumn stories');
+ await expect(alice.getByText('Draft saved',{exact:true})).toBeVisible();
+ const path=base+`/api/v1/businesses/${firstBusiness}/create-chat/draft`;
+ const saved=await(await alice.request.get(path)).json();
+ assert.equal(saved.draft.snapshot.data.name,'Autumn stories');
+ assert.equal((await bob.request.get(path)).status(),404);
+ assert.equal((await bob.request.put(path,{headers:{origin:base},data:{revision:0,snapshot:saved.draft.snapshot}})).status(),404);
+ await alice.reload();
+ await expect(alice.locator('.create-brief-card h1')).toHaveText('Autumn stories');
+ await alice.getByRole('textbox').fill('New seasonal collection, responsibly made');
+ await alice.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(alice.getByText('Draft saved',{exact:true})).toBeVisible();
+ const newer=await(await alice.request.get(path)).json();
+ assert.ok(newer.draft.revision>saved.draft.revision);
+ const stale=await alice.request.put(path,{headers:{origin:base},data:{revision:saved.draft.revision,snapshot:{...saved.draft.snapshot,data:{name:'Stale overwrite'}}}});
+ assert.equal(stale.status(),409);
+ await alice.screenshot({path:'work/browser/create-chat-campaign.png'});
+ for(const width of [390,1440]){await alice.setViewportSize({width,height:844});assert.equal(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);}
+ await alice.screenshot({path:'work/browser/create-chat-desktop.png'});
+ // A failed autosave must retain answers and expose an explicit recovery action.
+ await alice.route('**/create-chat/draft',route=>route.request().method()==='PUT'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Draft storage unavailable'})}):route.continue());
+ await alice.getByRole('button',{name:'Skip',exact:true}).click();
+ await expect(alice.getByRole('button',{name:'Retry saving draft'})).toBeVisible();
+ const beforeRetry=await(await alice.request.get(path)).json();
+ assert.equal(beforeRetry.draft.snapshot.step,2);
+ await alice.unroute('**/create-chat/draft');
+ await alice.getByRole('button',{name:'Retry saving draft'}).click();
+ await expect(alice.getByText('Draft saved',{exact:true})).toBeVisible();
+ await alice.getByRole('button',{name:'instagram',exact:true}).click();
+ await expect(alice.getByText('Draft saved',{exact:true})).toBeVisible();
+ await alice.reload();
+ await expect(alice.getByRole('button',{name:'instagram',exact:true})).toHaveAttribute('aria-pressed','true');
+ await alice.getByRole('button',{name:'Done ✓',exact:true}).click();
+ await alice.getByRole('button',{name:'Today',exact:true}).click();
+ await alice.getByRole('button',{name:'Edit start',exact:true}).click();
+ await expect(alice.locator('input[type=date]')).toBeVisible();
+ // A pending autosave cannot restore the old draft behind a slow reset.
+ await alice.route('**/create-chat/draft',async route=>{
+  if(route.request().method()==='PUT'&&route.request().postDataJSON()?.snapshot?.mode===null)await setTimeout(1000);
+  await route.continue();
+ });
+ await alice.locator('input[type=date]').fill('2026-11-12');
+ // Reset is durable before the local draft disappears.
+ await alice.getByRole('button',{name:'↶ Start over',exact:true}).click();
+ await alice.getByRole('dialog').getByRole('button',{name:'Start over',exact:true}).click();
+ await expect(alice.getByRole('heading',{name:'Your idea lands here.'})).toBeVisible();
+ await alice.unroute('**/create-chat/draft');
+ await alice.reload();
+ await expect(alice.getByRole('heading',{name:'Your idea lands here.'})).toBeVisible();
+});

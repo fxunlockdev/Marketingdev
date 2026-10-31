@@ -1,3 +1,4 @@
+import {Put} from '@nestjs/common';
 import {resolveIngressAddress} from './auth-ingress.js';
 import {CampaignIdeas} from './campaign-ideas.js';
 import {CampaignBlogs} from './campaign-blogs.js';
@@ -326,6 +327,8 @@ class ContentPlanController {
 @UseGuards(SessionGuard)
 class CanvasController {
  constructor(@Inject(Canvas) private readonly service:Canvas){}
+ @Get('create-chat/draft') createDraft(@Req() r:AuthRequest,@Param('id') id:string){return this.service.createDraft(r.actorId,id);}
+ @Put('create-chat/draft') saveCreateDraft(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.saveCreateDraft(r.actorId,id,body);}
  @Get('canvas/allowances') allowances(@Req() r:AuthRequest,@Param('id') id:string){return this.service.allowances(r.actorId,id);}
  @Get('canvas/references') references(@Req() r:AuthRequest,@Param('id') id:string){return this.service.references(r.actorId,id);}
  @Post('canvas/references') approveReference(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.approveReference(r.actorId,id,body);}

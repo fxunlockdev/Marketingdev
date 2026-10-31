@@ -1,3 +1,4 @@
+import {parseCreateDraft} from './create-chat-draft.js';
 import {normalizeCreativeSpec,creativeSourceSize,creativeDimensions} from "./campaign-formats.js";
 import {approvedLearning} from './learning-context.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
@@ -49,6 +50,22 @@ export class Canvas {
       (db) => action(db, b),
       id,reviewOnly,
     );
+  }
+  createDraft(user:string,id:string){
+    return this.scope(user,id,false,async(db,b)=>({draft:(await db.query('SELECT revision,snapshot,updated_at FROM app.create_chat_drafts WHERE organization_id=$1 AND brand_id=$2 AND actor_id=$3',[b.organization_id,id,user])).rows[0]??null}));
+  }
+  saveCreateDraft(user:string,id:string,body:unknown){
+    const {revision,snapshot}=parseCreateDraft(body);
+    return this.scope(user,id,true,async(db,b)=>{
+      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`create-draft:${id}:${user}`]);
+      const prior=(await db.query('SELECT revision,snapshot FROM app.create_chat_drafts WHERE organization_id=$1 AND brand_id=$2 AND actor_id=$3',[b.organization_id,id,user])).rows[0];
+      // Lost-response replay is safe; divergent tabs cannot silently overwrite each other.
+      if(prior&&canonicalJSON(prior.snapshot)===canonicalJSON(snapshot))return {revision:prior.revision};
+      if((prior?.revision??0)!==revision)throw new ConflictException('This draft changed in another tab. Reload to continue from the saved version.');
+      const result=await db.query(`INSERT INTO app.create_chat_drafts(organization_id,brand_id,actor_id,snapshot) VALUES($1,$2,$3,$4)
+        ON CONFLICT(organization_id,brand_id,actor_id) DO UPDATE SET snapshot=EXCLUDED.snapshot,revision=create_chat_drafts.revision+1,updated_at=now() RETURNING revision`,[b.organization_id,id,user,snapshot]);
+      return result.rows[0];
+    });
   }
   allowances(user:string,id:string){
     return this.scope(user,id,false,async(db,b)=>{

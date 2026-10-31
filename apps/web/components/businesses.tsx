@@ -1,4 +1,5 @@
 "use client";
+import {CreateChat} from './create-chat';
 import {Strategies} from "./strategies";
 import {GenerationBalance} from "./generation-balance";
 import {AppLink} from "./app-link";
@@ -170,7 +171,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       parts[0] === "b" ? (parts[2] ?? "overview") : (parts[0] ?? "overview"),
     isNew = pathname === "/brands/new",
     label =
-      section === "campaign-post" ? "Campaign post" : section === "canvas" ? "Campaigns" : section === "strategies" ? "Strategies" : section === "campaign-review" ? "Campaign" : section === "campaign-new" ? "New campaign" : section === "manage"
+      section === "create" ? "Create" : section === "campaign-post" ? "Campaign post" : section === "canvas" ? "Campaigns" : section === "strategies" ? "Strategies" : section === "campaign-review" ? "Campaign" : section === "campaign-new" ? "New campaign" : section === "manage"
         ? "Manage brand"
         : section === "onboarding"
         ? "Brand onboarding"
@@ -193,6 +194,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         : businesses.length === 1 && key !== "overview"
           ? `/b/${businesses[0].id}/${key}`
           : `/${key}`;
+  if(section === "create" && business)return <CreateChat key={business.id} business={business}/>;
   return (
     <div className={`v5-shell ${menu ? "menu-open" : ""}`}>
       <aside className="v5-sidebar">
@@ -276,6 +278,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         <header className="v5-topbar">
           <span className="workspace-page-title">{business&&<><span className="workspace-breadcrumb">{business.name}</span><span className="workspace-separator" aria-hidden="true">/</span></>}{label}</span>
           <div className="header-actions">
+            {business&&["owner","admin","editor"].includes(business.role)&&<AppLink className="button" href={`/b/${business.id}/create`}>Create with chat</AppLink>}
             {business&&<GenerationBalance key={business.organization_id} organizationId={business.organization_id}/>}
             <AppLink className="profile-link workspace-avatar" href="/profile" aria-label="Profile" title="Your profile">
               {session.user.name.slice(0,1)}
@@ -319,6 +322,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <BrandOnboarding business={business} />
           ) : ["content-plan","review"].includes(section) ? (
             <ContentWorkspace key={`${business.id}:${section}`} business={business} inbox={section==="review"}/>
+          ) : section === "create" ? (
+            <CreateChat key={business.id} business={business}/>
           ) : section === "campaign-review" ? (
             <CampaignReview key={business.id} business={business}/>
           ) : section === "strategies" ? (
