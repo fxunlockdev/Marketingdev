@@ -1,0 +1,79 @@
+{
+  "scope": "Restore supplied chat start menu and wire all shortcuts to existing flows",
+  "reference": "codex-clipboard-2b8591ed-a30d-4874-af7a-7b1db539549d.png",
+  "local_browser": {
+    "checked_at": "2026-10-31T19:23:49.110Z",
+    "hosted": false,
+    "screens": [
+      {
+        "width": 1041,
+        "height": 743,
+        "overflow": false
+      },
+      {
+        "width": 1440,
+        "height": 1000,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "actions": [
+      "Post",
+      "Image",
+      "Reel",
+      "Video",
+      "Story",
+      "Campaign",
+      "Approve posts",
+      "Publish a post",
+      "Connect an account",
+      "Add a brand fact",
+      "Content preferences",
+      "Invite a teammate",
+      "Add a business",
+      "Check results",
+      "Carousel",
+      "Add strategy"
+    ],
+    "history": true
+  },
+  "source_sha256": {
+    "apps/web/components/chat-start-menu.tsx": "9d3de21d63f4153a1b3cc9f88333b8fa9e9fed06e763039bcc549b9808578c9d",
+    "apps/web/components/conversation-chat.tsx": "5598c9557f2da7492f3c95dc6d7337dc8b34b61044a9fede0dec1ece03f7692e",
+    "apps/web/components/conversation-chat.css": "a32587afb0b00db935141eb4c00e14039a9d67b677e648d1d700c28c760a43cc",
+    "tests/browser/canvas.test.mjs": "ce556453288100a6a4d5900ec0bf4b4bfa822d1fa94d82cce9f7d18d8170b61f"
+  },
+  "visual_review": {
+    "viewports": [
+      [
+        1041,
+        743
+      ],
+      [
+        1440,
+        1000
+      ],
+      [
+        390,
+        844
+      ]
+    ],
+    "comparison": "work/start-menu-compare/page-@2x-compare.png",
+    "note": "Reference includes red markup and a partly scrolled Post card. Preserve a compact History control and readable section labels. No pixel-identity claim."
+  },
+  "regression": {
+    "command": "node scripts/foundation-test.mjs --ai-chat-web",
+    "status": "passed",
+    "providers": "MOCK OpenAI and image generation; real isolated persistence, rendering and job services",
+    "tests_passed": 1,
+    "tests_failed": 0
+  },
+  "hosted": {
+    "status": "pending"
+  }
+}

@@ -1542,6 +1542,14 @@ test('Generated replacement confirms credits, survives reload and preserves sche
 test('AI canvas interprets, generates inline, resumes a lost response and remembers history (MOCK OpenAI)',async()=>{
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org,brand]);
  await page.goto(`${base}/b/${brand}/create`);
+ const startMenu=page.getByRole('navigation',{name:'Create and manage your content'});
+ await expect(startMenu).toBeVisible();
+ await page.getByRole('button',{name:'Story',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'Message Desvio'})).toHaveValue('Create a story image about ');
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('');
+ await page.getByRole('button',{name:'Image',exact:true}).click();
+ await expect(page.getByLabel('Format',{exact:true})).toBeVisible();
+ assert.equal(chatCalls,0,'Choosing a format never submits an incomplete or paid request');
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Create a clean botanical soap image for mindful households without text');
  // Server commits the message but the response is lost. Reload must resume the same envelope.
  let dropped=false;
@@ -1632,11 +1640,11 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  const revised=(await admin.query('SELECT v.design FROM app.creative_projects p JOIN app.creative_versions v ON v.id=p.latest_version_id WHERE p.id=$1',[project.id])).rows[0].design;
  assert.equal(revised.layers.find(layer=>layer.id==='custom').text,'Keep my manually added headline');
  assert.equal(revised.layers[0].fontFamily,'Lora');
- await page.getByRole('button',{name:'New chat',exact:true}).click();
+ await page.getByRole('button',{name:'Start over',exact:true}).click();
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Remember the soap image we created?');await page.getByRole('button',{name:'Send message',exact:true}).click();
  await expect(page.getByText('I found your saved conversation.',{exact:true})).toBeVisible({timeout:60000});assert.equal(generated,2);
  await page.locator('.conversation-sources button').click();await expect(page).toHaveURL(new RegExp(conversation));
- await page.getByRole('button',{name:'History',exact:true}).click();await expect(page.getByRole('dialog',{name:'Conversation history'})).toBeVisible();await page.getByLabel('Search this business’s conversations').fill('botanical');await expect(page.getByRole('dialog').locator('li')).toHaveCount(1);
+ await page.getByRole('button',{name:'Conversation history',exact:true}).click();await expect(page.getByRole('dialog',{name:'Conversation history'})).toBeVisible();await page.getByLabel('Search this business’s conversations').fill('botanical');await expect(page.getByRole('dialog').locator('li')).toHaveCount(1);
  await page.getByRole('button',{name:'Close history',exact:true}).click();
  for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await page.screenshot({path:`work/browser/chat-canvas-${viewport.width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
  await page.setViewportSize({width:1440,height:1000});

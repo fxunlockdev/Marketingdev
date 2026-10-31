@@ -147,3 +147,47 @@
 .desvio-redesign .conversation-saved-image .creative-artboard>.hint{display:none}
 .desvio-redesign .conversation-saved-image canvas{max-width:100%}
 @media(max-width:760px){.desvio-redesign .conversation-saved-image{margin-left:32px;padding:12px}}
+
+/* Start menu dimensions and hierarchy follow the supplied Create Chat prototype. */
+.desvio-redesign .chat-start-menu{display:flex;flex-direction:column;gap:16px;padding-left:40px;min-width:0}
+.desvio-redesign .chat-start-cards{display:grid;gap:8px}
+.desvio-redesign .chat-start-card{display:flex;align-items:center;gap:14px;width:100%;margin:0;padding:14px;border:0;border-radius:22px;background:#f1efff;color:#17171a;text-align:left;min-height:74px;box-shadow:none}
+.desvio-redesign .chat-start-card.campaign{background:#fff1b8}
+.desvio-redesign .chat-start-card.strategy{background:#cfe6c8}
+.desvio-redesign .chat-start-icon{display:grid;place-items:center;width:46px;height:46px;flex:none;border-radius:15px;background:white}
+.desvio-redesign .chat-start-icon svg{width:20px;height:20px}
+.desvio-redesign .chat-start-card>span:nth-child(2){flex:1;min-width:0}
+.desvio-redesign .chat-start-card strong{display:block;font:400 21px/1.1 'Desvio Serif',Georgia,serif}
+.desvio-redesign .chat-start-card small{display:block;font-size:13px;line-height:1.4;font-weight:400;color:#3a3a44;margin-top:2px}
+.desvio-redesign .chat-start-chevron{width:16px;height:16px;flex:none}
+.desvio-redesign .chat-start-menu section{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;border:0;background:transparent}
+.desvio-redesign .chat-start-menu h2{font:600 11.5px/1.4 'Desvio Sans',sans-serif;color:#777381;margin:0;padding-left:2px}
+.desvio-redesign .chat-start-shortcuts{display:flex;flex-wrap:wrap;gap:6px}
+.desvio-redesign .chat-start-shortcuts button{display:flex;align-items:center;gap:7px;height:36px;min-height:36px;padding:0 13px 0 8px;border-radius:999px;border:0;background:#f4f3f8;font-size:13px;font-weight:600;color:#17171a;white-space:nowrap;margin:0}
+.desvio-redesign .chat-start-shortcuts button>span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;flex:none}
+.desvio-redesign .chat-start-shortcuts svg{width:12px;height:12px}
+.desvio-redesign .chat-start-shortcuts .lavender{background:#f1efff}.desvio-redesign .chat-start-shortcuts .purple{background:#dcd6ff}.desvio-redesign .chat-start-shortcuts .peach{background:#ffd9c7}.desvio-redesign .chat-start-shortcuts .yellow{background:#fff1b8}.desvio-redesign .chat-start-shortcuts .green{background:#cfe6c8}
+.desvio-redesign .chat-start-menu button:hover{filter:brightness(.98)}
+.desvio-redesign .conversation-screen .create-chat-panel>header button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.desvio-redesign .conversation-screen.is-start .create-chat-panel>header button:last-child{width:36px;height:36px;padding:0;border-radius:50%;font-size:21px;flex:none}
+.desvio-redesign .conversation-screen.is-start .create-chat-panel{padding-bottom:14px}
+.desvio-redesign .conversation-screen.is-start .create-composer{min-height:58px;padding:5px 6px 5px 14px;gap:4px}
+.desvio-redesign .conversation-screen.is-start .create-composer textarea{height:44px;min-height:44px;padding:11px 4px!important;white-space:nowrap;overflow-x:auto;font-size:15px}
+.desvio-redesign .conversation-screen.is-start .create-composer button{width:44px;height:44px;min-height:44px;background:#6a5cff;border-radius:50%;flex:none}
+.desvio-redesign .conversation-screen.is-start .create-composer button:disabled{background:#cbc9d5;opacity:1}
+.desvio-redesign .conversation-screen.is-start .create-preview-area .create-empty{width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;gap:0}
+.desvio-redesign .conversation-screen.is-start .create-empty h1{max-width:460px;margin:36px 0 10px}
+.desvio-redesign .conversation-screen.is-start .create-empty p{max-width:460px;font-size:16px;line-height:1.5}
+.desvio-redesign .conversation-screen.is-start .create-empty em{display:block}
+.desvio-redesign .conversation-screen.is-start .create-paper-tiles span:nth-child(2){left:120px}
+.desvio-redesign .conversation-screen.is-start .create-paper-tiles span:nth-child(3){right:10px}
+@media(max-width:760px){.desvio-redesign .chat-start-menu{padding-left:32px}.desvio-redesign .chat-start-card{gap:10px;padding:12px}.desvio-redesign .chat-start-icon{width:40px;height:40px}.desvio-redesign .chat-start-card strong{font-size:20px}.desvio-redesign .conversation-screen.is-start .create-composer textarea{font-size:14px}.desvio-redesign .conversation-screen.is-start .create-paper-tiles span:nth-child(2){left:28%}.desvio-redesign .chat-start-shortcuts button{min-height:40px;height:40px}}
+.desvio-redesign .conversation-screen.is-start .create-chat-panel>header button{font-size:13px}
+.desvio-redesign .conversation-screen.is-start .create-chat-panel>header button:last-child{font-size:21px}
+.desvio-redesign .conversation-screen.is-start .create-composer:has(textarea:not(:placeholder-shown)) textarea{white-space:pre-wrap;height:72px}
+
+.desvio-redesign .conversation-screen.is-start .create-chat-panel>header .chat-start-history{width:32px;height:36px;padding:0;flex:none}
+.desvio-redesign .conversation-screen.is-start .create-empty em{font-style:italic}
+
+.desvio-redesign .conversation-screen.is-start .create-chat-log{padding-top:0}
+.desvio-redesign .conversation-screen.is-start .create-empty em{font-synthesis:style}
