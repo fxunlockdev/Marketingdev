@@ -1,0 +1,9 @@
+{
+  "checked_at": "2026-10-31T17:49:23.346Z",
+  "passed": true,
+  "renders": 6,
+  "seconds": 14.22,
+  "image": "sha256:b14cfd4260c940ed239e31dc8c06ffc3bc961038756f3d70cd90fc977f0b75b7",
+  "paid_calls": false,
+  "scope": "Native hosted renderer; synthetic text/background only; both curve directions, PNG and JPEG"
+}

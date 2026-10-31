@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-31T17:56:35.897263+00:00",
+  "source_commit": "f76a70f",
+  "web_deployment": {
+    "id": "bfab9759-c748-4293-9e76-1a84b54b1a7a",
+    "status": "SUCCESS"
+  },
+  "api_deployment": {
+    "id": "00d89026-7189-4f7f-852a-bcb16482ff13",
+    "status": "SUCCESS"
+  },
+  "worker_rollout": "curved-text-worker-rollout.json",
+  "native_host_render": "curved-text-host-render.json",
+  "local_checks": "curved-text-local.json",
+  "hosted_browser": "curved-text-hosted.json",
+  "scope": "Per-layer upward/downward arc text, real preview, draggable layers, saved/reopened versions, PNG and final JPEG rendering. Chat persistence test uses mocked external generation; native hosted render uses synthetic assets; hosted browser is read-only. No paid generation or publishing performed."
+}
