@@ -1,0 +1,50 @@
+{
+  "checked_at": "2026-10-31T10:07:22.949Z",
+  "scope": "Authenticated saved customer API/media readback only; no generation, edits, approvals or publishing",
+  "passed": true,
+  "images": [
+    {
+      "slot_id": "466b6bec-db00-44c0-955d-517fa1eae384",
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "slot_id": "c09204e1-fe38-4c6c-bf1c-3917ec793b69",
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "slot_id": "bc2fa2fb-1e79-46e0-adf6-01b1715ff68d",
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "slot_id": "7e12a858-1bf5-49f2-814c-9a019eb48934",
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    },
+    {
+      "slot_id": "b978a12e-b7e9-44e3-8ad7-ecf547fa228d",
+      "width": 1024,
+      "height": 1024,
+      "decoded": true
+    }
+  ],
+  "video": {
+    "configured": true,
+    "projects": 0,
+    "versions": 0,
+    "runs": []
+  },
+  "image_replacement": {
+    "configured": false
+  },
+  "social": {
+    "configured": true,
+    "accounts": 0
+  }
+}

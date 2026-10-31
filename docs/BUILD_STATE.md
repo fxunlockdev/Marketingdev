@@ -1,3 +1,9 @@
+## Current saved campaign readback — 31 October 2026
+
+Authenticated hosted customer API checks retrieved all five saved campaign images, validated available hashes and decoded1024×1024 pixels. This confirms the saved assets remain accessible; it does not prove new generation or visual quality. The video API reports configured=true but this business has zero video projects/versions/runs. Social is configured with zero connected accounts; live publication remains explicitly deferred. Higgsfield image replacement remains unconfigured. No content mutation, generation, approval or publication was performed. Evidence: saved-campaign-readback.json.
+
+Full current-source browser regression started through `make verify-browser` (real local database/storage/jobs, MOCK external generation). It is still running; do not use the older browser.json as current-source acceptance. Log: work/production-journey-browser.log. Prior goal turn was verified progress: recovery cleanup fixed, Linux CI passed and hosted backup plan limitation recorded.
+
 GitHub recovery follow-up run41191042719 completed SUCCESS on7c40668. Downloaded artifacts confirm passing unchanged-source recovery evidence, with86 migrations and543 policies restored. Offline/contracts, web build/proxy, load and dependency audit also passed.
 
 ## Hosted backup gap confirmed — 31 October 2026
