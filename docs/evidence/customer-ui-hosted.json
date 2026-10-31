@@ -1,0 +1,30 @@
+{
+  "screens": [
+    {
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "width": 924,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    }
+  ],
+  "errors": [],
+  "blocked": [],
+  "checked_at": "2026-10-31T11:54:46.251Z",
+  "clean_text_action": true,
+  "saved_existing_posts": false,
+  "deployment_id": "db65da96-2fe2-4ea8-9ad2-779a1701f544",
+  "deployment_status": "SUCCESS",
+  "source_commit": "af20340",
+  "scope": "Dev web read-only editor smoke, not full production acceptance",
+  "api_mutations": "Blocked except account initialization; no saved edits, generation or publication",
+  "limitations": "Ideas request is intentionally blocked by read-only guard; visible retry state is not evidence of provider failure.",
+  "screenshots_reviewed": [
+    "work/post-artwork-live-390.png"
+  ]
+}

@@ -1,3 +1,9 @@
+## Customer UI deployed to dev — 31 October 2026
+
+Web deployment db65da96-2fe2-4ea8-9ad2-779a1701f544 observed SUCCESS for af20340. Read-only authenticated editor smoke passes at1440/924/390 without CSP bypass, overflow or JS errors. Font family/weight controls, clean-text mode, reference checkbox bounds and local contrast/removal actions checked without saving posts. Mobile screenshot inspected. Idea POSTs are deliberately blocked by this probe, so the displayed retry state is not live idea-provider verification. Evidence customer-ui-hosted.json. Access remains invite-only/manual approved testers; no social publication, provider generation or customer content mutation.
+
+Broader browser regression is running; legacy Canvas journeys still need migration to campaign workflows. No production-readiness claim.
+
 ## Customer redesign regression — 31 October 2026
 
 All 24 current customer browser scenarios pass with a clean process exit (work/customer-final-regression-7.log). Actual local database, storage, scanner and workers; local SMTP and mocked external generation. Updated obsolete Home/Canvas navigation expectations to campaign flows without removing permissions, saved-font, private-upload, stale-save, approval, filtering or request-idempotency assertions. Fixed contrast in selected design options, Brand Kit and calendar supporting text; removed unreadable channel-selector color interpolation; named reference checkboxes clearly. Drained the final mocked intake handler before browser disposal to fix teardown failures. Brand typography and daily calendar screenshots inspected. Evidence: customer-redesign-regression.json.
