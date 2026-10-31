@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-10-31T15:58:22.707Z",
+  "checked_at": "2026-10-31T16:03:19.913Z",
   "scope": "Read-only local web using authenticated dev data. No generation or content mutation.",
   "viewports": [
     {
@@ -39,5 +39,6 @@
   "image_options": true,
   "page_errors": [],
   "unexpected_writes": [],
-  "typecheck": "passed"
+  "typecheck": "passed",
+  "verification_markers_omitted": true
 }

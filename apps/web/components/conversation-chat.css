@@ -42,3 +42,6 @@
 
 .desvio-redesign .conversation-image-frame{width:100%;margin-inline:auto}
 @media(min-width:761px){.desvio-redesign .conversation-image-frame{max-width:calc((100dvh - 280px) * var(--artwork-ratio,1))}}
+
+.desvio-redesign .conversation-history li strong{font-size:14px;line-height:1.5;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+.desvio-redesign .conversation-sources button{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle}
