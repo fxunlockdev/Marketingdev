@@ -1,0 +1,50 @@
+{
+  "screens": [
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 924,
+      "height": 600,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "card": 320
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "overflow": false,
+      "card": 264
+    }
+  ],
+  "errors": [],
+  "blocked": [],
+  "checked_at": "2026-10-31T16:46:39.385Z",
+  "inline_controls": true,
+  "unsaved_guards": true,
+  "discard": true,
+  "scope": "Inline text-layer editor in conversational canvas",
+  "typescript": "passed",
+  "isolated_browser": {
+    "result": "passed",
+    "test": "AI canvas interprets, generates inline, resumes a lost response and remembers history (MOCK OpenAI)",
+    "external_generation": "mocked",
+    "save_reload_png": "passed"
+  },
+  "hosted_content_mutated": false,
+  "paid_generation": false
+}

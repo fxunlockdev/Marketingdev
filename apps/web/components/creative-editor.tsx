@@ -1,4 +1,6 @@
 "use client";
+import {ChatLayerControls} from './chat-layer-controls';
+import type {ReactNode,CSSProperties} from 'react';
 import {readableDesign} from '../../api/src/creative-design';
 import { useEffect, useRef, useState } from "react";
 import { Canvas, FabricImage, Textbox, Rect } from "fabric";
@@ -16,6 +18,9 @@ export function CreativeEditor({
   onChange,
   readOnly = false,
   previewOnly = false,
+  chatControls = false,
+  afterArtwork,
+  controlsFooter,
   onExportReady,
 }: {
   businessId: string;
@@ -23,6 +28,9 @@ export function CreativeEditor({
   onChange: (design: Design) => void;
   readOnly?: boolean;
   previewOnly?: boolean;
+  chatControls?: boolean;
+  afterArtwork?: ReactNode;
+  controlsFooter?: ReactNode;
   onExportReady: (download: (() => void) | null) => void;
 }) {
   const host = useRef<HTMLDivElement>(null),
@@ -163,6 +171,8 @@ export function CreativeEditor({
             splitByGrapheme: !l.backing,
             strokeWidth: 0,
             padding: 4,
+            borderColor: "#6a5cff",
+            borderDashArray: [6,4],
           });
           (text as any).layerId = l.id;
           c.add(text);
@@ -214,6 +224,13 @@ export function CreativeEditor({
   }, [design, readOnly, retry, ready, fontRetry]);
   const layer =
     design.layers.find((l) => l.id === selected) ?? design.layers[0];
+  useEffect(()=>{
+    if(!chatControls||!ready||fontsLoading)return;
+    const c=canvas.current,object=c?.getObjects().find(o=>(o as any).layerId===layer?.id);
+    if(!c)return;
+    if(object&&!readOnly)c.setActiveObject(object);else c.discardActiveObject();
+    c.requestRenderAll();
+  },[chatControls,ready,fontsLoading,layer?.id,readOnly]);
   function update(values: Partial<Design["layers"][number]>) {
     if (!layer) return;
     onChange({
@@ -254,7 +271,7 @@ export function CreativeEditor({
     </Field>
   );
   return (
-    <div className="creative-editor">
+    <div className="creative-editor" style={chatControls?{'--artwork-ratio':design.width/design.height} as CSSProperties:undefined}>
       <section className="creative-artboard" aria-label="Creative preview">
         <div
           ref={host}
@@ -281,7 +298,9 @@ export function CreativeEditor({
             : "Drag text to position it, or use the fields below."}
         </p>
       </section>
-      {!previewOnly && <fieldset className="creative-layer-controls" disabled={readOnly}>
+      {afterArtwork}
+      {!previewOnly && chatControls && <ChatLayerControls design={design} layer={layer} readOnly={readOnly} update={update} change={onChange} footer={controlsFooter} select={id=>{setSelected(id);const c=canvas.current,o=c?.getObjects().find(o=>(o as any).layerId===id);if(c&&o){c.setActiveObject(o);c.requestRenderAll();}}}/>}
+      {!previewOnly && !chatControls && <fieldset className="creative-layer-controls" disabled={readOnly}>
         <legend>Text layers</legend><div className="creative-text-actions"><button type="button" disabled={!design.layers.some(l=>l.text.trim())} onClick={()=>onChange(readableDesign(design))}>Improve text contrast</button><button type="button" disabled={!design.layers.length} onClick={()=>onChange({...design,layers:[]})}>Remove all image text</button></div><p className="hint">Use a short headline or leave the image clean. Save your changes to update the post.</p>
         <Field label="Selected layer">
           {(id) => (

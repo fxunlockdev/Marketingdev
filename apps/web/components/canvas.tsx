@@ -579,12 +579,20 @@ export function CreativeProject({
   refresh = "",
   onDirty = () => {},
   onRevision,
+  chatLayout = false,
+  canvasDetails,
+  onDisplayed,
+  editingDisabled = false,
 }: {
   business: Business;
   projectId: string;
   refresh?: string;
   onDirty?: (v: boolean) => void;
   onRevision?: (v: Version) => void;
+  chatLayout?: boolean;
+  canvasDetails?: React.ReactNode;
+  onDisplayed?: (id:string) => void;
+  editingDisabled?: boolean;
 }) {
   const root = `/api/v1/businesses/${business.id}`,
     [data, setData] = useState<Project>(),
@@ -610,9 +618,9 @@ export function CreativeProject({
   const onDirtyRef = useRef(onDirty);
   onDirtyRef.current = onDirty;
   useEffect(() => {
-    onDirtyRef.current(dirty);
+    onDirtyRef.current(dirty || busy);
     return () => onDirtyRef.current(false);
-  }, [dirty]);
+  }, [dirty,busy]);
   const load = useCallback(
     async (id?: string) => {
       const value: Project = await api(
@@ -705,6 +713,7 @@ export function CreativeProject({
     (fn: (() => void) | null) => setDownload(() => fn),
     [],
   );
+  useEffect(()=>{if(download&&version)onDisplayed?.(version.id);},[download,version?.id,onDisplayed]);
   if (!data || !version || !design)
     return (
       <>
@@ -713,7 +722,7 @@ export function CreativeProject({
       </>
     );
   return (
-    <article className="creative-project">
+    <article className={`creative-project ${chatLayout?"chat-creative-project":""}`}>
       {data.project.archived_at && <p role="status">Archived creative · restore it to make changes.</p>}
       <div className="creative-toolbar">
         <Field label="Saved version">
@@ -736,7 +745,7 @@ export function CreativeProject({
         <span className="status neutral">
           {dirty ? "Unsaved changes" : label(version.status)}
         </span>
-        <button
+        {!chatLayout&&<button
           disabled={!download || busy || dirty}
           onClick={() => {
             try {
@@ -751,7 +760,7 @@ export function CreativeProject({
           }}
         >
           Download PNG
-        </button>
+        </button>}
       </div>
       {["owner","admin","editor"].includes(business.role) && <button className="creative-archive-action" disabled={busy||dirty} onClick={changeArchive}>{data.project.archived_at?"Restore creative":"Archive creative"}</button>}
       <Notice error={error} />
@@ -768,7 +777,10 @@ export function CreativeProject({
         businessId={business.id}
         design={design}
         onChange={setDesign}
-        readOnly={!write || !latest || busy}
+        readOnly={!write || !latest || busy || editingDisabled}
+        chatControls={chatLayout}
+        afterArtwork={chatLayout?<div className="conversation-canvas-strip" aria-label="Creative details">{canvasDetails}<strong>{dirty?"Unsaved changes":label(version.status)}</strong></div>:undefined}
+        controlsFooter={chatLayout?<div className="chat-export-actions"><button disabled={!download||busy||dirty} onClick={()=>{try{download?.();}catch{setError(new Error("The image could not be exported. Reload and retry."));}}}>↓ Download PNG</button>{write&&latest&&<button className="primary" disabled={!dirty||busy||editingDisabled} onClick={save}>{busy?"Saving…":"Save changes"}</button>}</div>:undefined}
         onExportReady={exportReady}
       />
       {write&&latest&&<GeneratedReplacement key={`generated:${business.id}:${projectId}:${version.id}`} businessId={business.id} projectId={projectId} parentId={version.id} disabled={dirty||busy} onReady={async id=>{await load(id);setNotice('Your new photo is ready to review.');}}/>}

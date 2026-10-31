@@ -1,3 +1,9 @@
+## Inline canvas text-layer editor — 1 November 2026
+
+The chat canvas now displays the real text-layer editor directly below the artwork and metadata strip, matching the supplied card layout instead of requiring a separate Edit design view. Includes selectable layers, font family and supported weights, size stepper, colour swatches, alignment, position/width, contrast backing, add/remove, save and PNG export. Selected text has a purple dashed border. Existing versions, review and archive remain available below. Unsaved changes block export and chat continuation; edits use the existing version-save path. Portrait artwork fits desktop height and the controls stack on small screens.
+
+Validation: web TypeScript passes. Focused isolated AI-canvas browser test passes with real local storage/database/rendering and mocked external generation, including manual font/colour/alignment/backing save, reload and PNG download, chat recovery and history. Read-only hosted-data/local-UI checks pass at 1440×1000, 1024×768, 924×600, 390×844 and 320×640 with no overflow or browser errors; unsaved guards and discard pass. Desktop/mobile screenshots inspected. No paid generation or hosted content changes. Evidence: chat-inline-editor-local.json. Deployment pending; this is a focused editor change, not full production acceptance.
+
 ## Chat welcome spacing — 31 October 2026
 
 Removed automatic promotion of the latest conversation from the welcome screen; saved conversations remain accessible through History. Shortened the greeting and aligned the five creation choices in a deliberate three/two grid. Choice selection now focuses the composer and exposes its selected state. Existing Image options and guided Carousel routing remain intact. History rows have compact two-line titles; legacy verification correlation prefixes are omitted from displayed messages and reference labels without changing stored transcripts.
