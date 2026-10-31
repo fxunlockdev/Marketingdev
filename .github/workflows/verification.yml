@@ -1,0 +1,46 @@
+name: Product verification
+on:
+  pull_request:
+  push:
+    branches: [dev, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verification-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts-and-load:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '26.5.0'
+          cache: npm
+      - uses: astral-sh/setup-uv@d0d8abe699bfb85fec6de9f7adb5ae17292296ff # v6
+        with:
+          version: '0.11.18'
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts
+      - run: uv sync --frozen
+      - run: mkdir -p work
+      - run: make verify-offline
+      - run: make verify-contracts
+      - run: make verify-load
+      - run: npm audit --omit=dev --audit-level=moderate
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: local-verification-${{ github.run_id }}
+          path: |
+            docs/evidence/offline.json
+            docs/evidence/contracts.json
+            docs/evidence/load.json
+            work/load-measurements.json
+          retention-days: 14
+  # These checks deliberately receive no deployment credentials or provider keys.
+  # A green local job is not a production launch authorization.

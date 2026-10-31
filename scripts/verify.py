@@ -5,12 +5,15 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+import os
+import signal
 
 from scripts.skill_audit import ROOT, main as audit_skills
 from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
+    "load": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--load"]],
     "resend-configuration": [["npm", "run", "build"], ["node", "--test", "tests/contracts/mail-config.test.mjs"], ["node", "scripts/foundation-test.mjs", "--accounts"]],
     "carousel-download": [["npm", "run", "build"], ["node", "--test", "tests/contracts/zip-download.test.mjs"], ["node", "scripts/foundation-test.mjs", "--exports"], ["node", "scripts/foundation-test.mjs", "--canvas-web"]],
     "carousel-calendar-ui": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--canvas-web"]],
@@ -211,6 +214,24 @@ def write_status():
     return status
 
 
+def run_command(command, timeout):
+    """Keep a timed-out npm parent from leaving its test children running."""
+    with subprocess.Popen(command, cwd=ROOT, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, start_new_session=True) as child:
+        try:
+            stdout, stderr = child.communicate(timeout=timeout)
+            return {"command": command, "exit_code": child.returncode, "output": stdout + stderr}
+        except subprocess.TimeoutExpired:
+            os.killpg(child.pid, signal.SIGTERM)
+            try:
+                stdout, stderr = child.communicate(timeout=15)
+            except subprocess.TimeoutExpired:
+                os.killpg(child.pid, signal.SIGKILL)
+                stdout, stderr = child.communicate()
+            return {"command": command, "exit_code": 124,
+                    "output": stdout + stderr + "\nVerification timed out; not passing evidence.\n"}
+
+
 def run_suite(name):
     EVIDENCE.mkdir(parents=True, exist_ok=True)
     if name == "offline":
@@ -223,11 +244,9 @@ def run_suite(name):
         browser_command = "test:browser" in command or any(
             flag in command for flag in ("--web", "--canvas-web", "--customer-web", "--social-web", "--publishing-web")
         )
-        result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True,
-                                timeout=1800 if browser_command else 600)
-        log = result.stdout + result.stderr
-        print(log, end="")
-        results.append({"command": command, "exit_code": result.returncode, "output": log})
+        result = run_command(command, 3600 if browser_command or "test:foundation" in command or "scripts/foundation-test.mjs" in command else 600)
+        print(result["output"], end="", flush=True)
+        results.append(result)
     scopes = {"review-reopen": "Real scoped reviewer undo/history and active-publication denial; PostgreSQL RLS, local publisher/renderer/Temporal and connected Canvas/calendar browser acceptance. MOCK paid/social transports, no remote cancellation or live claim.", "canvas-calendar": "Actual scoped calendar export service and CSV/iCalendar safety contracts; real customer and Canvas browser upload/crop/edit/video/review/planning/export workflows. MOCK paid transports. No live or deployed claim.", "canvas-photos": "Real customer and Canvas Chromium journeys with private upload, malware scanning, approved crop selection and saved creative editing/review; MOCK paid providers, no live or deployed claim.", "product-photos": "Actual private image upload/scanning/normalization, scoped crop approval/preview and real original-skill image editing transport with MOCK OpenAI; customer upload/crop/browser journey. No live model or cloud acceptance.", "container-images": "Actual Linux amd64 Docker builds, non-root/read-only native API dependencies and standalone web Chromium sign-in render. Packaging only; no connected cloud application or live providers.", "planning": "Real authenticated PostgreSQL calendar mutations and Chromium Canvas/calendar/review workflows; atomic batch submission and exact saved revisions. Actual local skill/worker/storage services with MOCK paid providers; no live or deployed claim.", "browser": "Actual Chromium through V5 business UI and Canvas to real local HTTP/PostgreSQL/SMTP/S3/ClamAV/Temporal; actual isolated owner skills, MOCK OpenAI generation/edit, Fabric edits/export, version approval and uncertain-outcome holds; calendar planning, linked creative generation/revision, feedback and bulk channel review with MOCK providers; manual onboarding/approved memory, scope, quota, recovery, accessibility and persisted AI-prefill/visual-guidance fixtures; browser faults are injected only to test recovery; no live providers or deployed browser proof", "offline": "TypeScript build and M0 skill archive/middleware probes", "contracts": "Pinned SDK and documented provider contracts with MOCK transports; bounded Higgsfield image-to-video/edit/status/cancel/idempotency and untrusted output download, including actual SafeWeb private-DNS denial; no live video or durable video product workflow", "security": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; plus Crawl4AI/Chromium screenshots, private visual storage, SSRF controls and AI reservation/recovery and multimodal image provenance/budget guards with MOCK model/resource transports; plus actual isolated owner-skill planning, MOCK OpenAI create/edit, creative media/version approval, cost holds, cancellation, stale edits and replay isolation; plus real HTTP/PostgreSQL 30-slot persistence, per-channel version approvals, atomic bulk reviews, date/DST boundaries and edit/history rollback; plus actual isolated marketing-plan runtime and Temporal 30-slot generation with MOCK Responses, approved-context integrity, per-business grants, unknown-result holds and atomic promotion recovery; no external model provider or deployed generation-worker proof"}
     if name in ("browser", "security"):
         scopes[name] += "; canonical saved PNG exports use actual network-disabled Fabric/node rendering, private storage, exact-pixel/context approval and failure recovery; no social publication"
@@ -242,6 +261,7 @@ def run_suite(name):
     scopes["mfa"] = "Pinned Better Auth authenticator enrollment, pending-sign-in denial, TOTP and single-use recovery, encrypted auth-only secret storage, recovery replacement and disable; real account services and customer browser including local QR generation and accessibility. Real local SMTP/DB, not deployed delivery or provider acceptance."
     scopes["memory"] = "Real customer browser/API/PostgreSQL/SMTP/private storage: approved Brand Brain evidence, source identity and digest checks, source retry, visual interpretation provenance, saved source listing, business-specific navigation and accessibility. Existing source API uses tenant RLS; no new provider calls. Local fixture/model responses only; no deployed/live claim."
     scopes["team"] = "Real local auth/PostgreSQL forced RLS/SMTP and business UI: selected-business invitations, independent Admin/Editor/Viewer grants, exact recipient/expiry/revocation/replay, per-business role changes/removal, immutable acceptance audit and effective scoped authorization. Actual browser email acceptance and mobile/desktop accessibility. Reviewer/Analyst roles and delegated business-admin invitations/acceptance/revocation/member changes are covered, including sibling/account/admin escalation denial, separate actor/business replay records, invitation sender revalidation and multi-business permissions. External email delivery, deployment and live acceptance are unverified."
+    scopes["load"] = "Disposable local PostgreSQL and real authenticated API: eight isolated accounts, 24 concurrent clients, mixed tenant reads, denied foreign reads and idempotent writes. SMTP is local. No paid providers, hosted capacity, video queue throughput or production SLA is measured."
     scopes["social"] = "Real local authentication, PostgreSQL forced RLS, encrypted per-business credentials and Temporal connection-refresh jobs; audited Postiz HTTP contracts against an explicitly MOCK local server; session-bound authorization/callback jobs with MOCK Postiz; no social OAuth or publication to an external provider"
     scopes["document-visuals"] = "Actual pinned PDFium, LibreOffice and English Tesseract in a baked network-disabled, read-only, non-root container. Synthetic real PDF/PPTX rendering, scanned text OCR, hidden slide/image composition and malformed/external-resource denial. Real local authenticated upload, malware scan, private S3, Temporal extraction, PostgreSQL/RLS, source-backed Correct/Wrong/Edit and approved memory, including an image-only PDF. Private document page storage, scoped signed preview, bounded actual JPEG inputs to the official model adapter with explicitly MOCK responses, exact page/source provenance, reviewed visual directions and approved memory are connected. OCR fallback covers pages without native text; mixed-page OCR, broader languages, complete visual coverage beyond the existing model budget, deployed/runtime and live model quality remain incomplete."
     scopes["connections"] = "Actual Next/Nest/Better Auth/PostgreSQL/Temporal/private provisioning worker browser journey; explicitly MOCK Postiz HTTP and LinkedIn consent; no external OAuth, paid models, deployment or publishing. Focused suite does not replace full browser/security gates."
@@ -262,6 +282,9 @@ def run_suite(name):
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,
               "results": results, "passed": started_hash == finished_hash and all(x["exit_code"] == 0 for x in results), "live_calls": False}
+    if name == "load":
+        report["measurements"] = json.loads((ROOT / "work/load-measurements.json").read_text()) if (ROOT / "work/load-measurements.json").exists() else None
+        report["passed"] = report["passed"] and bool(report["measurements"] and report["measurements"].get("passed"))
     (EVIDENCE / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")
     write_status()
     return 0 if report["passed"] else 1

@@ -1,0 +1,45 @@
+{
+  "suite": "load",
+  "scope": "Disposable local PostgreSQL and real authenticated API: eight isolated accounts, 24 concurrent clients, mixed tenant reads, denied foreign reads and idempotent writes. SMTP is local. No paid providers, hosted capacity, video queue throughput or production SLA is measured.",
+  "checked_at": "2026-10-31T09:20:02.218398+00:00",
+  "source_sha256": "075671b30f54c654de7678c6a4ffa0738cf92f3ccb144a15cc622947ba28a973",
+  "source_sha256_start": "075671b30f54c654de7678c6a4ffa0738cf92f3ccb144a15cc622947ba28a973",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--load"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\n\u2714 bounded concurrent tenant traffic preserves isolation and idempotency (3405.213291ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 4085.123709\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false,
+  "measurements": {
+    "scope": "local authenticated API, not hosted capacity or provider throughput",
+    "accounts": 8,
+    "concurrency": 24,
+    "requests": 480,
+    "passed": true,
+    "duration_ms": 918,
+    "latency_ms": {
+      "p50": 34,
+      "p95": 99,
+      "p99": 273
+    },
+    "requests_per_second": 522.88,
+    "failed_requests": 0
+  }
+}

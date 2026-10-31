@@ -1,0 +1,83 @@
+{
+  "checked_at": "2026-10-31T09:29:53.011675+00:00",
+  "scope": "Private beta hardening, not public launch certification",
+  "access": "manually provisioned approved testers; public signup and email disabled",
+  "social_acceptance": "deferred by owner; no publication performed",
+  "dependency": {
+    "package": "follow-redirects",
+    "version": "1.16.2",
+    "production_audit_vulnerabilities": 0
+  },
+  "api_deployment": "57921972-d303-4358-9cc9-e76e685c30ed",
+  "web_deployment": "16b93d78-8d92-4c7b-9a51-05fdf6196d8f",
+  "deployment_status": "SUCCESS",
+  "worker": {
+    "checked_at": "2026-10-31T09:20:02.585Z",
+    "passed": true,
+    "image": "sha256:d26e8090bcad1dd82c02fea9589c4a581b27c589443e6b0225ac38185ca92d18",
+    "backup_container": "desvio-worker-rollback-20261031-dependency",
+    "paid_calls": false,
+    "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+  },
+  "hosted_editor": {
+    "screens": [
+      {
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "width": 924,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "blocked": [],
+    "checked_at": "2026-10-31T09:28:25.168Z",
+    "clean_text_action": true,
+    "saved_existing_posts": false
+  },
+  "load": {
+    "scope": "local authenticated API, not hosted capacity or provider throughput",
+    "accounts": 8,
+    "concurrency": 24,
+    "requests": 480,
+    "passed": true,
+    "duration_ms": 918,
+    "latency_ms": {
+      "p50": 34,
+      "p95": 99,
+      "p99": 273
+    },
+    "requests_per_second": 522.88,
+    "failed_requests": 0
+  },
+  "checks": {
+    "offline": {
+      "passed": true,
+      "source_sha256": "075671b30f54c654de7678c6a4ffa0738cf92f3ccb144a15cc622947ba28a973",
+      "source_unchanged": true
+    },
+    "contracts": {
+      "passed": true,
+      "source_sha256": "075671b30f54c654de7678c6a4ffa0738cf92f3ccb144a15cc622947ba28a973",
+      "source_unchanged": true
+    },
+    "security": {
+      "passed": true,
+      "source_sha256": "075671b30f54c654de7678c6a4ffa0738cf92f3ccb144a15cc622947ba28a973",
+      "source_unchanged": true
+    },
+    "load": {
+      "passed": true,
+      "source_sha256": "075671b30f54c654de7678c6a4ffa0738cf92f3ccb144a15cc622947ba28a973",
+      "source_unchanged": true
+    }
+  },
+  "paid_calls": false,
+  "social_publications": false,
+  "public_launch_ready": false
+}

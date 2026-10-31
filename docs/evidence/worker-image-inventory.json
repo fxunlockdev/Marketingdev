@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-10-29T14:21:21.934050+00:00",
+  "checked_at": "2026-10-31T09:30:18.206145+00:00",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:3a5ecc00851b953ae55801a3a4295457e6f50cc37f5cff1403aeb513313f6a52",
+      "image_id": "sha256:d26e8090bcad1dd82c02fea9589c4a581b27c589443e6b0225ac38185ca92d18",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Current-source brand typography worker and renderer; 3 actual isolated renderer tests passed including six distinct families and actual weight pixel differences. Host activation must be checked separately."
+  "scope": "Typography worker with follow-redirects 1.16.2. Isolated dependency check and hosted image/scanner/poller registration passed; no new paid provider acceptance."
 }

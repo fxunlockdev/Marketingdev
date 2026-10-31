@@ -415,6 +415,7 @@ test("manual layer edits persist as new versions; review approves the exact curr
   const design = structuredClone(version.design);
   design.layers[0].text = "Owner headline";
   design.layers[0].fontFamily = "Georgia";
+  design.layers[0].fontWeight = 700; // Georgia supports regular/bold, not the brand fixture's 600.
   design.layers[0].x = 80;
   design.layers.push({
     ...design.layers[0],

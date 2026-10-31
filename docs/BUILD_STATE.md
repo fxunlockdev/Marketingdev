@@ -1,3 +1,17 @@
+## Private beta hardening — 31 October 2026 (current)
+
+Owner decision: keep access invite-only, with manually provisioned approved testers while mail is disabled. Do not enable public signup or claim working email invitations. Owner deferred connected-social publishing/analytics acceptance; do not publish test content or ask again in this batch.
+
+Added actual disposable multi-account API load verification (eight organizations, 24 concurrent clients, 480 requests), including cross-tenant denial and concurrent idempotent writes. `verify-load` now runs it and release-gate requires fresh passing evidence. Added pinned GitHub Actions offline/contracts/load/audit checks without provider or deployment secrets; CI execution remains unverified until pushed. Verification timeouts now terminate their command process group and report failure rather than orphaning test processes.
+
+Patched follow-redirects 1.16.1 to 1.16.2; local production dependency audits report zero vulnerabilities. Worker d26e8090… activated only after an idle check; previous worker retained for rollback, scanner and workflow/activity pollers verified. API57921972-d303-4358-9cc9-e76e685c30ed and web16b93d78-8d92-4c7b-9a51-05fdf6196d8f observed SUCCESS. Five exact duplicate archives were deleted only after local/remote SHA matching; customer data and Docker images were retained, recovering about 1.7GB.
+
+Read-only hosted editor checks at 1440/924/390 passed without CSP bypass or saved-content changes. Live Postforme authorization handoff returned a valid URL; no accounts are connected, and no live publication or analytics ingestion is claimed. No paid generation this batch.
+
+Initial expanded security run found test-fixture regressions: Georgia inherited unsupported weight600; its dependent edit test then failed. A deliberately unresolved synthetic carousel also held later tests sharing the same brand. Updated fixtures retain valid bold Georgia and retire only that test's unknown jobs after asserting the hold; no product safeguards were relaxed. Final security rerun passes: 30 account tests and 236 foundation tests, plus six Python security checks. Offline checks, 330 contracts and the 480-request load case pass with unchanged source hashes. The final hosted editor smoke passes after both deployments.
+
+Public launch remains blocked. Outstanding: trusted complete live journey proof, hosted capacity and queue throughput, backup/restore verification, and proxy-aware authentication rate-limit assessment (current API limiter uses the socket peer, so forwarded testers may share a bucket). Email and live social acceptance are explicitly deferred, not completed.
+
 ## Visual workspace refinement deployed — 28 October 2026
 
 Calendar and Approvals now use compact controls and image previews. Campaign/post details expose working inline Edit design, caption/layer saving and safe attachment retry. Canvas opens a clean dark composer by default; explicit saved-thread links retain their conversation. Media Library has a compact image grid, search and review filters. Connections use platform cards. Content Preferences, Learnings and Insights have focused sections and responsive layouts. Saved thumbnail decoding and the overview carousel query were corrected.

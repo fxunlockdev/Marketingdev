@@ -30,8 +30,11 @@ verify-live:
 release-gate:
 	$(PYTHON) -m scripts.release_gate
 
-dev verify-load:
-	@echo 'NOT_IMPLEMENTED: full-stack dev/load harness and production provisioning remain pending. Local API foundation tests: npm run test:foundation.'
+verify-load:
+	$(PYTHON) -m scripts.verify load
+
+dev:
+	@echo 'NOT_IMPLEMENTED: full-stack dev harness and production provisioning remain pending. Local API foundation tests: npm run test:foundation.'
 	@exit 2
 
 verify-social:

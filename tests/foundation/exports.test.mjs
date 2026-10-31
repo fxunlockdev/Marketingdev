@@ -419,6 +419,9 @@ test('durable carousel uses one actual isolated plan, sequential MOCK images and
  assert.deepEqual(slides.map(s=>s.generation_status),['succeeded','unknown','canceled']);assert.ok(slides[0].output_version_id);assert.ok(slides[0].export_id);assert.equal(partialRead.runs.find(r=>r.id===partial.id).output_version_id,null);
  await assert.rejects(service.cancel(alice.id,brand.id,partial.id),/Active carousel generation not found/);assert.equal(await coordinator.fail(scope(partial)),'unknown');assert.equal(images,4);
  await assert.rejects(service.submit(alice.id,brand.id,{prompt:'Must not bypass the unknown hold',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID()),/reconciliation/);
+ // This test intentionally leaves an unknown paid outcome. Retire only its synthetic
+ // jobs after proving the hold, so later tests sharing this fixture brand stay isolated.
+ await admin.query("UPDATE app.jobs SET status='failed' WHERE status='unknown' AND (id=$1 OR id IN (SELECT generation_job_id FROM app.carousel_children WHERE parent_job_id=$1))",[partial.id]);
 
 });
 
