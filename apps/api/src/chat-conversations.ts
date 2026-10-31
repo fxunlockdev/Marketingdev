@@ -43,7 +43,14 @@ export class ChatConversations {
  read(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async db=>{
   const conversation=await this.own(db,id);
   const turns=(await db.query(`SELECT t.job_id AS id,t.message,t.created_at,t.action_result,j.status,j.error_code,a.status AS action_status,a.error_code AS action_error,r.output,r.input->'chat'->'memories' AS source_records FROM app.chat_turns t JOIN app.jobs j ON j.id=t.job_id JOIN app.planning_requests r ON r.job_id=t.job_id LEFT JOIN delivery.chat_actions a ON a.job_id=t.job_id WHERE t.conversation_id=$1 ORDER BY t.created_at,t.job_id LIMIT 150`,[id])).rows;
-  return {conversation:{id:conversation.id,title:conversation.title},turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
+  // Saved versions are the durable chat attachment. No second write or retry-created message.
+  const saved_images=(await db.query(`SELECT v.id,v.project_id,v.design,v.created_at,
+    (SELECT count(*)::int FROM app.creative_versions prior WHERE prior.project_id=v.project_id AND (prior.created_at,prior.id)<=(v.created_at,v.id)) AS version_number
+    FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id
+    WHERE p.thread_id=$1 AND v.organization_id=$2 AND v.brand_id=$3
+      AND v.job_id IS NULL AND v.parent_id IS NOT NULL
+    ORDER BY v.created_at,v.id`,[id,conversation.organization_id,brand])).rows;
+  return {conversation:{id:conversation.id,title:conversation.title},saved_images,turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
  });}
  submit(user:string,brand:string,body:unknown,key:unknown){
   const v=object(body,['conversation_id','message']);

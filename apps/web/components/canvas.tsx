@@ -582,6 +582,7 @@ export function CreativeProject({
   chatLayout = false,
   canvasDetails,
   onDisplayed,
+  onSaved,
   editingDisabled = false,
 }: {
   business: Business;
@@ -592,6 +593,7 @@ export function CreativeProject({
   chatLayout?: boolean;
   canvasDetails?: React.ReactNode;
   onDisplayed?: (id:string) => void;
+  onSaved?: (id:string) => void;
   editingDisabled?: boolean;
 }) {
   const root = `/api/v1/businesses/${business.id}`,
@@ -670,6 +672,7 @@ export function CreativeProject({
         caption,
       });
       await load(v.id);
+      onSaved?.(v.id);
       setNotice("Saved as a new draft version.");
     } catch (e) {
       setError(e);

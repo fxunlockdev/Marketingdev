@@ -481,6 +481,7 @@ export class Canvas {
         "UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1",
         [projectId, version],
       );
+      await db.query("UPDATE app.chat_conversations SET updated_at=now() WHERE id=(SELECT thread_id FROM app.creative_projects WHERE id=$1)",[projectId]);
       return { id: version };
     });
   }

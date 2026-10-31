@@ -135,3 +135,15 @@
 .text-curve-controls output {font-variant-numeric:tabular-nums;color:#615b79}
 .text-curve-controls input[type=range] {width:100%;min-height:32px;padding:0;accent-color:#6a5cff;background:transparent;cursor:pointer}
 .text-curve-controls .hint {margin:0;font-size:12px;line-height:1.5;color:#757184}
+
+/* A saved image is a versioned attachment, separate from the editable canvas. */
+.desvio-redesign .conversation-saved-image{margin:16px 0 24px 40px;padding:14px;background:#f4f3f8;border-radius:20px;max-width:320px;min-width:0}
+.desvio-redesign .conversation-saved-image figcaption{display:grid;gap:4px;margin-bottom:12px;font-size:14px;line-height:1.5}
+.desvio-redesign .conversation-saved-image figcaption span{font-size:12px;color:#686477}
+.desvio-redesign .conversation-saved-preview{width:100%;background:#e7e4ef;border-radius:12px;position:relative}
+.desvio-redesign .conversation-saved-image .creative-editor{display:block;margin:0;padding:0;border:0;background:transparent}
+.desvio-redesign .conversation-saved-image .creative-artboard{margin:0;padding:0;width:100%;min-width:0}
+.desvio-redesign .conversation-saved-image .creative-surface{border-radius:12px;overflow:hidden}
+.desvio-redesign .conversation-saved-image .creative-artboard>.hint{display:none}
+.desvio-redesign .conversation-saved-image canvas{max-width:100%}
+@media(max-width:760px){.desvio-redesign .conversation-saved-image{margin-left:32px;padding:12px}}
