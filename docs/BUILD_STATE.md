@@ -1,3 +1,9 @@
+## Database recovery check — 31 October 2026
+
+Added `make verify-recovery` and CI execution for a real pg_dump/pg_restore into a new disposable database. Tests compare all 86 migration checksums and 543 application/auth policies, replay migrations, recover two synthetic tenants, reject foreign reads/updates and auth-table access under the runtime role, and prove a source mutation after backup does not appear in the restored copy. The release gate now requires fresh local recovery evidence. No hosted data is copied or changed.
+
+The first restore passed but report generation failed because the suite scope was missing; fixed that reporting entry and reran. This is logical database recovery only, with existing cluster roles. Hosted backup schedule/retention, PITR, role/key/object recovery and measured production RPO/RTO remain open. Invite-only/manual tester access and deferred live social acceptance remain the owner's scope decisions.
+
 ## Auth ingress rate-limit isolation — 31 October 2026
 
 The API previously keyed login limits by the web server socket address. Added an optional independent AUTH_INGRESS_SECRET and short-lived HMAC address proof, bound to method/pathname. The Railway-edge web proxy removes caller Desvio proofs before signing X-Real-IP; API verifies it with constant-time comparison and otherwise keeps the conservative socket bucket. No limit thresholds, verified-email requirements, MFA or tenant permissions were weakened. TRUST_RAILWAY_EDGE remains an explicit hosting trust switch; direct exposure of that web listener is outside this trust model. See CONFIGURE_AND_LAUNCH.md.

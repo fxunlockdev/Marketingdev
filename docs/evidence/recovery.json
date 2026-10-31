@@ -1,0 +1,38 @@
+{
+  "suite": "recovery",
+  "scope": "Actual local pg_dump/pg_restore into a separate disposable database, migration checksum replay and restored two-tenant read/write isolation. Does not verify hosted backups, PITR, cluster roles, private objects or production RPO/RTO.",
+  "checked_at": "2026-10-31T09:56:46.186985+00:00",
+  "source_sha256": "ca3dc8aa627f8026a4389b97e73754e61edbef0d2d12f01e78c75ab1853c6cc4",
+  "source_sha256_start": "ca3dc8aa627f8026a4389b97e73754e61edbef0d2d12f01e78c75ab1853c6cc4",
+  "source_unchanged": true,
+  "results": [
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit_code": 0,
+      "output": "\n> desvio@0.0.0 build\n> tsc -p tsconfig.json\n\n"
+    },
+    {
+      "command": [
+        "node",
+        "scripts/foundation-test.mjs",
+        "--recovery"
+      ],
+      "exit_code": 0,
+      "output": "Disposable PostgreSQL 17.11; image postgres@sha256:18cfe3ef5e6815560c98237d6216d1e5119702fb0f3894c8785dd58b8bbe5d73; migration replay passed\n\u2714 database dump restores tenant data, policies and migration history into a separate database (3081.952208ms)\n\u2139 tests 1\n\u2139 suites 0\n\u2139 pass 1\n\u2139 fail 0\n\u2139 cancelled 0\n\u2139 skipped 0\n\u2139 todo 0\n\u2139 duration_ms 3211.77\n"
+    }
+  ],
+  "passed": true,
+  "live_calls": false,
+  "measurements": {
+    "passed": true,
+    "scope": "Disposable local logical database restore; not hosted backup, PITR, role recovery or object storage recovery",
+    "tenants": 2,
+    "dump_and_restore_ms": 2412,
+    "migrations": 86,
+    "policies": 543
+  }
+}

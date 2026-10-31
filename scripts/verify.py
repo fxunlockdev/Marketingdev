@@ -13,6 +13,7 @@ from scripts.ui_control_evidence import update_matrix
 
 EVIDENCE = ROOT / "docs/evidence"
 SUITES = {
+    "recovery": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--recovery"]],
     "load": [["npm", "run", "build"], ["node", "scripts/foundation-test.mjs", "--load"]],
     "resend-configuration": [["npm", "run", "build"], ["node", "--test", "tests/contracts/mail-config.test.mjs"], ["node", "scripts/foundation-test.mjs", "--accounts"]],
     "carousel-download": [["npm", "run", "build"], ["node", "--test", "tests/contracts/zip-download.test.mjs"], ["node", "scripts/foundation-test.mjs", "--exports"], ["node", "scripts/foundation-test.mjs", "--canvas-web"]],
@@ -261,6 +262,7 @@ def run_suite(name):
     scopes["mfa"] = "Pinned Better Auth authenticator enrollment, pending-sign-in denial, TOTP and single-use recovery, encrypted auth-only secret storage, recovery replacement and disable; real account services and customer browser including local QR generation and accessibility. Real local SMTP/DB, not deployed delivery or provider acceptance."
     scopes["memory"] = "Real customer browser/API/PostgreSQL/SMTP/private storage: approved Brand Brain evidence, source identity and digest checks, source retry, visual interpretation provenance, saved source listing, business-specific navigation and accessibility. Existing source API uses tenant RLS; no new provider calls. Local fixture/model responses only; no deployed/live claim."
     scopes["team"] = "Real local auth/PostgreSQL forced RLS/SMTP and business UI: selected-business invitations, independent Admin/Editor/Viewer grants, exact recipient/expiry/revocation/replay, per-business role changes/removal, immutable acceptance audit and effective scoped authorization. Actual browser email acceptance and mobile/desktop accessibility. Reviewer/Analyst roles and delegated business-admin invitations/acceptance/revocation/member changes are covered, including sibling/account/admin escalation denial, separate actor/business replay records, invitation sender revalidation and multi-business permissions. External email delivery, deployment and live acceptance are unverified."
+    scopes["recovery"] = "Actual local pg_dump/pg_restore into a separate disposable database, migration checksum replay and restored two-tenant read/write isolation. Does not verify hosted backups, PITR, cluster roles, private objects or production RPO/RTO."
     scopes["load"] = "Disposable local PostgreSQL and real authenticated API: eight isolated accounts, 24 concurrent clients, mixed tenant reads, denied foreign reads and idempotent writes. SMTP is local. No paid providers, hosted capacity, video queue throughput or production SLA is measured."
     scopes["social"] = "Real local authentication, PostgreSQL forced RLS, encrypted per-business credentials and Temporal connection-refresh jobs; audited Postiz HTTP contracts against an explicitly MOCK local server; session-bound authorization/callback jobs with MOCK Postiz; no social OAuth or publication to an external provider"
     scopes["document-visuals"] = "Actual pinned PDFium, LibreOffice and English Tesseract in a baked network-disabled, read-only, non-root container. Synthetic real PDF/PPTX rendering, scanned text OCR, hidden slide/image composition and malformed/external-resource denial. Real local authenticated upload, malware scan, private S3, Temporal extraction, PostgreSQL/RLS, source-backed Correct/Wrong/Edit and approved memory, including an image-only PDF. Private document page storage, scoped signed preview, bounded actual JPEG inputs to the official model adapter with explicitly MOCK responses, exact page/source provenance, reviewed visual directions and approved memory are connected. OCR fallback covers pages without native text; mixed-page OCR, broader languages, complete visual coverage beyond the existing model budget, deployed/runtime and live model quality remain incomplete."
@@ -282,8 +284,9 @@ def run_suite(name):
     report = {"suite": name, "scope": scopes[name], "checked_at": now(),
               "source_sha256": finished_hash, "source_sha256_start": started_hash, "source_unchanged": started_hash == finished_hash,
               "results": results, "passed": started_hash == finished_hash and all(x["exit_code"] == 0 for x in results), "live_calls": False}
-    if name == "load":
-        report["measurements"] = json.loads((ROOT / "work/load-measurements.json").read_text()) if (ROOT / "work/load-measurements.json").exists() else None
+    if name in {"load", "recovery"}:
+        measurements = ROOT / f"work/{name}-measurements.json"
+        report["measurements"] = json.loads(measurements.read_text()) if measurements.exists() else None
         report["passed"] = report["passed"] and bool(report["measurements"] and report["measurements"].get("passed"))
     (EVIDENCE / f"{name}.json").write_text(json.dumps(report, indent=2) + "\n")
     write_status()

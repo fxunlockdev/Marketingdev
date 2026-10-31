@@ -111,3 +111,7 @@ verify-worker-host:
 .PHONY: verify-creative-amd64
 verify-creative-amd64:
 	$(PYTHON) -m scripts.verify creative-amd64
+
+.PHONY: verify-recovery
+verify-recovery:
+	$(PYTHON) -m scripts.verify recovery

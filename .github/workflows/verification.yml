@@ -32,6 +32,7 @@ jobs:
       - run: make verify-contracts
       - run: npm run build:web
       - run: node --test tests/runtime/web-ingress.test.mjs
+      - run: make verify-recovery
       - run: make verify-load
       - run: npm audit --omit=dev --audit-level=moderate
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -43,6 +44,8 @@ jobs:
             docs/evidence/contracts.json
             docs/evidence/load.json
             work/load-measurements.json
+            docs/evidence/recovery.json
+            work/recovery-measurements.json
           retention-days: 14
   # These checks deliberately receive no deployment credentials or provider keys.
   # A green local job is not a production launch authorization.

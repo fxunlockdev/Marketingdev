@@ -76,11 +76,12 @@ try {
     const version = (await pool.query('SHOW server_version')).rows[0].server_version;
     const provisionPass=randomBytes(32).toString('hex');await pool.query(`ALTER ROLE desvio_provisioner LOGIN PASSWORD '${provisionPass}'`);config.provisionerDatabaseUrl=url('desvio_provisioner',provisionPass);
     console.log(`Disposable PostgreSQL ${version}; image ${IMAGE}; migration replay passed`);
+    const recoveryOnly=process.argv.includes('--recovery');
     const loadOnly=process.argv.includes('--load');
     const campaignIdeasOnly=process.argv.includes('--campaign-ideas');
     const operatorOnly=campaignIdeasOnly||process.argv.includes('--operator')||process.argv.includes('--postforme')||process.argv.includes('--campaign-blogs');
     const documentOnly=process.argv.includes('--documents');
-    const visualReviewOnly=process.argv.includes('--visual-reviews'),accountOnly=loadOnly||process.argv.includes('--accounts')||visualReviewOnly,videoStorageOnly=process.argv.includes('--video-storage'),videoOnly=process.argv.includes('--video-provider')||videoStorageOnly;
+    const visualReviewOnly=process.argv.includes('--visual-reviews'),accountOnly=recoveryOnly||loadOnly||process.argv.includes('--accounts')||visualReviewOnly,videoStorageOnly=process.argv.includes('--video-storage'),videoOnly=process.argv.includes('--video-provider')||videoStorageOnly;
     const publishingWeb=process.argv.includes('--publishing-web'),publishingOnly=process.argv.includes('--publishing')||publishingWeb;
     const socialWeb=process.argv.includes('--social-web');
     const exportOnly=process.argv.includes('--higgsfield-images')||process.argv.includes('--exports')||process.argv.includes('--carousel-generation')||publishingOnly,socialOnly=process.argv.includes('--social')||socialWeb;
@@ -93,7 +94,7 @@ try {
     if(!strategyOnly&&!stockOnly&&!operatorOnly&&!documentOnly&&!videoOnly&&!accountOnly&&!intakeOnly&&!planningOnly&&!aiPlanningOnly&&!socialOnly){process.env.RENDER_RUNTIME_IMAGE=prepareRenderImage();config.renderImage=process.env.RENDER_RUNTIME_IMAGE;}
     if(!strategyOnly&&!stockOnly&&!operatorOnly&&!videoOnly&&!accountOnly&&!socialOnly&&!exportOnly&&!browserSuite&&!canvasOnly&&!planningOnly&&!aiPlanningOnly)process.env.DOCUMENT_PARSER_IMAGE=prepareDocumentImage();
     const code = strategyOnly||stockOnly||operatorOnly||documentOnly||videoOnly||socialOnly||exportOnly||browserSuite||intakeOnly||canvasOnly||planningOnly||aiPlanningOnly?0:await new Promise((resolve,reject) => {
-      const child = spawn(process.execPath,['--test','--test-concurrency=1',loadOnly?'tests/foundation/load.test.mjs':visualReviewOnly?'tests/foundation/brand-visual-review.test.mjs':'tests/foundation/tenancy.test.mjs'], {
+      const child = spawn(process.execPath,['--test','--test-concurrency=1',recoveryOnly?'tests/foundation/recovery.test.mjs':loadOnly?'tests/foundation/load.test.mjs':visualReviewOnly?'tests/foundation/brand-visual-review.test.mjs':'tests/foundation/tenancy.test.mjs'], {
         stdio:'inherit', env:{...process.env, DESVIO_TEST_CONFIG:JSON.stringify(config), DESVIO_TEST_ADMIN_URL:url('postgres',password), DESVIO_TEST_CONTAINER:container} });
       child.on('error',reject); child.on('exit', code=>resolve(code ?? 1));
     });
