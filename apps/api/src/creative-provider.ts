@@ -1,3 +1,4 @@
+import {chatSchema} from './chat-contracts.js';
 import {CREATIVE_PLANNER_LIMITS} from './creative-budget.js';
 import OpenAI, { toFile } from "openai";
 import sharp from "sharp";
@@ -77,6 +78,7 @@ export class CreativeProvider {
         strict: false,
       })),
       parallel_tool_calls: false,
+      ...(request.chat_response?{reasoning:{effort:'low' as const},text:{format:{type:'json_schema' as const,name:'desvio_chat',strict:true,schema:chatSchema}}}:{}),
       ...(request.creative_fact_ids?{text:{format:{type:'json_schema' as const,name:'desvio_creative_brief',strict:true,schema:creativeBriefSchema(request.creative_fact_ids)}}}:{}),
     };
     const bytes = Buffer.byteLength(canonicalJSON(body));

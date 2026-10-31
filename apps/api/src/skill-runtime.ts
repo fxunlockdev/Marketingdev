@@ -120,7 +120,7 @@ export class SkillRuntime {
               )
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               pending = true;
-              void model(value)
+              void model({...value,chat_response:undefined})
                 .then((result) => {
                   pending = false;
                   if (!settled)

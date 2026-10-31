@@ -1,3 +1,4 @@
+import {CHAT_MODEL,CHAT_RATES,chatRequest,validateChatDecision} from './chat-contracts.js';
 import {planningReferences,assertPlanningReferences} from './planning-references.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
 import {approvedLearning,assertLearningCurrent} from './learning-context.js';
@@ -25,7 +26,7 @@ export class PlanningJobs {
    if(!bound||bound.provider!==providerName||bound.selected_model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
    await assertLearningCurrent(db,(bound.execution_input??bound.input).brand.learning);
    await assertPlanningReferences(db,j.organization_id,j.brand_id,(bound.execution_input??bound.input).references);
-   if(new Date(bound.scheduled_at).getTime()>Date.now())throw new CreativeError('PLAN_NOT_DUE');
+   if(!bound.input.chat&&new Date(bound.scheduled_at).getTime()>Date.now())throw new CreativeError('PLAN_NOT_DUE');
    const loop=bound.loop_id?(await db.query('SELECT * FROM app.planning_loops WHERE id=$1',[bound.loop_id])).rows[0]:null;
    if(bound.loop_id&&(!loop||loop.stopped_at))throw new CreativeError('PLAN_ACCESS_REVOKED');
    const prior=(await db.query('SELECT * FROM app.planning_calls WHERE job_id=$1 AND step=$2',[j.id,message.step])).rows[0];
@@ -40,8 +41,8 @@ export class PlanningJobs {
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`planning-budget:${j.brand_id.toLowerCase()}`]);
    const grant=(await db.query('SELECT * FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,providerName])).rows[0];
    if(!grant)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
-   if(grant.model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
-   const cost=Math.ceil(wire.maxInputTokens*Number(grant.input_micros_per_token)+wire.maxOutputTokens*Number(grant.output_micros_per_token));
+   if((bound.input.chat?CHAT_MODEL:grant.model)!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
+   const cost=Math.ceil(wire.maxInputTokens*Number(bound.input.chat?CHAT_RATES.input:grant.input_micros_per_token)+wire.maxOutputTokens*Number(bound.input.chat?CHAT_RATES.output:grant.output_micros_per_token));
    const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM (SELECT reserved_micros FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2 AND $3='openai') reservations",[j.organization_id,j.brand_id,providerName])).rows[0].n);
    if(!Number.isSafeInteger(cost)||cost<=0||exceedsAllowance(cost+used,grant.budget_micros))throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
    if(loop){const loopUsed=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.planning_calls WHERE loop_id=$1',[loop.id])).rows[0].n);if(cost+loopUsed>Number(loop.budget_micros))throw new CreativeError('PLAN_LOOP_BUDGET_EXHAUSTED');}
@@ -68,7 +69,7 @@ export class PlanningJobs {
     if(!await this.jobs.permitted(db,j)){await this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');return null;}
     if(!this.runtime.configured)throw new CreativeError('SKILL_RUNTIME_NOT_CONFIGURED');
     const request=(await db.query('SELECT * FROM app.planning_requests WHERE job_id=$1',[j.id])).rows[0];
-    if(new Date(request.scheduled_at).getTime()>Date.now())return null;
+    if(!request.input.chat&&new Date(request.scheduled_at).getTime()>Date.now())return null;
     if(request.loop_id){
      const loop=(await db.query('SELECT stopped_at FROM app.planning_loops WHERE id=$1',[request.loop_id])).rows[0];
      if(!loop||loop.stopped_at){await this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');return null;}
@@ -91,12 +92,23 @@ export class PlanningJobs {
     if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256||hash(canonicalJSON(input))!==request.input_sha256||input.brand.id!==brain.id||input.brand.sha256!==brain.sha256||canonicalJSON(input.brand.facts)!==canonicalJSON(brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))))throw new CreativeError('PLAN_BRAND_INTEGRITY_FAILED');
     const grant=(await db.query('SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,request.provider])).rows[0];
     if(!grant||!request.selected_model)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
-    if(grant.model!==request.selected_model)throw new CreativeError('PLAN_CONFIG_CHANGED');
+    if(((input as any).chat?CHAT_MODEL:grant.model)!==request.selected_model)throw new CreativeError('PLAN_CONFIG_CHANGED');
     await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);
     return {request,input,model:request.selected_model};
    });
    if(!prepared)return 'finished';
    const {request,input,model}=prepared;
+   if((input as any).chat){
+    const context=(input as any).chat;
+    const response=request.output??validateChatDecision(JSON.parse((await this.call(scope,chatRequest({...context,brand:input.brand}),model,'openai',4000)).content),context);
+    validateChatDecision(response,context);
+    return await this.jobs.transaction(scope,async(db,j)=>{
+     if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
+     await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(response)]);
+     if(['image','edit_image','campaign'].includes(response.action))await db.query('INSERT INTO delivery.chat_actions(job_id,organization_id,brand_id,actor_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[j.id,j.organization_id,j.brand_id,j.requested_by]);
+     return this.finish(db,j,'succeeded');
+    });
+   }
    let result:PlanningResult=request.output;
    if(!result){
     result=await this.runtime.contentPlan(input,message=>this.call(scope,message,model,request.provider,input.post_ideas?4000:16000));
@@ -136,6 +148,7 @@ export class PlanningJobs {
     return this.finish(db,j,'succeeded');
    });
   }catch(error){
+      if(error instanceof SyntaxError)error=new CreativeError('CHAT_RESPONSE_INVALID');
       if(monthlyBudgetExceeded(error))error=new CreativeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
    if(!(error instanceof CreativeError))throw error;
    return this.jobs.transaction(scope,async(db,j)=>{

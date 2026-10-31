@@ -275,3 +275,18 @@ test('post typography overrides defaults and clean artwork stays text-free throu
  const long=createDesign('media',1024,1024,{...brief,headline:'Too much text '.repeat(20)});
  assert.equal(long.layers[0].text,'');
 });
+
+
+test('explicit revision text mode removes overlays and can restore a branded headline',async()=>{
+ const {reviseDesign}=await import('../../dist/creative-design.js');
+ const typography={headline:{family:'Lora',weight:600},body:{family:'Montserrat',weight:500}};
+ const parent=createDesign('first',1024,1536,brief,'modern',{text:'headline',typography});
+ parent.layers.push({...parent.layers[0],id:'custom',text:'Custom text'});
+ const clean=reviseDesign(parent,'second',brief,{text:'none',typography});
+ assert.deepEqual(clean.layers,[]);assert.equal(parent.layers.length,4);
+ const restored=reviseDesign(clean,'third',brief,{text:'headline',typography});
+ assert.equal(restored.height,1536);assert.equal(restored.background_media_id,'third');
+ assert.equal(restored.layers[0].fontFamily,'Lora');assert.equal(restored.layers[0].text,brief.headline);
+ assert.equal(restored.layers.filter(layer=>layer.text).length,1);
+ assert.deepEqual(reviseDesign(clean,'fourth',brief).layers,[]);
+});

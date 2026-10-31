@@ -17,7 +17,7 @@ import {VideoDownload} from '../../dist/video-download.js';
 import {canonicalJSON,hash} from '../../dist/brand-brain.js';
 import {prepareVideoImage} from '../../scripts/video-runtime-image.mjs';
 import {execFileSync} from 'node:child_process';
-let videoSubmits=0;
+let videoSubmits=0,chatCalls=0;
 import {PlanningJobs} from '../../dist/planning-jobs.js';
 import {ExportJobs} from '../../dist/export-jobs.js';
 import {StaticRenderer} from '../../dist/static-renderer.js';
@@ -195,6 +195,13 @@ before(async () => {
         if (String(url).startsWith("data:")) return fetch(url, init);
         if (new URL(url).pathname === "/v1/responses") {
 
+          const chatWire=JSON.parse(init.body);
+          if(chatWire.text?.format?.name==='desvio_chat'){
+            chatCalls++;assert.equal(chatWire.model,'gpt-6-sol');
+            const context=JSON.parse(chatWire.input.find(m=>m.role==='user').content);
+            const recall=/remember/i.test(context.message),edit=/warmer/i.test(context.message),unclear=/something/i.test(context.message);
+            return modelResponse({reply:recall?'I found your saved conversation.':unclear?'What should the image show?':edit?'I’ll warm up the saved image.':'I’ll create your clean image now.',action:recall||unclear?'answer':edit?'edit_image':'image',prompt:recall||unclear?'':'TEST a botanical soap image without text',channel:'instagram',size:'1024x1024',sources:recall?[context.memories[0].id]:[],starts_on:null,text_mode:edit?context.current_image.text_mode:'none'});
+          }
           const body = JSON.parse(init.body),
             entry = body.input.find(
               (m) =>
@@ -330,6 +337,7 @@ before(async () => {
     dispatching = true;
     try {
       await dispatcher.runOnce();
+      await runtime.chatWorker.runOnce();
     } catch (e) {
       errors.push(e.message);
     } finally {
@@ -1528,4 +1536,47 @@ test('Generated replacement confirms credits, survives reload and preserves sche
  const after=(await admin.query('SELECT creative_version_id,state,approved_by FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.notEqual(after.creative_version_id,before.creative_version_id);assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.equal(replacementSubmits,1);
  await expect.poll(()=>page.locator('.creative-artboard canvas.lower-canvas').evaluate(canvas=>Array.from(canvas.getContext('2d').getImageData(10,10,1,1).data).slice(0,3))).toEqual([179,217,232]);
  await page.screenshot({path:'work/browser/generated-calendar-replacement.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
+});
+
+
+test('AI canvas interprets, generates inline, resumes a lost response and remembers history (MOCK OpenAI)',async()=>{
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org,brand]);
+ await page.goto(`${base}/b/${brand}/create`);
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Create a clean botanical soap image for mindful households without text');
+ // Server commits the message but the response is lost. Reload must resume the same envelope.
+ let dropped=false;
+ await page.route('**/create-chat/messages',async route=>{if(dropped){await route.continue();return;}dropped=true;await route.fetch();await route.abort('failed');});
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Retry saved request'})).toBeVisible();
+ await page.reload();
+ await expect(page).toHaveURL(/conversation=/,{timeout:20000});
+ await expect(page.getByRole('heading',{name:'Your creative',exact:true})).toBeVisible({timeout:90000});
+ assert.equal(chatCalls,1);assert.equal(generated,1);
+ await page.screenshot({path:'work/browser/chat-canvas-desktop.png',fullPage:true});
+ const conversation=new URL(page.url()).searchParams.get('conversation');
+ await expect(page.getByText('Conversation saved · Available in History',{exact:true})).toBeVisible();
+ // A manual saved version has no generation-job foreign key; conversational edit must use it.
+ const project=(await admin.query('SELECT id,latest_version_id FROM app.creative_projects WHERE thread_id=$1',[conversation])).rows[0];
+ const old=(await admin.query('SELECT design,caption FROM app.creative_versions WHERE id=$1',[project.latest_version_id])).rows[0];
+ old.design.layers=[{id:'custom',type:'text',text:'Keep my manually added headline',x:72,y:72,width:880,fontSize:48,fontFamily:'Lora',fontWeight:600,fill:'#ffffff',backing:{fill:'#111111',opacity:0.96,padding:16},align:'left'}];
+ const manual=await post(`/api/v1/businesses/${brand}/creative-projects/${project.id}/versions`,{parent_id:project.latest_version_id,design:old.design,caption:'TEST manually edited caption'},randomUUID());
+ assert.equal(manual.status,201,JSON.stringify(manual.body));
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Make it warmer');
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect.poll(()=>generated,{timeout:90000}).toBe(2);
+ const edited=(await admin.query('SELECT parent_version_id FROM app.creative_requests WHERE thread_id=$1 ORDER BY job_id',[conversation])).rows;
+ assert.ok(edited.some(r=>r.parent_version_id===manual.body.id));
+ await expect.poll(async()=> (await admin.query('SELECT latest_version_id FROM app.creative_projects WHERE id=$1',[project.id])).rows[0].latest_version_id,{timeout:90000}).not.toBe(manual.body.id);
+ const revised=(await admin.query('SELECT v.design FROM app.creative_projects p JOIN app.creative_versions v ON v.id=p.latest_version_id WHERE p.id=$1',[project.id])).rows[0].design;
+ assert.equal(revised.layers.find(layer=>layer.id==='custom').text,'Keep my manually added headline');
+ assert.equal(revised.layers[0].fontFamily,'Lora');
+ await page.getByRole('button',{name:'New chat',exact:true}).click();
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Remember the soap image we created?');await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByText('I found your saved conversation.',{exact:true})).toBeVisible({timeout:60000});assert.equal(generated,2);
+ await page.locator('.conversation-sources button').click();await expect(page).toHaveURL(new RegExp(conversation));
+ await page.getByRole('button',{name:'History',exact:true}).click();await expect(page.getByRole('dialog',{name:'Conversation history'})).toBeVisible();await page.getByLabel('Search this business’s conversations').fill('botanical');await expect(page.getByRole('dialog').locator('li')).toHaveCount(1);
+ await page.getByRole('button',{name:'Close history',exact:true}).click();
+ for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await page.screenshot({path:`work/browser/chat-canvas-${viewport.width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
+ await page.setViewportSize({width:1440,height:1000});
+ assert.deepEqual(errors,[]);
 });

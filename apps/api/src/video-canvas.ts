@@ -40,7 +40,7 @@ export class VideoCanvas {
     if(canonicalJSON(slot.creative_spec??null)!==canonicalJSON(creativeSpec))throw new ConflictException('Use the saved video placement and aspect');
     if(slot.format!=='video'||slot.channel!==v.channel||slot.revision!==v.slot_revision||['approved','cancelled'].includes(slot.state))throw new ConflictException('Save the current video post as a draft before creating it');
    }
-   if(!(await db.query('SELECT id FROM app.canvas_threads WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[threadId,b.organization_id,brand])).rowCount)throw new NotFoundException('Conversation not found');
+   if(!(await db.query("SELECT id FROM app.canvas_threads WHERE id=$1 AND organization_id=$2 AND brand_id=$3 AND (request_key NOT LIKE 'chat:%' OR created_by=app.actor())",[threadId,b.organization_id,brand])).rowCount)throw new NotFoundException('Conversation not found');
    if((await db.query("SELECT id FROM app.jobs WHERE brand_id=$1 AND kind='creative.video' AND status IN ('queued','running','retrying','unknown')",[brand])).rowCount)throw new ConflictException('A video request is running or needs reconciliation');
    if((await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind='creative.video' AND created_at>now()-interval '1 day'",[brand])).rows[0].n>=10)throw new ConflictException('Daily video limit reached');
    const used=Number((await db.query('SELECT (SELECT COALESCE(sum(bytes),0) FROM app.video_bases)+(SELECT COALESCE(sum(bytes+poster_bytes),0) FROM app.video_versions) AS n')).rows[0].n);

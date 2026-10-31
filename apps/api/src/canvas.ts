@@ -99,7 +99,7 @@ export class Canvas {
     return this.scope(user, id, false, async (db, b) => ({
       threads: (
         await db.query(
-          "SELECT id,title,created_at FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 ORDER BY created_at DESC LIMIT 100",
+          "SELECT id,title,created_at FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND (request_key NOT LIKE 'chat:%' OR created_by=app.actor()) ORDER BY created_at DESC LIMIT 100",
           [b.organization_id, id],
         )
       ).rows,
@@ -160,7 +160,7 @@ export class Canvas {
     return this.scope(user, id, false, async (db, b) => {
       const thread = (
         await db.query(
-          "SELECT id,title,created_at FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+          "SELECT id,title,created_at FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND (request_key NOT LIKE 'chat:%' OR created_by=app.actor())",
           [b.organization_id, id, threadId],
         )
       ).rows[0];
@@ -254,7 +254,7 @@ export class Canvas {
       if (
         !(
           await db.query(
-            "SELECT id FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3",
+            "SELECT id FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND (request_key NOT LIKE 'chat:%' OR created_by=app.actor())",
             [b.organization_id, id, threadId],
           )
         ).rowCount
@@ -320,7 +320,7 @@ export class Canvas {
           );
         if(version.skill_manifest?.creative_spec&&!creativeSpec)throw new BadRequestException("Keep the saved post format when editing this image");
         const target=creativeSpec?creativeDimensions(creativeSpec):null;
-        if (creativeSpec && canonicalJSON(version.skill_manifest?.creative_spec??null)!==canonicalJSON(creativeSpec))throw new BadRequestException("Keep the current post placement when editing this image");
+        if (creativeSpec && version.skill_manifest?.creative_spec && ['placement','aspect','slide_count'].some(k=>(version.skill_manifest.creative_spec as any)[k]!==(creativeSpec as any)[k]))throw new BadRequestException("Keep the current post placement when editing this image");
         if (target?version.width!==target.width||version.height!==target.height:`${version.width}x${version.height}` !== v.size)
           throw new BadRequestException(
             "Keep the current dimensions when editing this image",

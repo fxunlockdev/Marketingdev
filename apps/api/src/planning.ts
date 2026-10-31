@@ -12,7 +12,7 @@ import {canonicalJSON,hash} from './brand-brain.js';
 import type {PlanningInput,PostIdeaPurpose} from './planning-contracts.js';
 export class Planning {
  constructor(readonly plans:ContentPlan){}
- submit(user:string,id:string,body:unknown,key:unknown,scoped?:{db:PoolClient;b:{organization_id:string};budgetMicros:number;weeklyIncrease:number},ideas?:PostIdeaPurpose){
+ submit(user:string,id:string,body:unknown,key:unknown,scoped?:{db:PoolClient;b:{organization_id:string};budgetMicros:number;weeklyIncrease:number;single?:boolean},ideas?:PostIdeaPurpose){
   const v=object(body,['starts_on','brief','duration_days','post_count','video_count','provider','repeat_cycles','loop_budget_micros','confirm_recurring_spend','canvas_thread_id','planning_mode','reference_plan_id','campaign','content_mix']),brief=v.brief??'';
   const campaign=campaignInput(v.campaign);
   let mix:ContentMixItem[]|undefined;try{if(v.content_mix!==undefined)mix=normalizeContentMix(v.content_mix);}catch(e){throw new BadRequestException((e as Error).message);}
@@ -41,7 +41,7 @@ export class Planning {
    const prior=(await db.query('SELECT r.request_hash,j.id,j.status,r.output_plan_id,r.thread_id,r.loop_id FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,key])).rows[0];
    if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another planning request');return {id:prior.id,status:prior.status,output_plan_id:prior.output_plan_id,thread_id:prior.thread_id,loop_id:prior.loop_id};}
    if((await db.query("SELECT j.id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND (j.status='unknown' OR (j.status IN ('queued','running','retrying') AND r.scheduled_at<=now() AND (r.loop_id IS NULL OR EXISTS(SELECT 1 FROM app.planning_loops l WHERE l.id=r.loop_id AND l.stopped_at IS NULL))))",[b.organization_id,id])).rowCount)throw new ConflictException('A plan is running or its uncertain provider result needs reconciliation');
-   if((await db.query("SELECT count(*)::int AS n FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND j.created_at>now()-interval '1 day' AND (r.input->'post_ideas' IS NOT NULL)=$3",[b.organization_id,id,!!ideas])).rows[0].n>=(ideas?20:5))throw new ConflictException('Daily planning request limit reached');
+   if((await db.query("SELECT count(*)::int AS n FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND j.created_at>now()-interval '1 day' AND r.input->'chat' IS NULL AND (r.input->'post_ideas' IS NOT NULL)=$3",[b.organization_id,id,!!ideas])).rows[0].n>=(ideas?20:5))throw new ConflictException('Daily planning request limit reached');
    if(!ideas&&(await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0].n>=36)throw new ConflictException('This business has reached its plan limit');
    const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,id])).rows[0];
    if(!brain)throw new ConflictException('Confirm your brand profile before planning');
@@ -64,12 +64,12 @@ export class Planning {
    if(Number(cycles)>1&&(await db.query("SELECT l.id FROM app.planning_loops l WHERE l.organization_id=$1 AND l.brand_id=$2 AND l.stopped_at IS NULL AND EXISTS(SELECT 1 FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.loop_id=l.id AND j.status IN ('queued','running','retrying','unknown'))",[b.organization_id,id])).rowCount)throw new ConflictException('Stop the active planning loop before starting another');
    if(Number(cycles)>1&&!grant)throw new ConflictException('Enable this planning model before starting a loop');
    let conversation=threadId;
-   if(conversation){if(!(await db.query('SELECT id FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,conversation])).rowCount)throw new NotFoundException('Conversation not found');}
+   if(conversation){if(!(await db.query("SELECT id FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND (request_key NOT LIKE 'chat:%' OR created_by=app.actor())",[b.organization_id,id,conversation])).rowCount)throw new NotFoundException('Conversation not found');}
    if(conversation===null){
     if((await db.query('SELECT count(*)::int AS n FROM app.canvas_threads WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0].n>=100)throw new ConflictException('This business has reached its conversation limit');
     conversation=randomUUID();await db.query('INSERT INTO app.canvas_threads(id,organization_id,brand_id,title,created_by,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7)',[conversation,b.organization_id,id,brief.trim().slice(0,140)||'Content planning',user,`plan:${key}`,requestHash]);
    }
-   const loop=Number(cycles)>1||scoped?randomUUID():null;
+   const loop=Number(cycles)>1||(scoped&&!scoped.single)?randomUUID():null;
    if(loop)await db.query('INSERT INTO app.planning_loops(id,organization_id,brand_id,created_by,cycles,budget_micros) VALUES($1,$2,$3,$4,$5,$6)',[loop,b.organization_id,id,user,cycles,scoped?.budgetMicros??v.loop_budget_micros]);
    let first='';
    for(let cycle=0;cycle<Number(cycles);cycle++){
@@ -93,7 +93,7 @@ export class Planning {
   await db.query("UPDATE app.jobs SET cancel_requested=true WHERE id IN (SELECT job_id FROM app.planning_requests WHERE loop_id=$1) AND status IN ('queued','running','retrying')",[loopId]);
   return r.rows[0];
  });}
- jobs(user:string,id:string){return this.plans.scope(user,id,false,async(db,b)=>({jobs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.output_plan_id,r.input->'preferences' AS preferences,COALESCE(r.output->'plan'->'settings'->'duration_days',r.input->'duration_days') AS duration_days,COALESCE(r.output->'plan'->'settings'->'post_count',r.input->'post_count') AS post_count,r.provider,r.selected_model,r.loop_id,r.scheduled_at,r.thread_id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->'post_ideas' IS NULL ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id])).rows}));}
+ jobs(user:string,id:string){return this.plans.scope(user,id,false,async(db,b)=>({jobs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.output_plan_id,r.input->'preferences' AS preferences,COALESCE(r.output->'plan'->'settings'->'duration_days',r.input->'duration_days') AS duration_days,COALESCE(r.output->'plan'->'settings'->'post_count',r.input->'post_count') AS post_count,r.provider,r.selected_model,r.loop_id,r.scheduled_at,r.thread_id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->'post_ideas' IS NULL AND r.input->'chat' IS NULL ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id])).rows}));}
  cancel(user:string,id:string,jobId:string){jobId=uuid(jobId);return this.plans.scope(user,id,true,async(db,b)=>{
   const j=(await db.query("SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND kind='plan.generate'",[b.organization_id,id,jobId])).rows[0];
   if(!j)throw new NotFoundException('Planning request not found');

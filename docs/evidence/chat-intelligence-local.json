@@ -1,0 +1,142 @@
+{
+  "checked_at": "2026-10-31T14:55:43.525691+00:00",
+  "scope": "GPT-6 Sol conversational canvas. Local actual database, auth, storage, jobs, renderer and browser; image/model transports mocked except explicitly recorded interpretation calls. Not production readiness.",
+  "checks": [
+    {
+      "log": "work/chat-all-contracts.log",
+      "sha256": "8871ef2f052f53af91c7cf6613dc1f3ea15e4d0d42046517e6f08e476b34981c",
+      "passed": true
+    },
+    {
+      "log": "work/chat-foundation.log",
+      "sha256": "8649586991f6db06d68d36a36664e91af189bf8568125c84cb05a1c36fdc77ef",
+      "passed": true
+    },
+    {
+      "log": "work/chat-browser.log",
+      "sha256": "313dbe855835857cfc3869d1d11c24a590cc41d24d62d37497632fe5273c36c3",
+      "passed": true
+    },
+    {
+      "log": "work/chat-guided-browser.log",
+      "sha256": "fc0a1069d7fe95efe8199b5a2b6d0d1334b7cdd12b806ecd79cc843c174f1322",
+      "passed": true
+    },
+    {
+      "log": "work/chat-planning-regression.log",
+      "sha256": "cc949a80f0f08c4dbbd55c94e3c953cee7b5ddad8f4d16f324f3ccc8c14f4977",
+      "passed": true
+    }
+  ],
+  "live_interpretation": {
+    "checked_at": "2026-10-31T14:24:47.987Z",
+    "model": "gpt-6-sol",
+    "scope": "Actual OpenAI interpretation with synthetic brand data; no image, video or publishing request.",
+    "passed": true,
+    "results": [
+      {
+        "expected": "image",
+        "passed": true,
+        "action": "image",
+        "reply": "I\u2019ll prepare a text-free luxury residences image with warm sunset light and lush gardens, designed to appeal to young families.",
+        "starts_on": null,
+        "text_mode": "none",
+        "latency_ms": 4981,
+        "usage": {
+          "input_tokens": 711,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0
+          },
+          "output_tokens": 101,
+          "output_tokens_details": {
+            "reasoning_tokens": 0
+          },
+          "total_tokens": 812
+        }
+      },
+      {
+        "expected": "answer",
+        "passed": true,
+        "action": "answer",
+        "reply": "What would you like to create for TEST Fictional Homes\u2014an image, a post, or something else?",
+        "starts_on": null,
+        "text_mode": "none",
+        "latency_ms": 1970,
+        "usage": {
+          "input_tokens": 697,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0
+          },
+          "output_tokens": 93,
+          "output_tokens_details": {
+            "reasoning_tokens": 25
+          },
+          "total_tokens": 790
+        }
+      },
+      {
+        "expected": "campaign",
+        "passed": true,
+        "action": "campaign",
+        "reply": "I\u2019ll prepare a five-image campaign for TEST Fictional Homes, starting November 15, 2026, focused on luxury residences for young families.",
+        "starts_on": "2026-11-15",
+        "text_mode": "none",
+        "latency_ms": 2415,
+        "usage": {
+          "input_tokens": 714,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0
+          },
+          "output_tokens": 172,
+          "output_tokens_details": {
+            "reasoning_tokens": 26
+          },
+          "total_tokens": 886
+        }
+      }
+    ]
+  },
+  "screenshots": [
+    "work/browser/chat-canvas-desktop.png",
+    "work/browser/chat-canvas-390.png",
+    "work/browser/desvio-date-picker.png"
+  ],
+  "known_limits": [
+    "Direct carousel creation and recurring strategies use existing guided workflows. Video retains reference and script approval.",
+    "History retrieval is bounded recent and lexical retrieval within the business and actor.",
+    "Hosted new-chat image generation/edit acceptance and deployment pending.",
+    "Invite-only; live social publishing, email, backup and public production acceptance remain unverified/deferred."
+  ],
+  "live_edit_interpretation": {
+    "checked_at": "2026-10-31T14:55:18.179Z",
+    "model": "gpt-6-sol",
+    "scope": "Actual OpenAI interpretation with synthetic brand data; no image, video or publishing request.",
+    "passed": true,
+    "results": [
+      {
+        "expected": "edit_image",
+        "passed": true,
+        "action": "edit_image",
+        "reply": "I\u2019ll warm the background while keeping your lettering unchanged.",
+        "starts_on": null,
+        "text_mode": "headline",
+        "latency_ms": 4315,
+        "usage": {
+          "input_tokens": 735,
+          "input_tokens_details": {
+            "cache_write_tokens": 0,
+            "cached_tokens": 0
+          },
+          "output_tokens": 115,
+          "output_tokens_details": {
+            "reasoning_tokens": 17
+          },
+          "total_tokens": 850
+        }
+      }
+    ]
+  }
+}

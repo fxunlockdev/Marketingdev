@@ -2,3 +2,5 @@
 .hero.hero .composer input:not([type=checkbox]){border:0;background:transparent;box-shadow:none;border-radius:0;font-weight:400;outline:none;padding:0}.hero.hero .tiles small{font-weight:400}.hero.hero .quick button,.hero.hero .prompts button{min-height:34px}.hero.hero .composer button{min-height:48px}@media(max-width:600px){.hero .circles i:first-child{right:-145px;top:-145px}.hero .circles i:nth-child(2){right:70px;top:-48px}}
 /* The composer is one white surface, not a nested settings input. */
 .hero.hero .composer input:not([type=checkbox]){background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important}
+
+.recent{display:flex;gap:8px;flex-wrap:wrap;align-items:center;position:relative;z-index:1}.recent>span{font-size:13px;color:#c7c5d1}.recent button{background:#29282f!important;color:white!important;border:0!important;padding:8px 14px!important;max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px!important;margin:0!important}

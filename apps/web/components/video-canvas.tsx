@@ -9,8 +9,8 @@ import {localCandidates,localMinute} from '../../api/src/local-calendar';
 import {useUnsavedChanges} from './unsaved';
 type Business={id:string;role:string};
 const active=(status:string)=>['queued','running','retrying'].includes(status);
-export function VideoRequest({business,threadId,reference,ensureThread,initiallyOpen=false,onDirty}:{business:Business;threadId:string;reference:{export_id:string;approval_id:string;source_sha256:string;export_sha256:string}|{brand_reference_id:string;source_sha256:string};ensureThread?:()=>Promise<string>;initiallyOpen?:boolean;onDirty?:(dirty:boolean)=>void}){
- const [prompt,setPrompt]=useState(''),[creativity,setCreativity]=useState<Creativity>('normal'),[duration,setDuration]=useState(5),[channel,setChannel]=useState('instagram'),[enabled,setEnabled]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[notice,setNotice]=useState('');
+export function VideoRequest({business,threadId,reference,ensureThread,initiallyOpen=false,initialPrompt='',onDirty}:{business:Business;threadId:string;reference:{export_id:string;approval_id:string;source_sha256:string;export_sha256:string}|{brand_reference_id:string;source_sha256:string};ensureThread?:()=>Promise<string>;initiallyOpen?:boolean;initialPrompt?:string;onDirty?:(dirty:boolean)=>void}){
+ const [prompt,setPrompt]=useState(initialPrompt),[creativity,setCreativity]=useState<Creativity>('normal'),[duration,setDuration]=useState(5),[channel,setChannel]=useState('instagram'),[enabled,setEnabled]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[notice,setNotice]=useState('');
  const [slot,setSlot]=useState<any>(),[slotLoading,setSlotLoading]=useState(true);
  const key=useRef(crypto.randomUUID());useUnsavedChanges(!!prompt||busy);
  useEffect(()=>{onDirty?.(!!prompt||busy);return()=>onDirty?.(false);},[prompt,busy,onDirty]);

@@ -406,3 +406,39 @@ test('campaign ideas use approved brand, preferences and feedback with scoped du
  assert.equal((await planning.jobs(alice,b.id)).jobs.length,0,'suggestions must not appear as unfinished campaigns');
  const reopen=await api(path,{method:'POST',body:selection,key:randomUUID()});assert.equal(reopen.body.id,reply.body.id);assert.equal(reopen.body.ideas.length,3);assert.equal(calls,beforeCalls+1);
 });
+
+test('AI chat uses GPT-6, persists exact envelopes, asks focused questions and resumes without duplicate provider work',async()=>{
+ const {Canvas}=await import('../../dist/canvas.js'),{ChatConversations}=await import('../../dist/chat-conversations.js');
+ const canvas=new Canvas(businesses,null),chat=new ChatConversations(canvas,planning),b=await fresh();await grant(b);
+ const key=randomUUID(),body={conversation_id:null,message:'Create a luxury residences image for young families, without text.'};
+ await chat.saveOutbox(alice,b.id,{key,body});
+ assert.deepEqual((await chat.outbox(alice,b.id)).request,{key,body});
+ await assert.rejects(chat.saveOutbox(alice,b.id,{key:randomUUID(),body}),/saved message/);
+ await chat.discard(alice,b.id,key);assert.equal((await chat.outbox(alice,b.id)).request,null);
+ await assert.rejects(chat.submit(alice,b.id,body,key),/discarded/,'a delayed POST cannot revive a discarded message');
+ const replacement=randomUUID();await chat.saveOutbox(alice,b.id,{key:replacement,body:{...body,message:'Changed request'}});
+ await assert.rejects(chat.submit(alice,b.id,body,key),/discarded/,'a delayed POST cannot consume a replacement envelope');
+ await chat.discard(alice,b.id,replacement);await chat.saveOutbox(alice,b.id,{key,body});
+ assert.throws(()=>chat.saveOutbox(alice,b.id,{key:randomUUID(),body:{message:'bad\u0000text'}}),/Enter a message/);
+ const submitted=await chat.submit(alice,b.id,body,key);assert.deepEqual(await chat.submit(alice,b.id,body,key),submitted);await assert.rejects(chat.discard(alice,b.id,key),/already accepted/);
+ await assert.rejects(chat.submit(alice,b.id,{...body,message:'Different'},key),/different message/);
+ let count=0;transport=async(url,init)=>{count++;const wire=JSON.parse(init.body);assert.equal(wire.model,'gpt-6-sol');assert.equal(wire.reasoning.effort,'low');assert.equal(wire.text.format.strict,true);assert.equal(wire.max_output_tokens,4000);return modelResponse({reply:'I’ll create a clean luxury residences image for young families.',action:'image',prompt:'Luxury residences for young families. No text.',channel:'instagram',size:'1024x1024',sources:[],starts_on:null,text_mode:'none'});};
+ try{
+  assert.equal(await handler.run(scope(b,submitted)),'succeeded');assert.equal(await handler.run(scope(b,submitted)),'finished');assert.equal(count,1);
+  await chat.acknowledge(alice,b.id,key);assert.equal((await chat.outbox(alice,b.id)).request,null);
+  const history=await chat.read(alice,b.id,submitted.conversation_id);assert.equal(history.turns[0].action_status,'queued');
+  const nextKey=randomUUID(),nextBody={conversation_id:submitted.conversation_id,message:'Make it warmer'};await chat.saveOutbox(alice,b.id,{key:nextKey,body:nextBody});await assert.rejects(chat.submit(alice,b.id,nextBody,nextKey),/being prepared/);await chat.discard(alice,b.id,nextKey);
+  await app.chatWorker.runOnce();const accepted=await chat.execute(alice,b.id,submitted.id);assert.equal(accepted.kind,'image');assert.deepEqual(await chat.execute(alice,b.id,submitted.id),accepted);
+  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.creative_requests WHERE thread_id=$1',[submitted.conversation_id])).rows[0].n,1);
+  assert.equal((await chat.read(alice,b.id,submitted.conversation_id)).turns[0].action_status,'completed');
+  // Same-business collaborator must not read, submit to or execute another actor's chat.
+  await admin.query("INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,'admin') ON CONFLICT DO NOTHING",[org.id,bob]);
+  assert.equal((await chat.list(bob,b.id)).conversations.length,0);
+  await assert.rejects(chat.read(bob,b.id,submitted.conversation_id),/not found/);
+  await assert.rejects(chat.execute(bob,b.id,submitted.id),/not found/);
+  await assert.rejects(canvas.submit(bob,b.id,submitted.conversation_id,{prompt:'Hijack',format:'static',channel:'instagram',size:'1024x1024'},randomUUID()),/not found/);
+ }finally{transport=undefined;}
+ const clarify=await fresh();await grant(clarify);const clarifyKey=randomUUID();await chat.saveOutbox(alice,clarify.id,{key:clarifyKey,body:{message:'Create something'}});const q=await chat.submit(alice,clarify.id,{message:'Create something'},clarifyKey);
+ transport=async()=>modelResponse({reply:'What would you like the image to show?',action:'answer',prompt:'',channel:'instagram',size:'1024x1024',sources:[],starts_on:null,text_mode:'none'});
+ try{assert.equal(await handler.run(scope(clarify,q)),'succeeded');await assert.rejects(chat.execute(alice,clarify.id,q.id),/does not authorize/);assert.equal((await admin.query('SELECT count(*)::int AS n FROM delivery.chat_actions WHERE job_id=$1',[q.id])).rows[0].n,0);}finally{transport=undefined;}
+});

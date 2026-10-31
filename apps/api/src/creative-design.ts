@@ -138,12 +138,18 @@ export function validateDesign(
   return v;
 }
 
-// An image revision must not reset the user's layout or remove custom text layers.
+// Preserve the saved layout unless the user explicitly changes text mode.
 export function reviseDesign(
   parent: Design,
   mediaId: string,
   brief: CreativeBrief,
+  artwork?: PostArtwork,
+  font?: BrandFontPreset | BrandTypography,
 ): Design {
+  if (artwork?.text === 'none') return {...parent, background_media_id: mediaId, layers: []};
+  if (artwork?.text === 'headline' && !parent.layers.some(layer => layer.text.trim())) {
+    return createDesign(mediaId, parent.width, parent.height, brief, font, artwork);
+  }
   const copy: Record<string, string> = {
     headline: brief.headline,
     body: visualBody(brief.body),

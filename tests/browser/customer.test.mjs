@@ -1420,7 +1420,7 @@ test('Create chat persists author answers and denies another tenant (real databa
  await home.getByRole('textbox',{name:'Ask Desvio'}).fill('A post about our new collection');
  await expect(alice).toHaveURL(base+`/b/${firstBusiness}/overview`);
  for(const width of [1440,390]){await alice.setViewportSize({width,height:1000});assert.equal(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await alice.screenshot({path:`work/browser/home-chat-${width}.png`,fullPage:true});}
- await alice.goto(base+`/b/${firstBusiness}/create`);
+ await alice.goto(base+`/b/${firstBusiness}/create?guided=1`);
  await expect(alice.getByRole('heading',{name:'Your idea lands here.'})).toBeVisible();
  await alice.setViewportSize({width:924,height:540});
  await alice.screenshot({path:'work/browser/create-chat-start.png'});
@@ -1462,13 +1462,26 @@ test('Create chat persists author answers and denies another tenant (real databa
  await alice.getByRole('button',{name:'Done ✓',exact:true}).click();
  await alice.getByRole('button',{name:'Today',exact:true}).click();
  await alice.getByRole('button',{name:'Edit start',exact:true}).click();
- await expect(alice.locator('input[type=date]')).toBeVisible();
+ await expect(alice.locator('.desvio-date-trigger')).toBeVisible();
  // A pending autosave cannot restore the old draft behind a slow reset.
  await alice.route('**/create-chat/draft',async route=>{
   if(route.request().method()==='PUT'&&route.request().postDataJSON()?.snapshot?.mode===null)await setTimeout(1000);
   await route.continue();
  });
- await alice.locator('input[type=date]').fill('2026-11-12');
+ await alice.locator('.desvio-date-trigger').click();
+ await expect(alice.getByRole('dialog',{name:'When do we kick off?'})).toBeVisible();
+ const dateStyle=await alice.getByRole('dialog',{name:'When do we kick off?'}).evaluate(dialog=>{
+  const selected=dialog.querySelector('[aria-pressed=true]');
+  const ordinary=dialog.querySelector('[aria-pressed=false]:not(.outside)');
+  const apply=dialog.querySelector('.desvio-date-apply');
+  return {selected:getComputedStyle(selected).backgroundColor,ordinary:getComputedStyle(ordinary).backgroundColor,applyWidth:apply.clientWidth,applyScroll:apply.scrollWidth};
+ });
+ assert.notEqual(dateStyle.selected,dateStyle.ordinary,'only the selected date has the accent background');
+ assert.ok(dateStyle.applyWidth>=dateStyle.applyScroll,'date action label is not clipped');
+ await alice.screenshot({path:'work/browser/desvio-date-picker.png'});
+ await alice.getByRole('dialog').getByRole('button',{name:'Next month'}).click();
+ await alice.getByRole('dialog').getByRole('button',{name:/12 November 2026|November 12, 2026/}).click();
+ await alice.getByRole('button',{name:'Use this date',exact:true}).click();
  // Reset is durable before the local draft disappears.
  await alice.getByRole('button',{name:'↶ Start over',exact:true}).click();
  await alice.getByRole('dialog').getByRole('button',{name:'Start over',exact:true}).click();

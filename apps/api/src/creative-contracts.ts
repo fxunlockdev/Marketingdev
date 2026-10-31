@@ -41,6 +41,7 @@ export type PlannerMessage = {
   tool_call_id?: string;
 };
 export type PlannerRequest = {
+  chat_response?: boolean; // Trusted conversation router only; not supplied by skills.
   creative_fact_ids?: string[]; // Added only by trusted static-creative runtime, never sandbox input.
   type: "model";
   step: number;

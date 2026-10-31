@@ -1,3 +1,5 @@
+import {ChatActionWorker} from './chat-action-worker.js';
+import {ChatConversations} from './chat-conversations.js';
 import {Put} from '@nestjs/common';
 import {resolveIngressAddress} from './auth-ingress.js';
 import {CampaignIdeas} from './campaign-ideas.js';
@@ -326,7 +328,15 @@ class ContentPlanController {
 @Controller('api/v1/businesses/:id')
 @UseGuards(SessionGuard)
 class CanvasController {
- constructor(@Inject(Canvas) private readonly service:Canvas){}
+ constructor(@Inject(Canvas) private readonly service:Canvas,@Inject(ChatConversations) private readonly chat:ChatConversations){}
+ @Get('create-chat/outbox') chatOutbox(@Req() r:AuthRequest,@Param('id') id:string){return this.chat.outbox(r.actorId,id);}
+ @Put('create-chat/outbox') saveChatOutbox(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.chat.saveOutbox(r.actorId,id,body);}
+ @Post('create-chat/outbox/:key/discard') discardChat(@Req() r:AuthRequest,@Param('id') id:string,@Param('key') key:string){return this.chat.discard(r.actorId,id,key);}
+ @Post('create-chat/outbox/:key/acknowledge') acknowledgeChat(@Req() r:AuthRequest,@Param('id') id:string,@Param('key') key:string){return this.chat.acknowledge(r.actorId,id,key);}
+ @Get('create-chat/history') history(@Req() r:AuthRequest,@Param('id') id:string,@Query('q') q?:string){return this.chat.list(r.actorId,id,q);}
+ @Get('create-chat/conversations/:conversationId') conversation(@Req() r:AuthRequest,@Param('id') id:string,@Param('conversationId') c:string){return this.chat.read(r.actorId,id,c);}
+ @Post('create-chat/messages') chatMessage(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.chat.submit(r.actorId,id,body,key);}
+ @Post('create-chat/turns/:turnId/execute') chatExecute(@Req() r:AuthRequest,@Param('id') id:string,@Param('turnId') t:string){return this.chat.execute(r.actorId,id,t);}
  @Get('create-chat/draft') createDraft(@Req() r:AuthRequest,@Param('id') id:string){return this.service.createDraft(r.actorId,id);}
  @Put('create-chat/draft') saveCreateDraft(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.saveCreateDraft(r.actorId,id,body);}
  @Get('canvas/allowances') allowances(@Req() r:AuthRequest,@Param('id') id:string){return this.service.allowances(r.actorId,id);}
@@ -463,6 +473,7 @@ export async function createApplication(config: Config) {
       catch {return unavailable();}
     }));
     @Module({ controllers: [CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+ {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning)=>new ChatConversations(canvas,planning),inject:[Canvas,Planning]},
  {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},
  {provide:Strategies,useValue:new Strategies(new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage)),new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)))},
  {provide:HiggsfieldReplacements,useFactory:(canvas:Canvas)=>new HiggsfieldReplacements(canvas,config.higgsfieldImagesEnabled),inject:[Canvas]},
@@ -477,6 +488,6 @@ export async function createApplication(config: Config) {
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());
     await app.init();
-    return { app, database, auth,mailWorker, async close() { await app.close();mailWorker.close();store.close(); await Promise.all([pool.end(), authPool.end(),mailPool.end()]); } };
+    return { app, database, auth,mailWorker,chatWorker:new ChatActionWorker(mailPool,app.get(ChatConversations)), async close() { await app.close();mailWorker.close();store.close(); await Promise.all([pool.end(), authPool.end(),mailPool.end()]); } };
   } catch (error) { store.close();await Promise.all([pool.end(), authPool.end(),mailPool.end()]); throw error; }
 }

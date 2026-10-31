@@ -448,7 +448,7 @@ export class CreativeJobs {
         const campaignFont = (link ? savedCampaignFont(request.prompt) : undefined) ?? approvedBrandFont(input.brand.facts);
         const version = randomUUID(),
           design = parent
-            ? reviseDesign(parent.design, image.id, plan.brief)
+            ? reviseDesign(parent.design, image.id, plan.brief, request.creative_spec?.artwork, campaignFont)
             : createDesign(image.id, image.width, image.height, plan.brief, campaignFont, request.creative_spec?.artwork),
           sha = hash(
             canonicalJSON({
