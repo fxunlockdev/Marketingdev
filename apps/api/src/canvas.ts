@@ -175,7 +175,7 @@ export class Canvas {
         ).rows,
         runs: (
           await db.query(
-            "SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.project_id,r.parent_version_id,r.output_version_id,r.channel,r.size,r.format,r.text_provider,r.selected_text_model FROM app.jobs j JOIN app.creative_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC LIMIT 100",
+            "SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.project_id,r.parent_version_id,r.output_version_id,r.channel,r.size,r.format,r.text_provider,r.selected_text_model,(r.plan IS NOT NULL) AS brief_ready,EXISTS(SELECT 1 FROM app.creative_media m WHERE m.organization_id=r.organization_id AND m.brand_id=r.brand_id AND m.job_id=j.id) AS image_received FROM app.jobs j JOIN app.creative_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC LIMIT 100",
             [b.organization_id, id, threadId],
           )
         ).rows,
@@ -341,7 +341,7 @@ export class Canvas {
         );
       }
       if(referenceIds.length&&(await db.query('SELECT id FROM app.brand_references WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[]) AND revoked_at IS NULL',[b.organization_id,id,referenceIds])).rowCount!==referenceIds.length)throw new ConflictException('A reference is unavailable or no longer approved');
-      const selectedTextModel=await creativeTextModel(db,b.organization_id,id,textProvider);
+      const selectedTextModel=await creativeTextModel(db,b.organization_id,id,textProvider,'image');
       const job = randomUUID();
       await db.query(
         "INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.generate')",

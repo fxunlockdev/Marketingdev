@@ -206,3 +206,23 @@
 @media(max-width:480px){.desvio-redesign .learnings-workspace>.workspace-view-switch{gap:6px}.desvio-redesign .learnings-workspace>.workspace-view-switch button{padding:10px 12px;font-size:13px}}
 
 .desvio-redesign .header-actions .header-create{background:#17171a;color:#fff;border:0;border-radius:999px;min-height:40px;display:inline-flex;gap:8px;align-items:center;padding:0 18px;font-size:14px}.desvio-redesign .header-actions .header-create:hover{background:#6a5cff;color:white}
+
+/* Export is a sequence of review steps shared by canvas and campaign posts. */
+.desvio-redesign .final-image-review{display:flex;flex-direction:column;align-items:flex-start;gap:16px;margin:28px 0 0;padding:24px 0 0;min-width:0;border-color:var(--line)}
+.desvio-redesign .final-image-review>h3{margin:0;font-size:20px;line-height:1.35}
+.desvio-redesign .final-image-review>p,.desvio-redesign .final-image-review>details,.desvio-redesign .final-image-review>.check-row{margin:0;line-height:1.6;max-width:72ch}
+.desvio-redesign .final-image-review>button{margin:0;min-height:44px;max-width:100%;white-space:normal;line-height:1.4}
+.desvio-redesign .final-image-review>div[role=status]{display:flex;flex-direction:column;align-items:flex-start;gap:12px}
+.desvio-redesign .final-image-review>div[role=status]>p{margin:0}
+.desvio-redesign .final-image-review .final-image-preview{margin:0;max-width:min(100%,560px);height:auto;border-radius:18px}
+.desvio-redesign .final-image-review>.check-row{display:flex;align-items:flex-start;gap:12px}
+.desvio-redesign .final-image-review>.check-row input{margin:3px 0 0}
+.desvio-redesign .final-image-review+ .plan-actions{margin-top:24px;gap:12px}
+
+.desvio-redesign .creative-project>.creative-archive-action{margin:0 0 20px}
+.desvio-redesign .stock-picker{margin:24px 0;padding:20px;border:1px solid var(--line);border-radius:20px;min-width:0}
+.desvio-redesign .stock-picker>summary{cursor:pointer;line-height:1.5;font-weight:600}
+.desvio-redesign .stock-picker[open]>summary{margin-bottom:16px}
+.desvio-redesign .stock-picker>p{margin:0 0 16px;line-height:1.6}
+.desvio-redesign .stock-picker>label{display:grid;gap:8px;margin:0 0 16px}
+.desvio-redesign .stock-picker>button{margin:0;min-height:44px}

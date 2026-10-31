@@ -753,7 +753,7 @@ export function CreativeProject({
           Download PNG
         </button>
       </div>
-      {["owner","admin","editor"].includes(business.role) && <button disabled={busy||dirty} onClick={changeArchive}>{data.project.archived_at?"Restore creative":"Archive creative"}</button>}
+      {["owner","admin","editor"].includes(business.role) && <button className="creative-archive-action" disabled={busy||dirty} onClick={changeArchive}>{data.project.archived_at?"Restore creative":"Archive creative"}</button>}
       <Notice error={error} />
       {notice && <p role="status">{notice}</p>}
       {!latest && (

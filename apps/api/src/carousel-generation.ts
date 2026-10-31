@@ -44,7 +44,7 @@ export class CarouselGeneration {
    if(refs.length&&(await db.query('SELECT id FROM app.brand_references WHERE id=ANY($1::uuid[]) AND revoked_at IS NULL',[refs])).rowCount!==refs.length)throw new ConflictException('A reference is unavailable');
    const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions ORDER BY approved_at DESC,id LIMIT 1')).rows[0];if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('Approve this business’s brand knowledge first');
    const memory=await approvedLearning(db),input:CarouselInput={task:'carousel',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value})),learning:memory},prompt:direction,channel:v.channel as CarouselInput['channel'],slide_count:count};validateCarouselInput(input);
-   const model=await creativeTextModel(db,b.organization_id,brand,provider),parent=randomUUID(),project=randomUUID();
+   const model=await creativeTextModel(db,b.organization_id,brand,provider,'image'),parent=randomUUID(),project=randomUUID();
    const thread=await this.canvas.createThread(user,brand,{title:String(v.prompt).slice(0,140)},`carousel:${parent}`,{db,b});
    await db.query('INSERT INTO app.carousel_projects(id,organization_id,brand_id,created_by) VALUES($1,$2,$3,$4)',[project,b.organization_id,brand,user]);
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'carousel.generate')",[parent,b.organization_id,brand,user]);

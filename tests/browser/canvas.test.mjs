@@ -1554,6 +1554,11 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  assert.equal(chatCalls,1);assert.equal(generated,1);
  await page.screenshot({path:'work/browser/chat-canvas-desktop.png',fullPage:true});
  const conversation=new URL(page.url()).searchParams.get('conversation');
+ const progressResponse=await page.request.get(`${base}/api/v1/businesses/${brand}/canvas/threads/${conversation}`);
+ assert.equal(progressResponse.status(),200,'Customer role can read workflow progress without provider-call access');
+ const progressRun=(await progressResponse.json()).runs[0];
+ assert.equal(progressRun.selected_text_model,'gpt-6-sol');assert.equal(progressRun.brief_ready,true);assert.equal(progressRun.image_received,true);assert.ok(progressRun.output_version_id);
+ await expect(page.getByRole('progressbar',{name:'Completed image workflow steps',exact:true})).toHaveAttribute('value','5',{timeout:30000});
  await expect(page.getByText('Conversation saved · Available in History',{exact:true})).toBeVisible();
  // A manual saved version has no generation-job foreign key; conversational edit must use it.
  const project=(await admin.query('SELECT id,latest_version_id FROM app.creative_projects WHERE thread_id=$1',[conversation])).rows[0];

@@ -1,3 +1,4 @@
+import {imagePlanningRates} from './creative-planning.js';
 import {normalizeCreativeSpec,creativeSourceSize} from './campaign-formats.js';
 import type {CarouselGeneration} from './carousel-generation.js';
 import {imageGenerationCapacity,planningGenerationCapacity} from './creative-budget.js';
@@ -221,11 +222,11 @@ export class SlotCreatives {
     if(!grant&&rows.some(s=>s.format!=='video'))return {available:false,slots:[] as {id:string;revision:number;credits:number;planning_credits?:number}[]};
     return {available:true,slots:rows.map((s):{id:string;revision:number;credits:number;planning_credits?:number}=>{
       if(s.format==='video')return {id:s.id,revision:s.revision,credits:0};
-      const image=imageGenerationCapacity(grant,s.references).credits;
+      const image=imageGenerationCapacity({...grant,...imagePlanningRates(402048)},s.references).credits;
       if(s.format==='carousel'){
         const count=s.creative_spec?.slide_count;
         if(!Number.isInteger(count)||count<2||count>10)throw new ConflictException('Choose the carousel slide count before continuing');
-        const planning=planningGenerationCapacity(grant);
+        const planning=planningGenerationCapacity(imagePlanningRates(402048));
         return {id:s.id,revision:s.revision,credits:planning+count*image,planning_credits:planning};
       }
       return {id:s.id,revision:s.revision,credits:image};

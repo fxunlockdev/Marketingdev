@@ -1261,7 +1261,7 @@ export function SlotPanel({
             </div>
           )}
           {s.creative_version_id&&<CreativeExportPanel format={s.channel==='instagram'?'instagram-jpeg':'png'} key={business.id+s.id+s.creative_version_id+s.channel} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
-                <div className="plan-actions">
+                <div className="plan-actions post-review-actions" role="group" aria-label="Post review actions">
                   {["draft_ready", "changes_requested"].includes(s.state) &&
                     canWrite && (
                       <button

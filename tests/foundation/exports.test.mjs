@@ -348,7 +348,8 @@ test('carousel generation reserves ordered children once, isolates tenants and c
  await assert.rejects(service.submit(alice.id,sibling.id,body,randomUUID()),/Campaign not found/);
  const j=await service.submit(alice.id,brand.id,body,key);
  assert.match((await admin.query('SELECT input FROM app.carousel_requests WHERE job_id=$1',[j.id])).rows[0].input.prompt,/Urgency and discounts/);
- const childPrompts=(await admin.query('SELECT r.prompt FROM app.creative_requests r JOIN app.carousel_children c ON c.generation_job_id=r.job_id WHERE c.parent_job_id=$1',[j.id])).rows;assert.equal(childPrompts.length,3);assert.ok(childPrompts.every(row=>row.prompt.includes('Urgency and discounts')));
+ assert.equal((await admin.query('SELECT selected_text_model FROM app.carousel_requests WHERE job_id=$1',[j.id])).rows[0].selected_text_model,'gpt-6-sol');
+ const childPrompts=(await admin.query('SELECT r.prompt,r.selected_text_model FROM app.creative_requests r JOIN app.carousel_children c ON c.generation_job_id=r.job_id WHERE c.parent_job_id=$1',[j.id])).rows;assert.equal(childPrompts.length,3);assert.ok(childPrompts.every(row=>row.selected_text_model==='gpt-6-sol'));assert.ok(childPrompts.every(row=>row.prompt.includes('Urgency and discounts')));
  assert.equal((await service.submit(alice.id,brand.id,body,key)).id,j.id);
  await assert.rejects(service.submit(alice.id,brand.id,{...body,slide_count:4},key));
  const read=await service.read(alice.id,brand.id),children=read.slides.filter(s=>s.parent_job_id===j.id);

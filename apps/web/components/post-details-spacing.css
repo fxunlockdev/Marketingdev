@@ -23,3 +23,15 @@
 .desvio-redesign .slot-panel .slot-review>.field label{margin:0}
 .desvio-redesign .slot-panel .slot-review>button{margin:0;min-height:44px;padding:10px 20px;border:1px solid var(--line,#e4e1eb);border-radius:999px;background:var(--surface-soft,#f7f6fa);color:var(--ink,#17171a)}
 .desvio-redesign .slot-panel .slot-review>button.primary{background:var(--ink,#17171a);color:#fff}
+
+/* Complete post review flow, including sections below the artwork. */
+.desvio-redesign .slot-panel>.slot-activity{margin-top:28px;padding-top:24px;border-color:var(--line)}
+.desvio-redesign .slot-panel>.slot-activity>h3{margin:0 0 16px;font-size:20px}
+.desvio-redesign .slot-panel .plan-job-list li{gap:12px 20px;padding:16px 0;min-width:0;border-color:var(--line)}
+.desvio-redesign .slot-panel .plan-job-list li>span{min-width:min(180px,100%);overflow-wrap:anywhere}
+.desvio-redesign .slot-panel .plan-job-list a{overflow-wrap:anywhere}
+.desvio-redesign .slot-panel>.post-review-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin:24px 0 0;padding:24px 0 0;border-top:1px solid var(--line)}
+.desvio-redesign .slot-panel>.post-review-actions>button{margin:0;min-height:44px;max-width:100%;white-space:normal;line-height:1.4}
+.desvio-redesign .slot-panel>.post-review-actions>.hint{flex-basis:100%;margin:0}
+.desvio-redesign .slot-panel>.slot-activity>summary{padding:4px 0;line-height:1.5}
+@media(max-width:480px){.desvio-redesign .slot-panel>.post-review-actions>button{flex:1 1 160px}.desvio-redesign .slot-panel .plan-job-list li{align-items:flex-start}.desvio-redesign .slot-panel .plan-job-list li>span{flex-basis:100%}}

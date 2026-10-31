@@ -1,0 +1,131 @@
+{
+  "checked_at": "2026-10-31T15:06:58.100964+00:00",
+  "source_commit": "04f4d028dd514cc5ed4e07f4e199734a83955c62",
+  "api": {
+    "deploymentId": "bfde8559-097c-4893-af80-edff142888cc",
+    "logsUrl": "https://railway.com/project/5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12/service/21260f12-2ad2-413c-9f67-2a1c4d6f8c83?id=bfde8559-097c-4893-af80-edff142888cc&",
+    "status": "SUCCESS"
+  },
+  "web": {
+    "deploymentId": "f4a6a44c-b1e7-4402-90c9-4795d2b2b0a9",
+    "logsUrl": "https://railway.com/project/5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12/service/a92160c2-54ef-4523-b13b-4a9a0e2dbdd2?id=f4a6a44c-b1e7-4402-90c9-4795d2b2b0a9&",
+    "status": "SUCCESS"
+  },
+  "migration": {
+    "checked_at": "2026-10-31T14:58:52.465Z",
+    "project_id": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+    "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+    "service_id": "45ae520d-f681-424b-8758-6cee8789b2cf",
+    "deployment_id": "2bda4fbb-4a67-4b34-96bd-6cee212b5fa2",
+    "deployment_status": "REMOVED",
+    "source_commit": "04f4d028dd514cc5ed4e07f4e199734a83955c62",
+    "migrations": [
+      {
+        "file": "088_chat_conversations.sql",
+        "sha256": "306b65aecb91ac4ef86e16585379ec4ad5df195aa01aaf72c5a9df0374413fc3"
+      }
+    ],
+    "bootstrap_output": {
+      "status": "configured",
+      "replayed": true,
+      "roles": [
+        "desvio_app",
+        "desvio_auth",
+        "desvio_mail",
+        "desvio_worker",
+        "desvio_dispatcher",
+        "desvio_provisioner"
+      ]
+    },
+    "active_secret_variables_cleared": true,
+    "scope": "Actual dedicated dev migrations through 088, checksum replay and all six runtime-role login checks. API/web and customer/provider acceptance remain pending.",
+    "live_model_or_social_calls": false
+  },
+  "worker": {
+    "rollout": {
+      "checked_at": "2026-10-31T15:03:28.041Z",
+      "passed": true,
+      "image": "sha256:58ce509fc9785fe6b003f017ebe46277d263b5020fae24601b82117fefc4d433",
+      "backup_container": "desvio-worker-rollback-20261031-chat",
+      "paid_calls": false,
+      "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+    },
+    "host": {
+      "checked_at": "2026-10-31T15:02:46.364Z",
+      "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+      "images": [
+        {
+          "role": "trusted_worker",
+          "image_id": "sha256:58ce509fc9785fe6b003f017ebe46277d263b5020fae24601b82117fefc4d433",
+          "architecture": "amd64",
+          "user": "node"
+        },
+        {
+          "role": "documents",
+          "image_id": "sha256:1b5a92d5e659ae8a5f47994f3d0705671712bc673c65f1d01bea6ad165fe0a57",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "skills",
+          "image_id": "sha256:27cb8f5907fa7bc372d26474ec853c56ca56d90e1ed756238689a5ac3a52b9f5",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "static_renderer",
+          "image_id": "sha256:bc22d228dbba08934b773df45d8c54934bb81636f41aa2bcfa29ff7df22d61ae",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "video_renderer",
+          "image_id": "sha256:95401ad08e49ae619fb9f1bae50cef443cf9c54bd72d3d31960b746cf292f9f5",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "website_renderer",
+          "image_id": "sha256:4452071e703e04bbf8e9d882cf3c32b3eff057a542d2e3b233983dbe86ce6e89",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        }
+      ],
+      "scanner_version": "ClamAV 1.5.4/28170/Sat Oct 31 06:24:42 2026",
+      "clean_accepted": true,
+      "antivirus_test_rejected": true,
+      "signatures_fresh": true,
+      "scope": "Actual imported image identity/architecture/user and private scanner acceptance; worker jobs and providers not verified"
+    },
+    "registration": {
+      "checked_at": "2026-10-31T15:03:28.028Z",
+      "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+      "queues": [
+        {
+          "type": 1,
+          "pollers": 1
+        },
+        {
+          "type": 2,
+          "pollers": 1
+        }
+      ],
+      "roles": [
+        "desvio_worker",
+        "desvio_dispatcher"
+      ],
+      "scope": "Actual workflow/activity pollers and role logins; durable job execution/recovery not yet accepted"
+    },
+    "transfer": {
+      "checked_at": "2026-10-31T15:01:39.641Z",
+      "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+      "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+      "sha256": "d040e4928f504dbbc93c1a3ecfdd19a9c2aa1106018b261f189518c6fc065efb",
+      "bytes": 294636411,
+      "verified": true,
+      "temporary_private_object_removed": true,
+      "scope": "Exact Docker archive bytes transferred and hashed on private host; image import and worker readiness not yet proven"
+    }
+  },
+  "scope": "Dedicated dev migration, API, web and worker deployment verified. Hosted customer acceptance in progress; not production approval."
+}

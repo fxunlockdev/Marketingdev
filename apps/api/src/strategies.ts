@@ -1,3 +1,4 @@
+import {imagePlanningRates} from './creative-planning.js';
 import {imageGenerationCapacity,planningGenerationCapacity} from './creative-budget.js';
 import type {PoolClient} from 'pg';
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
@@ -12,7 +13,7 @@ export class Strategies{
  async quote(db:PoolClient,org:string,id:string){
   const image=(await db.query('SELECT max_image_request_micros,input_micros_per_token,output_micros_per_token FROM app.creative_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND expires_at>now()',[org,id])).rows[0];
   const planning=(await db.query("SELECT input_micros_per_token,output_micros_per_token FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[org,id])).rows[0];
-  return image&&planning?{available:true,image_credits:imageGenerationCapacity(image,3).credits,planning_credits:planningGenerationCapacity(planning)}:{available:false};
+  return image&&planning?{available:true,image_credits:imageGenerationCapacity({...image,...imagePlanningRates(402048)},3).credits,planning_credits:planningGenerationCapacity(planning)}:{available:false};
  }
  list(user:string,id:string){return this.planning.plans.scope(user,id,false,async(db,b)=>({catalog:STRATEGIES,quote:await this.quote(db,b.organization_id,id),strategies:(await db.query(`SELECT s.*,l.stopped_at,l.cycles,
  (SELECT jsonb_agg(jsonb_build_object('ordinal',o.ordinal,'job_id',j.id,'status',j.status,'error_code',j.error_code,'scheduled_at',r.scheduled_at,'plan_id',r.output_plan_id,'title',p.title,'images_requested',(SELECT count(*) FROM app.strategy_image_requests ir JOIN app.content_slots cs ON cs.id=ir.slot_id WHERE ir.strategy_id=s.id AND cs.plan_id=p.id),'images_active',(SELECT count(*) FROM app.strategy_image_requests ir JOIN app.content_slots cs ON cs.id=ir.slot_id JOIN app.jobs ij ON ij.id=ir.job_id WHERE ir.strategy_id=s.id AND cs.plan_id=p.id AND ij.status IN ('queued','running','retrying')),'images_failed',(SELECT count(*) FROM app.strategy_image_requests ir JOIN app.content_slots cs ON cs.id=ir.slot_id JOIN app.jobs ij ON ij.id=ir.job_id WHERE ir.strategy_id=s.id AND cs.plan_id=p.id AND ij.status IN ('failed','rejected','unknown','canceled')),'cover',(SELECT jsonb_build_object('design',cv.design,'format','static') FROM app.content_slots cs JOIN app.creative_versions cv ON cv.id=cs.creative_version_id WHERE cs.plan_id=p.id ORDER BY cs.planned_at,cs.id LIMIT 1)) ORDER BY o.ordinal)

@@ -1,0 +1,48 @@
+{
+  "screens": [
+    {
+      "width": 1440,
+      "overflow": false,
+      "toolbar_to_art": 16,
+      "export_gap": 24
+    },
+    {
+      "width": 924,
+      "overflow": false,
+      "toolbar_to_art": 16,
+      "export_gap": 24
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "toolbar_to_art": 16,
+      "export_gap": 24
+    }
+  ],
+  "errors": [],
+  "blocked": [],
+  "checked_at": "2026-10-31T15:36:18.469Z",
+  "mobile_fresh_log": {
+    "bottom_gap": 0
+  },
+  "progress": {
+    "scope": "Read response fixture, not a provider completion estimate",
+    "completed_steps": 2,
+    "total_steps": 5,
+    "percent": 40,
+    "remaining": 60
+  },
+  "passed": true,
+  "scope": "Local current UI against read-only hosted records; progress state uses a clearly identified read-response fixture.",
+  "contracts": 342,
+  "chat_foundation": 1,
+  "carousel_foundation": 2,
+  "chat_browser": 1,
+  "logs": [
+    "work/gpt6-chat-web-foundation-3.log",
+    "work/gpt6-carousel-foundation.log",
+    "work/canvas-polish-contracts.log"
+  ],
+  "design_reference": "work/chat-handoff/design_handoff_create_chat/prototype/Desvio Create Chat.dc.html",
+  "independent_visual_review": "No remaining layout blockers in editor, mobile latest message, preview and progress fixtures."
+}

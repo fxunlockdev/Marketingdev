@@ -1,3 +1,4 @@
+import {IMAGE_PLANNING_MODEL,imagePlanningRates} from './creative-planning.js';
 import {artworkDirection} from './post-artwork.js';
 import {frameCreative} from "./creative-framing.js";
 import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
@@ -48,7 +49,7 @@ export class CreativeJobs {
     if(!model)throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
     if(!provider.configured)throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const wire=provider.plannerRequest(message,model,maxOutputTokens);
-    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>wire.maxInputTokens*Number(g.input_micros_per_token)+wire.maxOutputTokens*Number(g.output_micros_per_token),()=>provider.plan(message,model,maxOutputTokens),request.text_provider);
+    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=model===IMAGE_PLANNING_MODEL?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(message,model,maxOutputTokens),request.text_provider);
   }
   finish(db: any, j: any, status: string, code: string | null = null) {
     return db
@@ -105,7 +106,7 @@ export class CreativeJobs {
       if((await db.query('SELECT 1 FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id WHERE c.job_id=$1 AND r.revoked_at IS NOT NULL',[j.id])).rowCount)throw new CreativeError('CREATIVE_REFERENCE_REVOKED');
       const grant=await this.plannerGrant(db,j,providerName);
       if (!grant) throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
-      if (model !== (step === "image" ? grant.image_model : grant.text_model))
+      if (!(step!=="image" && ["creative.generate","carousel.generate"].includes(j.kind) && model===IMAGE_PLANNING_MODEL) && model !== (step === "image" ? grant.image_model : grant.text_model))
         throw new CreativeError("CREATIVE_CONFIG_CHANGED");
       const reserved = Math.ceil(cost(grant)),
         used = Number(

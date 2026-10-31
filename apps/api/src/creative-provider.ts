@@ -78,6 +78,7 @@ export class CreativeProvider {
         strict: false,
       })),
       parallel_tool_calls: false,
+      ...(model==='gpt-6-sol'?{reasoning:{effort:'low' as const}}:{}),
       ...(request.chat_response?{reasoning:{effort:'low' as const},text:{format:{type:'json_schema' as const,name:'desvio_chat',strict:true,schema:chatSchema}}}:{}),
       ...(request.creative_fact_ids?{text:{format:{type:'json_schema' as const,name:'desvio_creative_brief',strict:true,schema:creativeBriefSchema(request.creative_fact_ids)}}}:{}),
     };
