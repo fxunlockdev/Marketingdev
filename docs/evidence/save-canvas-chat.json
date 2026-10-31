@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-10-31T18:16:41.039858+00:00",
+  "source_commit": "783d190",
+  "checks": {
+    "api_types": "passed",
+    "web_types": "passed",
+    "browser_flow": "1 passed",
+    "lost_save_response_retry": "one saved attachment",
+    "reload": "same saved version",
+    "later_save": "previous preview unchanged",
+    "manual_save_generation_calls": 0,
+    "preview": "actual Fabric composition including curved text",
+    "desktop_mobile_overflow": "passed"
+  },
+  "test_scope": "Isolated real persistence/rendering with mocked external generation; hosted browser verified existing customer artwork read-only at desktop and mobile sizes and after reload. No paid generation or publication.",
+  "deployments": {
+    "api": {
+      "id": "59fc9924-d2a0-410f-8102-3cf62d41c09b",
+      "status": "SUCCESS"
+    },
+    "web": {
+      "id": "820866ff-b96b-4631-bf2b-e823ca91f144",
+      "status": "SUCCESS"
+    }
+  },
+  "hosted_browser": {
+    "checked_at": "2026-10-31T18:19:22.676Z",
+    "screens": [
+      {
+        "width": 1440,
+        "height": 1000,
+        "overflow": false
+      },
+      {
+        "width": 390,
+        "height": 844,
+        "overflow": false
+      }
+    ],
+    "errors": [],
+    "existing_saved_versions": 1,
+    "reload": true,
+    "read_only": true
+  }
+}
