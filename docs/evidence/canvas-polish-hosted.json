@@ -1,0 +1,62 @@
+{
+  "checked_at": "2026-10-31T15:46:58.212Z",
+  "passed": true,
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "brand": "77ab73a3-67c7-447c-a339-d2f9b160042b",
+  "conversation": "4159a16a-c5db-423e-8437-c1473cc675e9",
+  "version": "1e6f7410-ce14-404d-a1dc-29ff9af74017",
+  "model": "gpt-6-sol",
+  "size": "1024x1536",
+  "stages": [
+    {
+      "turn": "queued",
+      "action": null,
+      "run": null,
+      "brief": false,
+      "image": false,
+      "saved": false
+    },
+    {
+      "turn": "running",
+      "action": null,
+      "run": null,
+      "brief": false,
+      "image": false,
+      "saved": false
+    },
+    {
+      "turn": "succeeded",
+      "action": "completed",
+      "run": "queued",
+      "brief": false,
+      "image": false,
+      "saved": false
+    },
+    {
+      "turn": "succeeded",
+      "action": "completed",
+      "run": "running",
+      "brief": false,
+      "image": false,
+      "saved": false
+    },
+    {
+      "turn": "succeeded",
+      "action": "completed",
+      "run": "running",
+      "brief": true,
+      "image": false,
+      "saved": false
+    },
+    {
+      "turn": "succeeded",
+      "action": "completed",
+      "run": "succeeded",
+      "brief": true,
+      "image": true,
+      "saved": true
+    }
+  ],
+  "scope": "Actual hosted GPT-6 interpretation and creative planning, GPT Image portrait generation, no-text/options honored, persisted workflow stages, decoded preview and editor, reload and responsive overflow checks. One private draft only; no publication.",
+  "source_commit": "20bbd055d1ec3436e5f6064515c14c2b19ed38e7"
+}

@@ -1,0 +1,107 @@
+{
+  "checked_at": "2026-10-31T15:45:14.492488+00:00",
+  "source_commit": "20bbd055d1ec3436e5f6064515c14c2b19ed38e7",
+  "passed": true,
+  "environment": "dev",
+  "api": {
+    "id": "4b09e027-434b-4cbd-9bab-b00a749e6097",
+    "status": "SUCCESS"
+  },
+  "web": {
+    "id": "d43c2bcb-4eb3-49a8-8368-f911f7a07477",
+    "status": "SUCCESS"
+  },
+  "source_manifest_sha256": "7421ce2ac9a37abd4dbeed8667f041bd0233315095f41433125fcb75c48eee3d",
+  "source_file_count": 392,
+  "ci": {
+    "id": 41216081579,
+    "conclusion": "success"
+  },
+  "worker": {
+    "rollout": {
+      "checked_at": "2026-10-31T15:43:50.594Z",
+      "passed": true,
+      "image": "sha256:cdb6d5c4cf6a78187d1e290f8127c2eac70804f27537794a59d85a7f52bfafd2",
+      "backup_container": "desvio-worker-rollback-20261031-polish",
+      "paid_calls": false,
+      "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Paid provider and social acceptance deferred."
+    },
+    "registration": {
+      "checked_at": "2026-10-31T15:43:50.583Z",
+      "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+      "queues": [
+        {
+          "type": 1,
+          "pollers": 1
+        },
+        {
+          "type": 2,
+          "pollers": 1
+        }
+      ],
+      "roles": [
+        "desvio_worker",
+        "desvio_dispatcher"
+      ],
+      "scope": "Actual workflow/activity pollers and role logins; durable job execution/recovery not yet accepted"
+    },
+    "host_checks": {
+      "checked_at": "2026-10-31T15:43:11.754Z",
+      "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+      "images": [
+        {
+          "role": "trusted_worker",
+          "image_id": "sha256:cdb6d5c4cf6a78187d1e290f8127c2eac70804f27537794a59d85a7f52bfafd2",
+          "architecture": "amd64",
+          "user": "node"
+        },
+        {
+          "role": "documents",
+          "image_id": "sha256:1b5a92d5e659ae8a5f47994f3d0705671712bc673c65f1d01bea6ad165fe0a57",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "skills",
+          "image_id": "sha256:27cb8f5907fa7bc372d26474ec853c56ca56d90e1ed756238689a5ac3a52b9f5",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "static_renderer",
+          "image_id": "sha256:bc22d228dbba08934b773df45d8c54934bb81636f41aa2bcfa29ff7df22d61ae",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "video_renderer",
+          "image_id": "sha256:95401ad08e49ae619fb9f1bae50cef443cf9c54bd72d3d31960b746cf292f9f5",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        },
+        {
+          "role": "website_renderer",
+          "image_id": "sha256:4452071e703e04bbf8e9d882cf3c32b3eff057a542d2e3b233983dbe86ce6e89",
+          "architecture": "amd64",
+          "user": "65534:65534"
+        }
+      ],
+      "scanner_version": "ClamAV 1.5.4/28170/Sat Oct 31 06:24:42 2026",
+      "clean_accepted": true,
+      "antivirus_test_rejected": true,
+      "signatures_fresh": true,
+      "scope": "Actual imported image identity/architecture/user and private scanner acceptance; worker jobs and providers not verified"
+    },
+    "transfer": {
+      "checked_at": "2026-10-31T15:38:14.824Z",
+      "sandbox_id": "e39e62d3-e5b2-4e1a-9a5d-4a6291ecba2b",
+      "environment_id": "6a760b10-9ed8-4f01-9c4a-77a25919755a",
+      "sha256": "15af8d34066194fd8eba27d1b2b81cc23327ab4072a39a45881356ebefe1c204",
+      "bytes": 294637450,
+      "verified": true,
+      "temporary_private_object_removed": true,
+      "scope": "Exact Docker archive bytes transferred and hashed on private host; image import and worker readiness not yet proven"
+    }
+  },
+  "scope": "Exact reviewed source uploaded; both deployment IDs observed SUCCESS, idle worker swap and registration verified. Live generation acceptance recorded separately."
+}

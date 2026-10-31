@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-10-31T09:30:18.206145+00:00",
+  "checked_at": "2026-10-31T15:39:31.439Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:d26e8090bcad1dd82c02fea9589c4a581b27c589443e6b0225ac38185ca92d18",
+      "image_id": "sha256:cdb6d5c4cf6a78187d1e290f8127c2eac70804f27537794a59d85a7f52bfafd2",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Typography worker with follow-redirects 1.16.2. Isolated dependency check and hosted image/scanner/poller registration passed; no new paid provider acceptance."
+  "scope": "Canvas polish/GPT-6 image planner worker. Exact hosted image/scanner and poller registration verified; one actual hosted portrait image generation passed. See canvas-polish-release.json and canvas-polish-hosted.json."
 }
