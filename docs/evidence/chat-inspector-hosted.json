@@ -1,0 +1,82 @@
+{
+  "screens": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "overflow": false,
+      "card": 320,
+      "layout": "right",
+      "independent_scroll": true
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false,
+      "card": 320,
+      "layout": "right",
+      "independent_scroll": true
+    },
+    {
+      "width": 1366,
+      "height": 768,
+      "overflow": false,
+      "card": 320,
+      "layout": "right",
+      "independent_scroll": true
+    },
+    {
+      "width": 1280,
+      "height": 720,
+      "overflow": false,
+      "card": 320,
+      "layout": "right",
+      "independent_scroll": true
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "overflow": false,
+      "card": 320,
+      "layout": "stacked",
+      "independent_scroll": false
+    },
+    {
+      "width": 924,
+      "height": 600,
+      "overflow": false,
+      "card": 320,
+      "layout": "stacked",
+      "independent_scroll": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false,
+      "card": 320,
+      "layout": "stacked",
+      "independent_scroll": false
+    },
+    {
+      "width": 320,
+      "height": 640,
+      "overflow": false,
+      "card": 264,
+      "layout": "stacked",
+      "independent_scroll": false
+    }
+  ],
+  "errors": [],
+  "blocked": [],
+  "checked_at": "2026-10-31T17:19:58.541Z",
+  "post_details": true,
+  "no_legacy_canvas_form": true,
+  "inline_controls": true,
+  "unsaved_guards": true,
+  "discard": true,
+  "source_commit": "9ba1958",
+  "web_deployment": "c41257a4-2ca7-42ae-8f82-36c163f8c0d6",
+  "deployment_status": "SUCCESS",
+  "csp_bypassed": false,
+  "hosted_content_mutated": false,
+  "paid_generation": false
+}

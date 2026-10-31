@@ -2,7 +2,7 @@
 
 Moved Text layers beside the artwork when the canvas container has at least 760px available. The 320px inspector scrolls independently; artwork and metadata remain in the left column. Smaller canvas areas retain the stacked layout. This is CSS-only; saving, export and permissions are unchanged.
 
-Read-only authenticated hosted-data/local-UI checks pass at 1920, 1440, 1366 and 1280 widths with the inspector on the right, and at 1024, 924, 390 and 320 with stacked controls. Verified no overlap/overflow, artwork remains still while inspector scrolls, Save is reachable, unsaved guards/discard and Post details work. Screenshots inspected. No paid generation or hosted content mutation. Evidence: chat-inspector-local.json. Deployment pending.
+Read-only authenticated hosted-data/local-UI checks pass at 1920, 1440, 1366 and 1280 widths with the inspector on the right, and at 1024, 924, 390 and 320 with stacked controls. Verified no overlap/overflow, artwork remains still while inspector scrolls, Save is reachable, unsaved guards/discard and Post details work. Screenshots inspected. No paid generation or hosted content mutation. Evidence: chat-inspector-local.json. Source 9ba1958 pushed to dev; exact web deployment c41257a4-2ca7-42ae-8f82-36c163f8c0d6 observed SUCCESS. Authenticated hosted checks repeated all eight sizes, right/stacked placement, independent inspector scrolling, reachable Save, no overflow/errors and working Post details. Evidence: chat-inspector-hosted.json. No API/worker changes.
 
 ## Match the conversational canvas surface — 1 November 2026
 
