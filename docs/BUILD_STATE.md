@@ -1,3 +1,9 @@
+## Linux CI cleanup correction — 31 October 2026
+
+GitHub run41188963691 passed offline/contracts and all load requests, then failed because the Linux host could not delete PostgreSQL-owned bind-mounted temporary files. The harness now restores ownership only within its unique disposable data directory using the pinned database image, no network and narrowly scoped capabilities, before host cleanup. It does not chmod shared workspace files or touch hosted databases. Linux CI acceptance of this correction remains pending. The previous turn made verified progress: dependency patch deployed, local security/contracts/load passed and dev commitf6c5e50 pushed.
+
+Authentication proxy assessment confirmed the API currently buckets by socket peer. Forwarded-header trust must be resolved without accepting caller-controlled addresses; no limiter weakening or product authentication change was made in this CI correction.
+
 ## Private beta hardening — 31 October 2026 (current)
 
 Owner decision: keep access invite-only, with manually provisioned approved testers while mail is disabled. Do not enable public signup or claim working email invitations. Owner deferred connected-social publishing/analytics acceptance; do not publish test content or ask again in this batch.

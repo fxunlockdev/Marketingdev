@@ -107,5 +107,16 @@ try {
   await services?.close();
   await authMigrationPool?.end(); await pool?.end();
   if (started) {try{docker('rm','-f',container);}catch{/* --rm may already have removed a failed database. */}}
-  await rm(databaseDir,{recursive:true,force:true});
+  try { await rm(databaseDir,{recursive:true,force:true}); }
+  catch (error) {
+    if(process.platform!=='linux'||!['EACCES','EPERM'].includes(error.code))throw error;
+    // Linux bind mounts retain PostgreSQL's container UID. Restore ownership only
+    // inside this run's mkdtemp directory; never relax permissions on shared work/.
+    docker('run','--rm','--network','none','--read-only','--user','0',
+      '--cap-drop','ALL','--cap-add','CHOWN','--cap-add','DAC_OVERRIDE',
+      '--security-opt','no-new-privileges','--pids-limit','32','--memory','64m',
+      '-v',`${databaseDir}:/cleanup`,'--entrypoint','chown',IMAGE,
+      '-hR',`${process.getuid()}:${process.getgid()}`,'/cleanup');
+    await rm(databaseDir,{recursive:true,force:true});
+  }
 }
