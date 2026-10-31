@@ -92,16 +92,12 @@
 .desvio-redesign .chat-export-actions{margin-top:10px}
 .desvio-redesign .chat-export-actions>button:first-child{background:#f1efff;color:#4332cc;border:0}
 .desvio-redesign .chat-layer-help,.desvio-redesign .chat-layer-empty{font-size:13px;line-height:1.6;color:#686477;margin:16px 0 0}
-.desvio-redesign .chat-creative-project>.creative-toolbar,.desvio-redesign .chat-creative-project>.field,.desvio-redesign .chat-creative-project>.creative-review,.desvio-redesign .chat-creative-project>.creative-provenance{width:100%;max-width:600px;margin:0 auto;padding:20px;background:#fff;border-radius:20px;border:0}
-.desvio-redesign .chat-creative-project>.actions{justify-content:center;margin:0}
-.desvio-redesign .chat-creative-project>.creative-archive-action{align-self:center;margin:0}
 @media(max-width:1000px){.desvio-redesign .chat-layer-card{padding:20px}.desvio-redesign .chat-layer-position{gap:8px}}
 @media(max-width:760px){.desvio-redesign .conversation-artwork.is-inline>h1{font-size:22px}.desvio-redesign .chat-layer-card h2{font-size:26px}.desvio-redesign .chat-layer-card{padding:18px;border-radius:24px}.desvio-redesign .chat-layer-position{grid-template-columns:minmax(0,1fr)}.desvio-redesign .chat-creative-project .creative-surface{border-radius:20px}}
 
 .desvio-redesign .chat-layer-footer{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}
 .desvio-redesign .chat-layer-footer .chat-export-actions{display:contents}
 .desvio-redesign .chat-layer-footer button{min-width:0;padding:10px 8px;font-size:13px}
-.desvio-redesign .chat-export-actions>button:last-child:not(:first-child){grid-column:1/-1}
 @media(max-width:760px){.desvio-redesign .chat-layer-pair{grid-template-columns:minmax(0,1fr)}}
 .desvio-redesign .conversation-screen .chat-backing-toggle input{min-height:28px!important;max-height:28px;height:28px!important;width:44px!important;padding:3px!important;box-shadow:none;border:0!important}
 .desvio-redesign .conversation-screen .chat-font-stepper>input{border:0!important;box-shadow:none!important;background:transparent!important;height:36px!important;min-height:36px!important;padding:2px!important}
@@ -112,3 +108,14 @@
 .desvio-redesign .chat-layer-position{align-items:end}
 .desvio-redesign .conversation-screen .chat-layer-card input[type=number],.desvio-redesign .conversation-screen .chat-layer-card select{min-height:44px;height:44px}
 @media(min-width:761px){.desvio-redesign .chat-creative-project .creative-artboard{max-width:min(600px,calc((100dvh - 320px) * var(--artwork-ratio,1)))}}
+
+/* The conversational canvas contains only artwork, metadata and layer controls. */
+.desvio-redesign .chat-creative-project>.creative-editor{order:0}
+.desvio-redesign .chat-layer-footer .chat-download{display:flex;align-items:center;justify-content:center;gap:6px;background:#f1efff;color:#3a2fc2;border:0}
+.desvio-redesign .chat-save-actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:6px}
+.desvio-redesign .chat-save-actions button{margin:0;min-height:42px;border-radius:999px}
+.desvio-redesign .chat-creative-project .conversation-canvas-strip>span+span:before{content:'•';color:#c7c3d3;margin-right:16px}
+.desvio-redesign .conversation-screen .create-live-canvas>header .conversation-post-details{margin-left:auto;background:white;color:#17171a;white-space:nowrap}
+.desvio-redesign .conversation-screen .create-live-canvas>header .conversation-post-details+button{margin-left:0}
+.desvio-redesign .chat-layer-card fieldset>legend.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.desvio-redesign .chat-layer-card input:not([type=checkbox]),.desvio-redesign .chat-layer-card select,.desvio-redesign .chat-layer-card textarea{border:0!important}

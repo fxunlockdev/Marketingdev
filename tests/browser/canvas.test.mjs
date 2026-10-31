@@ -1550,10 +1550,17 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await expect(page.getByRole('button',{name:'Retry saved request'})).toBeVisible();
  await page.reload();
  await expect(page).toHaveURL(/conversation=/,{timeout:20000});
- await expect(page.getByRole('heading',{name:'Your creative',exact:true})).toBeVisible({timeout:90000});
+ await expect(page.getByRole('region',{name:'Your creative',exact:true})).toBeVisible({timeout:90000});
  assert.equal(chatCalls,1);assert.equal(generated,1);
  // The reference editor is available directly under the image, with durable manual edits.
  await expect(page.getByRole('heading',{name:'Text layers',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Text layers',exact:true})).toHaveCount(1);
+ await expect(page.getByLabel('Post caption',{exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Save new version',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Prepare final image',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Review this version',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Save changes',exact:true})).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Post details',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Add text layer',exact:true}).click();
  await page.getByLabel('Layer text',{exact:true}).fill('A little everyday care');
  await page.getByLabel('Font',{exact:true}).selectOption('Lora');
@@ -1562,7 +1569,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await page.getByRole('button',{name:'White text',exact:true}).click();
  await page.getByRole('button',{name:'Align center',exact:true}).click();
  await page.getByRole('switch',{name:'Contrast backing',exact:true}).check();
- await expect(page.getByRole('button',{name:'↓ Download PNG',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Download PNG',exact:true})).toBeDisabled();
  await page.getByRole('button',{name:'Save changes',exact:true}).click();
  await expect(page.getByText('Saved as a new draft version.',{exact:true})).toBeVisible();
  await page.reload();
@@ -1572,7 +1579,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await expect(page.getByRole('switch',{name:'Contrast backing',exact:true})).toBeChecked();
  await expect(page.getByRole('button',{name:'Align center',exact:true})).toHaveAttribute('aria-pressed','true');
  const pngDownload=page.waitForEvent('download');
- await page.getByRole('button',{name:'↓ Download PNG',exact:true}).click();
+ await page.getByRole('button',{name:'Download PNG',exact:true}).click();
  const png=await pngDownload;assert.equal(png.suggestedFilename(),'desvio-creative.png');assert.equal(await png.failure(),null);
 
  await page.screenshot({path:'work/browser/chat-canvas-desktop.png',fullPage:true});

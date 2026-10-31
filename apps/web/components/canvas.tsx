@@ -721,8 +721,31 @@ export function CreativeProject({
         {!error && <Loading />}
       </>
     );
+  if (chatLayout) return (
+    <article className="creative-project chat-creative-project" aria-label="Canvas artwork editor">
+      <Notice error={error} />
+      {notice && <p role="status">{notice}</p>}
+      {data.project.archived_at && <p role="status">Archived creative · open Post details to restore it.</p>}
+      <CreativeEditor
+        businessId={business.id}
+        design={design}
+        onChange={setDesign}
+        readOnly={!write || !latest || busy || editingDisabled}
+        chatControls
+        afterArtwork={<div className="conversation-canvas-strip" aria-label="Creative details">{canvasDetails}<strong>{dirty?"Unsaved changes":label(version.status)}</strong></div>}
+        controlsFooter={<>
+          <button className="chat-download" disabled={!download||busy||dirty} onClick={()=>{try{download?.();}catch{setError(new Error("The image could not be exported. Reload and retry."));}}}><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>Download PNG</button>
+          {write&&latest&&dirty&&<div className="chat-save-actions">
+            <button className="primary" disabled={busy||editingDisabled} onClick={save}>{busy?"Saving…":"Save changes"}</button>
+            <button disabled={busy||editingDisabled} onClick={()=>{setDesign(structuredClone(version.design));setCaption(version.caption);setNotice('');}}>Discard edits</button>
+          </div>}
+        </>}
+        onExportReady={exportReady}
+      />
+    </article>
+  );
   return (
-    <article className={`creative-project ${chatLayout?"chat-creative-project":""}`}>
+    <article className="creative-project">
       {data.project.archived_at && <p role="status">Archived creative · restore it to make changes.</p>}
       <div className="creative-toolbar">
         <Field label="Saved version">
@@ -745,7 +768,7 @@ export function CreativeProject({
         <span className="status neutral">
           {dirty ? "Unsaved changes" : label(version.status)}
         </span>
-        {!chatLayout&&<button
+        <button
           disabled={!download || busy || dirty}
           onClick={() => {
             try {
@@ -760,7 +783,7 @@ export function CreativeProject({
           }}
         >
           Download PNG
-        </button>}
+        </button>
       </div>
       {["owner","admin","editor"].includes(business.role) && <button className="creative-archive-action" disabled={busy||dirty} onClick={changeArchive}>{data.project.archived_at?"Restore creative":"Archive creative"}</button>}
       <Notice error={error} />
@@ -778,9 +801,6 @@ export function CreativeProject({
         design={design}
         onChange={setDesign}
         readOnly={!write || !latest || busy || editingDisabled}
-        chatControls={chatLayout}
-        afterArtwork={chatLayout?<div className="conversation-canvas-strip" aria-label="Creative details">{canvasDetails}<strong>{dirty?"Unsaved changes":label(version.status)}</strong></div>:undefined}
-        controlsFooter={chatLayout?<div className="chat-export-actions"><button disabled={!download||busy||dirty} onClick={()=>{try{download?.();}catch{setError(new Error("The image could not be exported. Reload and retry."));}}}>↓ Download PNG</button>{write&&latest&&<button className="primary" disabled={!dirty||busy||editingDisabled} onClick={save}>{busy?"Saving…":"Save changes"}</button>}</div>:undefined}
         onExportReady={exportReady}
       />
       {write&&latest&&<GeneratedReplacement key={`generated:${business.id}:${projectId}:${version.id}`} businessId={business.id} projectId={projectId} parentId={version.id} disabled={dirty||busy} onReady={async id=>{await load(id);setNotice('Your new photo is ready to review.');}}/>}
