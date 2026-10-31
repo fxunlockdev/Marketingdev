@@ -1,0 +1,39 @@
+{
+  "checked_at": "2026-10-31T09:36:25.481280+00:00",
+  "commit": "bf155356719c2c775c7e238cee88013b988c14aa",
+  "run_url": "https://github.com/fxunlockdev/Marketingdev/actions/runs/41189238993",
+  "conclusion": "success",
+  "scope": "Linux offline/contracts/load/production dependency audit only; no hosted or paid-provider journey",
+  "checks": {
+    "offline": {
+      "passed": true,
+      "source_sha256": "5390d5f8486d0b8e9c4918e8d96a273867bf23523311d81ce6eb1f71376a3e6f",
+      "source_unchanged": true
+    },
+    "contracts": {
+      "passed": true,
+      "source_sha256": "5390d5f8486d0b8e9c4918e8d96a273867bf23523311d81ce6eb1f71376a3e6f",
+      "source_unchanged": true
+    },
+    "load": {
+      "passed": true,
+      "source_sha256": "5390d5f8486d0b8e9c4918e8d96a273867bf23523311d81ce6eb1f71376a3e6f",
+      "source_unchanged": true
+    }
+  },
+  "load_measurements": {
+    "scope": "local authenticated API, not hosted capacity or provider throughput",
+    "accounts": 8,
+    "concurrency": 24,
+    "requests": 480,
+    "passed": true,
+    "duration_ms": 1385,
+    "latency_ms": {
+      "p50": 62,
+      "p95": 107,
+      "p99": 250
+    },
+    "requests_per_second": 346.57,
+    "failed_requests": 0
+  }
+}
