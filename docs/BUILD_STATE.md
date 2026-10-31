@@ -1,3 +1,7 @@
+## Recovery CI follow-up — 31 October 2026
+
+GitHub run41190771067 completed the restore assertions (86 migrations, 543 policies, tenant isolation) but failed during FORCE-drop cleanup with an asynchronous connection-termination error. Removed the redundant FORCE-drop: the existing harness owns disposal of the entire isolated container and data directory. Local `make verify-recovery` passes again. Hosted CLI read-only inspection confirms Postgres-Rh6A in dev has PITR disabled and no archive bucket wired; scheduled backups are being inspected separately. No live database mutation.
+
 ## Database recovery check — 31 October 2026
 
 Added `make verify-recovery` and CI execution for a real pg_dump/pg_restore into a new disposable database. Tests compare all 86 migration checksums and 543 application/auth policies, replay migrations, recover two synthetic tenants, reject foreign reads/updates and auth-table access under the runtime role, and prove a source mutation after backup does not appear in the restored copy. The release gate now requires fresh local recovery evidence. No hosted data is copied or changed.

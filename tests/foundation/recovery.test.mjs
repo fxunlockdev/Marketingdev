@@ -62,7 +62,10 @@ test('database dump restores tenant data, policies and migration history into a 
   report.migrations=before.length;report.policies=policies.length;report.passed=true;
  } finally {
   await app?.end();await restored?.end();
-  await admin.query(`DROP DATABASE IF EXISTS ${target} WITH (FORCE)`);await admin.end();
+  // The harness removes the entire disposable container and data directory.
+  // Do not FORCE-drop here: PostgreSQL can still be closing pooled sockets,
+  // causing an asynchronous termination error after successful assertions.
+  await admin.end();
   await writeFile('work/recovery-measurements.json',JSON.stringify(report,null,2)+'\n');
  }
 });
