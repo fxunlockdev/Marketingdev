@@ -2,7 +2,7 @@
   "scope": "Restore supplied chat start menu and wire all shortcuts to existing flows",
   "reference": "codex-clipboard-2b8591ed-a30d-4874-af7a-7b1db539549d.png",
   "local_browser": {
-    "checked_at": "2026-10-31T19:23:49.110Z",
+    "checked_at": "2026-11-01T04:31:16.049Z",
     "hosted": false,
     "screens": [
       {
@@ -63,7 +63,7 @@
         844
       ]
     ],
-    "comparison": "work/start-menu-compare/page-@2x-compare.png",
+    "comparison": "work/start-menu-compare-final/page-@2x-compare.png",
     "note": "Reference includes red markup and a partly scrolled Post card. Preserve a compact History control and readable section labels. No pixel-identity claim. Short desktop heights compact card padding so the bottom action row clears the composer."
   },
   "regression": {
@@ -74,6 +74,58 @@
     "tests_failed": 0
   },
   "hosted": {
-    "status": "pending"
-  }
+    "status": "verified",
+    "deployment_id": "d6f604f9-29a1-422f-bac0-70913dd0a053",
+    "deployment_status": "SUCCESS",
+    "environment": "dev",
+    "url": "https://desvio-dev-web-dev.up.railway.app",
+    "browser": {
+      "checked_at": "2026-11-01T04:34:47.902Z",
+      "hosted": true,
+      "screens": [
+        {
+          "width": 1041,
+          "height": 743,
+          "overflow": false,
+          "all_start_actions_visible": true
+        },
+        {
+          "width": 1440,
+          "height": 1000,
+          "overflow": false
+        },
+        {
+          "width": 390,
+          "height": 844,
+          "overflow": false
+        }
+      ],
+      "errors": [],
+      "actions": [
+        "Post",
+        "Image",
+        "Reel",
+        "Video",
+        "Story",
+        "Campaign",
+        "Approve posts",
+        "Publish a post",
+        "Connect an account",
+        "Add a brand fact",
+        "Content preferences",
+        "Invite a teammate",
+        "Add a business",
+        "Check results",
+        "Carousel",
+        "Add strategy"
+      ],
+      "history": true
+    },
+    "screenshots": [
+      "work/browser/start-menu-hosted-1041.png",
+      "work/browser/start-menu-hosted-1440.png",
+      "work/browser/start-menu-hosted-390.png"
+    ]
+  },
+  "source_commit": "7cf4acf"
 }
