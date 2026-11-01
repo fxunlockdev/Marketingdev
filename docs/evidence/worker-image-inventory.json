@@ -3,7 +3,7 @@
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:fe4e1e2089610e3abafd082febe4f6f0050d3543cb642a8e330ba287cf7d2bfc",
+      "image_id": "sha256:94d954b7f386af5ac9aafa8f49dc514e0b3f6ca13155b1afc464602bafe20190",
       "architecture": "amd64",
       "user": "node"
     },

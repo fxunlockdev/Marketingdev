@@ -12,7 +12,7 @@ import {approvedLearning} from './learning-context.js';
 import {validateCarouselInput,type CarouselInput} from './carousel-planning.js';
 export class CarouselGeneration {
  constructor(readonly canvas:Canvas,readonly rendererImage?:string){}
- submit(user:string,brand:string,body:unknown,key:unknown,scoped?:{db:PoolClient;b:{organization_id:string};batchJobIds?:string[]}){
+ submit(user:string,brand:string,body:unknown,key:unknown,scoped?:{db:PoolClient;b:{organization_id:string};batchJobIds?:string[];threadId?:string}){
   const v=object(body,['prompt','slide_count','channel','size','text_provider','reference_ids','campaign_plan_id','slot_id','slot_revision','creative_spec','max_cost_micros','planning_cost_micros']),provider=creativeTextProvider(v.text_provider);
   if(typeof v.prompt!=='string'||!v.prompt.trim()||v.prompt.length>4000||!Number.isInteger(v.slide_count)||Number(v.slide_count)<2||Number(v.slide_count)>10||!['linkedin','instagram','facebook'].includes(String(v.channel))||!['1024x1024','1536x1024','1024x1536'].includes(String(v.size))||typeof key!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(key)||v.reference_ids!==undefined&&(!Array.isArray(v.reference_ids)||v.reference_ids.length>3))throw new BadRequestException('Describe the carousel and choose 2–10 slides, channel and size');
   let spec:CreativeSpec|null=null;try{if(v.creative_spec!=null)spec=normalizeCreativeSpec(v.creative_spec,'carousel',String(v.channel));}catch{throw new BadRequestException('Choose a compatible carousel format');}
@@ -24,7 +24,7 @@ export class CarouselGeneration {
   const campaignPlan=v.campaign_plan_id===undefined?null:uuid(String(v.campaign_plan_id));
   const refs=(v.reference_ids??[]).map((id:unknown)=>uuid(String(id)));if(new Set(refs).size!==refs.length)throw new BadRequestException('Choose each reference once');
   if(!this.rendererImage||!/^sha256:[a-f0-9]{64}$/.test(this.rendererImage))throw new ConflictException('The final image renderer must be configured');
-  const fingerprint=hash(canonicalJSON({user,...v,text_provider:provider,reference_ids:refs}));
+  const fingerprint=hash(canonicalJSON({user,...v,text_provider:provider,reference_ids:refs,...(scoped?.threadId?{thread_id:scoped.threadId}:{})}));
   const execute=async(db:PoolClient,b:{organization_id:string})=>{
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${brand.toLowerCase()}`]);
    const prior=(await db.query('SELECT r.job_id AS id,r.request_hash,j.status FROM app.carousel_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.request_key=$1',[key])).rows[0];if(prior){if(prior.request_hash!==fingerprint)throw new ConflictException('This key belongs to another carousel');return {id:prior.id,status:prior.status};}
@@ -45,7 +45,8 @@ export class CarouselGeneration {
    const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions ORDER BY approved_at DESC,id LIMIT 1')).rows[0];if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('Approve this business’s brand knowledge first');
    const memory=await approvedLearning(db),input:CarouselInput={task:'carousel',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value})),learning:memory},prompt:direction,channel:v.channel as CarouselInput['channel'],slide_count:count};validateCarouselInput(input);
    const model=await creativeTextModel(db,b.organization_id,brand,provider,'image'),parent=randomUUID(),project=randomUUID();
-   const thread=await this.canvas.createThread(user,brand,{title:String(v.prompt).slice(0,140)},`carousel:${parent}`,{db,b});
+   const thread=scoped?.threadId?{id:uuid(scoped.threadId)}:await this.canvas.createThread(user,brand,{title:String(v.prompt).slice(0,140)},`carousel:${parent}`,{db,b});
+   if(scoped?.threadId&&!(await db.query('SELECT id FROM app.canvas_threads WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[thread.id,b.organization_id,brand])).rowCount)throw new NotFoundException('Canvas thread not found');
    await db.query('INSERT INTO app.carousel_projects(id,organization_id,brand_id,created_by) VALUES($1,$2,$3,$4)',[project,b.organization_id,brand,user]);
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'carousel.generate')",[parent,b.organization_id,brand,user]);
    await db.query('INSERT INTO app.carousel_requests(job_id,organization_id,brand_id,project_id,thread_id,input,input_sha256,text_provider,selected_text_model,memory_context,renderer_image,request_key,request_hash,creative_spec,max_cost_micros) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',[parent,b.organization_id,brand,project,thread.id,JSON.stringify(input),hash(canonicalJSON(input)),provider,model,JSON.stringify(memory),this.rendererImage,key,fingerprint,spec?JSON.stringify(spec):null,planningBudget??null]);

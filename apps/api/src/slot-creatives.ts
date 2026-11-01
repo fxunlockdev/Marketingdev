@@ -312,7 +312,9 @@ export class SlotCreatives {
         )
       ).rows;
       const videos=(await db.query('SELECT r.job_id,r.slot_revision,r.project_id,r.output_version_id,p.thread_id,j.status,j.error_code,j.cancel_requested FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id JOIN app.jobs j ON j.id=r.job_id WHERE r.slot_id=$1 ORDER BY j.created_at DESC',[slotId])).rows;
-      return { slot, events, generations, videos };
+      const carousel_runs=(await db.query(`SELECT j.id,j.status,j.error_code,j.cancel_requested,r.project_id,r.output_version_id,r.input->>'slide_count' AS slide_count FROM app.content_slot_carousel_generations g JOIN app.carousel_requests r ON r.job_id=g.job_id JOIN app.jobs j ON j.id=r.job_id WHERE g.slot_id=$1 ORDER BY j.created_at DESC,j.id`,[slotId])).rows;
+      const carousel_slides=(await db.query(`SELECT c.parent_job_id,c.position,g.status AS generation_status,e.status AS export_status,r.project_id,r.output_version_id FROM app.content_slot_carousel_generations link JOIN app.carousel_children c ON c.parent_job_id=link.job_id JOIN app.creative_requests r ON r.job_id=c.generation_job_id JOIN app.jobs g ON g.id=c.generation_job_id JOIN app.jobs e ON e.id=c.export_job_id WHERE link.slot_id=$1 ORDER BY c.position`,[slotId])).rows;
+      return { slot, events, generations, videos, carousel_runs, carousel_slides };
     });
   }
 }

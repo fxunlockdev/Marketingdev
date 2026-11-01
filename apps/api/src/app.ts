@@ -473,7 +473,7 @@ export async function createApplication(config: Config) {
       catch {return unavailable();}
     }));
     @Module({ controllers: [CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
- {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning)=>new ChatConversations(canvas,planning),inject:[Canvas,Planning]},
+ {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning,carousels:CarouselGeneration)=>new ChatConversations(canvas,planning,carousels),inject:[Canvas,Planning,CarouselGeneration]},
  {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},
  {provide:Strategies,useValue:new Strategies(new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage)),new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)))},
  {provide:HiggsfieldReplacements,useFactory:(canvas:Canvas)=>new HiggsfieldReplacements(canvas,config.higgsfieldImagesEnabled),inject:[Canvas]},

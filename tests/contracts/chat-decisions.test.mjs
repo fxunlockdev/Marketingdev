@@ -10,3 +10,11 @@ test('chat decisions cannot invent memory sources, dates or image parents',()=>{
  assert.equal(validateChatDecision({...decision,action:'answer',prompt:'',sources:['saved-campaign']},context).action,'answer');
  const request=chatRequest({...context,brand:{facts:[]},message:'What next?'});assert.equal(request.chat_response,true);assert.deepEqual(request.tools,[]);
 });
+
+test('chat media decisions retain requested carousel count, reel framing and duration',()=>{
+ const full={...decision,slide_count:4,placement:'feed',duration_seconds:5,action:'carousel'};
+ assert.equal(validateChatDecision(full,context).slide_count,4);
+ assert.equal(validateChatDecision({...full,action:'video',placement:'reel',size:'1024x1536',duration_seconds:8},context).duration_seconds,8);
+ for(const patch of [{slide_count:1},{slide_count:11},{slide_count:2.5},{placement:'reel'},{action:'video',placement:'reel',size:'1024x1536',channel:'linkedin'},{duration_seconds:16},{duration_seconds:0}])assert.throws(()=>validateChatDecision({...full,...patch},context),/CHAT_RESPONSE_INVALID/);
+ assert.equal(validateChatDecision(decision,context).action,'image','Existing saved turns remain executable after rollout');
+});

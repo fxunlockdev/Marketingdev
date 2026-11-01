@@ -1,0 +1,40 @@
+{
+  "checked_at": "2026-11-01T05:07:18.443Z",
+  "status": "MOCKED",
+  "scope": "Real browser, API, durable jobs, database, uploads/scanning, image exports and video renderer. OpenAI and video provider network responses mocked in isolated test environment.",
+  "tests": [
+    "✔ AI canvas interprets, generates inline, resumes a lost response and remembers history (MOCK OpenAI) (36685.10225ms)",
+    "✔ AI canvas creates carousel slides and playable reels and videos in the same saved chat (MOCK providers) (215110.621ms)",
+    "✔ AI canvas date dialog keeps time controls aligned and validates time at desktop and mobile sizes (512.677ms)",
+    "✔ AI canvas resumes a guided carousel into generation without leaving an empty calendar post (MOCK providers) (8023.381917ms)"
+  ],
+  "contract_tests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "checks": [
+    "Three-slide carousel creates three saved exports and appears in chat",
+    "Carousel action retry and reload do not duplicate generation",
+    "Cross-brand conversation access denied",
+    "Uploaded reference explicitly approved before video script",
+    "Reel preserves 9:16 placement; feed video preserves feed placement",
+    "No video generation before script approval",
+    "Saved reel and video both load playable media and reload without duplicate provider submissions",
+    "Guided carousel saves calendar slot then generates inline and resumes after reload",
+    "Date controls align at desktop and 390px; invalid time rejected"
+  ],
+  "live_paid_calls": false,
+  "limitations": [
+    "No fresh paid OpenAI or Higgsfield request in this verification",
+    "Social publishing is outside this change"
+  ],
+  "screenshots": [
+    "work/browser/chat-carousel-complete.png",
+    "work/browser/chat-reel-complete.png",
+    "work/browser/chat-video-complete.png",
+    "work/browser/chat-guided-carousel.png",
+    "work/browser/chat-date-390.png"
+  ],
+  "api_deployment": "7179eaa7-e017-4f05-ad62-e420b1f9b79e",
+  "web_deployment": "bbafd16c-23a2-4191-8a2e-dbb396adf887"
+}

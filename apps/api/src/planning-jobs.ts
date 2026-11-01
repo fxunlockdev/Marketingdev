@@ -105,7 +105,7 @@ export class PlanningJobs {
     return await this.jobs.transaction(scope,async(db,j)=>{
      if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(response)]);
-     if(['image','edit_image','campaign'].includes(response.action))await db.query('INSERT INTO delivery.chat_actions(job_id,organization_id,brand_id,actor_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[j.id,j.organization_id,j.brand_id,j.requested_by]);
+     if(['image','edit_image','carousel','campaign'].includes(response.action))await db.query('INSERT INTO delivery.chat_actions(job_id,organization_id,brand_id,actor_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[j.id,j.organization_id,j.brand_id,j.requested_by]);
      return this.finish(db,j,'succeeded');
     });
    }

@@ -1,6 +1,7 @@
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
 import {Canvas} from './canvas.js';
+import {CarouselGeneration} from './carousel-generation.js';
 import {Planning} from './planning.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {approvedLearning} from './learning-context.js';
@@ -10,7 +11,7 @@ import {CHAT_MODEL,validateChatDecision} from './chat-contracts.js';
 const active=['queued','running','retrying','unknown'];
 const recallTerms=(message:string)=>[...new Set((message.toLowerCase().match(/[a-z0-9]{3,}/g)??[]).filter(w=>!new Set(['the','and','for','that','this','with','remember','created','create','campaign','post','image','about','from','you','our','was','were','had','have','did','what','please','can','show']).has(w)))].slice(0,16).join(' | ')||'__no_recall_terms__';
 export class ChatConversations {
- constructor(readonly canvas:Canvas,readonly planning:Planning){}
+ constructor(readonly canvas:Canvas,readonly planning:Planning,readonly carousels?:CarouselGeneration){}
  outbox(user:string,brand:string){return this.canvas.scope(user,brand,false,async db=>({request:(await db.query('SELECT request_key AS key,body FROM app.chat_outbox')).rows[0]??null}));}
  saveOutbox(user:string,brand:string,body:unknown){
   const v=object(body,['key','body']),value=object(v.body,['conversation_id','message']);
@@ -50,7 +51,9 @@ export class ChatConversations {
     WHERE p.thread_id=$1 AND v.organization_id=$2 AND v.brand_id=$3
       AND v.job_id IS NULL AND v.parent_id IS NOT NULL
     ORDER BY v.created_at,v.id`,[id,conversation.organization_id,brand])).rows;
-  return {conversation:{id:conversation.id,title:conversation.title},saved_images,turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
+  const carousel_runs=(await db.query(`SELECT j.id,j.status,j.error_code,j.cancel_requested,r.project_id,r.output_version_id,r.input->>'slide_count' AS slide_count FROM app.carousel_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.thread_id=$1 ORDER BY j.created_at DESC,j.id`,[id])).rows;
+  const carousel_slides=(await db.query(`SELECT c.parent_job_id,c.position,g.status AS generation_status,e.status AS export_status,r.project_id,r.output_version_id FROM app.carousel_children c JOIN app.carousel_requests parent ON parent.job_id=c.parent_job_id JOIN app.creative_requests r ON r.job_id=c.generation_job_id JOIN app.jobs g ON g.id=c.generation_job_id JOIN app.jobs e ON e.id=c.export_job_id WHERE parent.thread_id=$1 ORDER BY c.position`,[id])).rows;
+  return {conversation:{id:conversation.id,title:conversation.title},saved_images,carousel_runs,carousel_slides,turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
  });}
  submit(user:string,brand:string,body:unknown,key:unknown){
   const v=object(body,['conversation_id','message']);
@@ -76,7 +79,7 @@ export class ChatConversations {
    // Search private transcripts and business campaigns separately. Retrieved text is untrusted evidence.
    const memories=(await db.query(`SELECT c.id,c.title,c.updated_at,(SELECT jsonb_agg(x) FROM (SELECT t.message,j.status,left(r.output->>'reply',800) AS reply FROM app.chat_turns t JOIN app.jobs j ON j.id=t.job_id JOIN app.planning_requests r ON r.job_id=t.job_id WHERE t.conversation_id=c.id ORDER BY t.created_at DESC LIMIT 2)x) AS recent FROM app.chat_conversations c WHERE c.id IS DISTINCT FROM $1 ORDER BY (CASE WHEN (to_tsvector('simple',c.title) @@ to_tsquery('simple',$2) OR EXISTS(SELECT 1 FROM app.chat_turns mt WHERE mt.conversation_id=c.id AND to_tsvector('simple',mt.message) @@ to_tsquery('simple',$2))) THEN 1 ELSE 0 END) DESC,c.updated_at DESC LIMIT 12`,[conversation,recallTerms(message)])).rows;
    const campaigns=(await db.query(`SELECT id,title,starts_on::text,duration_days,created_at FROM app.content_plans ORDER BY (CASE WHEN to_tsvector('simple',title) @@ to_tsquery('simple',$1) THEN 1 ELSE 0 END) DESC,created_at DESC LIMIT 20`,[recallTerms(message)])).rows.map((p:any)=>({...p,kind:'campaign'}));
-   const currentImage=conversation?(await db.query(`SELECT v.id,p.id AS project_id,CASE WHEN EXISTS(SELECT 1 FROM jsonb_array_elements(v.design->'layers') layer WHERE length(trim(layer->>'text'))>0) THEN 'headline' ELSE 'none' END AS text_mode,CASE WHEN v.skill_manifest->'creative_spec'->>'aspect' IN ('portrait','vertical') THEN '1024x1536' WHEN v.skill_manifest->'creative_spec'->>'aspect'='landscape' THEN '1536x1024' ELSE m.width::text||'x'||m.height::text END AS size,r.channel,v.skill_manifest->'creative_spec' AS creative_spec FROM app.creative_projects p JOIN app.creative_versions v ON v.id=p.latest_version_id JOIN app.creative_media m ON m.id=v.media_id LEFT JOIN LATERAL(SELECT channel FROM app.creative_requests WHERE project_id=p.id ORDER BY output_version_id IS NOT NULL DESC,job_id LIMIT 1)r ON true WHERE p.thread_id=$1 AND p.archived_at IS NULL ORDER BY v.created_at DESC LIMIT 1`,[conversation])).rows[0]??null:null;
+   const currentImage=conversation?(await db.query(`SELECT v.id,p.id AS project_id,CASE WHEN EXISTS(SELECT 1 FROM jsonb_array_elements(v.design->'layers') layer WHERE length(trim(layer->>'text'))>0) THEN 'headline' ELSE 'none' END AS text_mode,CASE WHEN v.skill_manifest->'creative_spec'->>'aspect' IN ('portrait','vertical') THEN '1024x1536' WHEN v.skill_manifest->'creative_spec'->>'aspect'='landscape' THEN '1536x1024' ELSE m.width::text||'x'||m.height::text END AS size,r.channel,v.skill_manifest->'creative_spec' AS creative_spec FROM app.creative_projects p JOIN app.creative_versions v ON v.id=p.latest_version_id JOIN app.creative_media m ON m.id=v.media_id LEFT JOIN LATERAL(SELECT channel FROM app.creative_requests WHERE project_id=p.id ORDER BY output_version_id IS NOT NULL DESC,job_id LIMIT 1)r ON true WHERE p.thread_id=$1 AND p.archived_at IS NULL AND NOT EXISTS(SELECT 1 FROM app.carousel_children cc JOIN app.creative_requests cr ON cr.job_id=cc.generation_job_id WHERE cr.project_id=p.id) ORDER BY v.created_at DESC LIMIT 1`,[conversation])).rows[0]??null:null;
    if(conversation&&(await db.query(`SELECT j.id FROM app.creative_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.thread_id=$1 AND j.status=ANY($2::text[])`,[conversation,active])).rowCount)throw new ConflictException('Your image is still generating or needs attention. Wait for its result before another edit.');
    const input={task:'content_plan',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value})),learning:await approvedLearning(db)},chat:{message,previous,memories:[...memories,...campaigns],current_image:currentImage,timezone:prefs?.timezone??'UTC',today:localMinute(Date.now(),prefs?.timezone??'UTC').slice(0,10)}};
    if(Buffer.byteLength(JSON.stringify(input))>90000)throw new ConflictException('This conversation has too much context. Start a new chat; the previous chat stays in History.');
@@ -101,13 +104,17 @@ export class ChatConversations {
   const decision=validateChatDecision(turn.output,turn.input.chat);let result:any;
   if(['image','edit_image'].includes(decision.action)){
    const parent=decision.action==='edit_image'?turn.input.chat.current_image:null;
-   const spec={...(parent?.creative_spec??{placement:'feed',aspect:(parent?.size??decision.size)==='1024x1024'?'square':(parent?.size??decision.size)==='1536x1024'?'landscape':'portrait',slide_count:null}),artwork:{...parent?.creative_spec?.artwork,text:decision.text_mode}};
+   const spec={...(parent?.creative_spec??{placement:decision.placement??'feed',aspect:decision.placement&&decision.placement!=='feed'?'vertical':(parent?.size??decision.size)==='1024x1024'?'square':(parent?.size??decision.size)==='1536x1024'?'landscape':'portrait',slide_count:null}),artwork:{...parent?.creative_spec?.artwork,text:decision.text_mode}};
    result=await this.canvas.submit(user,brand,turn.conversation_id,{prompt:decision.prompt,format:'static',channel:parent?.channel??decision.channel,size:parent?.size??decision.size,parent_version_id:parent?.id??null,creative_spec:spec},`chat-action:${turnId}`,{db,b});
    result={...result,kind:'image'};
+  }else if(decision.action==='carousel'){
+   if(!this.carousels)throw new ConflictException('Carousel generation is unavailable. Your request is saved.');
+   result=await this.carousels.submit(user,brand,{prompt:decision.prompt,slide_count:decision.slide_count??3,channel:decision.channel,size:decision.size,text_provider:'openai',creative_spec:{placement:'feed',aspect:decision.size==='1024x1024'?'square':decision.size==='1536x1024'?'landscape':'portrait',slide_count:decision.slide_count??3,artwork:{text:decision.text_mode}}},`chat-action:${turnId}`,{db,b,threadId:turn.conversation_id});
+   result={...result,kind:'carousel'};
   }else if(decision.action==='campaign'){
    result=await this.planning.submit(user,brand,{provider:'openai',brief:decision.prompt,starts_on:decision.starts_on,canvas_thread_id:turn.conversation_id,planning_mode:'natural'},`chat-action:${turnId}`,{db,b,budgetMicros:0,weeklyIncrease:0,single:true});
    result={...result,kind:'campaign'};
-  }else throw new BadRequestException('This message does not authorize image or campaign generation.');
+  }else throw new BadRequestException('This message does not authorize image, carousel or campaign generation.');
   await db.query('UPDATE app.chat_turns SET action_result=$2 WHERE job_id=$1',[turnId,JSON.stringify(result)]);
   await db.query("UPDATE delivery.chat_actions SET status='completed',error_code=NULL WHERE job_id=$1",[turnId]);return result;
  });}

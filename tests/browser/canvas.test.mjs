@@ -199,6 +199,10 @@ before(async () => {
           if(chatWire.text?.format?.name==='desvio_chat'){
             chatCalls++;assert.equal(chatWire.model,'gpt-6-sol');
             const context=JSON.parse(chatWire.input.find(m=>m.role==='user').content);
+            if(/carousel|reel|video/i.test(context.message)){
+              const carousel=/carousel/i.test(context.message),reel=/reel/i.test(context.message);
+              return modelResponse({reply:carousel?'I’ll create your three-slide story.':`Choose a starting image for your ${reel?'reel':'video'}, then review its script.`,action:carousel?'carousel':'video',prompt:carousel?'TEST botanical soap carousel for mindful households':'TEST gentle botanical product film',channel:'instagram',size:reel?'1024x1536':'1024x1024',sources:[],starts_on:null,text_mode:'none',slide_count:3,placement:reel?'reel':'feed',duration_seconds:3});
+            }
             const recall=/remember/i.test(context.message),edit=/warmer/i.test(context.message),unclear=/something/i.test(context.message);
             return modelResponse({reply:recall?'I found your saved conversation.':unclear?'What should the image show?':edit?'I’ll warm up the saved image.':'I’ll create your clean image now.',action:recall||unclear?'answer':edit?'edit_image':'image',prompt:recall||unclear?'':'TEST a botanical soap image without text',channel:'instagram',size:'1024x1024',sources:recall?[context.memories[0].id]:[],starts_on:null,text_mode:edit?context.current_image.text_mode:'none'});
           }
@@ -1649,4 +1653,108 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await page.screenshot({path:`work/browser/chat-canvas-${viewport.width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
  await page.setViewportSize({width:1440,height:1000});
  assert.deepEqual(errors,[]);
+});
+
+
+test('AI canvas creates carousel slides and playable reels and videos in the same saved chat (MOCK providers)',async()=>{
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ await page.unrouteAll({behavior:'wait'});
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create`);
+ await page.getByRole('button',{name:'Carousel',exact:true}).click();
+ await expect(page.getByRole('textbox',{name:'Message Desvio'})).toHaveValue('Create a carousel about ');
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Create a 3-slide carousel about botanical soap for mindful households, no image text');
+ const imageCount=generated;
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ const carousel=page.getByRole('region',{name:'Your carousel',exact:true});
+ await expect(carousel).toBeVisible({timeout:60000});
+ await expect(carousel.getByRole('img')).toBeVisible({timeout:150000});
+ const conversation=new URL(page.url()).searchParams.get('conversation');
+ assert.equal(generated,imageCount+3,'Chat generates the complete requested set, not one image');
+ const read=await page.request.get(`${base}/api/v1/businesses/${brand}/create-chat/conversations/${conversation}`),d=await read.json();
+ assert.equal(d.carousel_runs.length,1);assert.equal(d.carousel_runs[0].status,'succeeded');assert.equal(d.carousel_slides.length,3);
+ const turn=d.turns.at(-1),retry=await post(`/api/v1/businesses/${brand}/create-chat/turns/${turn.id}/execute`,{});
+ assert.equal(retry.body.id,turn.action_result.id,'Retry keeps the same durable carousel');
+ await carousel.getByRole('button',{name:/Slide 2/}).click();await expect(carousel.getByText('Slide 2 of 3',{exact:true})).toBeVisible();
+ await page.screenshot({path:'work/browser/chat-carousel-complete.png'});
+ await page.reload();await expect(carousel.getByRole('img')).toBeVisible({timeout:30000});
+ assert.equal(generated,imageCount+3);
+ const sibling=(await post('/api/v1/businesses',{name:'Chat media isolation test'},randomUUID())).body;
+ assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/create-chat/conversations/${conversation}`)).status(),404);
+ for(const kind of ['reel','video']){
+  await page.goto(`${base}/b/${brand}/create`);await page.getByRole('button',{name:kind==='reel'?'Reel':'Video',exact:true}).click();
+  await page.getByRole('textbox',{name:'Message Desvio'}).fill(`Create a ${kind} about botanical soap for mindful households, 3 seconds`);
+  await page.getByRole('button',{name:'Send message',exact:true}).click();
+  const media=page.getByRole('region',{name:`Your ${kind}`,exact:true});await expect(media).toBeVisible({timeout:60000});
+  if(kind==='reel'){
+   await media.getByText('Add product photos',{exact:true}).click();
+   await media.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'chat-video-product.png',mimeType:'image/png',buffer:png});
+   await media.getByRole('button',{name:'Upload file',exact:true}).click();
+   const approval=media.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+   await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
+   await approval.getByLabel('Reference name',{exact:true}).fill('Chat video product');
+   await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
+   await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
+  }
+  await media.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
+  await expect(media.getByLabel('Video length (seconds)',{exact:true})).toHaveValue('3');
+  const count=videoSubmits;
+  await media.getByRole('button',{name:'Draft video script',exact:true}).click();
+  await expect(media.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
+  await expect(media.getByLabel('Video format',{exact:true})).toContainText(kind==='reel'?'Reel':'Feed video');
+  assert.equal(videoSubmits,count,'No paid video generation before script approval');
+  await page.reload();await expect(media.getByLabel('Video prompt',{exact:true})).toBeVisible();
+  await expect(media.getByRole('button',{name:'Draft video script',exact:true})).toHaveCount(0);
+  await media.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for chat');
+  await media.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
+  await media.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
+  await media.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+  await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});
+  await expect.poll(()=>media.locator('video').evaluate(el=>el.readyState),{timeout:30000}).toBeGreaterThanOrEqual(2);
+  assert.equal(videoSubmits,count+1);
+  const chatId=new URL(page.url()).searchParams.get('conversation');
+  const spec=(await admin.query('SELECT r.creative_spec FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
+  assert.equal(spec.length,1);assert.equal(spec[0].creative_spec.placement,kind==='reel'?'reel':'feed');
+  await page.reload();await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible();
+  await page.screenshot({path:`work/browser/chat-${kind}-complete.png`});
+  assert.equal(videoSubmits,count+1,'Reload never resubmits the paid generation');
+ }
+ await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+ assert.deepEqual(errors,[]);
+});
+
+test('AI canvas date dialog keeps time controls aligned and validates time at desktop and mobile sizes',async()=>{
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create?guided=1&start=post`);
+ await page.locator('.create-composer input').fill('Botanical soap');await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await page.getByRole('button',{name:'Lifestyle',exact:true}).click();await page.getByRole('button',{name:'Image',exact:true}).click();await page.getByRole('button',{name:'instagram',exact:true}).click();
+ await page.locator('.desvio-date-trigger').click();
+ const dialog=page.getByRole('dialog',{name:'When should it be posted?'});await expect(dialog).toBeVisible();
+ for(const width of [1440,390]){
+  await page.setViewportSize({width,height:844});
+  const geometry=await dialog.locator('.desvio-date-time').evaluate(el=>{const hour=el.querySelector('label:nth-of-type(1) input').getBoundingClientRect(),minute=el.querySelector('label:nth-of-type(2) input').getBoundingClientRect(),colon=el.querySelector('.desvio-time-separator').getBoundingClientRect();return {aligned:Math.abs(hour.top-minute.top)<1&&Math.abs(colon.top-hour.top)<1,widths:hour.width>80&&minute.width>80,overflow:el.scrollWidth>el.clientWidth+1};});
+  assert.deepEqual(geometry,{aligned:true,widths:true,overflow:false});
+  assert.ok(await dialog.evaluate(el=>el.getBoundingClientRect().right<=innerWidth));
+  await page.screenshot({path:`work/browser/chat-date-${width}.png`});
+ }
+ await dialog.getByLabel('Hour',{exact:true}).fill('24');await dialog.getByRole('button',{name:'Use date & time',exact:true}).click();await expect(dialog.getByRole('alert')).toContainText('0–23');
+ await dialog.getByLabel('Hour',{exact:true}).fill('23');await dialog.getByLabel('Minute',{exact:true}).fill('58');await dialog.getByRole('button',{name:'Use date & time',exact:true}).click();
+ await expect(dialog).toHaveCount(0);await expect(page.locator('.desvio-date-trigger')).toContainText('23:58');
+});
+
+test('AI canvas resumes a guided carousel into generation without leaving an empty calendar post (MOCK providers)',async()=>{
+ const businesses=new Businesses(runtime.database,new Workspaces(runtime.database)),preferences=await businesses.onboarding(actor,brand);
+ if(preferences.step!==3)await businesses.onboarding(actor,brand,{revision:preferences.revision,step:3,goal:'awareness',timezone:'UTC',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create`);await expect(page.getByRole('navigation',{name:'Create and manage your content'})).toBeVisible();
+ const root=`/api/v1/businesses/${brand}`,plan=await post(root+'/content-plans',{title:'Guided carousel test',objective:'Botanical soap',starts_on:'2027-01-06',timezone:'UTC',slots:[{channel:'instagram',format:'static',brief:'Saved planning context',planned_at:'2027-01-06T09:00:00Z'}]},randomUUID());assert.equal(plan.status,201,JSON.stringify(plan.body));
+ const prior=await(await page.request.get(base+root+'/create-chat/draft')).json();
+ const snapshot={version:1,mode:'post',step:6,data:{topic:'Botanical soap for mindful households',direction:'Clean photography without text',format:'carousel',channel:'instagram',date:'2027-01-06T10:00',campaign:plan.body.id},messages:[{role:'user',text:'Create my carousel'},{role:'assistant',text:'Review your carousel brief.'}]};
+ const seeded=await page.request.put(base+root+'/create-chat/draft',{headers:{origin:base},data:{revision:prior.draft?.revision??0,snapshot}});assert.equal(seeded.status(),200);
+ await page.goto(`${base}/b/${brand}/create?guided=1`);await page.getByRole('button',{name:'Approve brief & create visual',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Your planned creative'})).toBeVisible({timeout:30000});
+ await expect(page.getByRole('region',{name:'Your carousel',exact:true}).getByRole('img')).toBeVisible({timeout:150000});
+ const saved=await(await page.request.get(base+root+'/create-chat/draft')).json(),slotId=saved.draft.snapshot.data.created_slot;
+ assert.ok(slotId);const slot=await(await page.request.get(base+root+'/content-slots/'+slotId)).json();assert.ok(slot.slot.carousel_version_id);assert.equal(slot.carousel_runs.length,1);
+ await page.reload();await expect(page.getByRole('region',{name:'Your carousel',exact:true}).getByRole('img')).toBeVisible({timeout:30000});
+ const after=await(await page.request.get(base+root+'/content-slots/'+slotId)).json();assert.equal(after.carousel_runs.length,1);
+ await page.screenshot({path:'work/browser/chat-guided-carousel.png'});
 });
