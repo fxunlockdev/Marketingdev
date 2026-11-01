@@ -1,0 +1,144 @@
+{
+  "checked_at": "2026-11-01T13:37:38.860Z",
+  "passed": true,
+  "scope": "Authenticated live dev chat creation and recovery acceptance; not a whole-product production certification",
+  "origin": "https://desvio-dev-web-dev.up.railway.app",
+  "phases": [
+    {
+      "name": "image",
+      "passed": true,
+      "conversation_id": "861a8b87-a500-401b-841a-c732ad827e7b",
+      "checks": [
+        "manual_text_font_curve_save_attached_in_chat",
+        "saved_text_and_curve_survive_reload",
+        "png_download",
+        "history_available"
+      ]
+    },
+    {
+      "name": "edit",
+      "passed": true,
+      "conversation_id": "861a8b87-a500-401b-841a-c732ad827e7b",
+      "output_version_id": "79c822b6-b929-4e61-be09-89e99707f3b1",
+      "checks": [
+        "real_ai_edit_saved",
+        "manual_text_font_curve_preserved_after_ai_edit"
+      ]
+    },
+    {
+      "name": "carousel",
+      "passed": true,
+      "conversation_id": "fdafcad0-7e10-4f3e-8d49-aa802c0305ed",
+      "job_id": "6acc617c-642f-41ba-a707-a27e18540d80",
+      "output_version_id": "ed171011-8617-482f-bebc-2f94b2100471",
+      "checks": [
+        "two_real_generated_slides_saved",
+        "slide_navigation",
+        "reload_saved_carousel"
+      ]
+    },
+    {
+      "name": "reel",
+      "passed": true,
+      "conversation_id": "36b5476d-e53e-40f1-94c2-52538814120b",
+      "job_id": "deed181a-5b23-42c4-a804-28bea4074f81",
+      "metadata": {
+        "width": 1080,
+        "height": 1920,
+        "duration": 3.033333
+      },
+      "checks": [
+        "script_saved_before_generation",
+        "script_survives_reload",
+        "real_provider_clip_saved",
+        "canvas_playback",
+        "saved_video_survives_reload"
+      ]
+    },
+    {
+      "name": "video",
+      "passed": true,
+      "conversation_id": "5e8c2282-5d19-4d2d-b9a7-3bcff2b9a490",
+      "job_id": "be23c925-3b15-4854-965c-7569a95e5d9d",
+      "metadata": {
+        "width": 1024,
+        "height": 1024,
+        "duration": 3.033333
+      },
+      "checks": [
+        "script_saved_before_generation",
+        "script_survives_reload",
+        "real_provider_clip_saved",
+        "canvas_playback",
+        "saved_video_survives_reload"
+      ]
+    }
+  ],
+  "real_providers": {
+    "chat_and_image_carousel_reasoning": "gpt-6-sol",
+    "image_generation_and_edit": "gpt-image-2.5-sunburst",
+    "video": "kling-video/v3.0/std/image-to-video"
+  },
+  "clarification_and_recall": [
+    "unclear_request_asks_question_without_generation",
+    "recall_cites_saved_conversation",
+    "source_opens_saved_creative",
+    "no_media_generation_for_recall"
+  ],
+  "hosted_recovery": [
+    "initialization_retry_preserves_draft_and_blocks_send_until_ready",
+    "transient_read_error_clears_automatically",
+    "saved_canvas_retained",
+    "desktop_mobile_composer_reachable",
+    "history_failure_scoped_and_recoverable",
+    "expired_session_has_sign_in_recovery",
+    "raw_source_id_hidden_with_clickable_history_link",
+    "zero_message_submissions_during_recovery"
+  ],
+  "regressions": [
+    {
+      "name": "contracts",
+      "passed": 344,
+      "failed": 0,
+      "log_sha256": "b52d83b826b2d97a96f452bf688938c125a1145c59b30a4a8f1cad3462d62014"
+    },
+    {
+      "name": "chat_browser",
+      "passed": 7,
+      "failed": 0,
+      "log_sha256": "aa015b2b9e6c7109777ee058f75efd95acdc53c0683ee2559b224909ae4eecce"
+    },
+    {
+      "name": "recovery_browser",
+      "passed": 2,
+      "failed": 0,
+      "log_sha256": "e473f441622517694fcebf5a7637f4c22f60533a69310520afc569064a0a18bf"
+    }
+  ],
+  "fixes": [
+    "Aligned API static renderer pin with deployed worker after live carousel EXPORT_RENDERER_CHANGED failure",
+    "Concrete Reel/Video requests open reference and script workflow before asking for uploads",
+    "Separate initialization, history, transcript and send errors; read recovery does not resubmit creation",
+    "Recover saved carousel reads and clear recovered video/post loading errors",
+    "Preserve prefilled Home prompt across initialization retry; exact sent-envelope recovery retained",
+    "Render verified history links without raw citation identifiers"
+  ],
+  "initial_failed_carousel": {
+    "conversation_id": "2a67b6e4-1df7-4d03-b4c7-bf0a89546cdd",
+    "error_code": "EXPORT_RENDERER_CHANGED",
+    "paid_image_calls_started": false,
+    "resolution": "Fresh two-slide run completed after correcting API renderer pin"
+  },
+  "deployment": {
+    "api_config": "ecb43b9a-4339-4409-b036-6176ef7ceae5",
+    "web": "5d592c1d-dda6-4ba8-87af-534b030b4a84",
+    "worker_image": "sha256:f6d1f4bffe07957e3ad6fa105f7476906647191d35d347855790f2f370d2f2ab",
+    "static_renderer": "sha256:b14cfd4260c940ed239e31dc8c06ffc3bc961038756f3d70cd90fc977f0b75b7"
+  },
+  "limits": [
+    "No social publication or external analytics acceptance; user excluded those tests",
+    "Invite-only access retained",
+    "No production-scale load, billing or exhaustive all-feature certification in this acceptance run"
+  ],
+  "spend_note": "Real provider tests authorized by user. Per-call reservations are conservative allowances, not actual billed cost. No uncertain paid job was blindly resubmitted."
+}

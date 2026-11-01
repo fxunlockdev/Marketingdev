@@ -1,0 +1,23 @@
+{
+  "checked_at": "2026-11-01T13:24:00.803Z",
+  "scope": "Real GPT-6 chat clarification and grounded retrieval; no media generation or publishing",
+  "checks": [
+    "unclear_request_asks_question_without_generation",
+    "recall_cites_saved_conversation",
+    "source_opens_saved_creative",
+    "no_media_generation_for_recall"
+  ],
+  "conversation_id": "9d10015b-f0c4-4540-a6a3-c486ac296b18",
+  "clarification": {
+    "job_id": "4c54328c-3d3c-4984-9aee-284903c92975",
+    "reply": "Would you like an image, carousel, or reel—and what should it show?"
+  },
+  "recall": {
+    "job_id": "a8ad6163-e99a-40c2-b140-5a625af58ea6",
+    "reply": "I found the saved conversation [861a8b87-a500-401b-841a-c732ad827e7b]. You asked: “Create one square conceptual image of a fictional luxury residence at sunset for young families. Warm natural lighting, landscaped courtyard, no text or logos. This is a visual study, not a depiction of any actual project.” I replied that I’d prepare a square visual study with a landscaped courtyard and warm, family-friendly atmosphere. Later, you requested warmer sunset lighting and soft golden light in the courtyard while preserving the existing headline, font and curved text; I replied that I’d make that edit. The saved record contains these messages, not the image itself. I haven’t created or edited anything now.",
+    "sources": [
+      "861a8b87-a500-401b-841a-c732ad827e7b"
+    ]
+  },
+  "passed": true
+}

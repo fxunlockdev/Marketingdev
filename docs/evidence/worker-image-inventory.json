@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-10-31T17:47:29.576Z",
+  "checked_at": "2026-11-01T13:16:10.990Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:94d954b7f386af5ac9aafa8f49dc514e0b3f6ca13155b1afc464602bafe20190",
+      "image_id": "sha256:f6d1f4bffe07957e3ad6fa105f7476906647191d35d347855790f2f370d2f2ab",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Curved-text worker and static renderer. Exact hosted images, scanner and poller registration verified; six native synthetic curve exports passed. See curved-text-host-render.json and curved-text-worker-rollout.json."
+  "scope": "Frozen chat intelligence worker image; host activation must be checked separately"
 }

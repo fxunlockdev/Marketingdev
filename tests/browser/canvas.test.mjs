@@ -204,7 +204,7 @@ before(async () => {
               return modelResponse({reply:carousel?'I’ll create your three-slide story.':`Choose a starting image for your ${reel?'reel':'video'}, then review its script.`,action:carousel?'carousel':'video',prompt:carousel?'TEST botanical soap carousel for mindful households':'TEST gentle botanical product film',channel:'instagram',size:reel?'1024x1536':'1024x1024',sources:[],starts_on:null,text_mode:'none',slide_count:3,placement:reel?'reel':'feed',duration_seconds:3});
             }
             const recall=/remember/i.test(context.message),edit=/warmer/i.test(context.message),unclear=/something/i.test(context.message);
-            return modelResponse({reply:recall?'I found your saved conversation.':unclear?'What should the image show?':edit?'I’ll warm up the saved image.':'I’ll create your clean image now.',action:recall||unclear?'answer':edit?'edit_image':'image',prompt:recall||unclear?'':'TEST a botanical soap image without text',channel:'instagram',size:'1024x1024',sources:recall?[context.memories[0].id]:[],starts_on:null,text_mode:edit?context.current_image.text_mode:'none'});
+            return modelResponse({reply:recall?`I found your saved conversation [${context.memories[0].id}].`:unclear?'What should the image show?':edit?'I’ll warm up the saved image.':'I’ll create your clean image now.',action:recall||unclear?'answer':edit?'edit_image':'image',prompt:recall||unclear?'':'TEST a botanical soap image without text',channel:'instagram',size:'1024x1024',sources:recall?[context.memories[0].id]:[],starts_on:null,text_mode:edit?context.current_image.text_mode:'none'});
           }
           const body = JSON.parse(init.body),
             entry = body.input.find(
@@ -1658,6 +1658,67 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
 });
 
 
+test('AI canvas recovers initialization, history and transcript reads without resending creation',async()=>{
+ await page.unrouteAll({behavior:'wait'});
+ await page.setViewportSize({width:1280,height:720});
+ let bootReads=0,posts=0,failReads=false,failHistory=true;
+ await page.route('**/create-chat/outbox',async route=>{if(route.request().method()==='GET'&&++bootReads===1){await route.abort('failed');return;}await route.continue();});
+ await page.route('**/create-chat/messages',async route=>{posts++;await route.continue();});
+ await page.route('**/create-chat/history?*',async route=>{if(failHistory){await route.abort('failed');return;}await route.continue();});
+ await page.goto(`${base}/b/${brand}/create`);
+ await expect(page.getByRole('button',{name:'Reconnect chat',exact:true})).toBeVisible();
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Make something');
+ await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Retry saved request',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Reconnect chat',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeEnabled();
+ await expect(page.getByRole('region',{name:'Chat connection',exact:true})).toHaveCount(0);
+ assert.equal(bootReads,2);assert.equal(posts,0);
+ await page.getByRole('button',{name:'Conversation history',exact:true}).click();
+ const history=page.getByRole('dialog',{name:'Conversation history',exact:true});
+ await expect(history.getByRole('button',{name:'Reload history',exact:true})).toBeVisible();
+ await expect(page.getByRole('region',{name:'Message recovery',exact:true})).toHaveCount(0);
+ failHistory=false;await history.getByRole('button',{name:'Reload history',exact:true}).click();
+ await expect(history.getByRole('button',{name:'Reload history',exact:true})).toHaveCount(0);
+ await history.getByRole('button',{name:'Close history',exact:true}).click();
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByText('What should the image show?',{exact:true})).toBeVisible({timeout:60000});
+ const submitted=posts,conversation=new URL(page.url()).searchParams.get('conversation');
+ await page.route(`**/create-chat/conversations/${conversation}`,async route=>{if(failReads){await route.abort('failed');return;}await route.continue();});
+ failReads=true;
+ const reconnect=page.getByRole('region',{name:'Conversation connection',exact:true});
+ await expect(reconnect).toBeVisible({timeout:15000});
+ await expect(page.getByText('What should the image show?',{exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Retry saved request',exact:true})).toHaveCount(0);
+ // Recovery lives in the scrollable transcript, not between the composer and its send button.
+ assert.equal(await reconnect.evaluate(el=>el.parentElement.classList.contains('create-chat-log')),true);
+ for(const viewport of [{width:1280,height:720},{width:390,height:844}]){
+  await page.setViewportSize(viewport);const composer=await page.locator('form.create-composer').boundingBox();
+  assert.ok(composer.y>=0&&composer.y+composer.height<=viewport.height);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await page.screenshot({path:`work/browser/chat-recovery-${viewport.width}.png`});
+ }
+ failReads=false;
+ await expect(reconnect).toHaveCount(0,{timeout:15000});
+ assert.equal(posts,submitted,'Read recovery must never resubmit generation');
+ await expect(page.getByText('What should the image show?',{exact:true})).toBeVisible();
+ await page.unrouteAll({behavior:'wait'});await page.setViewportSize({width:1440,height:1000});
+ // A Home composer prompt must still send once after initialization reconnects.
+ let failHomeBoot=true;
+ await page.route('**/create-chat/outbox',async route=>{if(failHomeBoot&&route.request().method()==='GET'){await route.abort('failed');return;}await route.continue();});
+ const callsBefore=chatCalls;
+ await page.goto(`${base}/b/${brand}/create?q=Make%20something`);
+ await expect(page.getByRole('button',{name:'Reconnect chat',exact:true})).toBeVisible();
+ assert.equal(chatCalls,callsBefore);
+ failHomeBoot=false;await page.getByRole('button',{name:'Reconnect chat',exact:true}).click();
+ await expect(page.getByText('What should the image show?',{exact:true})).toBeVisible({timeout:60000});
+ assert.equal(chatCalls,callsBefore+1);
+ await page.reload();await expect(page.getByText('What should the image show?',{exact:true})).toBeVisible();
+ assert.equal(chatCalls,callsBefore+1);
+ await page.unrouteAll({behavior:'wait'});
+});
+
 test('AI canvas format choices open the right artboard immediately and survive reload without generation',async()=>{
  await page.setViewportSize({width:1440,height:1000});
  const before=generated,videoBefore=videoSubmits;
@@ -1728,7 +1789,13 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
  assert.equal(retry.body.id,turn.action_result.id,'Retry keeps the same durable carousel');
  await carousel.getByRole('button',{name:/Slide 2/}).click();await expect(carousel.getByText('Slide 2 of 3',{exact:true})).toBeVisible();
  await page.screenshot({path:'work/browser/chat-carousel-complete.png'});
- await page.reload();await expect(carousel.getByRole('img')).toBeVisible({timeout:30000});
+ let failCarouselRead=true;
+ await page.route(`**/carousels/${d.carousel_runs[0].project_id}`,async route=>{if(failCarouselRead){await route.abort('failed');return;}await route.continue();});
+ await page.reload();await expect(carousel.getByRole('button',{name:'Reload saved carousel',exact:true})).toBeVisible();
+ failCarouselRead=false;await carousel.getByRole('button',{name:'Reload saved carousel',exact:true}).click();
+ await expect(carousel.getByRole('img')).toBeVisible({timeout:30000});
+ await expect(carousel.getByRole('button',{name:'Reload saved carousel',exact:true})).toHaveCount(0);
+ await page.unroute(`**/carousels/${d.carousel_runs[0].project_id}`);
  assert.equal(generated,imageCount+3);
  const sibling=(await post('/api/v1/businesses',{name:'Chat media isolation test'},randomUUID())).body;
  assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/create-chat/conversations/${conversation}`)).status(),404);
@@ -1777,6 +1844,13 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   const spec=(await admin.query('SELECT r.creative_spec FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
   assert.equal(spec.length,1);assert.equal(spec[0].creative_spec.placement,kind==='reel'?'reel':'feed');
   await page.reload();await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible();
+  let failVideoRead=true;
+  await page.route('**/videos',async route=>{if(failVideoRead&&route.request().method()==='GET'){await route.abort('failed');return;}await route.continue();});
+  await expect(media.locator('.chat-video-controls > .notice.error')).toBeVisible({timeout:15000});
+  await expect(media.locator('.chat-saved-video video')).toBeVisible();
+  failVideoRead=false;
+  await expect(media.locator('.chat-video-controls > .notice.error')).toHaveCount(0,{timeout:15000});
+  await page.unroute('**/videos');
   await page.screenshot({path:`work/browser/chat-${kind}-complete.png`});
   assert.equal(videoSubmits,count+1,'Reload never resubmits the paid generation');
  }

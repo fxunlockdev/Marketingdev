@@ -1,0 +1,16 @@
+{
+  "checked_at": "2026-11-01T13:33:42.038Z",
+  "scope": "Deployed dev UI with real saved conversation; browser-injected network failures; no generation or publishing",
+  "checks": [
+    "initialization_retry_preserves_draft_and_blocks_send_until_ready",
+    "transient_read_error_clears_automatically",
+    "saved_canvas_retained",
+    "desktop_mobile_composer_reachable",
+    "history_failure_scoped_and_recoverable",
+    "expired_session_has_sign_in_recovery",
+    "raw_source_id_hidden_with_clickable_history_link",
+    "zero_message_submissions_during_recovery"
+  ],
+  "errors": [],
+  "passed": true
+}

@@ -262,3 +262,10 @@
 @media(min-width:761px){.desvio-redesign .format-reel .chat-saved-video,.desvio-redesign .format-story .chat-saved-video{max-width:min(330px,calc((100dvh - 310px)*.5625))}}
 
 .desvio-redesign .chat-video-next{background:#17171a;color:white;min-height:42px;padding:10px 20px;border-radius:99px;margin:0}.desvio-redesign .chat-format-meta>strong{text-transform:capitalize}
+
+/* Recovery belongs to the transcript, leaving the composer reachable on short screens. */
+.conversation-recovery{display:grid;gap:12px;margin:16px 0;padding:16px;border:1px solid #e4e1ed;border-radius:20px;background:#f6f5fa;min-width:0;overflow-wrap:anywhere}
+.conversation-recovery .notice{margin:0;padding:0;border:0;background:transparent}
+.conversation-recovery p{margin:0;color:#565366;line-height:1.5}
+.conversation-recovery-actions{display:flex;flex-wrap:wrap;gap:10px}
+.conversation-recovery button{min-height:44px;white-space:normal;text-align:center}
