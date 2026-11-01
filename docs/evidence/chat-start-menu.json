@@ -45,7 +45,7 @@
   "source_sha256": {
     "apps/web/components/chat-start-menu.tsx": "9d3de21d63f4153a1b3cc9f88333b8fa9e9fed06e763039bcc549b9808578c9d",
     "apps/web/components/conversation-chat.tsx": "5598c9557f2da7492f3c95dc6d7337dc8b34b61044a9fede0dec1ece03f7692e",
-    "apps/web/components/conversation-chat.css": "a32587afb0b00db935141eb4c00e14039a9d67b677e648d1d700c28c760a43cc",
+    "apps/web/components/conversation-chat.css": "9e016d2004a2f009c2c2deef28b923b3f4fb8d3743bebd64896178a6d0ef591f",
     "tests/browser/canvas.test.mjs": "ce556453288100a6a4d5900ec0bf4b4bfa822d1fa94d82cce9f7d18d8170b61f"
   },
   "visual_review": {
@@ -64,7 +64,7 @@
       ]
     ],
     "comparison": "work/start-menu-compare/page-@2x-compare.png",
-    "note": "Reference includes red markup and a partly scrolled Post card. Preserve a compact History control and readable section labels. No pixel-identity claim."
+    "note": "Reference includes red markup and a partly scrolled Post card. Preserve a compact History control and readable section labels. No pixel-identity claim. Short desktop heights compact card padding so the bottom action row clears the composer."
   },
   "regression": {
     "command": "node scripts/foundation-test.mjs --ai-chat-web",

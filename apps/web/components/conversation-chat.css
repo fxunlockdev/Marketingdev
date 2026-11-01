@@ -191,3 +191,4 @@
 
 .desvio-redesign .conversation-screen.is-start .create-chat-log{padding-top:0}
 .desvio-redesign .conversation-screen.is-start .create-empty em{font-synthesis:style}
+@media(min-width:761px) and (max-height:800px){.desvio-redesign .conversation-screen.is-start .chat-start-menu{gap:12px}.desvio-redesign .conversation-screen.is-start .chat-start-card{padding-block:12px;min-height:70px}}
