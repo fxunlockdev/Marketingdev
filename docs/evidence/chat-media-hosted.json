@@ -1,0 +1,48 @@
+{
+  "checked_at": "2026-11-01T05:09:32.397Z",
+  "hosted": true,
+  "screens": [
+    {
+      "width": 1041,
+      "height": 743,
+      "overflow": false,
+      "all_start_actions_visible": true
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false
+    }
+  ],
+  "errors": [],
+  "actions": [
+    "Post",
+    "Image",
+    "Carousel",
+    "Reel",
+    "Video",
+    "Story",
+    "Campaign",
+    "Approve posts",
+    "Publish a post",
+    "Connect an account",
+    "Add a brand fact",
+    "Content preferences",
+    "Invite a teammate",
+    "Add a business",
+    "Check results",
+    "Add strategy"
+  ],
+  "history": true,
+  "scope": "Read-only deployed UI review; no paid generation or social publishing performed",
+  "api_deployment": "7179eaa7-e017-4f05-ad62-e420b1f9b79e",
+  "web_deployment": "bbafd16c-23a2-4191-8a2e-dbb396adf887",
+  "api_status": "SUCCESS",
+  "web_status": "SUCCESS",
+  "source_commit": "579edae"
+}
