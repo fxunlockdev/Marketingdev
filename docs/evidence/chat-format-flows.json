@@ -1,0 +1,50 @@
+{
+  "checked_at": "2026-11-01T11:04:59.278Z",
+  "status": "MOCKED",
+  "scope": "Actual browser, API, database, durable jobs, uploads, image exports and video rendering; provider network responses mocked. No paid generation or social publishing.",
+  "broad_run": {
+    "passed": 5,
+    "failed": 1,
+    "remaining_failure": "Immediate reload could lose a selected format in an existing conversation; fixed with synchronous URL state."
+  },
+  "followup_run": {
+    "command": "node scripts/foundation-test.mjs --chat-format-web",
+    "passed": 2,
+    "failed": 0
+  },
+  "passed_checks": [
+    "✔ AI canvas interprets, generates inline, resumes a lost response and remembers history (MOCK OpenAI) (37138.916792ms)",
+    "✔ AI canvas format choices open the right artboard immediately and survive reload without generation (4501.537209ms)",
+    "✔ AI canvas creates carousel slides and playable reels and videos in the same saved chat (MOCK providers) (218581.74525ms)",
+    "✔ AI canvas date dialog keeps time controls aligned and validates time at desktop and mobile sizes (460.797583ms)",
+    "✔ AI canvas resumes a guided carousel into generation without leaving an empty calendar post (MOCK providers) (11303.390958ms)",
+    "✔ AI canvas format choices open the right artboard immediately and survive reload without generation (21013.057ms)",
+    "✔ AI canvas format selection after a conversation keeps the thread and carries the choice into the request (6016.382792ms)"
+  ],
+  "contracts": {
+    "passed": 10,
+    "failed": 0
+  },
+  "typecheck": "passed",
+  "checks": [
+    "Image, Carousel, Reel, Video and Story immediately open the appropriate canvas",
+    "Reload preserves format; selecting a format after a saved chat keeps that same conversation and sends the chosen format",
+    "Reference approval and video script approval remain required",
+    "Completed reel preserves its 9:16 player proportions",
+    "Review notes survive closing and reopening the controls",
+    "Carousel generates the requested slides, reload and retry do not duplicate generation, cross-brand access denied",
+    "Image edits, saved chat attachments and lost-response recovery",
+    "Guided carousel generation and date controls"
+  ],
+  "limitations": [
+    "No fresh paid OpenAI/Higgsfield generation in this verification",
+    "Not a whole-product production certification"
+  ],
+  "source_snapshot": "work/chat-format-release-20261101-v3",
+  "screenshots": [
+    "work/browser/chat-format-reel.png",
+    "work/browser/chat-carousel-complete.png",
+    "work/browser/chat-reel-complete.png",
+    "work/browser/chat-video-complete.png"
+  ]
+}

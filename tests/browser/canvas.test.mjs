@@ -1549,9 +1549,11 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  const startMenu=page.getByRole('navigation',{name:'Create and manage your content'});
  await expect(startMenu).toBeVisible();
  await page.getByRole('button',{name:'Story',exact:true}).click();
- await expect(page.getByRole('textbox',{name:'Message Desvio'})).toHaveValue('Create a story image about ');
- await page.getByRole('textbox',{name:'Message Desvio'}).fill('');
+ await expect(page.getByRole('region',{name:'Story canvas preview',exact:true})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Message Desvio'})).toHaveValue('');
+ await page.getByRole('button',{name:'Start over',exact:true}).click();
  await page.getByRole('button',{name:'Image',exact:true}).click();
+ await page.getByRole('button',{name:'Creation options +',exact:true}).click();
  await expect(page.getByLabel('Format',{exact:true})).toBeVisible();
  assert.equal(chatCalls,0,'Choosing a format never submits an incomplete or paid request');
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Create a clean botanical soap image for mindful households without text');
@@ -1656,13 +1658,62 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
 });
 
 
+test('AI canvas format choices open the right artboard immediately and survive reload without generation',async()=>{
+ await page.setViewportSize({width:1440,height:1000});
+ const before=generated,videoBefore=videoSubmits;
+ for(const [kind,label,ratio] of [['image','Image',1],['carousel','Carousel',1],['reel','Reel',9/16],['video','Video',3/2],['story','Story',9/16]]){
+  await page.goto(`${base}/b/${brand}/create`);
+  await page.getByRole('button',{name:label,exact:true}).click();
+  const preview=page.getByRole('region',{name:`${label} canvas preview`,exact:true});
+  await expect(preview).toBeVisible();await expect(page.locator('.create-mode')).toHaveText(label);
+  await expect(page.getByText(`What should this ${kind} be about?`,{exact:true})).toBeVisible();
+  await expect(page.getByRole('textbox',{name:'Message Desvio'})).toHaveValue('');
+  const box=await preview.locator('.chat-format-frame').boundingBox();assert.ok(Math.abs(box.width/box.height-ratio)<.02);
+  await page.screenshot({path:`work/browser/chat-format-${kind}.png`});
+  await page.reload();await expect(preview).toBeVisible();
+  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Start over',exact:true}).click();
+  await expect(page.getByRole('navigation',{name:'Create and manage your content'})).toBeVisible();
+ }
+ for(const viewport of [{width:1041,height:743},{width:390,height:844}]){
+  await page.setViewportSize(viewport);await page.goto(`${base}/b/${brand}/create?start=reel`);
+  await expect(page.getByRole('region',{name:'Reel canvas preview',exact:true})).toBeVisible();
+  await page.screenshot({path:`work/browser/chat-format-reel-${viewport.width}.png`,fullPage:true});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  assert.ok(await page.locator('.create-chat-panel>header').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+ }
+ assert.equal(generated,before);assert.equal(videoSubmits,videoBefore);assert.deepEqual(errors,[]);
+});
+
+test('AI canvas format selection after a conversation keeps the thread and carries the choice into the request',async()=>{
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true",[org,brand]);
+ await page.goto(`${base}/b/${brand}/create`);
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Make something');
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByText('What should the image show?',{exact:true})).toBeVisible({timeout:60000});
+ const thread=new URL(page.url()).searchParams.get('conversation'),calls=chatCalls;
+ await page.getByRole('button',{name:'Reel',exact:true}).click();
+ await expect(page.getByText('What should this reel be about?',{exact:true})).toBeVisible();
+ await page.reload();await expect(page.getByRole('region',{name:'Reel canvas preview',exact:true})).toBeVisible();
+ assert.equal(new URL(page.url()).searchParams.get('conversation'),thread);assert.equal(chatCalls,calls);
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Botanical soap for mindful households');
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Your reel',exact:true})).toBeVisible({timeout:60000});
+ assert.equal(new URL(page.url()).searchParams.get('conversation'),thread);
+ const response=await page.request.get(`${base}/api/v1/businesses/${brand}/create-chat/conversations/${thread}`),chat=await response.json();
+ assert.equal(chat.turns.length,2);assert.equal(chat.turns.at(-1).output.placement,'reel');
+ assert.match(chat.turns.at(-1).message,/^Create a reel\./);
+ assert.deepEqual(errors,[]);
+});
+
 test('AI canvas creates carousel slides and playable reels and videos in the same saved chat (MOCK providers)',async()=>{
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
  await page.unrouteAll({behavior:'wait'});
  await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create`);
  await page.getByRole('button',{name:'Carousel',exact:true}).click();
- await expect(page.getByRole('textbox',{name:'Message Desvio'})).toHaveValue('Create a carousel about ');
+ await expect(page.getByRole('textbox',{name:'Message Desvio'})).toHaveValue('');
+ await expect(page.getByRole('region',{name:'Carousel canvas preview',exact:true})).toBeVisible();
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Create a 3-slide carousel about botanical soap for mindful households, no image text');
  const imageCount=generated;
  await page.getByRole('button',{name:'Send message',exact:true}).click();
@@ -1686,6 +1737,7 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   await page.getByRole('textbox',{name:'Message Desvio'}).fill(`Create a ${kind} about botanical soap for mindful households, 3 seconds`);
   await page.getByRole('button',{name:'Send message',exact:true}).click();
   const media=page.getByRole('region',{name:`Your ${kind}`,exact:true});await expect(media).toBeVisible({timeout:60000});
+  await media.getByRole('button',{name:'Choose a starting image →',exact:true}).click();
   if(kind==='reel'){
    await media.getByText('Add product photos',{exact:true}).click();
    await media.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'chat-video-product.png',mimeType:'image/png',buffer:png});
@@ -1710,7 +1762,16 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   await media.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
   await media.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
   await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});
-  await expect.poll(()=>media.locator('video').evaluate(el=>el.readyState),{timeout:30000}).toBeGreaterThanOrEqual(2);
+  await expect(media.locator('.chat-saved-video video')).toBeVisible({timeout:30000});
+  await expect.poll(()=>media.locator('.chat-saved-video video').evaluate(el=>el.readyState),{timeout:30000}).toBeGreaterThanOrEqual(2);
+  if(kind==='reel'){const box=await media.locator('.chat-saved-video video').boundingBox();assert.ok(Math.abs(box.width/box.height-9/16)<.02,'The saved reel keeps its vertical canvas dimensions');}
+  await media.getByText('Edit, review & history',{exact:true}).click();await expect(media.getByLabel('Saved video version',{exact:true})).toBeVisible();
+  await media.getByLabel('Video feedback',{exact:true}).fill('Keep this review note while I inspect the canvas');
+  await media.getByText('Edit, review & history',{exact:true}).click();
+  await media.getByText('Edit, review & history',{exact:true}).click();
+  await expect(media.getByLabel('Video feedback',{exact:true})).toHaveValue('Keep this review note while I inspect the canvas');
+  await media.getByLabel('Video feedback',{exact:true}).fill('');
+  await media.getByText('Edit, review & history',{exact:true}).click();await expect(media.getByRole('link',{name:'Download video',exact:true})).toHaveCount(1);
   assert.equal(videoSubmits,count+1);
   const chatId=new URL(page.url()).searchParams.get('conversation');
   const spec=(await admin.query('SELECT r.creative_spec FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
