@@ -1,0 +1,48 @@
+{
+  "checked_at": "2026-11-01T11:07:05.979Z",
+  "hosted": true,
+  "screens": [
+    {
+      "width": 1041,
+      "height": 743,
+      "overflow": false,
+      "all_start_actions_visible": true
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "overflow": false
+    }
+  ],
+  "errors": [],
+  "actions": [
+    "Post",
+    "Image",
+    "Carousel",
+    "Reel",
+    "Video",
+    "Story",
+    "Campaign",
+    "Approve posts",
+    "Publish a post",
+    "Connect an account",
+    "Add a brand fact",
+    "Content preferences",
+    "Invite a teammate",
+    "Add a business",
+    "Check results",
+    "Add strategy"
+  ],
+  "history": true,
+  "status": "VERIFIED",
+  "scope": "Read-only hosted UI checks. No chat generation submitted, no paid provider requests and no social publishing.",
+  "source_commit": "3c59033",
+  "web_deployment": "d84cf21c-83e5-4ff4-a7d0-28ebed502820",
+  "web_status": "SUCCESS",
+  "origin": "https://desvio-dev-web-dev.up.railway.app"
+}
