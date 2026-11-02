@@ -1,7 +1,7 @@
 import {validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
 import {validateInsightResult,type InsightInput} from './insight-contracts.js';
 import {scheduleGeneratedPlan,validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
-import {validateVideoInput,validateVideoPlanningResult,type VideoPlanningInput,type VideoPlanningResult} from './video-planning.js';
+import {normalizeGeneratedVideoBrief,validateVideoInput,validateVideoPlanningResult,type VideoPlanningInput,type VideoPlanningResult} from './video-planning.js';
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { randomUUID } from "node:crypto";
@@ -28,7 +28,7 @@ export class SkillRuntime {
   }
   videoPlan(input:VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<VideoPlanningResult> {
     validateVideoInput(input);
-    return this.run(input,model,value=>validateVideoPlanningResult(value,input));
+    return this.run(input,request=>model({...request,video_plan:{fact_ids:input.brand.facts.map(f=>f.id),duration_seconds:input.duration_seconds}}),value=>validateVideoPlanningResult({...value,brief:normalizeGeneratedVideoBrief(value.brief,input)},input));
   }
   insights(input:InsightInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<any>{return this.run(input,model,value=>validateInsightResult(value,input));}
   carouselPlan(input:CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<CarouselResult>{validateCarouselInput(input);return this.run(input,model,value=>validateCarouselResult(value,input));}
@@ -120,7 +120,7 @@ export class SkillRuntime {
               )
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               pending = true;
-              void model({...value,chat_response:undefined})
+              void model({...value,chat_response:undefined,video_plan:undefined})
                 .then((result) => {
                   pending = false;
                   if (!settled)

@@ -1,0 +1,21 @@
+{
+  "checked_at": "2026-11-02T02:44:53.525Z",
+  "checks": {
+    "contracts": {
+      "passed": 346,
+      "failed": 0,
+      "log_sha256": "f6afc054d7f6d4f184aefa9c0b85487d479885095eb8bc2b426a63fb55bbf9ce"
+    },
+    "foundation": {
+      "passed": 1,
+      "failed": 0,
+      "log_sha256": "e2ef4362865e248f61479fcc56ea9f1f6fad91e24d2169b595e0f32f043df68a"
+    },
+    "browser": {
+      "passed": 1,
+      "failed": 0,
+      "log_sha256": "97518bae1bef2478b8fa246985f23b3d69bba8508c98ef8e51c7030c1d717720"
+    }
+  },
+  "scope": "Contract, real database/RLS, isolated renderer, and browser recovery tests. Paid providers mocked in local integration/browser tests; real generation recorded separately."
+}

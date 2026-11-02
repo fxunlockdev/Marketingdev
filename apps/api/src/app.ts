@@ -272,6 +272,7 @@ class VideoController {
  @Get('video-jobs/:jobId/draft') draft(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.draft(r.actorId,id,j);}
  @Post('video-jobs/:jobId/draft') saveDraft(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string,@Body() body:unknown){return this.service.saveDraft(r.actorId,id,j,body);}
  @Post('video-versions/:versionId/regenerate') regenerate(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.regenerate(r.actorId,id,v,body,key);}
+ @Post('video-jobs/:jobId/retry-script') retryScript(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.retryScript(r.actorId,id,j);}
  @Post('video-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
  @Get('videos') list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
  @Post('canvas/threads/:threadId/videos') submit(@Req() r:AuthRequest,@Param('id') id:string,@Param('threadId') t:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.submit(r.actorId,id,t,body,key);}

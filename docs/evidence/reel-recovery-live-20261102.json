@@ -1,0 +1,20 @@
+{
+  "checked_at": "2026-11-02T02:46:41.176Z",
+  "conversation": "1152eed0-e250-4c4f-aa77-c03e667f1cf2",
+  "original_job": "0d084cda-e48f-4bc6-b8d8-ed9f9733c642",
+  "project": "c6c8bb1c-f635-4750-aa8a-20fb22303e51",
+  "scope": "Real GPT script recovery in original customer conversation; video generation still requires prompt approval; no publishing",
+  "checks": [
+    "authenticated",
+    "specific_script_error_and_retry_visible",
+    "retry_endpoint_accepted",
+    "same_project_script_awaits_review",
+    "saved_draft_readable",
+    "five_second_script_preserved",
+    "valid_colors_and_readable_text_duration",
+    "repeat_retry_returns_same_job",
+    "script_survives_reload"
+  ],
+  "retry_job": "946c97bf-08f0-4a5d-be80-e8634b032424",
+  "passed": true
+}

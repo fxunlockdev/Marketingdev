@@ -1823,6 +1823,20 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   await expect(media.getByLabel('Video format',{exact:true})).toContainText(kind==='reel'?'Reel':'Feed video');
   assert.equal(videoSubmits,count,'No paid video generation before script approval');
   await page.reload();await expect(media.getByLabel('Video prompt',{exact:true})).toBeVisible();
+  if(kind==='reel'){
+   const chatId=new URL(page.url()).searchParams.get('conversation'),prior=(await admin.query('SELECT r.job_id,r.project_id FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows[0];
+   await admin.query("UPDATE app.jobs SET status='rejected',error_code='VIDEO_PLAN_OUTPUT_INVALID' WHERE id=$1",[prior.job_id]);await admin.query('UPDATE app.video_requests SET plan=NULL WHERE job_id=$1',[prior.job_id]);
+   await expect(media.getByRole('button',{name:'Retry script preparation',exact:true})).toBeVisible({timeout:15000});
+   await expect(media.getByText('Script needs attention',{exact:true})).toBeVisible();
+   await expect(media.getByRole('button',{name:'View generation progress →',exact:true})).toHaveCount(0);
+   let lostRetry=false;await page.route('**/video-jobs/*/retry-script',async route=>{if(lostRetry){await route.continue();return;}lostRetry=true;await route.fetch();await route.abort('failed');});
+   await media.getByRole('button',{name:'Retry script preparation',exact:true}).click();
+   await expect(media.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
+   await expect(media.locator('.notice.error')).toHaveCount(0,{timeout:15000});
+   assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_requests WHERE project_id=$1',[prior.project_id])).rows[0].n,2);assert.equal(videoSubmits,count);
+   await page.unroute('**/video-jobs/*/retry-script');
+  }
+
   await expect(media.getByRole('button',{name:'Draft video script',exact:true})).toHaveCount(0);
   await media.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for chat');
   await media.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
@@ -1842,7 +1856,7 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   assert.equal(videoSubmits,count+1);
   const chatId=new URL(page.url()).searchParams.get('conversation');
   const spec=(await admin.query('SELECT r.creative_spec FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
-  assert.equal(spec.length,1);assert.equal(spec[0].creative_spec.placement,kind==='reel'?'reel':'feed');
+  assert.equal(spec.length,kind==='reel'?2:1);assert.equal(spec[0].creative_spec.placement,kind==='reel'?'reel':'feed');
   await page.reload();await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible();
   let failVideoRead=true;
   await page.route('**/videos',async route=>{if(failVideoRead&&route.request().method()==='GET'){await route.abort('failed');return;}await route.continue();});

@@ -23,3 +23,24 @@ test('video results require exact original skill digests, read evidence, bounded
  assert.ok(validateVideoPlanningResult(result,videoInput()));
  for(const mutate of [v=>v.skills[0].live=true,v=>v.reads.push('/skills/video/helper.py'),v=>v.skills[0].tree_sha256='bad',v=>v.skills[0].skill_sha256='bad',v=>v.skills.push(v.skills[0]),v=>v.skills.pop(),v=>v.reads.pop(),v=>v.reads.push('/etc/passwd'),v=>v.reads.push('/skills/video/../image/SKILL.md'),v=>v.reads.push('/skills/image/SKILL.md'),v=>v.helpers_executed=true,v=>v.model_calls=4,v=>v.model_calls=0,v=>v.version='fake',v=>v.live_verified=true]){const value=structuredClone(result);mutate(value);assert.throws(()=>validateVideoPlanningResult(value,videoInput()),/SKILL_/);}
 });
+
+test('generated video colors and short end titles recover without weakening user-edit validation',async()=>{
+ const {normalizeGeneratedVideoBrief,videoBriefSchema}=await import('../../dist/video-planning.js');
+ const input=videoInput(),brief=videoBrief();
+ brief.overlays=[{text:'Brand introduction',start_ms:2200,end_ms:4000,position:'bottom',foreground:'FFFFFF',background:'23272B'},{text:'Brand name',start_ms:4200,end_ms:5000,position:'bottom',foreground:'FFFFFF',background:'000000'}];
+ const before=structuredClone(brief),normalized=normalizeGeneratedVideoBrief(brief,input);
+ assert.deepEqual(brief,before);assert.equal(normalized.overlays[1].start_ms,4000);assert.equal(normalized.overlays[1].end_ms,5000);assert.equal(normalized.overlays[0].foreground,'#FFFFFF');
+ assert.throws(()=>validateVideoBrief(brief,input),/VIDEO_PLAN_OUTPUT_INVALID/);
+ for(const mutate of [v=>v.fact_ids=['invented'],v=>v.beats[1].start_ms=1999,v=>v.overlays[1].start_ms=3900,v=>v.overlays[1].end_ms=5001,v=>v.overlays[1].foreground='red',v=>v.overlays[1].font='/etc/passwd',v=>v.overlays[0].end_ms=4500]){
+  const bad=structuredClone(brief);mutate(bad);assert.throws(()=>normalizeGeneratedVideoBrief(bad,input),/VIDEO_PLAN_OUTPUT_INVALID/);
+ }
+ const schema=videoBriefSchema(input.brand.facts.map(f=>f.id),5);
+ assert.equal(schema.additionalProperties,false);assert.equal(schema.properties.overlays.items.properties.foreground.pattern,'^#[a-fA-F0-9]{6}$');
+ assert.deepEqual(schema.properties.fact_ids.items.enum,['offering','palette']);assert.equal(schema.properties.beats.items.properties.end_ms.maximum,5000);
+});
+
+test('video broker constrains the final model response using only approved fact IDs and duration',async()=>{
+ const {CreativeProvider}=await import('../../dist/creative-provider.js');
+ const provider=new CreativeProvider();const wire=provider.plannerRequest({type:'model',step:1,tools:[],messages:[{role:'user',content:'Create a five second introduction'}],video_plan:{fact_ids:['approved'],duration_seconds:5}},'gpt-4.1-2025-04-14');
+ assert.equal(wire.body.text.format.name,'desvio_video_brief');assert.equal(wire.body.text.format.strict,true);assert.deepEqual(wire.body.text.format.schema.properties.fact_ids.items.enum,['approved']);
+});

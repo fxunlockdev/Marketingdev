@@ -269,3 +269,9 @@
 .conversation-recovery p{margin:0;color:#565366;line-height:1.5}
 .conversation-recovery-actions{display:flex;flex-wrap:wrap;gap:10px}
 .conversation-recovery button{min-height:44px;white-space:normal;text-align:center}
+
+.chat-video .video-recovery{display:grid;gap:12px;padding:24px;background:var(--surface-soft,#f5f3fa);border:1px solid var(--border,#e5e1ef);border-radius:24px;}
+.chat-video .video-recovery h3,.chat-video .video-recovery p{margin:0;}
+.chat-video .video-recovery h3{text-wrap:balance;}
+.chat-video .video-recovery p{text-wrap:pretty;}
+.chat-video .video-recovery button{justify-self:start;min-height:44px;white-space:normal;}

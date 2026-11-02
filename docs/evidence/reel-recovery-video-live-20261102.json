@@ -1,0 +1,20 @@
+{
+  "started_at": "2026-11-02T02:53:07.127Z",
+  "job": "946c97bf-08f0-4a5d-be80-e8634b032424",
+  "conversation": "1152eed0-e250-4c4f-aa77-c03e667f1cf2",
+  "scope": "Owner-authorized real five-second Reel generation after recovering failed script. No social publishing.",
+  "checks": [
+    "real_five_second_vertical_video_plays",
+    "saved_playback_and_download_survive_reload"
+  ],
+  "status": "succeeded",
+  "error_code": null,
+  "version": "f52062c1-ae35-4720-ae8f-05a52cd1b801",
+  "metadata": {
+    "width": 1080,
+    "height": 1920,
+    "duration": 5.033333
+  },
+  "passed": true,
+  "finished_at": "2026-11-02T02:53:17.217Z"
+}

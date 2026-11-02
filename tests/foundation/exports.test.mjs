@@ -170,16 +170,25 @@ test('approved export to original video skills, durable provider stage, actual m
  const body={prompt:'Animate our approved creative',slot_id:linkedSlot.id,slot_revision:linkedSlot.revision,channel:'instagram',duration_seconds:3,reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
  await assert.rejects(service.submit(viewer.id,brand.id,thread,body,randomUUID()));await assert.rejects(service.submit(bob.id,brand.id,thread,body,randomUUID()));
  await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour',budget_micros=10000000",[org.id,brand.id]);
- const requestKey=randomUUID(),j=await service.submit(alice.id,brand.id,thread,body,requestKey);
+ const requestKey=randomUUID();let j=await service.submit(alice.id,brand.id,thread,body,requestKey);
  assert.match((await admin.query('SELECT prompt FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0].prompt,/Urgency and discounts/);
  assert.equal((await service.submit(alice.id,brand.id,thread,body,requestKey)).id,j.id);
  await assert.rejects(service.submit(alice.id,brand.id,thread,{...body,prompt:'Different'},requestKey),/different video/);
 
+ // Reproduce a rejected pre-provider script; retry keeps its exact reference and project.
+ const original=j,originalRequest=(await admin.query('SELECT * FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
+ await assert.rejects(service.retryScript(alice.id,brand.id,j.id),/running|safely retry/);
+ await admin.query("UPDATE app.jobs SET status='rejected',error_code='VIDEO_PLAN_OUTPUT_INVALID' WHERE id=$1",[j.id]);
+ await assert.rejects(service.retryScript(bob.id,brand.id,j.id));await assert.rejects(service.retryScript(viewer.id,brand.id,j.id));await assert.rejects(service.retryScript(editor.id,brand.id,j.id));
+ const recovered=await Promise.all([service.retryScript(alice.id,brand.id,j.id),service.retryScript(alice.id,brand.id,j.id)]);assert.equal(recovered[0].id,recovered[1].id);assert.notEqual(recovered[0].id,j.id);j=recovered[0];
+ const recoveredRequest=(await admin.query('SELECT * FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];assert.equal(recoveredRequest.project_id,originalRequest.project_id);assert.equal(recoveredRequest.prompt,originalRequest.prompt);assert.equal(recoveredRequest.approved_brief,null);assert.equal(recoveredRequest.creative_spec?.placement,originalRequest.creative_spec?.placement);
+ assert.equal((await admin.query('SELECT export_id FROM app.video_references WHERE job_id=$1',[j.id])).rows[0].export_id,e.id);
+ assert.equal((await service.retryScript(alice.id,brand.id,original.id)).id,j.id);
  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL TEST',true)",[org.id,brand.id]);
  let plansCalled=0,submits=0,statuses=0,downloads=0,leasedURL;
  const text=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
   plansCalled++;assert.equal(new URL(url).pathname,'/v1/responses');const wire=JSON.parse(init.body),message=wire.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')),input=JSON.parse(message.content.slice(message.content.indexOf('\n')+1));
-  assert.equal(input.task,'video');assert.equal(input.reference.sha256,e.sha256);assert.ok(!JSON.stringify(wire).includes('X-Amz'));assert.ok(!JSON.stringify(wire).includes(config.storage.secretAccessKey));
+  assert.equal(wire.text.format.name,'desvio_video_brief');assert.equal(input.task,'video');assert.equal(input.reference.sha256,e.sha256);assert.ok(!JSON.stringify(wire).includes('X-Amz'));assert.ok(!JSON.stringify(wire).includes(config.storage.secretAccessKey));
   const brief={title:'TEST video',caption:'TEST FIXTURE video caption',video_prompt:'TEST FIXTURE subtle motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:3000,action:'Subtle motion',camera:'Static'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]};
   return Response.json({object:'response',id:'resp_mock_video',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(brief),annotations:[]}]}]});
  }}));
@@ -201,6 +210,7 @@ test('approved export to original video skills, durable provider stage, actual m
  await assert.rejects(service.saveDraft(alice.id,brand.id,j.id,{brief:edited,revision:1,approve:true}));
  await service.saveDraft(alice.id,brand.id,j.id,{brief:edited,revision:2,approve:true});
  assert.equal(await pipeline.step(scope(j)),'accepted');
+ await assert.rejects(service.retryScript(alice.id,brand.id,j.id),/safely retry|running/);
  await assert.rejects(service.saveDraft(alice.id,brand.id,j.id,{brief:edited,revision:3,approve:false}));
  assert.equal(await pipeline.step(scope(j)),'completed');assert.equal(await pipeline.step(scope(j)),'succeeded');
  assert.equal(plansCalled,1);assert.equal(submits,1);assert.equal(statuses,1);assert.equal(downloads,1);

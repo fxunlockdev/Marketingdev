@@ -1,3 +1,4 @@
+import {videoBriefSchema} from './video-planning.js';
 import {chatSchema} from './chat-contracts.js';
 import {CREATIVE_PLANNER_LIMITS} from './creative-budget.js';
 import OpenAI, { toFile } from "openai";
@@ -80,6 +81,7 @@ export class CreativeProvider {
       parallel_tool_calls: false,
       ...(model==='gpt-6-sol'?{reasoning:{effort:'low' as const}}:{}),
       ...(request.chat_response?{reasoning:{effort:'low' as const},text:{format:{type:'json_schema' as const,name:'desvio_chat',strict:true,schema:chatSchema}}}:{}),
+      ...(request.video_plan?{text:{format:{type:'json_schema' as const,name:'desvio_video_brief',strict:true,schema:videoBriefSchema(request.video_plan.fact_ids,request.video_plan.duration_seconds)}}}:{}),
       ...(request.creative_fact_ids?{text:{format:{type:'json_schema' as const,name:'desvio_creative_brief',strict:true,schema:creativeBriefSchema(request.creative_fact_ids)}}}:{}),
     };
     const bytes = Buffer.byteLength(canonicalJSON(body));

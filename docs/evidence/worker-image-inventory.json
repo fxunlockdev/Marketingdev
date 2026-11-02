@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-01T13:16:10.990Z",
+  "checked_at": "2026-11-02T02:39:32.386Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:f6d1f4bffe07957e3ad6fa105f7476906647191d35d347855790f2f370d2f2ab",
+      "image_id": "sha256:a9a283868c30b6994ef830a2d6b1bac8227132792570cfc732d4465ed9c179be",
       "architecture": "amd64",
       "user": "node"
     },

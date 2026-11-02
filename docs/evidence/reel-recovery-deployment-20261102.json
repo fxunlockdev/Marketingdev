@@ -1,0 +1,61 @@
+{
+  "checked_at": "2026-11-02T02:47:11.763Z",
+  "environment": "dev",
+  "api": {
+    "deploymentId": "9830dc33-1330-4033-a28d-ea6146c3609c",
+    "logsUrl": "https://railway.com/project/5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12/service/21260f12-2ad2-413c-9f67-2a1c4d6f8c83?id=9830dc33-1330-4033-a28d-ea6146c3609c&",
+    "status": "SUCCESS"
+  },
+  "web": {
+    "deploymentId": "4e9553f3-af35-4e71-812c-2db0b95d2977",
+    "logsUrl": "https://railway.com/project/5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12/service/a92160c2-54ef-4523-b13b-4a9a0e2dbdd2?id=4e9553f3-af35-4e71-812c-2db0b95d2977&",
+    "status": "SUCCESS"
+  },
+  "worker": {
+    "checked_at": "2026-11-02T02:42:16.595Z",
+    "passed": true,
+    "image": "sha256:a9a283868c30b6994ef830a2d6b1bac8227132792570cfc732d4465ed9c179be",
+    "backup_container": "desvio-worker-rollback-20261102-reel",
+    "paid_calls": false,
+    "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Chat media provider acceptance recorded separately; social publishing excluded."
+  },
+  "source_files": [
+    {
+      "file": "apps/api/src/app.ts",
+      "sha256": "075dd3910fc8555e716d4a13317002015dc3464432b8bca665fad807540512db"
+    },
+    {
+      "file": "apps/api/src/creative-contracts.ts",
+      "sha256": "5e9dfcac02afad9593acde3f559e85d4b40631e74c5d6af4b796328cd78f8226"
+    },
+    {
+      "file": "apps/api/src/creative-provider.ts",
+      "sha256": "3e44a97678be9f18f4226a5aa5cb1bdb3c76d0cdad06fbf0d046fd8b7302f796"
+    },
+    {
+      "file": "apps/api/src/skill-runtime.ts",
+      "sha256": "a56b42c701bbbe66c8b47a47dee4040bbe50cd9edaf23c957296a010a8ab1863"
+    },
+    {
+      "file": "apps/api/src/video-canvas.ts",
+      "sha256": "eee7572f399fbad22cc2a80f33b43f4dd7138d95885faae220fdf2c99a79514e"
+    },
+    {
+      "file": "apps/api/src/video-planning.ts",
+      "sha256": "38b769eac161a1a74d4b6f0e08d167bf5c85a46586c646ae4de914be41834f07"
+    },
+    {
+      "file": "apps/web/components/chat-media.tsx",
+      "sha256": "2965869fa1a6dfd7a2c021fa5ef0da82e4cf4913d76216712b94cd7709e27781"
+    },
+    {
+      "file": "apps/web/components/conversation-chat.css",
+      "sha256": "fcacb2ddf25309bc2900fb4b2584bcbf5a73e2bba3cb45446ea3fd1e88b8f377"
+    },
+    {
+      "file": "apps/web/components/video-canvas.tsx",
+      "sha256": "8d5af4788fd96c40b66fbe5b696d75074e8c9a02abe9cc3133a98c8aaa47f39e"
+    }
+  ],
+  "scope": "Exact frozen source deployed to existing invite-only dev services. Railway deployment SUCCESS independently read through Railway MCP; worker pollers and DB roles checked. Customer verification reported separately."
+}
