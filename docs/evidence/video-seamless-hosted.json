@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-11-04T16:28:30.899Z",
+  "scope": "Hosted dev: one real 3-second Runway video through Generate in chat; existing configured provider budget enforced; no publishing",
+  "checks": [
+    "real_ai_preserves_prompt_and_duration",
+    "no_document_reload",
+    "compact_setup_in_chat",
+    "compact_image_choice",
+    "mobile_no_horizontal_overflow",
+    "image_selection_does_not_spend",
+    "single_generate_action",
+    "generation_continues_without_browser",
+    "no_second_script_form",
+    "one_saved_video",
+    "runway_output_with_skill_evidence",
+    "new_runway_video_plays_after_reopening_chat"
+  ],
+  "conversation": "b30ae973-2997-42d3-9c19-408b259da9bc",
+  "job": "05bac399-8fc9-4427-b7fe-7ec15e9b6446",
+  "version": "9811bb0f-9c3f-4c6d-bc3c-447a9e2f7207",
+  "provider": "runway",
+  "skill_count": 5,
+  "passed": true
+}

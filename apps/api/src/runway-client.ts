@@ -4,7 +4,7 @@ import {VideoProviderError} from './video-provider.js';
 export const RUNWAY_VIDEO_MODEL='runway/router'; // Entitlement, not a model sent to Runway.
 export const RUNWAY_API_VERSION='2024-11-06';
 export class RunwayError extends VideoProviderError {}
-export type RunwayIntent={kind:'image';model:typeof RUNWAY_VIDEO_MODEL;idempotencyKey:string;referenceURL:string;prompt:string;durationSeconds:number;sound:'off';aspectRatio:'9:16'|'16:9'|'1:1'|'3:4'|'4:3';maxCredits?:number};
+export type RunwayIntent={kind:'image';model:typeof RUNWAY_VIDEO_MODEL;idempotencyKey:string;referenceURL:string;prompt:string;durationSeconds:number;sound:'off';aspectRatio:'9:16'|'16:9'|'1:1'|'3:4'|'4:3';maxCredits?:number;routingProfile?:'short-clip-v1'};
 export const validRunwaySecret=(v:unknown):v is string=>typeof v==='string'&&/^[\x21-\x7e]{1,2048}$/.test(v);
 const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/;
 const fail=():never=>{throw Error('invalid');};
@@ -36,9 +36,11 @@ export class RunwayClient {
   try{
    record(intent);id(intent.idempotencyKey);
    if(intent.kind!=='image'||intent.model!==RUNWAY_VIDEO_MODEL||intent.sound!=='off'||!this.#origins.has(url(intent.referenceURL).origin)||typeof intent.prompt!=='string'||!intent.prompt.trim()||intent.prompt.length>26000||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(intent.prompt)||!Number.isInteger(intent.durationSeconds)||intent.durationSeconds<3||intent.durationSeconds>15||!['9:16','16:9','1:1','3:4','4:3'].includes(intent.aspectRatio)||!Number.isInteger(intent.maxCredits)||intent.maxCredits!<1||intent.maxCredits!>10000)fail();
-   if(Object.keys(intent).some(k=>!['kind','model','idempotencyKey','referenceURL','prompt','durationSeconds','sound','aspectRatio','maxCredits'].includes(k)))fail();
-   const configId=`desvio-video-quality-v1-${intent.maxCredits}`;
-   const body=JSON.stringify({configId,input:{referenceImages:[{uri:intent.referenceURL,role:'first'}],promptText:intent.prompt,duration:intent.durationSeconds,aspectRatio:intent.aspectRatio,resolution:'1080p',audio:false}});
+   if(intent.routingProfile!==undefined&&(intent.routingProfile!=='short-clip-v1'||intent.durationSeconds!==3||intent.prompt.length>1000))fail();
+   if(Object.keys(intent).some(k=>!['kind','model','idempotencyKey','referenceURL','prompt','durationSeconds','sound','aspectRatio','maxCredits','routingProfile'].includes(k)))fail();
+   const short=intent.routingProfile==='short-clip-v1';
+   const configId=short?`desvio-video-short-quality-v1-${intent.maxCredits}`:`desvio-video-quality-v1-${intent.maxCredits}`;
+   const body=JSON.stringify({configId,input:{referenceImages:[{uri:intent.referenceURL,role:'first'}],promptText:intent.prompt,duration:intent.durationSeconds,aspectRatio:intent.aspectRatio,resolution:short?'720p':'1080p',audio:false}});
    return {model:intent.model,idempotencyKey:intent.idempotencyKey,body,configId,sha256:createHash('sha256').update(body).digest('hex')};
   }catch{throw new RunwayError('RUNWAY_INPUT_INVALID');}
  }
@@ -57,9 +59,9 @@ export class RunwayClient {
    }catch{await r.body?.cancel().catch(()=>{});throw new RunwayError('RUNWAY_RESPONSE_INVALID',outcome);}
   }finally{clearTimeout(timer);}
  }
- private validRouter(router:any,slug:string,cap:number){
+ private validRouter(router:any,slug:string,cap:number,excluded:string[]){
   const s=router?.settings;
-  return router?.slug===slug&&s?.optimizeFor==='quality'&&s?.models?.mode==='allow_new_except'&&Array.isArray(s.models.ids)&&s.models.ids.length===0&&s?.maxCreditsPerGeneration?.video===cap;
+  return router?.slug===slug&&s?.optimizeFor==='quality'&&s?.models?.mode==='allow_new_except'&&Array.isArray(s.models.ids)&&JSON.stringify(s.models.ids)===JSON.stringify(excluded)&&s?.maxCreditsPerGeneration?.video===cap;
  }
  private async findRouter(slug:string){
   let cursor:string|undefined;
@@ -71,18 +73,18 @@ export class RunwayClient {
    if(typeof r.nextCursor!=='string'||!r.nextCursor||r.nextCursor===cursor)throw new RunwayError('RUNWAY_ROUTER_RESPONSE_INVALID');cursor=r.nextCursor;
   }throw new RunwayError('RUNWAY_ROUTER_RESPONSE_INVALID');
  }
- private async ensureRouter(slug:string,cap:number){
+ private async ensureRouter(slug:string,cap:number,excluded:string[]){
   let router=await this.findRouter(slug);
   if(!router){
-   try{router=await this.request('/v1/routers','POST',{slug,name:`Desvio video · Quality · ${cap} credits`,settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:cap}}});}
+   try{router=await this.request('/v1/routers','POST',{slug,name:`Desvio video · Quality · ${cap} credits`,settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:excluded},maxCreditsPerGeneration:{video:cap}}});}
    catch(error){if(error instanceof RunwayError&&error.code==='RUNWAY_CONFLICT')router=await this.findRouter(slug);else throw error;}
   }
-  if(!this.validRouter(router,slug,cap))throw new RunwayError('RUNWAY_ROUTER_CONFIGURATION_CHANGED');
+  if(!this.validRouter(router,slug,cap,excluded))throw new RunwayError('RUNWAY_ROUTER_CONFIGURATION_CHANGED');
  }
  async submit(intent:RunwayIntent,expectedSHA:string){
   const p=this.prepare(intent);if(p.sha256!==expectedSHA)throw new RunwayError('RUNWAY_REPLAY_MISMATCH');
   // Nothing paid has been sent if router preparation fails; release safely.
-  try{await this.ensureRouter(p.configId,intent.maxCredits!);}catch(e){throw new RunwayError(e instanceof RunwayError?e.code:'RUNWAY_ROUTER_UNAVAILABLE','rejected');}
+  try{await this.ensureRouter(p.configId,intent.maxCredits!,intent.routingProfile==='short-clip-v1'?['wan3']:[]);}catch(e){throw new RunwayError(e instanceof RunwayError?e.code:'RUNWAY_ROUTER_UNAVAILABLE','rejected');}
   const value=await this.request('/v1/generate/video','POST',JSON.parse(p.body),true);
   try{
    const r=record(value),requestId=id(r.id),route=record(r.routing),settings=record(route.resolvedSettings),credits=record(route.estimatedCost).credits;

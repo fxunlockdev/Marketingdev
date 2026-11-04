@@ -201,7 +201,7 @@ before(async () => {
             const context=JSON.parse(chatWire.input.find(m=>m.role==='user').content);
             if(/carousel|reel|video/i.test(context.message)){
               const carousel=/carousel/i.test(context.message),reel=/reel/i.test(context.message);
-              return modelResponse({reply:carousel?'I’ll create your three-slide story.':`Choose a starting image for your ${reel?'reel':'video'}, then review its script.`,action:carousel?'carousel':'video',prompt:carousel?'TEST botanical soap carousel for mindful households':'TEST gentle botanical product film',channel:'instagram',size:reel?'1024x1536':'1024x1024',sources:[],starts_on:null,text_mode:'none',slide_count:3,placement:reel?'reel':'feed',duration_seconds:3});
+              return modelResponse({reply:carousel?'I’ll create your three-slide story.':`Choose a starting image for your ${reel?'reel':'video'}, then select Generate video.`,action:carousel?'carousel':'video',prompt:carousel?'TEST botanical soap carousel for mindful households':'TEST gentle botanical product film',channel:'instagram',size:reel?'1024x1536':'1024x1024',sources:[],starts_on:null,text_mode:'none',slide_count:3,placement:reel?'reel':'feed',duration_seconds:3});
             }
             const recall=/remember/i.test(context.message),edit=/warmer/i.test(context.message),unclear=/something/i.test(context.message);
             return modelResponse({reply:recall?`I found your saved conversation [${context.memories[0].id}].`:unclear?'What should the image show?':edit?'I’ll warm up the saved image.':'I’ll create your clean image now.',action:recall||unclear?'answer':edit?'edit_image':'image',prompt:recall||unclear?'':'TEST a botanical soap image without text',channel:'instagram',size:'1024x1024',sources:recall?[context.memories[0].id]:[],starts_on:null,text_mode:edit?context.current_image.text_mode:'none'});
@@ -301,10 +301,11 @@ before(async () => {
   const videoRefs=new Map();let runwayTask=randomUUID();
   const videoProvider=new RunwayClient({mode:'test',secret:'fixture',referenceOrigins:['https://media.example.com']},async(url,init)=>{
    const path=new URL(url).pathname;
-   if(path==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
+   if(path==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}},{slug:'desvio-video-short-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:['wan3']},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
    if(path==='/v1/generate/video'){
     videoSubmits++;const body=JSON.parse(init.body),input=body.input;
-    assert.ok(input.promptText.startsWith('TEST user edited video prompt'));assert.ok(input.promptText.includes('TEST revised storyline'));assert.equal((await fetch(videoRefs.get(input.referenceImages[0].uri))).status,200);
+    const jobId=new URL(input.referenceImages[0].uri).pathname.slice(1),saved=(await admin.query('SELECT approved_brief FROM app.video_requests WHERE job_id=$1',[jobId])).rows[0];
+    assert.ok(saved?.approved_brief);assert.equal(input.promptText,saved.approved_brief.video_prompt+'\nScript:\n'+saved.approved_brief.beats.map(b=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n'));assert.equal((await fetch(videoRefs.get(input.referenceImages[0].uri))).status,200);
     runwayTask=randomUUID();return Response.json({id:runwayTask,dryRun:false,routing:{model:'gen4.5',provider:'runway',configId:body.configId,resolvedSettings:{optimizeFor:'quality',priceCeiling:10},estimatedCost:{credits:9}}});
    }
    return Response.json({id:runwayTask,status:'SUCCEEDED',output:['https://video.example.org/fixture.mp4']});
@@ -1822,9 +1823,10 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   const flow=page.getByRole('region',{name:'Video conversation',exact:true});
   await expect(flow).toBeVisible();
   assert.equal(await media.locator('textarea,fieldset').count(),0,'Canvas contains no setup form');
-  await expect(flow.getByRole('button',{name:'3s',exact:true})).toHaveAttribute('aria-pressed','true');
+  await expect(flow.getByText('3s · '+(kind==='reel'?'Reel':'Video'),{exact:true})).toBeVisible();
+  await expect(flow.getByRole('button',{name:'Generate video',exact:true})).toBeDisabled();
   if(kind==='reel'){
-   await flow.getByRole('button',{name:'Upload or approve another image',exact:true}).click();
+   await flow.getByRole('button',{name:'Choose or upload image',exact:true}).click();
    const picker=page.getByRole('dialog',{name:'Choose a video image',exact:true});
    await picker.getByText('Add product photos',{exact:true}).click();
    await picker.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'chat-video-product.png',mimeType:'image/png',buffer:png});
@@ -1834,65 +1836,41 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
    await approval.getByLabel('Reference name',{exact:true}).fill('Chat video product');
    await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
    await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
-  }
-  await page.screenshot({path:`work/browser/chat-${kind}-image-choice.png`});
+   await picker.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
+   await expect(picker).toHaveCount(0);
+  }else await flow.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
   const count=videoSubmits;
+  assert.equal(videoSubmits,count,'Choosing an image alone does not generate');
+  await page.screenshot({path:`work/browser/chat-${kind}-image-choice.png`});
   if(kind==='reel'){
    await page.route('**/canvas/threads/*/videos',route=>route.abort('failed'));
-   await page.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
-   const picker=page.getByRole('dialog',{name:'Choose a video image',exact:true});
-   await expect(picker.getByRole('button',{name:'Retry saved video setup',exact:true})).toBeVisible();
-   await picker.getByRole('button',{name:'Close image picker',exact:true}).click();
-   await expect(picker).toHaveCount(0);
+   await flow.getByRole('button',{name:'Generate video',exact:true}).click();
+   await expect(flow.getByRole('button',{name:'Retry saved video setup',exact:true})).toBeVisible();
    await page.unroute('**/canvas/threads/*/videos');
    await flow.getByRole('button',{name:'Retry saved video setup',exact:true}).click();
   }else{
    await page.route('**/canvas/threads/*/videos',route=>route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({message:'The reference approval has changed'})}));
-   await flow.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
+   await flow.getByRole('button',{name:'Generate video',exact:true}).click();
    await expect(flow.locator('.notice.error')).toBeVisible();
-   await expect(flow.getByRole('button',{name:'3s',exact:true})).toBeEnabled();
    await expect(flow.getByRole('button',{name:'Use Chat video product for video',exact:true})).toBeEnabled();
    await page.unroute('**/canvas/threads/*/videos');
    await page.route('**/canvas/threads/*/videos',async route=>{await route.fetch();await route.abort('failed');});
-   await flow.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
+   await flow.getByRole('button',{name:'Generate video',exact:true}).click();
   }
-  await flow.getByText('Edit script & caption',{exact:true}).click({timeout:60000});
+  const chatId=new URL(page.url()).searchParams.get('conversation');
+  await expect.poll(async()=>(await admin.query('SELECT count(*)::int AS n FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows[0].n).toBe(1);
   if(kind==='video')await page.unroute('**/canvas/threads/*/videos');
-  await expect(flow.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
-  await expect(flow.getByLabel('Video format',{exact:true})).toContainText(kind==='reel'?'Reel':'Feed video');
-  assert.equal(videoSubmits,count,'No paid video generation before script approval');
-  await page.reload();await flow.getByText('Edit script & caption',{exact:true}).click();await expect(flow.getByLabel('Video prompt',{exact:true})).toBeVisible();
-  if(kind==='reel'){
-   const chatId=new URL(page.url()).searchParams.get('conversation'),prior=(await admin.query('SELECT r.job_id,r.project_id FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows[0];
-   await admin.query("UPDATE app.jobs SET status='rejected',error_code='VIDEO_PLAN_OUTPUT_INVALID' WHERE id=$1",[prior.job_id]);await admin.query('UPDATE app.video_requests SET plan=NULL WHERE job_id=$1',[prior.job_id]);
-   await expect(flow.getByRole('button',{name:'Retry script preparation',exact:true})).toBeVisible({timeout:15000});
-   await expect(media.getByText('Script needs attention',{exact:true})).toBeVisible();
-   await expect(flow.getByRole('button',{name:'View generation progress →',exact:true})).toHaveCount(0);
-   let lostRetry=false;await page.route('**/video-jobs/*/retry-script',async route=>{if(lostRetry){await route.continue();return;}lostRetry=true;await route.fetch();await route.abort('failed');});
-   await flow.getByRole('button',{name:'Retry script preparation',exact:true}).click();
-   await flow.getByText('Edit script & caption',{exact:true}).click();
-   await expect(flow.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
-   await expect(flow.locator('.notice.error')).toHaveCount(0,{timeout:15000});
-   assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_requests WHERE project_id=$1',[prior.project_id])).rows[0].n,2);assert.equal(videoSubmits,count);
-   await page.unroute('**/video-jobs/*/retry-script');
-  }
-
-  await expect(flow.getByRole('button',{name:'Draft video script',exact:true})).toHaveCount(0);
-  await flow.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for chat');
-  // Internal chat navigation must respect unsaved video fields, just like page unload.
-  page.once('dialog',dialog=>dialog.dismiss());
-  await page.getByRole('button',{name:'Start over',exact:false}).click();
-  await expect(flow.getByLabel('Video prompt',{exact:true})).toHaveValue('TEST user edited video prompt for chat');
-  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Change the scene');
-  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
-  await page.getByRole('textbox',{name:'Message Desvio'}).fill('');
-
-  await flow.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
-  const generationConsent=flow.getByLabel('I approve this prompt and authorize video generation using the configured allowance.');
-  const consentBox=await generationConsent.boundingBox();assert.ok(consentBox&&consentBox.width<=24&&consentBox.height<=24,'Consent checkbox keeps its compact size inside chat');
-  assert.ok(await generationConsent.locator('..').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Consent text fits the chat column');
-  await generationConsent.check();
-  await flow.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+  // Preparation and generation continue with the page gone; no client-side approval loop.
+  await page.goto('about:blank');
+  await expect.poll(async()=>(await admin.query('SELECT j.status FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id JOIN app.jobs j ON j.id=r.job_id WHERE p.thread_id=$1',[chatId])).rows[0]?.status,{timeout:150000}).toBe('succeeded');
+  await page.goto(`${base}/b/${brand}/create?conversation=${chatId}`);
+  const saved=(await admin.query('SELECT r.*,p.thread_id FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
+  assert.equal(saved.length,1,'Lost acknowledgement does not duplicate generation');
+  assert.equal(saved[0].generation_authorized_by,saved[0].approved_by);
+  assert.equal(saved[0].draft_revision,1);
+  assert.deepEqual(saved[0].approved_brief,saved[0].plan.brief,'Existing skills plan is used by generation');
+  assert.ok(saved[0].plan.skills.length>0,'Immutable skill evidence retained');
+  await expect(flow.getByRole('button',{name:'Approve prompt and generate video',exact:true})).toHaveCount(0);
   await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});
   await expect(media.locator('.chat-saved-video video')).toBeVisible({timeout:30000});
   await expect.poll(()=>media.locator('.chat-saved-video video').evaluate(el=>el.readyState),{timeout:30000}).toBeGreaterThanOrEqual(2);
@@ -1905,9 +1883,8 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   await flow.getByLabel('Video feedback',{exact:true}).fill('');
   await flow.getByText('Edit, review & history',{exact:true}).click();await expect(media.getByRole('link',{name:'Download video',exact:true})).toHaveCount(1);
   assert.equal(videoSubmits,count+1);
-  const chatId=new URL(page.url()).searchParams.get('conversation');
   const spec=(await admin.query('SELECT r.creative_spec FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
-  assert.equal(spec.length,kind==='reel'?2:1);assert.equal(spec[0].creative_spec.placement,kind==='reel'?'reel':'feed');
+  assert.equal(spec.length,1);assert.equal(spec[0].creative_spec.placement,kind==='reel'?'reel':'feed');
   await page.reload();await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible();
   let failVideoRead=true;
   await page.route('**/videos',async route=>{if(failVideoRead&&route.request().method()==='GET'){await route.abort('failed');return;}await route.continue();});

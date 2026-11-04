@@ -170,6 +170,8 @@ test('approved export to original video skills, durable provider stage, actual m
  const body={prompt:'Animate our approved creative',slot_id:linkedSlot.id,slot_revision:linkedSlot.revision,channel:'instagram',duration_seconds:3,reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
  await assert.rejects(service.submit(viewer.id,brand.id,thread,body,randomUUID()));await assert.rejects(service.submit(bob.id,brand.id,thread,body,randomUUID()));
  await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour',budget_micros=10000000",[org.id,brand.id]);
+ await assert.rejects(service.submit(editor.id,brand.id,thread,{...body,generate:true},randomUUID()),/owner or admin/);
+ assert.throws(()=>service.submit(alice.id,brand.id,thread,{...body,generate:'yes'},randomUUID()),/whether to generate/);
  const requestKey=randomUUID();let j=await service.submit(alice.id,brand.id,thread,body,requestKey);
  assert.match((await admin.query('SELECT prompt FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0].prompt,/Urgency and discounts/);
  assert.equal((await service.submit(alice.id,brand.id,thread,body,requestKey)).id,j.id);
@@ -198,7 +200,7 @@ test('approved export to original video skills, durable provider stage, actual m
  const localReferences=new Map();
  const mockProvider=new RunwayClient({mode:'test',secret:'fixture',referenceOrigins:['https://media.example.com']},async(url,init)=>{
   const path=new URL(url).pathname;
-  if(path==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
+  if(path==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}},{slug:'desvio-video-short-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:['wan3']},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
   if(path==='/v1/generate/video'){
    submits++;remoteId=randomUUID();const body=JSON.parse(init.body),input=body.input;assert.ok(input.promptText.startsWith('TEST FIXTURE user edited motion\nScript:\n'));assert.ok(input.promptText.includes('Subtle motion'));assert.equal(body.model,undefined);leasedURL=localReferences.get(input.referenceImages[0].uri);
    const downloaded=Buffer.from(await(await fetch(leasedURL)).arrayBuffer());assert.equal(digest(downloaded),e.sha256);
@@ -213,6 +215,7 @@ test('approved export to original video skills, durable provider stage, actual m
  const pipeline=new VideoJobs(jobs,refs,creative,provider,downloader,new VideoRenderer(image));
  const firstStep=await pipeline.step(scope(j));
  assert.equal(firstStep,'awaiting_approval',JSON.stringify((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[j.id])).rows[0]));assert.equal(submits,0);assert.equal(await pipeline.step(scope(j)),'awaiting_approval');assert.equal(plansCalled,1);
+ await assert.rejects(jobs.transaction(scope(j),db=>db.query("UPDATE app.video_requests SET approved_brief=plan->'brief',approved_revision=1,approved_by=$2,approved_at=now() WHERE job_id=$1",[j.id,alice.id])),/VIDEO_GENERATION_AUTHORIZATION_REQUIRED/);
  const draft=await service.draft(alice.id,brand.id,j.id),edited={...draft.brief,video_prompt:'TEST FIXTURE user edited motion'};
  await assert.rejects(service.saveDraft(editor.id,brand.id,j.id,{brief:edited,revision:1,approve:true}));
  await service.saveDraft(editor.id,brand.id,j.id,{brief:edited,revision:1,approve:false});

@@ -43,3 +43,12 @@ test('Runway paid submission rejects known HTTP errors but holds network/5xx/mal
 test('Runway refuses malformed configuration and nonlocal test endpoints',()=>{
  for(const delta of [{secret:''},{secret:'Bearer key'},{mode:'production'},{referenceOrigins:['https://media.example.com/path']},{testBaseURL:'https://evil.example'},{mode:'staging',testBaseURL:'http://127.0.0.1:1234'}])assert.throws(()=>new RunwayClient({...config,...delta}),/RUNWAY_CONFIG_INVALID/);
 });
+
+test('three-second compatible profile preserves duration and legacy replay while router chooses the model',async()=>{
+ let paid=0;const slug='desvio-video-short-quality-v1-100';
+ const c=client((u,i)=>{if(i.method==='GET')return Response.json({data:[],hasMore:false});const b=JSON.parse(i.body);if(u.pathname==='/v1/routers'){assert.deepEqual(b.settings.models,{mode:'allow_new_except',ids:['wan3']});return Response.json({...b,id:randomUUID()});}paid++;assert.equal(b.input.duration,3);assert.equal(b.input.resolution,'720p');assert.equal(b.input.promptText,'Self-contained approved direction');assert.equal(b.input.model,undefined);return Response.json({...receipt(),routing:{...receipt().routing,configId:slug}});});
+ const v={...intent(c),durationSeconds:3,prompt:'Self-contained approved direction',routingProfile:'short-clip-v1'};await c.submit(v,c.prepare(v).sha256);assert.equal(paid,1);
+ assert.throws(()=>c.prepare({...v,prompt:'x'.repeat(1001)}),/INPUT_INVALID/);
+ assert.throws(()=>c.prepare({...v,durationSeconds:5}),/INPUT_INVALID/);
+ const legacy=c.prepare({...v,routingProfile:undefined});assert.equal(JSON.parse(legacy.body).input.resolution,'1080p');assert.equal(legacy.configId,router().slug);
+});

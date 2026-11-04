@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-11-04T16:08:50.653Z",
+  "scope": "Hosted dev: one real 3-second Runway video through Generate in chat; existing configured provider budget enforced; no publishing",
+  "checks": [
+    "real_ai_preserves_prompt_and_duration",
+    "no_document_reload",
+    "compact_setup_in_chat",
+    "compact_image_choice",
+    "mobile_no_horizontal_overflow",
+    "image_selection_does_not_spend",
+    "single_generate_action"
+  ],
+  "conversation": "03c73da4-70ac-4df0-81d4-fa03c32e967b",
+  "job": "5a329408-6741-40e5-904f-ff68202b0741",
+  "passed": false,
+  "failure": "GENERATION_rejected:RUNWAY_REQUEST_REJECTED"
+}

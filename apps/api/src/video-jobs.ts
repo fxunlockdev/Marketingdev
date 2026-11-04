@@ -19,7 +19,13 @@ export class VideoJobs {
  constructor(readonly jobs:AssetJobs,readonly references:VideoReferences,readonly creative:CreativeJobs,readonly provider:VideoProviderJobs,readonly download:VideoDownload,readonly renderer:VideoRenderer){}
  private transaction<T>(scope:JobScope,action:(db:any,j:any)=>Promise<T>){return this.jobs.transaction(scope,async(db,j)=>{if(j.kind!=='creative.video')throw new VideoStateError('VIDEO_JOB_KIND_DENIED');return action(db,j);});}
  private async finish(scope:JobScope,status:string,code:string|null){await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]);});await this.references.revoke(scope);return status;}
- private async providerStep(scope:JobScope,forceCancel=false){const phase=await this.provider.step(scope,async(db,j)=>{await this.references.verifySubmission(db,j);await assertLearningCurrent(db,(await db.query('SELECT memory_context FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0]?.memory_context);await this.checkSlot(db,j);},forceCancel);if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
+ private async providerStep(scope:JobScope,forceCancel=false){const phase=await this.provider.step(scope,async(db,j)=>{await this.assertGenerationAuthority(db,j);await this.references.verifySubmission(db,j);await assertLearningCurrent(db,(await db.query('SELECT memory_context FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0]?.memory_context);await this.checkSlot(db,j);},forceCancel);if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
+ private async assertGenerationAuthority(db:any,j:any){
+  const r=(await db.query('SELECT generation_authorized_by FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
+  if(!r?.generation_authorized_by)return;
+  const allowed=(await db.query(`SELECT EXISTS(SELECT 1 FROM app.memberships m WHERE m.organization_id=$1 AND m.user_id=$2 AND m.active AND ((m.business_scope='all' AND m.role IN ('owner','admin')) OR (m.business_scope='selected' AND EXISTS(SELECT 1 FROM app.business_memberships b WHERE b.organization_id=$1 AND b.brand_id=$3 AND b.user_id=$2 AND b.active AND b.role='admin')))) AS allowed`,[j.organization_id,r.generation_authorized_by,j.brand_id])).rows[0]?.allowed;
+  if(r.generation_authorized_by!==j.requested_by||!allowed)throw new VideoStateError('VIDEO_GENERATION_AUTHORITY_REVOKED');
+ }
  private async checkSlot(db:any,j:any){
   const r=(await db.query('SELECT slot_id,slot_revision,creative_spec FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
   if(!r?.slot_id)return;
@@ -73,13 +79,23 @@ export class VideoJobs {
      validateVideoPlanningResult(plan,context.input);
      await this.transaction(scope,async(db,j)=>{if(!await this.jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');await db.query('UPDATE app.video_requests SET plan=$2 WHERE job_id=$1',[j.id,JSON.stringify(plan)]);});
     }
+    if(request.generation_authorized_by&&!request.approved_brief){
+     // Generate is an explicit authorization of this saved prompt/reference. The
+     // validated skill plan can proceed without another browser round-trip.
+     const approved=await this.transaction(scope,async(db,j)=>{
+      if(!await this.jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
+      await this.assertGenerationAuthority(db,j);
+      return (await db.query(`UPDATE app.video_requests SET approved_brief=plan->'brief',approved_revision=draft_revision,approved_by=generation_authorized_by,approved_at=now() WHERE job_id=$1 AND approved_brief IS NULL AND edited_brief IS NULL AND draft_revision=1 RETURNING *`,[j.id])).rows[0];
+     });
+     if(approved)Object.assign(request,approved);
+    }
     if(!request.approved_brief||request.approved_revision!==request.draft_revision)return 'awaiting_approval';
     plan={...plan,brief:request.approved_brief};
     validateVideoPlanningResult(plan,context.input);
     await this.transaction(scope,async(db)=>assertLearningCurrent(db,request.memory_context));
     const lease=await this.references.prepare(scope);
     await this.references.verify(scope);
-    await this.provider.prepare(scope,{kind:'image',model:RUNWAY_VIDEO_MODEL,idempotencyKey:scope.jobId,referenceURL:lease.url,prompt:plan.brief.video_prompt+'\nScript:\n'+plan.brief.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n'),durationSeconds:request.duration_seconds,sound:'off',aspectRatio:request.creative_spec?.aspect==='square'?'1:1':request.creative_spec?.aspect==='landscape'?'16:9':request.creative_spec?.aspect==='portrait'?'3:4':'9:16'},async(db,j)=>{
+    await this.provider.prepare(scope,{kind:'image',model:RUNWAY_VIDEO_MODEL,idempotencyKey:scope.jobId,referenceURL:lease.url,...(request.duration_seconds===3?{routingProfile:'short-clip-v1'}:{}),prompt:plan.brief.video_prompt+'\nScript:\n'+plan.brief.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n'),durationSeconds:request.duration_seconds,sound:'off',aspectRatio:request.creative_spec?.aspect==='square'?'1:1':request.creative_spec?.aspect==='landscape'?'16:9':request.creative_spec?.aspect==='portrait'?'3:4':'9:16'},async(db,j)=>{
      await this.checkSlot(db,j);
      const latest=(await db.query('SELECT approved_brief,approved_revision,draft_revision FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
      if(!latest?.approved_brief||latest.approved_revision!==request.approved_revision||latest.draft_revision!==request.draft_revision||canonicalJSON(latest.approved_brief)!==canonicalJSON(request.approved_brief))throw new Error('VIDEO_PROMPT_APPROVAL_CHANGED');

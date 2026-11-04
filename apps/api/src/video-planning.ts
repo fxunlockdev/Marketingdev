@@ -27,7 +27,7 @@ export function validateVideoInput(v:any):asserts v is VideoPlanningInput {
 export function validateVideoBrief(value:any,input:VideoPlanningInput):VideoBrief {
  const fail=()=>{throw new CreativeError('VIDEO_PLAN_OUTPUT_INVALID');};
  validateVideoInput(input);
- if(!fields(value,['title','caption','video_prompt','fact_ids','warnings','beats','overlays'])||!plain(value.title,140)||!plain(value.caption,3000)||!plain(value.video_prompt,8000)||!Array.isArray(value.fact_ids)||!value.fact_ids.length||value.fact_ids.length>20||new Set(value.fact_ids).size!==value.fact_ids.length||value.fact_ids.some((id:any)=>!input.brand.facts.some(f=>f.id===id))||!Array.isArray(value.warnings)||value.warnings.length>10||value.warnings.some((s:any)=>!plain(s,500)))fail();
+ if(!fields(value,['title','caption','video_prompt','fact_ids','warnings','beats','overlays'])||!plain(value.title,140)||!plain(value.caption,3000)||!plain(value.video_prompt,input.duration_seconds===3?1000:8000)||!Array.isArray(value.fact_ids)||!value.fact_ids.length||value.fact_ids.length>20||new Set(value.fact_ids).size!==value.fact_ids.length||value.fact_ids.some((id:any)=>!input.brand.facts.some(f=>f.id===id))||!Array.isArray(value.warnings)||value.warnings.length>10||value.warnings.some((s:any)=>!plain(s,500)))fail();
  const duration=input.duration_seconds*1000;
  if(!Array.isArray(value.beats)||!value.beats.length||value.beats.length>5)fail();
  let end=0;
@@ -42,7 +42,7 @@ export function validateVideoBrief(value:any,input:VideoPlanningInput):VideoBrie
  for(let i=0;i<value.overlays.length;i++)for(let j=i+1;j<value.overlays.length;j++){
   const a=value.overlays[i],b=value.overlays[j];if(a.position===b.position&&a.start_ms<b.end_ms&&b.start_ms<a.end_ms)fail();
  }
- if((value.video_prompt+'\nScript:\n'+value.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n')).length>10000)fail();
+ if((value.video_prompt+'\nScript:\n'+value.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n')).length>(input.duration_seconds===3?1000:10000))fail();
  return value;
 }
 /** Canonicalize generated drafts only; user edits and approved briefs remain strict.
@@ -75,8 +75,8 @@ export function videoBriefSchema(factIds:string[],durationSeconds:number){
  const string=(max:number)=>({type:'string',pattern:`^[\\s\\S]{1,${max}}$`});
  const time={type:'integer',minimum:0,maximum:durationSeconds*1000};
  const color={type:'string',pattern:'^#[a-fA-F0-9]{6}$'};
- return object({title:string(140),caption:string(3000),video_prompt:string(8000),fact_ids:{type:'array',minItems:1,maxItems:20,items:{type:'string',enum:factIds}},warnings:{type:'array',maxItems:10,items:string(500)},
-  beats:{type:'array',minItems:1,maxItems:5,description:`Contiguous beats from 0 to ${durationSeconds*1000} ms. Every beat starts at the previous end.`,items:object({start_ms:time,end_ms:time,action:string(800),camera:string(300)})},
+ return object({title:string(140),caption:string(3000),video_prompt:{...string(durationSeconds===3?400:8000),description:'Complete self-contained visual and motion direction, including the camera movement and all beats. Do not rely on other fields to convey the scene.'},fact_ids:{type:'array',minItems:1,maxItems:20,items:{type:'string',enum:factIds}},warnings:{type:'array',maxItems:10,items:string(500)},
+  beats:{type:'array',minItems:1,maxItems:durationSeconds===3?3:5,description:`Contiguous beats from 0 to ${durationSeconds*1000} ms. Every beat starts at the previous end.`,items:object({start_ms:time,end_ms:time,action:string(durationSeconds===3?100:800),camera:string(durationSeconds===3?40:300)})},
   overlays:{type:'array',maxItems:3,description:'Optional readable text. Each interval must last at least 1000 ms. No overlap at the same position. Use [] for no text.',items:object({text:string(90),start_ms:time,end_ms:time,position:{type:'string',enum:['top','bottom']},foreground:color,background:color})}});
 }
 

@@ -308,3 +308,17 @@
 .desvio-redesign .chat-video-dialogue .chat-video-management{margin-left:40px}
 @media(max-width:760px){.desvio-redesign .chat-video-answer-card,.desvio-redesign .chat-video-dialogue .creative-review{margin-left:0;padding:16px}.desvio-redesign .chat-video-dialogue .chat-video-management{margin-left:0}}
 .desvio-redesign .chat-video-dialogue .check-row input[type=checkbox]{width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;flex:0 0 18px;padding:0;margin:3px 0 0;appearance:auto}
+
+.desvio-redesign .chat-video-quick-create{margin-left:40px;display:grid;gap:12px;min-width:0}
+.desvio-redesign .chat-video-quick-create p{margin:0;text-wrap:pretty}
+.desvio-redesign .chat-video-image-strip{display:flex;gap:10px;overflow-x:auto;max-width:100%;padding:4px}
+.desvio-redesign .chat-video-image-strip .chat-video-reference{flex:0 0 72px;width:72px;height:72px;padding:3px;border-radius:14px}
+.desvio-redesign .chat-video-image-strip .private-visual-presentation{height:64px;width:64px;aspect-ratio:1}
+.desvio-redesign .chat-video-image-strip .chat-video-reference[aria-pressed=true]{border:2px solid #6c56ff;padding:2px}
+.desvio-redesign .chat-video-quick-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.desvio-redesign .chat-video-quick-actions button{padding:8px 14px;background:#f5f3fa}
+.desvio-redesign .chat-video-quick-actions span,.desvio-redesign .chat-video-options summary{font-size:13px;color:#666173}
+.desvio-redesign .chat-video-options summary{cursor:pointer;padding-block:4px}
+.desvio-redesign .chat-video-options[open] summary{margin-bottom:8px}
+.desvio-redesign .chat-video-quick-create .chat-video-generate{background:#17171a;color:#fff;justify-self:start;padding:10px 24px}
+@media(max-width:760px){.desvio-redesign .chat-video-quick-create{margin-left:0}}
