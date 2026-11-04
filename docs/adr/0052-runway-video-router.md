@@ -30,3 +30,11 @@ Set `RUNWAYML_API_SECRET` on `desvio-dev-worker-settings` in Railway dev. Keep t
 Contract and disposable-database/browser tests use explicit MOCK Runway responses, including real transport serialization, storage, renderer, RLS, lost receipts and recovery. Local reference leases are remapped to an HTTPS test origin at the test boundary because disposable object storage is loopback HTTP. These tests are not evidence of Runway quality, credentials, model eligibility or paid live generation.
 
 New routed requests explicitly request 1080p, the highest resolution retained by the existing safe video renderer. The router must select an eligible model at that resolution within the grant cap; it does not silently downgrade resolution.
+
+## Live media compatibility finding
+
+The first paid quality-router result selected Seedance 2.5 and returned HEVC 10-bit SDR (BT.709), 1440×1440. The original renderer rejected all 10-bit input. The normalizer now accepts 10-bit 4:2:0 only with explicit SDR transfer metadata and produces browser-compatible 8-bit H.264. Unknown 10-bit, PQ and HLG remain rejected; no unverified HDR tone mapping was introduced. Fifteen real FFmpeg tests pass on the private AMD64 host, including actual HEVC 10-bit fixtures and HDR/unknown-tag rejection. The actual Runway bytes also convert successfully. Renderer image and source digest are recorded in runway-media-normalization.json.
+
+The already completed provider operation was recovered in a separately identified Temporal workflow, guarded by exact job/error/provider/completed-output checks. The existing encrypted output, approval and consent were retained; no new provider submission or credit reservation was made. Live chat playback/reload evidence is separate.
+
+A first-frame request can follow the source image aspect even when router resolution reports a requested portrait aspect. The existing contain renderer deliberately preserves the approved source and adds padding to a mismatched final format. Use a portrait source for a full-frame portrait Reel. Do not present padded square footage as native portrait generation or claim that the router guarantees perfect visual quality.

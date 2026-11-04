@@ -73,7 +73,7 @@ def write_status():
     refs = [f"docs/evidence/{name}.json" for name in SUITES if (EVIDENCE / f"{name}.json").exists()]
     integrations = {name: {"state": "NOT_IMPLEMENTED", "live_test": False, "evidence": refs,
                            "blocked_reason": "Product provider journey and authorized staging verification are not implemented; M0 audit evidence does not prove a working integration."}
-                    for name in ["maxun", "docling", "deepagents", "openai_images", "higgsfield_video", "creative_editor", "postiz_publish", "performance_learning", "tenant_runtime"]}
+                    for name in ["maxun", "docling", "deepagents", "openai_images", "runway_video", "creative_editor", "postiz_publish", "performance_learning", "tenant_runtime"]}
     integrations["tenant_runtime"]["blocked_reason"] = "Auth/workspace/brand/team APIs and RLS are implemented locally; deployed private storage, generation-worker authorization and deployed tenant journey remain incomplete."
     security_path = EVIDENCE / "security.json"
     security = json.loads(security_path.read_text()) if security_path.exists() else {}
@@ -136,7 +136,7 @@ def write_status():
     integrations["video_planning_media_stage"] = {"state": "ADAPTER_READY" if runtime_ready else "NOT_IMPLEMENTED", "live_test": False,
         "evidence": ["docs/evidence/video-runtime.json", "docs/evidence/contracts.json"],
         "blocked_reason": "Actual isolated original video/ad-creative/product-marketing/social skill planning with MOCK model; bounded brief/fact/timing contracts. Actual ARM64 FFmpeg is packaged into an exact image from verified Debian archives and called through the Node adapter without runtime/dependency bind mounts. Synthetic MP4 decoding, normalization, timed caption/CTA overlays, output validation and replay are tested. This is not a cloud/AMD64-deployed runtime, private saved customer video, parent workflow, customer feature, provider output quality or live acceptance."}
-    integrations["higgsfield_video"]["blocked_reason"] = "Transport, untrusted download and durable provider substage have separate local test scope. Connecting the separately tested skill/media components into the full tenant generation/edit workflow, approved reference leases, baked media image and overlay composition, private versions/approval, customer UI and cost-capped live acceptance remain incomplete. No video customer route is enabled."
+    integrations["runway_video"]["blocked_reason"] = "Runway now owns video dispatch. The aggregate offline suite does not assert live provider verification; see the separate runway-offline, runway-provider-live and runway-chat-live evidence for exact transport, deployment, generation and playback coverage. Historical Higgsfield evidence must not be reused for Runway."
     creative_ready = foundation_passed and browser_passed and contracts.get("passed") is True and contracts.get("source_sha256") == source_hash()
     for capability in ["deepagents", "openai_images", "creative_editor", "canvas_runtime", "creative_review"]:
         integrations[capability] = {"state": "ADAPTER_READY" if creative_ready else "NOT_IMPLEMENTED", "live_test": False,

@@ -86,7 +86,12 @@ def probe(path, expected):
         reject("VIDEO_MEDIA_DIMENSIONS_OR_CODEC_INVALID")
     if v.get("disposition", {}).get("attached_pic") or v.get("sample_aspect_ratio", "1:1") not in {"1:1", "N/A"} or any(s.get("side_data_type") == "Display Matrix" or number(s.get("rotation", 0)) != 0 for s in v.get("side_data_list", [])):
         reject("VIDEO_MEDIA_ORIENTATION_INVALID")
-    if v.get("pix_fmt") != "yuv420p" or v.get("color_transfer", "unknown") not in {"unknown", "bt709", "smpte170m"}:
+    # Runway may return HEVC 10-bit SDR. Bit depth alone does not imply HDR.
+    # Accept only explicitly SDR-tagged 10-bit input; retain the HDR/unknown
+    # 10-bit rejection until a separately verified tone-mapping path exists.
+    transfer = v.get("color_transfer", "unknown")
+    supported_pixels = v.get("pix_fmt") == "yuv420p" or (v.get("pix_fmt") == "yuv420p10le" and transfer in {"bt709", "smpte170m"})
+    if not supported_pixels or transfer not in {"unknown", "bt709", "smpte170m"}:
         reject("VIDEO_MEDIA_COLOR_UNSUPPORTED")
     try:
         numerator, denominator = v["r_frame_rate"].split("/")

@@ -1,5 +1,5 @@
 {
-  "checked_at": "2026-11-04T13:15:23.163Z",
+  "checked_at": "2026-11-04T13:50:24.162Z",
   "images": [
     {
       "role": "trusted_worker",
@@ -27,7 +27,7 @@
     },
     {
       "role": "video_renderer",
-      "image_id": "sha256:95401ad08e49ae619fb9f1bae50cef443cf9c54bd72d3d31960b746cf292f9f5",
+      "image_id": "sha256:63975deea3d47e37d332be408a00ffc83fae6c5d7b8a0bbaf4bf2e4713b2864a",
       "architecture": "amd64",
       "user": "65534:65534"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Frozen chat intelligence worker image; host activation must be checked separately"
+  "scope": "Runway trusted worker and tested 10-bit SDR normalization renderer; exact host identities verified separately."
 }

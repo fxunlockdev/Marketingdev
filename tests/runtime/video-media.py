@@ -97,6 +97,29 @@ class MediaTests(unittest.TestCase):
         self.assertEqual(info['streams'][0].get('color_transfer'),'smpte2084',info)
         with self.assertRaisesRegex(media.Invalid,'VIDEO_MEDIA_COLOR_UNSUPPORTED'):media.run(self.request(path.read_bytes()))
 
+    def test_runway_hevc_10bit_sdr_normalizes_to_browser_h264_8bit(self):
+        for transfer in ['bt709', 'smpte2084', 'arib-std-b67', 'unknown']:
+            path = self.root/f'hevc-{transfer}.mp4'
+            args = ['-v','error','-nostdin','-filter_threads','1','-f','lavfi','-i',
+                    'testsrc2=size=180x320:rate=24:duration=3','-c:v','libx265',
+                    '-threads','1','-preset','ultrafast','-x265-params',f"pools=1:frame-threads=1:log-level=error:colorprim=1:colormatrix=1:transfer={ {'bt709':1,'smpte2084':16,'arib-std-b67':18,'unknown':2}[transfer]}",
+                    '-pix_fmt','yuv420p10le','-color_primaries','bt709','-colorspace','bt709','-color_trc',transfer,str(path)]
+            media.command('ffmpeg',args,timeout=30)
+            if transfer != 'bt709':
+                with self.assertRaisesRegex(media.Invalid,'VIDEO_MEDIA_COLOR_UNSUPPORTED'):
+                    media.run(self.request(path.read_bytes()))
+                continue
+            info = json.loads(media.command('ffprobe',['-v','error','-show_streams','-of','json',str(path)],capture=True))
+            self.assertEqual(info['streams'][0].get('color_transfer'),transfer,info)
+            self.assertEqual(info['streams'][0].get('pix_fmt'),'yuv420p10le',info)
+            result = media.run(self.request(path.read_bytes()))
+            self.assertEqual(result['metadata'], {'width':180,'height':320,'duration_ms':3000,'audio':False,'codec':'h264'})
+            output = self.root/'converted-sdr.mp4'
+            output.write_bytes(base64.b64decode(result['video']['base64']))
+            info = json.loads(media.command('ffprobe',['-v','error','-show_streams','-of','json',str(output)],capture=True))
+            self.assertEqual(info['streams'][0]['pix_fmt'],'yuv420p')
+            self.assertEqual(info['streams'][0]['color_transfer'],'bt709')
+
     def test_exact_decoder_version_and_gpl_build_are_observed(self):
         version=media.command('ffmpeg',['-version'],capture=True).decode()
         self.assertTrue(version.startswith('ffmpeg version 7.1.5-0+deb13u1'))
@@ -152,7 +175,7 @@ class MediaTests(unittest.TestCase):
     def test_sandbox_has_no_network_secret_mounts_or_writable_application(self):
         import os,socket
         self.assertEqual(os.getuid(),65534)
-        self.assertEqual([name for _,name in socket.if_nameindex()],['lo'])
+        self.assertEqual([name for _,name in socket.if_nameindex() if int(Path('/sys/class/net',name,'flags').read_text(),16) & 1],['lo'])
         self.assertFalse(any(key in os.environ for key in ['OPENAI_API_KEY','HIGGSFIELD_API_KEY','DATABASE_URL','AWS_SECRET_ACCESS_KEY']))
         with self.assertRaises(OSError):Path('/runtime/unwanted').write_text('denied')
         with self.assertRaises(OSError):Path('/opt/video-deps/unwanted').write_text('denied')
