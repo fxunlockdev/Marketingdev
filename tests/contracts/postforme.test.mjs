@@ -12,3 +12,12 @@ test('Postforme link projection rejects non-web schemes and URL credentials',()=
 
 test('Postforme authorization requests explicit direct Instagram login and preserves tenant binding',()=>{assert.deepEqual(postformeAuthorization('instagram','brand-bound'),{platform:'instagram',external_id:'brand-bound',permissions:['posts','feeds'],force_reauth:true,platform_data:{instagram:{connection_type:'instagram'}}});});
 test('Postforme shared LinkedIn credentials use organization flow and X maps both directions',()=>{assert.deepEqual(postformeAuthorization('linkedin','binding').platform_data,{linkedin:{connection_type:'organization'}});const x=postformeAuthorization('twitter','binding');assert.equal(x.platform,'x');assert.deepEqual(x.platform_data,{x:{connection_type:'oauth2'}});assert.equal(providerAccount({...remote,platform:'x'}).platform,'twitter');assert.equal(postformeAuthorization('facebook','binding').platform_data,undefined);});
+
+test('configured social platforms exclude disabled connectors and validate configuration',async()=>{
+ const {configuredPostformePlatforms}=await import('../../dist/postforme-client.js');
+ assert.deepEqual(configuredPostformePlatforms('instagram,facebook,linkedin,tiktok'),['instagram','facebook','linkedin','tiktok']);
+ assert.deepEqual(configuredPostformePlatforms(' x, x '),['twitter']);
+ assert.deepEqual(configuredPostformePlatforms(''),[]);
+ assert.throws(()=>configuredPostformePlatforms('unknown'));
+});
+

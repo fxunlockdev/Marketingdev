@@ -3,6 +3,12 @@ import {lookup} from 'node:dns/promises';
 import {publicAddress} from './safe-web.js';
 export class PostformeError extends Error {constructor(readonly code:string,readonly ambiguous=false){super(code);}}
 export const postformePlatforms=['instagram','facebook','linkedin','tiktok','youtube','threads','twitter','pinterest','bluesky'] as const;
+export function configuredPostformePlatforms(value:string|undefined){
+ if(value===undefined)return [...postformePlatforms];
+ const values=value.split(',').map(v=>v.trim()).filter(Boolean).map(v=>v==='x'?'twitter':v);
+ if(values.some(v=>!postformePlatforms.includes(v as any)))throw new Error('POSTFORME_PLATFORMS contains an unsupported platform');
+ return postformePlatforms.filter(p=>values.includes(p));
+}
 /** Postforme uses x externally; retain twitter for existing local account records. */
 export function postformeAuthorization(platform:typeof postformePlatforms[number],externalId:string){
  const remotePlatform=platform==='twitter'?'x':platform;

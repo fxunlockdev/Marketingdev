@@ -1,0 +1,48 @@
+{
+  "checked_at": "2026-11-04T16:50:46.703Z",
+  "environment": "dev",
+  "deployment": "a768ec24-03e4-4005-93ff-d5473f881357",
+  "disabled_checks": [
+    {
+      "platform": "youtube",
+      "status": 400
+    },
+    {
+      "platform": "threads",
+      "status": 400
+    },
+    {
+      "platform": "twitter",
+      "status": 400
+    },
+    {
+      "platform": "pinterest",
+      "status": 400
+    },
+    {
+      "platform": "bluesky",
+      "status": 400
+    }
+  ],
+  "viewports": [
+    {
+      "width": 1440,
+      "cards": 4,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "cards": 4,
+      "overflow": false
+    }
+  ],
+  "external_oauth_completed": false,
+  "published": false,
+  "platforms": [
+    "instagram",
+    "facebook",
+    "linkedin",
+    "tiktok"
+  ],
+  "javascript_errors": []
+}

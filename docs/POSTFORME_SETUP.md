@@ -8,6 +8,7 @@ Set on the Railway **API service**, never a NEXT_PUBLIC variable:
 
 - `POSTFORME_ENABLED=true`
 - `POSTFORME_API_KEY` to the project API key
+- `POSTFORME_PLATFORMS=instagram,facebook,linkedin,tiktok` to limit new connections to enabled platforms. Comma-separated provider names are validated; `x` is accepted as an alias for `twitter`. An empty value disables all new connection options; an absent value preserves the full legacy list. Existing account records remain visible.
 - `POSTFORME_PUBLISHING_ENABLED=true` only when ready for explicitly approved scheduled publishing
 
 Configure the Postforme project's OAuth redirect URL to `https://<your-app>/connections/postforme/return`. The hosted Quickstart flow uses the project's configured redirect; dynamic redirect overrides are not sent. Enable posts and feeds permissions for the desired platforms. API credentials do not belong in a browser or chat.
@@ -22,7 +23,7 @@ Publishing accepts an existing approved slot and exact final asset version. The 
 
 Postforme executes accepted scheduled posts. Current status reconciliation and analytics refresh are explicit user actions; there is no background status polling worker or webhook receiver yet. Upload preparation happens within the authenticated API request. An interrupted preparation is retained and never silently replayed. Unknown operations require status reconciliation; no unsupported promise of exactly-once delivery is made.
 
-Connections support Instagram, Facebook, LinkedIn, TikTok, YouTube, Threads, X/Twitter, Pinterest and Bluesky. Existing campaign scheduling currently supports the application's Instagram, Facebook and LinkedIn channel contracts; other connected accounts can supply feeds/analytics but are not exposed as publish destinations until corresponding campaign channel contracts exist. Blog content remains outside social-media publication.
+The adapter recognizes Instagram, Facebook, LinkedIn, TikTok, YouTube, Threads, X/Twitter, Pinterest and Bluesky, but Integrations displays only the configured allowlist and the API rejects authorization for excluded platforms. The dev allowlist currently contains Instagram, Facebook, LinkedIn and TikTok, whose provider authorization-link handoffs passed. This is operator configuration, not automatic synchronization: the documented provider API does not expose project platform enablement. Recheck and update the allowlist when provider setup changes. Existing campaign scheduling currently supports the application's Instagram, Facebook and LinkedIn channel contracts; other connected accounts can supply feeds/analytics but are not exposed as publish destinations until corresponding campaign channel contracts exist. Blog content remains outside social-media publication.
 
 Analytics refresh stores the latest 50 posts per connected account and actual numeric provider metrics. Missing metrics remain missing. Feed history pagination and automated continuous ingestion are not included.
 
