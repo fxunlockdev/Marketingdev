@@ -1,0 +1,29 @@
+{
+  "started_at": "2026-11-04T13:27:52.286Z",
+  "scope": "Owner-authorized Runway quality-router test through hosted chat; five-second video; no publishing",
+  "checks": [
+    "chat_script_saved",
+    "approved_through_ui",
+    "actual_video_plays",
+    "saved_video_and_download_survive_reload",
+    "actual_mp4_download_and_decoded_frames"
+  ],
+  "conversation": "fd63d898-9e48-4a29-8e1f-1e7a7817d9f0",
+  "job": "7e266ce9-afd7-433a-a1f7-3ba41b21f049",
+  "status": "succeeded",
+  "error_code": null,
+  "version": "e200fd88-fd40-412b-98ea-d6cd70c65513",
+  "provider_progress": null,
+  "passed": true,
+  "metadata": {
+    "width": 1080,
+    "height": 1920,
+    "duration": 5.033333
+  },
+  "finished_at": "2026-11-04T13:52:39.730Z",
+  "download": {
+    "bytes": 3308591,
+    "sha256": "cdf8d0367a6a6acf0e20e421cd757e39b61382bc57b89662ca7afeca3c665f1a",
+    "filename": "desvio-video.mp4"
+  }
+}

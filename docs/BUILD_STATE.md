@@ -1,3 +1,11 @@
+## Runway quality routing and real media acceptance — 4 November 2026
+
+New videos and Reels use Runway Model Router with a quality preference and the existing immutable credit cap. Runway chooses the eligible model; both paid test receipts selected Seedance 2.5 through Runway. GPT image/carousel generation remains separate. The settings-only Railway service may display Offline; the actual trusted worker is running, has the Runway secret, and has active Temporal pollers. API deployment `200c9982-4b0a-4048-8321-002aa7126dbc` was observed SUCCESS with video enabled and the new renderer pin.
+
+Live testing caught HEVC 10-bit SDR rejection. The corrected renderer accepts explicitly SDR-tagged 10-bit input, outputs 8-bit H.264, and still rejects unknown/PQ/HLG input. Fifteen actual FFmpeg tests pass locally and on the private AMD64 host. The first paid video was recovered from the completed provider output without re-generation. Its hosted Reel chat now passes playback, reload and actual MP4 download, with decoded frame review. The independent square Video test is still processing at the time of this entry; do not treat it as passed until its generated evidence says so.
+
+Known boundaries: first-frame generation can follow the reference aspect, so the tested square reference is padded in the portrait Reel. The reference already contains baked-in text; no new text overlays were requested. Native audio remains off. Quality routing can take more than ten minutes for a five-second clip; this is not instant generation. No social publishing was performed and these scoped tests do not establish full production readiness.
+
 ## Right-side canvas inspector — 1 November 2026
 
 Moved Text layers beside the artwork when the canvas container has at least 760px available. The 320px inspector scrolls independently; artwork and metadata remain in the left column. Smaller canvas areas retain the stacked layout. This is CSS-only; saving, export and permissions are unchanged.

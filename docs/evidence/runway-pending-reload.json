@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-11-04T14:08:28.613Z",
+  "passed": true,
+  "job_id": "1376b689-0f1f-49bd-a583-4ae71e1df24d",
+  "status": "running",
+  "conversation_id": "b33c5af8-4fbd-4db7-91b9-21c1fcee6dc1",
+  "scope": "Separate authenticated browser session reopens and reloads the existing Video chat while generation is pending; no new creation submitted."
+}
