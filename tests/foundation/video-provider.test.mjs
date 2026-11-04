@@ -235,3 +235,27 @@ test('real Temporal timer survives worker replacement and resumes the saved prov
   assert.equal(submits,before);assert.equal((await row(s)).job_status,'running');
  }finally{first?.shutdown();second?.shutdown();if(firstRun)await firstRun.catch(()=>{});await native.close();await connection.close();}
 });
+
+test('Runway replacement persists router decision, progress and output; paid timeouts never resubmit and tenants remain isolated',async()=>{
+ const {RunwayClient,RUNWAY_VIDEO_MODEL}=await import('../../dist/runway-client.js');
+ const f=await fixture();await admin.query("UPDATE app.video_grants SET models=ARRAY['runway/router'],max_create_micros=1000000,max_edit_micros=1000000,budget_micros=10000000 WHERE brand_id=$1",[f.brand]);
+ const task=randomUUID();let paid=0,remote='THROTTLED',lost=false;
+ const router={slug:'desvio-video-quality-v1-100',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:100}}};
+ const runway=new RunwayClient({mode:'test',secret:'fixture',referenceOrigins:['https://media.example.com']},async(url,init)=>{
+  const path=new URL(url).pathname;assert.equal(new URL(url).origin,'https://api.dev.runwayml.com');
+  if(path==='/v1/routers')return Response.json({data:[router],hasMore:false});
+  if(path==='/v1/generate/video'){paid++;if(lost)throw Error('lost receipt');return Response.json({id:task,dryRun:false,routing:{model:'gen4.5',provider:'runway',configId:router.slug,resolvedSettings:{optimizeFor:'quality',priceCeiling:100},estimatedCost:{credits:60}}});}
+  return Response.json({id:task,status:remote,progress:.6,...(remote==='SUCCEEDED'?{output:['https://cdn.example.com/video.mp4']}:{} )});
+ });
+ const engine=new VideoProviderJobs(jobs,runway,key),s=await newJob(f),v={...intent(),model:RUNWAY_VIDEO_MODEL,aspectRatio:'9:16'};
+ await engine.prepare(s,v);await Promise.all([engine.prepare(s,v),engine.prepare(s,v)]);assert.equal((await row(s)).provider,'runway');
+ assert.equal(await engine.step(s),'accepted');assert.equal(paid,1);
+ assert.equal((await row(s)).routing.model,'gen4.5');assert.equal((await row(s)).routing.max_credits,100);
+ assert.equal(await engine.step(s),'accepted');assert.equal((await row(s)).remote_state,'queued');assert.equal((await row(s)).progress,.6);
+ remote='SUCCEEDED';assert.equal(await new VideoProviderJobs(jobs,runway,key).step(s),'completed');assert.equal((await engine.output(s)).url,'https://cdn.example.com/video.mp4');
+ await assert.rejects(engine.output({...s,brandId:randomUUID()}));
+ lost=true;const uncertain=await newJob(f);await engine.prepare(uncertain,{...v,idempotencyKey:randomUUID()});assert.equal(await engine.step(uncertain),'unknown');assert.equal(await engine.step(uncertain),'unknown');assert.equal(paid,2);assert.equal((await row(uncertain)).reservation_state,'held');
+ // Existing Higgsfield jobs must never be sent or polled using Runway credentials.
+ const legacy=await fixture(),prepared=await prepare(legacy);const before=paid;
+ assert.equal(await engine.step(prepared.s),'rejected');assert.equal((await row(prepared.s)).job_error,'VIDEO_LEGACY_PROVIDER_RECONCILIATION_REQUIRED');assert.equal((await row(prepared.s)).reservation_state,'released');assert.equal(paid,before);
+});

@@ -39,9 +39,8 @@ export async function setupWizard(io){
  if(g.budget_micros===null)io.show('No Desvio lifetime spending ceiling for this capability. Usage is still recorded; provider limits still apply.');
  if(['planning','insights'].includes(kind))g.provider=await io.ask('Provider (openai or gemini): ');
  if(kind==='video'){
-  const choice=await io.ask('Video: 1 = create, 2 = edit, 3 = both: ');
-  if(!['1','2','3'].includes(choice))throw Error('Choose 1, 2 or 3.');
-  g.models=choice==='1'?['kling-video/v3.0/std/image-to-video']:choice==='2'?['kling-video/o3/video-edit']:['kling-video/v3.0/std/image-to-video','kling-video/o3/video-edit'];
+  io.show('Runway selects the video model automatically, optimized for quality within your request cap.');
+  g.models=['runway/router'];
   g.max_create_micros=dollars(await io.ask('Maximum reserved cost per video create request (USD): '));
   g.max_edit_micros=dollars(await io.ask('Maximum reserved cost per video edit request (USD): '));
  }else{

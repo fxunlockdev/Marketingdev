@@ -1,0 +1,38 @@
+{
+  "checked_at": "2026-11-04T13:21:43.295Z",
+  "status": "ADAPTER_READY",
+  "provider_calls": "MOCK",
+  "scope": "Real database isolation, durable workflow, storage, renderer, browser; Runway HTTP simulated. This is not live provider evidence.",
+  "results": [
+    {
+      "name": "contracts",
+      "passed": 363,
+      "failed": 0,
+      "log_sha256": "10655575d543c2e3323a95434e597e2d2ef12f40f4c712de7b0db066a8010e99"
+    },
+    {
+      "name": "provider recovery and isolation",
+      "passed": 18,
+      "failed": 0,
+      "log_sha256": "039f975ee881bf0cb767fb1a6c19f000e81c7129ef5e6b123a123377757bfa16"
+    },
+    {
+      "name": "media workflow",
+      "passed": 1,
+      "failed": 0,
+      "log_sha256": "8849d353d2a86f57d9c9f7126e340b728de6c8dad0a728cacfb3804fa100a1ee"
+    },
+    {
+      "name": "chat browser",
+      "passed": 1,
+      "failed": 0,
+      "log_sha256": "a09a27452e7866efcde29d163a1cd955ad9772a289b9b420c1fc2f93b2d67daa"
+    },
+    {
+      "name": "1080p request contract",
+      "passed": 9,
+      "failed": 0,
+      "log_sha256": "ae90226e2797d48c103b5ad5bf58c9ce7b5e30fbca0cc58ead90ef05460c19c3"
+    }
+  ]
+}

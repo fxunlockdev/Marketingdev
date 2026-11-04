@@ -2,7 +2,7 @@
 
 **Audience:** Codex implementers, tech leads, security, operations. **Status:** Target architecture; diagrams are not evidence of implemented functionality. Each `.mmd` file under `diagrams/` is the editable source. Diagrams below render directly on GitHub.
 
-**Critical operating rule:** The customer-facing application is ours. Deep Agents executes the owner's skill files. OpenAI GPT Images and Higgsfield are model providers through server-side SDKs. Postiz is a **headless organic publishing component**, subject to tenant isolation, supported API and licensing proof. There are no coding-agent processes in the customer runtime.
+**Critical operating rule:** The customer-facing application is ours. Deep Agents executes the owner's skill files. OpenAI GPT Images and Runway are model providers through server-side SDKs. Postiz is a **headless organic publishing component**, subject to tenant isolation, supported API and licensing proof. There are no coding-agent processes in the customer runtime.
 
 ## Quick visual previews (SVG exports)
 
@@ -33,7 +33,7 @@ flowchart TB
   api --> job[Temporal Durable Workflows]
   agent --> job
   job --> img[OpenAI GPT Image Adapter]
-  job --> vid[Higgsfield Video Adapter]
+  job --> vid[Runway Video Adapter]
   job --> render[Fabric.js Project + FFmpeg Renderer]
   api --> pub[Internal Postiz Adapter]
   pub --> postiz[Self-hosted Postiz Service]
@@ -80,7 +80,7 @@ flowchart LR
   end
   subgraph outside[EXTERNAL / UNTRUSTED]
     sites[Brand Websites + Files]
-    models[OpenAI + Higgsfield]
+    models[OpenAI + Runway]
     social[Social Platform APIs]
   end
   web -->|Authenticated API only| auth --> bff
@@ -186,7 +186,7 @@ A video provider job is not the final export. Persist external IDs, safely recon
 stateDiagram-v2
   [*] --> Draft
   Draft --> Queued: Validated + credits reserved
-  Queued --> Running: Dispatch to GPT Images / Higgsfield
+  Queued --> Running: Dispatch to GPT Images / Runway
   Running --> ProviderPending: Video provider returned job ID
   ProviderPending --> ProviderPending: Poll / verified webhook
   Running --> AssetCopying: Image result
@@ -289,7 +289,7 @@ flowchart TB
   tq --> w2[Intelligence workers: Deep Agents]
   tq --> w3[Media workers: FFmpeg]
   w2 --> oai[OpenAI APIs]
-  w2 --> hf[Higgsfield API]
+  w2 --> hf[Runway API]
   w3 --> obj
   api --> postiz[Postiz Adapter / Tenant Isolation Boundary]
   postiz --> pz[Self-hosted Postiz deployment(s)]
@@ -362,7 +362,7 @@ flowchart LR
   m0[M0 Prove OSS and SDK contracts] --> infra[M1 Tenant-safe skeleton + live Postiz service]
   infra --> onboard[M2 Real crawling + upload + review]
   onboard --> slice[M3 Real skill and GPT Image + approval + Postiz]
-  slice --> video[M4 Higgsfield + video render + analytics]
+  slice --> video[M4 Runway + video render + analytics]
   video --> learn[M5 Learning + billing + load hardening]
   learn --> paid[M6 Optional paid ads API]
   blocked[No UI-only completion. Live integrations must pass gates.] -.-> slice
@@ -409,7 +409,7 @@ sequenceDiagram
   participant T as Temporal Worker
   participant S as Skills + Brand Brain
   participant O as OpenAI Image Adapter
-  participant H as Higgsfield Video Adapter
+  participant H as Runway Video Adapter
   participant AS as Private Asset Store
   participant QA as Render + QA
   U->>UI: Request on-brand static and video ads
@@ -447,7 +447,7 @@ flowchart LR
   quota --> queue[Temporal per-tenant workload queues]
   queue --> skill[Isolated skill runtime]
   queue --> image[OpenAI image adapter]
-  queue --> video[Higgsfield video adapter]
+  queue --> video[Runway video adapter]
   queue --> publish[Postiz adapter with proven account mapping]
   skill --> facts[(Versioned brand context)]
   image --> ledger[(Usage and cost ledger)]

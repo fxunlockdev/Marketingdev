@@ -7,7 +7,7 @@ The desired end state is **no more feature programming after configuration**. Al
 | Item | Why required | Can Codex implement the product logic before it is supplied? |
 |---|---|---|
 | OpenAI API key and eligible paid account | Text and GPT image create/edit charges | **Yes**—typed adapter and contract tests; real image smoke test waits for key |
-| Higgsfield API access, required key parts and funded balance | Video generation is a paid, hosted service | **Yes**—async lifecycle, retries, storage, tests; live clip test waits for access |
+| Runway API access, required key parts and funded balance | Video generation is a paid, hosted service | **Yes**—async lifecycle, retries, storage, tests; live clip test waits for access |
 | Social-platform developer apps, credentials, callback URLs and approvals where required | OAuth and publishing access are platform-controlled | **Yes**—connector/permission flow and callback routing; authorizing a real account needs consent |
 | Postiz self-hosted config and legal decision | Postiz must actually run, integrate and be tenant-safe; AGPL obligations need review | **Yes**—can deploy local instance, adapter and tenancy security tests; launch waits on legal signoff |
 | Hosting account, domains, TLS, DNS and public webhook URLs | Remote providers must reach approved callback URLs | **Yes**—IaC and deployment scripts, actual external accounts/registration remain operator tasks |
@@ -60,7 +60,7 @@ With owner authorization, staging can explicitly set `MAIL_PROVIDER=disabled`. O
 
 ### Dev provider credential location
 
-In Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12`, environment **dev**, open **desvio-dev-worker-settings → Variables**. Add `OPENAI_API_KEY`, optionally `GEMINI_API_KEY`, and `HIGGSFIELD_CREDENTIALS` (`API_KEY:API_SECRET`). This is a settings-only service; credentials are read by the private worker deployment script, never the web service. Adding a variable does not automatically restart the sandbox worker. Apply via a controlled worker rollout; `start-dev.mjs` refuses an existing worker with different configuration. Video enablement/output origins/encryption and expiring business provider grants are separate prerequisites. Live calls and social publishing remain off until explicitly authorized. Owner has deferred adding credentials and will perform live tests later.
+In Railway project `5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12`, environment **dev**, open **desvio-dev-worker-settings → Variables**. Add `OPENAI_API_KEY`, optionally `GEMINI_API_KEY`, and `RUNWAYML_API_SECRET` for video. This is a settings-only service; credentials are read by the private worker deployment script, never the web service. Adding a variable does not automatically restart the sandbox worker. Apply via a controlled worker rollout; `start-dev.mjs` refuses an existing worker with different configuration. Video enablement/output origins/encryption and expiring business provider grants are separate prerequisites. Live calls and social publishing remain off until explicitly authorized. Record live verification separately from credential presence.
 
 
 ### Authenticated web ingress (private beta)
@@ -76,3 +76,11 @@ Run `make verify-recovery` to exercise a real logical dump and restore of the co
 This is not evidence that Railway backups are configured. Before a public launch, record the actual database backup schedule, retention, last successful backup and available recovery window. Agree on recovery-point and recovery-time objectives. Perform an isolated hosted restore into a **new** database/service; never use an in-place restore to test recovery. Keep workers, scheduled publishers and mail delivery disconnected from the restored copy until reconciliation is complete, so restored pending jobs cannot duplicate external actions.
 
 A complete recovery drill must separately verify cluster roles/grants, required extensions, encryption keys and private object storage. Restore an approved test tenant, validate its private media and tenant isolation, reconcile provider submissions/publications against external state, and record measured data loss and recovery time. Use a deliberate cutover only after validation; retain the original service for rollback. The local check uses already provisioned cluster roles and does not certify these operational steps. Hosted backup, object recovery and RPO/RTO remain unverified.
+
+## Runway video migration (2026-11-04)
+
+New videos and Reels now use Runway's Model Router, optimized for quality. Add **RUNWAYML_API_SECRET** to **desvio-dev-worker-settings → Variables** in Railway's **dev** environment. Use a Runway Developer API key, not a consumer subscription credential. The worker automatically creates/reuses a quality router within each existing request allowance; no model ID or separate router ID is required.
+
+Keep VIDEO_ENCRYPTION_KEY unchanged. The output policy defaults to RUNWAY_OUTPUT_POLICY=authenticated_provider_result and retains public-network/size/redirect validation before private storage. Higgsfield video credentials/output settings are no longer read for video. The optional separate still-image replacement integration has its own existing flag.
+
+Adding a key to this settings-only service does not restart the private worker. After adding it, apply the controlled worker configuration rollout, verify its registration, then enable VIDEO_ENABLED on the worker/API together and perform a real script-approval → video → storage → playback/download/reload check. Until that passes, Runway is ADAPTER_READY, not LIVE_VERIFIED. See ADR 0052. Keep access invite-only and social publishing unchanged.

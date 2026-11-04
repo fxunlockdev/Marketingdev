@@ -297,7 +297,20 @@ before(async () => {
   const carouselBeat=fn=>async(...args)=>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await fn(...args);}finally{clearInterval(timer);}};
   const videoImage=prepareVideoImage(),videoKey='ab'.repeat(32);
   const clip=Buffer.from(execFileSync('docker',['run','--rm','--network','none','--read-only','--cap-drop=ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--entrypoint','python',videoImage,'-c',"import sys,base64; sys.path.insert(0,'/runtime'); import runtime as r; r.command('ffmpeg',['-v','error','-f','lavfi','-i','color=blue:size=320x180:duration=3:rate=24','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','/tmp/test.mp4']); print(base64.b64encode(open('/tmp/test.mp4','rb').read()).decode())"],{encoding:'utf8',timeout:30000}).trim(),'base64');
-  const videoProvider={prepare:intent=>({model:intent.model,idempotencyKey:intent.idempotencyKey,sha256:hash(canonicalJSON(intent))}),submit:async intent=>{videoSubmits++;assert.ok(intent.prompt.startsWith('TEST user edited video prompt'));assert.ok(intent.prompt.includes('TEST revised storyline'));assert.equal((await fetch(intent.referenceURL)).status,200);return {requestId:randomUUID()};},status:async()=>({state:'completed',videoURL:'https://video.example.org/fixture.mp4',errorCode:null}),cancel:async()=>{}};
+  const {RunwayClient}=await import('../../dist/runway-client.js');
+  const videoRefs=new Map();let runwayTask=randomUUID();
+  const videoProvider=new RunwayClient({mode:'test',secret:'fixture',referenceOrigins:['https://media.example.com']},async(url,init)=>{
+   const path=new URL(url).pathname;
+   if(path==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
+   if(path==='/v1/generate/video'){
+    videoSubmits++;const body=JSON.parse(init.body),input=body.input;
+    assert.ok(input.promptText.startsWith('TEST user edited video prompt'));assert.ok(input.promptText.includes('TEST revised storyline'));assert.equal((await fetch(videoRefs.get(input.referenceImages[0].uri))).status,200);
+    runwayTask=randomUUID();return Response.json({id:runwayTask,dryRun:false,routing:{model:'gen4.5',provider:'runway',configId:body.configId,resolvedSettings:{optimizeFor:'quality',priceCeiling:10},estimatedCost:{credits:9}}});
+   }
+   return Response.json({id:runwayTask,status:'SUCCEEDED',output:['https://video.example.org/fixture.mp4']});
+  });
+  const runwayBudget=videoProvider.withBudget.bind(videoProvider);
+  videoProvider.withBudget=(intent,cap)=>{const uri='https://media.example.com/'+intent.idempotencyKey;videoRefs.set(uri,intent.referenceURL);return runwayBudget({...intent,referenceURL:uri},cap);};
   const video=new VideoJobs(jobs,new VideoReferences(undefined,jobs,videoKey,process.env.RENDER_RUNTIME_IMAGE,'test'),handler,new VideoProviderJobs(jobs,videoProvider,videoKey),new VideoDownload(['https://video.example.org'],{fetch:async()=>({status:200,headers:{'content-type':'video/mp4'},bytes:clip})}),new VideoRenderer(videoImage));
   native = await NativeConnection.connect({ address: config.jobs.address });
   connection = await Connection.connect({ address: config.jobs.address });
@@ -613,7 +626,7 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   const finalBytes=await readFile(await(await finalDownload).path());
   assert.equal((await import('node:crypto')).createHash('sha256').update(finalBytes).digest('hex'),exportApproval[0].sha256);
   await page.screenshot({path:'work/browser/canvas-final-image.png',fullPage:true});
-  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true)",[org,brand]);
+  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true)",[org,brand]);
   const videoPlans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
   const linkedPlan=await videoPlans.create(actor,brand,{title:'Browser video plan',objective:'Create a planned video',starts_on:'2027-01-01',timezone:'Asia/Kuala_Lumpur',slots:[{channel:'instagram',format:'video',brief:'TEST planned browser video',planned_at:'2027-01-06T04:00:00Z'}]},randomUUID());
   let videoSlot=(await videoPlans.list(actor,brand,{start:'2027-01-01T00:00:00Z',end:'2027-02-01T00:00:00Z',plan_id:linkedPlan.id})).slots[0];
@@ -1254,7 +1267,7 @@ test('staging creative acceptance runner exercises real customer APIs and pauses
 });
 
 test('uploaded product photo starts video without static generation, then feedback regenerates through prompt approval (MOCK providers)',async()=>{
- await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
  await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);
  await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
  await page.getByText('Brand image references',{exact:true}).click();
@@ -1421,7 +1434,7 @@ test('Archive displays generated carousels with saved slide history and restores
 
 test('Archive displays generated video history, plays saved media and restores across reloads (MOCK providers)',async()=>{
  // Auth, storage, worker, approvals and video rendering are real; provider response uses the fixture MP4.
- await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
  await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);await page.getByRole('button',{name:'+ New conversation',exact:true}).click();await page.getByRole('button',{name:'Add assets',exact:true}).click();await page.getByText('Brand image references',{exact:true}).click();await page.getByText('Add product photos',{exact:true}).click();await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'archive-video.png',mimeType:'image/png',buffer:png});await page.getByRole('button',{name:'Upload file',exact:true}).click();
  const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});await approval.getByLabel('Reference name',{exact:true}).fill('Archive video reference');await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();await page.getByRole('button',{name:'Use Archive video reference for video',exact:true}).click();
  const request=page.getByRole('region',{name:'Creative conversation',exact:true});await request.getByLabel('Describe your creative',{exact:true}).fill('TEST archive video history');await request.getByLabel('Video length (seconds)',{exact:true}).fill('3');await request.getByRole('button',{name:'Send',exact:true}).click();
@@ -1769,7 +1782,7 @@ test('AI canvas format selection after a conversation keeps the thread and carri
 
 test('AI canvas creates carousel slides and playable reels and videos in the same saved chat (MOCK providers)',async()=>{
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
- await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
  await page.unrouteAll({behavior:'wait'});
  await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create`);
  await page.getByRole('button',{name:'Carousel',exact:true}).click();

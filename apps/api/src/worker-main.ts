@@ -12,7 +12,7 @@ import {VideoReferences} from './video-references.js';
 import {VideoProviderJobs} from './video-provider-jobs.js';
 import {VideoRenderer} from './video-renderer.js';
 import {VideoDownload} from './video-download.js';
-import {HiggsfieldClient,HIGGSFIELD_MODELS} from './higgsfield-client.js';
+import {RunwayClient} from './runway-client.js';
 import {PublicationJobs} from './publication-jobs.js';
 import {SocialOAuthJobs} from './social-oauth-jobs.js';
 import {SocialJobs,SocialReadRetry} from './social-jobs.js';
@@ -56,7 +56,7 @@ const socialOAuth=new SocialOAuthJobs(jobs,config.social,config.oauthEncryptionK
 const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
 const carousel=new CarouselJobs(jobs,creative,exporter);
 const video=config.video?new VideoJobs(jobs,new VideoReferences(undefined,jobs,config.video.encryptionKey,config.renderImage!,config.video.mode),creative,
- new VideoProviderJobs(jobs,new HiggsfieldClient({mode:config.video.mode,credentials:config.video.credentials,models:[HIGGSFIELD_MODELS.image],referenceOrigins:[new URL(config.storage.endpoint).origin]}),config.video.encryptionKey),
+ new VideoProviderJobs(jobs,new RunwayClient({mode:config.video.mode,secret:config.video.credentials,referenceOrigins:[new URL(config.storage.endpoint).origin]}),config.video.encryptionKey),
  new VideoDownload(config.video.outputOrigins,undefined,config.video.outputPolicy),new VideoRenderer(config.video.image)):undefined;
 const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue,config.provisionTaskQueue);
 async function carouselActivity<T>(action:()=>Promise<T>):Promise<T>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await action();}catch{throw ApplicationFailure.retryable('Carousel processing temporarily unavailable','CarouselUnavailable');}finally{clearInterval(timer);}}

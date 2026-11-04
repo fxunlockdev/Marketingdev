@@ -2,7 +2,7 @@ import {authenticatedVideoOutput} from './video-output.js';
 import {exceedsAllowance} from "./spending-allowance.js";
 import {randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
-import {HiggsfieldClient,HiggsfieldError,type VideoIntent} from './higgsfield-client.js';
+import {VideoProviderError,type VideoProvider} from './video-provider.js';
 import {VideoVault,VideoStateError} from './video-vault.js';
 const terminal=new Set(['completed','failed','nsfw','canceled','rejected','unknown']);
 
@@ -11,8 +11,8 @@ const terminal=new Set(['completed','failed','nsfw','canceled','rejected','unkno
  * then decode and privately save completed output before marking a job succeeded.
  * There is deliberately no customer route or default worker registration yet. */
 export class VideoProviderJobs {
- #jobs:AssetJobs;#provider:HiggsfieldClient;#vault:VideoVault;
- constructor(jobs:AssetJobs,provider:HiggsfieldClient,encryptionKey:string){this.#jobs=jobs;this.#provider=provider;this.#vault=new VideoVault(encryptionKey);}
+ #jobs:AssetJobs;#provider:VideoProvider;#vault:VideoVault;
+ constructor(jobs:AssetJobs,provider:VideoProvider,encryptionKey:string){this.#jobs=jobs;this.#provider=provider;this.#vault=new VideoVault(encryptionKey);}
  private transaction<T>(scope:JobScope,action:(db:any,j:any)=>Promise<T>){return this.#jobs.transaction(scope,(db,j)=>{
   if(j.kind!=='creative.video')throw new VideoStateError('VIDEO_JOB_KIND_DENIED');return action(db,j);
  });}
@@ -25,18 +25,20 @@ export class VideoProviderJobs {
   if(release)await db.query("UPDATE app.video_reservations SET state='released' WHERE job_id=$1",[j.id]);
   await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,phase==='canceled'?'canceled':phase==='unknown'?'unknown':phase==='failed'?'failed':'rejected',code]);return phase;
  }
- async prepare(scope:JobScope,intent:VideoIntent,beforePrepare?:(db:any,j:any)=>Promise<void>){
-  const prepared=this.#provider.prepare(intent);
+ async prepare(scope:JobScope,intent:any,beforePrepare?:(db:any,j:any)=>Promise<void>){
   return this.transaction(scope,async(db,j)=>{
    const prior=(await db.query('SELECT * FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
-   if(prior){if(prior.intent_sha256!==prepared.sha256||prior.provider_key!==prepared.idempotencyKey)throw new VideoStateError('VIDEO_REPLAY_MISMATCH');return {phase:prior.phase};}
+   const reserve=prior?Number((await db.query('SELECT reserved_micros FROM app.video_reservations WHERE job_id=$1',[j.id])).rows[0].reserved_micros):Number((await this.grant(db,j,intent.model))[intent.kind==='image'?'max_create_micros':'max_edit_micros']);
+   intent=this.#provider.withBudget?.(intent,reserve)??intent;
+   const prepared=this.#provider.prepare(intent);
+   if(prior){if(prior.provider!==(this.#provider.providerName??'higgsfield')||prior.intent_sha256!==prepared.sha256||prior.provider_key!==prepared.idempotencyKey)throw new VideoStateError('VIDEO_REPLAY_MISMATCH');return {phase:prior.phase};}
    if(!['queued','running','retrying'].includes(j.status)||!await this.#jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');
    if(beforePrepare)await beforePrepare(db,j);
-   const g=await this.grant(db,j,prepared.model),reserve=Number(intent.kind==='image'?g.max_create_micros:g.max_edit_micros);
+   const g=await this.grant(db,j,prepared.model);
    const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.video_reservations WHERE organization_id=$1 AND brand_id=$2 AND state='held'",[j.organization_id,j.brand_id])).rows[0].n);
    if(!Number.isSafeInteger(reserve)||reserve<=0||exceedsAllowance(used+reserve,g.budget_micros))throw new VideoStateError('VIDEO_BUDGET_EXHAUSTED');
    await db.query('INSERT INTO app.video_reservations(job_id,organization_id,brand_id,model,reserved_micros) VALUES($1,$2,$3,$4,$5)',[j.id,j.organization_id,j.brand_id,prepared.model,reserve]);
-   await db.query('INSERT INTO app.video_operations(job_id,organization_id,brand_id,provider_key,model,intent_sha256,encrypted_intent) VALUES($1,$2,$3,$4,$5,$6,$7)',[j.id,j.organization_id,j.brand_id,prepared.idempotencyKey,prepared.model,prepared.sha256,this.#vault.seal(scope,'intent',intent)]);
+   await db.query('INSERT INTO app.video_operations(job_id,organization_id,brand_id,provider_key,model,intent_sha256,encrypted_intent,provider) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[j.id,j.organization_id,j.brand_id,prepared.idempotencyKey,prepared.model,prepared.sha256,this.#vault.seal(scope,'intent',intent),this.#provider.providerName??'higgsfield']);
    return {phase:'prepared'};
   });
  }
@@ -45,6 +47,7 @@ export class VideoProviderJobs {
    const r=(await db.query('SELECT * FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
    if(!r)throw new VideoStateError('VIDEO_INTENT_MISSING');
    if(terminal.has(r.phase))return {done:r.phase};
+   if(r.provider!==(this.#provider.providerName??'higgsfield'))return {done:await this.stop(db,j,r.phase==='prepared'?'rejected':'unknown','VIDEO_LEGACY_PROVIDER_RECONCILIATION_REQUIRED',r.phase==='prepared')};
    if(r.phase==='submitting')return {done:await this.stop(db,j,'unknown','VIDEO_SUBMISSION_UNKNOWN')};
    if(r.phase==='prepared'&&(!['queued','running','retrying'].includes(j.status)||new Date(r.deadline_at).getTime()<=Date.now()))
     return {done:await this.stop(db,j,'rejected','VIDEO_UNUSED_INTENT_EXPIRED_OR_STOPPED',true)};
@@ -54,7 +57,7 @@ export class VideoProviderJobs {
     if(!permitted)return {done:await this.stop(db,j,'canceled','VIDEO_ACCESS_REVOKED_OR_CANCELED',true)};
     let g;try{g=await this.grant(db,j,r.model);}catch{return {done:await this.stop(db,j,'rejected','VIDEO_STAGING_APPROVAL_REQUIRED',true)};}
     const held=(await db.query('SELECT reserved_micros,state FROM app.video_reservations WHERE job_id=$1',[j.id])).rows[0];
-    const intent=this.#vault.open(scope,'intent',r.encrypted_intent) as VideoIntent,prepared=this.#provider.prepare(intent);
+    const intent=this.#vault.open(scope,'intent',r.encrypted_intent) as any,prepared=this.#provider.prepare(intent);
     if(prepared.sha256!==r.intent_sha256||prepared.idempotencyKey!==r.provider_key||prepared.model!==r.model||held.state!=='held')throw new VideoStateError('VIDEO_REPLAY_MISMATCH');
     const currentCap=Number(intent.kind==='image'?g.max_create_micros:g.max_edit_micros);
     const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.video_reservations WHERE state='held'",[])).rows[0].n);
@@ -72,14 +75,14 @@ export class VideoProviderJobs {
    let receipt;
    try{receipt=await this.#provider.submit(state.submit!,state.sha!);}catch(e){
     return this.transaction(scope,async(db,j)=>{
-     const known=e instanceof HiggsfieldError&&e.outcome==='rejected';
-     return this.stop(db,j,known?'rejected':'unknown',e instanceof HiggsfieldError?e.code:'VIDEO_SUBMISSION_UNKNOWN',known);
+     const known=e instanceof VideoProviderError&&e.outcome==='rejected';
+     return this.stop(db,j,known?'rejected':'unknown',e instanceof VideoProviderError?e.code:'VIDEO_SUBMISSION_UNKNOWN',known);
     });
    }
    // If committing this receipt fails, leave the submitting marker. A later
    // activity holds it unknown; it must not repeat the paid POST automatically.
    return this.transaction(scope,async(db,j)=>{
-    await db.query("UPDATE app.video_operations SET phase='accepted',remote_request_id=$2,error_code=NULL WHERE job_id=$1",[j.id,receipt.requestId]);
+    await db.query("UPDATE app.video_operations SET phase='accepted',remote_request_id=$2,routing=$3,error_code=NULL WHERE job_id=$1",[j.id,receipt.requestId,receipt.routing?JSON.stringify(receipt.routing):null]);
     await db.query("UPDATE app.jobs SET status='running',error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);return 'accepted';
    });
   }
@@ -90,13 +93,13 @@ export class VideoProviderJobs {
     await db.query("UPDATE app.video_operations SET cancel_phase='submitting' WHERE job_id=$1",[j.id]);return true;
    });
    if(send){
-    let phase='accepted';try{await this.#provider.cancel(state.poll!);}catch(e){phase=e instanceof HiggsfieldError&&e.outcome==='rejected'?'rejected':'unknown';}
+    let phase='accepted';try{await this.#provider.cancel(state.poll!);}catch(e){phase=e instanceof VideoProviderError&&e.outcome==='rejected'?'rejected':'unknown';}
     await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.video_operations SET cancel_phase=$2 WHERE job_id=$1',[j.id,phase]);});
    }
   }
   let observed;
   try{observed=await this.#provider.status(state.poll!);}catch(e){
-   await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.video_operations SET error_code=$2,last_checked_at=now() WHERE job_id=$1',[j.id,e instanceof HiggsfieldError?e.code:'VIDEO_STATUS_UNAVAILABLE']);});
+   await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.video_operations SET error_code=$2,last_checked_at=now() WHERE job_id=$1',[j.id,e instanceof VideoProviderError?e.code:'VIDEO_STATUS_UNAVAILABLE']);});
    throw new VideoStateError('VIDEO_STATUS_UNAVAILABLE');
   }
   return this.transaction(scope,async(db,j)=>{
@@ -104,7 +107,7 @@ export class VideoProviderJobs {
    if(terminal.has(current.phase))return current.phase;
    await db.query('INSERT INTO app.video_observations(id,organization_id,brand_id,job_id,state) VALUES($1,$2,$3,$4,$5)',[randomUUID(),j.organization_id,j.brand_id,j.id,observed.state]);
    const phase=['completed','failed','nsfw','canceled'].includes(observed.state)?observed.state:'accepted';
-   await db.query('UPDATE app.video_operations SET phase=$2,remote_state=$3,encrypted_output=$4,error_code=$5,last_checked_at=now() WHERE job_id=$1',[j.id,phase,observed.state,phase==='completed'?this.#vault.seal(scope,'output',{url:observed.videoURL}):null,observed.errorCode]);
+   await db.query('UPDATE app.video_operations SET phase=$2,remote_state=$3,encrypted_output=$4,error_code=$5,progress=$6,last_checked_at=now() WHERE job_id=$1',[j.id,phase,observed.state,phase==='completed'?this.#vault.seal(scope,'output',{url:observed.videoURL}):null,observed.errorCode,observed.progress??null]);
    if(['failed','nsfw','canceled'].includes(phase))await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,phase==='failed'?'failed':phase==='canceled'?'canceled':'rejected',observed.errorCode]);
    // Completed provider work is not a succeeded Desvio job; validation/save and
    // a fresh permission check are still required. Reservation remains held.

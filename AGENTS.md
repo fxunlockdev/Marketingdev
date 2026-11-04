@@ -6,7 +6,7 @@ Read **`PRODUCT.md`**, **`ARCHITECTURE.md`**, **`INTEGRATION_FIRST_BUILD.md`**, 
 
 ## Mission
 
-Build a **fully custom customer-facing**, production-oriented, multi-tenant AI Marketing OS. Postiz is a hidden **organic** social publishing integration, never the customer-facing UI or paid ads engine. Your runtime skill harness executes the owner's 52 marketing skills within the platform via Deep Agents. Image creation/editing uses OpenAI GPT Images; video generation uses Higgsfield. Users do not run Codex or visit provider dashboards.
+Build a **fully custom customer-facing**, production-oriented, multi-tenant AI Marketing OS. Postiz is a hidden **organic** social publishing integration, never the customer-facing UI or paid ads engine. Your runtime skill harness executes the owner's 52 marketing skills within the platform via Deep Agents. Image creation/editing uses OpenAI GPT Images; video generation uses Runway. Users do not run Codex or visit provider dashboards.
 
 ## Most important rule: production functionality before visual polish
 
@@ -20,7 +20,7 @@ The final operator should not need to write code after development. Supply secur
 
 1. Inspect the Postiz checkout and record its exact commit: `git rev-parse HEAD`. Verify runnable setup, API contracts, social-account lifecycle, tenant isolation, webhooks and rate limiting. Do **not** rely solely on descriptions from `PRODUCT.md` for currently supported endpoints.
 2. Import **`inputs/marketingskills-main.zip`**. Audit its license, YAML frontmatter, references and any scripts; never run untrusted helper programs by default. Verify SHA against `inventory/skills-archive.sha256` and create immutable skill digests from contents (do not assume semver is present).
-3. Examine official OpenAI/Higgsfield SDK behavior at pinned versions. Paid API calls must be opt-in and cost capped. Implement fake adapters first so local development does not require live keys.
+3. Examine official OpenAI/Runway SDK behavior at pinned versions. Paid API calls must be opt-in and cost capped. Implement fake adapters first so local development does not require live keys.
 4. Write `docs/adr/0001-reuse-decisions.md`, `docs/POSTIZ_API_MATRIX.md`, `docs/SKILL_AUDIT.md`, and `docs/SECURITY_THREAT_MODEL.md` with actual file paths and observations.
 5. Propose the **smallest functional backend-to-UI vertical-slice PR** and implement M0/M1 until gates pass, then proceed sequentially. Do not stop at design documents, skeleton views, or keyless-only mocks.
 6. Implement `make verify-offline`, `make verify-contracts`, guarded `make verify-live`, `make verify-security`, `make release-gate`, and `docs/evidence/integration-status.json` as early engineering infrastructure (or documented equivalents).
@@ -39,7 +39,7 @@ The final operator should not need to write code after development. Supply secur
 
 ## Evidence or do not claim completion
 
-Each integration declares exactly one of `NOT_IMPLEMENTED`, `MOCKED`, `ADAPTER_READY`, `LIVE_VERIFIED`, `LAUNCH_READY`. Do not manually mark a provider verified; tests generate the evidence. Live smoke tests require explicit cost cap, dev credentials and allowlisted accounts. Postiz publishing needs tenant-safe OAuth, upload, schedule, status reconciliation and cross-tenant denial. Real GPT Images requires generate **and edit**. Higgsfield requires real async create/status/asset copy. A success badge cannot be driven by a canned response.
+Each integration declares exactly one of `NOT_IMPLEMENTED`, `MOCKED`, `ADAPTER_READY`, `LIVE_VERIFIED`, `LAUNCH_READY`. Do not manually mark a provider verified; tests generate the evidence. Live smoke tests require explicit cost cap, dev credentials and allowlisted accounts. Postiz publishing needs tenant-safe OAuth, upload, schedule, status reconciliation and cross-tenant denial. Real GPT Images requires generate **and edit**. Runway requires real async create/status/asset copy. A success badge cannot be driven by a canned response.
 
 ## Pull request format
 
@@ -54,4 +54,4 @@ Each PR must describe `scope`, `changed_paths`, `migrations`, `config`, `tests_r
 - Don't claim SaaS scale without tenant isolation, rate and cost limits, adversarial tests and load test evidence.
 - Don't ask for production API keys until a mocked version of the feature is demonstrable.
 
-**Success for the first real product slice:** brand website → grounded findings → owner corrections → approved Brand Brain → selected `social`/`image` skills → GPT image/editable branded creative → review → authenticated headless Postiz scheduling → verified status; after that, Higgsfield video and learning.
+**Success for the first real product slice:** brand website → grounded findings → owner corrections → approved Brand Brain → selected `social`/`image` skills → GPT image/editable branded creative → review → authenticated headless Postiz scheduling → verified status; after that, Runway video and learning.

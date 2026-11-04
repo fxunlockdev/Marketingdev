@@ -46,7 +46,7 @@ export function configurationManifest(input,now=Date.now()){
    else if(field==='provider'){if(!['openai','gemini'].includes(g[field]))deny('CONFIGURATION_INVALID_PROVIDER');}
    else if(['model','text_model','image_model'].includes(field))model(g[field]);
    else if(field==='quality'){if(!['low','medium','high'].includes(g[field]))deny('CONFIGURATION_INVALID_QUALITY');}
-   else if(field==='models'){if(!Array.isArray(g.models)||!g.models.length||g.models.length>2||new Set(g.models).size!==g.models.length||g.models.some(m=>!['kling-video/v3.0/std/image-to-video','kling-video/o3/video-edit'].includes(m)))deny('CONFIGURATION_INVALID_VIDEO_MODEL');g.models=[...g.models].sort();}
+   else if(field==='models'){if(!Array.isArray(g.models)||!g.models.length||g.models.length>2||new Set(g.models).size!==g.models.length||g.models.some(m=>!['runway/router'].includes(m)))deny('CONFIGURATION_INVALID_VIDEO_MODEL');g.models=[...g.models].sort();}
    else if(field==='channel_id')g.channel_id=uuid(g.channel_id);
    else if(field==='remote_account_id'){if(typeof g[field]!=='string'||! /^[a-zA-Z0-9_-]{1,256}$/.test(g[field]))deny('CONFIGURATION_EXACT_ACCOUNT_REQUIRED');}
    else if(field==='budget_micros'&&g[field]===null){} // Explicit uncapped lifetime allowance; never implied by omission.

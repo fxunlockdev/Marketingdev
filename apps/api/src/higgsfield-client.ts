@@ -1,3 +1,4 @@
+import {VideoProviderError} from './video-provider.js';
 import { createHash } from 'node:crypto';
 import { websiteURL } from './safe-web.js';
 
@@ -8,9 +9,9 @@ export const HIGGSFIELD_MODELS = {
 export type VideoModel = typeof HIGGSFIELD_MODELS[keyof typeof HIGGSFIELD_MODELS];
 export type VideoState = 'queued' | 'in_progress' | 'completed' | 'failed' | 'nsfw' | 'canceled';
 export type VideoOutcome = 'not_sent' | 'rejected' | 'unknown';
-export class HiggsfieldError extends Error {
+export class HiggsfieldError extends VideoProviderError {
   constructor(readonly code: string, readonly outcome: VideoOutcome = 'not_sent', readonly retryAfterSeconds?: number) {
-    super(code); this.name = 'HiggsfieldError';
+    super(code,outcome,retryAfterSeconds); this.name = 'HiggsfieldError';
   }
 }
 export type HiggsfieldConfig = {

@@ -13,9 +13,9 @@ test('remote Docker, extra administrative credentials, mutable images and implic
 });
 
 test('worker host forwards only the explicit authenticated video policy and rejects conflicting modes',()=>{
- const env={...fixture(),OPENAI_API_KEY:'fixture',VIDEO_ENABLED:'true',VIDEO_ENCRYPTION_KEY:'a'.repeat(64),HIGGSFIELD_CREDENTIALS:'fixture:key',HIGGSFIELD_OUTPUT_POLICY:'authenticated_provider_result'};
- assert.equal(workerHostSpec(env).values.HIGGSFIELD_OUTPUT_POLICY,'authenticated_provider_result');
- for(const change of [{HIGGSFIELD_OUTPUT_POLICY:'all'},{HIGGSFIELD_OUTPUT_POLICY:'exact_origins'},{HIGGSFIELD_OUTPUT_ORIGINS:'https://example.com'}])assert.throws(()=>workerHostSpec({...env,...change}),/WORKER_CONFIGURATION_INVALID/);
+ const env={...fixture(),OPENAI_API_KEY:'fixture',VIDEO_ENABLED:'true',VIDEO_ENCRYPTION_KEY:'a'.repeat(64),RUNWAYML_API_SECRET:'fixture:key',RUNWAY_OUTPUT_POLICY:'authenticated_provider_result'};
+ assert.equal(workerHostSpec(env).values.RUNWAY_OUTPUT_POLICY,'authenticated_provider_result');
+ for(const change of [{RUNWAY_OUTPUT_POLICY:'all'},{RUNWAY_OUTPUT_POLICY:'exact_origins'},{RUNWAY_OUTPUT_ORIGINS:'https://example.com'}])assert.throws(()=>workerHostSpec({...env,...change}),/WORKER_CONFIGURATION_INVALID/);
 });
 
 test('optional website renderer is pinned, forwarded, inspected and fingerprints readiness',()=>{

@@ -10,7 +10,7 @@ test('explicit uncapped allowance retains arithmetic integrity and fails closed 
  assert.equal(exceedsAllowance(100,'100'),false);assert.equal(exceedsAllowance(101,'100'),true);
 });
 test('uncapped manifest is explicit, audited input and still validates per-call pricing',()=>{
- const m={version:1,change_id:randomUUID(),organization_id:randomUUID(),business_id:randomUUID(),operator_reference:'Owner explicitly chose uncapped',grants:[{kind:'video',enabled:true,expires_at:new Date(Date.now()+86400000).toISOString(),budget_micros:null,models:['kling-video/v3.0/std/image-to-video'],max_create_micros:1000,max_edit_micros:1000}]};
+ const m={version:1,change_id:randomUUID(),organization_id:randomUUID(),business_id:randomUUID(),operator_reference:'Owner explicitly chose uncapped',grants:[{kind:'video',enabled:true,expires_at:new Date(Date.now()+86400000).toISOString(),budget_micros:null,models:['runway/router'],max_create_micros:1000,max_edit_micros:1000}]};
  assert.equal(configurationManifest(m).grants[0].budget_micros,null);
  const missing=structuredClone(m);delete missing.grants[0].budget_micros;assert.throws(()=>configurationManifest(missing));
  m.grants[0].max_create_micros=null;assert.throws(()=>configurationManifest(m));

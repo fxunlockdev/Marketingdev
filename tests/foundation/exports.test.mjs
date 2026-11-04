@@ -184,7 +184,7 @@ test('approved export to original video skills, durable provider stage, actual m
  const recoveredRequest=(await admin.query('SELECT * FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];assert.equal(recoveredRequest.project_id,originalRequest.project_id);assert.equal(recoveredRequest.prompt,originalRequest.prompt);assert.equal(recoveredRequest.approved_brief,null);assert.equal(recoveredRequest.creative_spec?.placement,originalRequest.creative_spec?.placement);
  assert.equal((await admin.query('SELECT export_id FROM app.video_references WHERE job_id=$1',[j.id])).rows[0].export_id,e.id);
  assert.equal((await service.retryScript(alice.id,brand.id,original.id)).id,j.id);
- await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['kling-video/v3.0/std/image-to-video'],now()+interval '1 hour',10000000,100000,100000,'LOCAL TEST',true)",[org.id,brand.id]);
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL TEST',true)",[org.id,brand.id]);
  let plansCalled=0,submits=0,statuses=0,downloads=0,leasedURL;
  const text=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
   plansCalled++;assert.equal(new URL(url).pathname,'/v1/responses');const wire=JSON.parse(init.body),message=wire.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')),input=JSON.parse(message.content.slice(message.content.indexOf('\n')+1));
@@ -192,12 +192,22 @@ test('approved export to original video skills, durable provider stage, actual m
   const brief={title:'TEST video',caption:'TEST FIXTURE video caption',video_prompt:'TEST FIXTURE subtle motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:3000,action:'Subtle motion',camera:'Static'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]};
   return Response.json({object:'response',id:'resp_mock_video',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(brief),annotations:[]}]}]});
  }}));
- // Provider boundary is explicitly MOCK. Real Higgsfield wire behavior is
- // independently covered by provider contracts; this loopback URL is not staging.
- let remoteId=randomUUID();const mockProvider={prepare:intent=>({model:intent.model,idempotencyKey:intent.idempotencyKey,sha256:hash(canonicalJSON(intent))}),submit:async(intent,sha)=>{
-  submits++;remoteId=randomUUID();assert.ok(intent.prompt.startsWith('TEST FIXTURE user edited motion\nScript:\n'));assert.ok(intent.prompt.includes('Subtle motion'));assert.equal(sha,hash(canonicalJSON(intent)));leasedURL=intent.referenceURL;
-  const downloaded=Buffer.from(await(await fetch(leasedURL)).arrayBuffer());assert.equal(digest(downloaded),e.sha256);
-  return {requestId:remoteId};},status:async()=>{statuses++;return {requestId:remoteId,state:'completed',videoURL:'https://video.example.org/fixture.mp4',errorCode:null};},cancel:async()=>{}};
+ // Real Runway adapter with MOCK HTTP; real auth, storage, skills and renderer below.
+ const {RunwayClient}=await import('../../dist/runway-client.js');
+ let remoteId=randomUUID();
+ const localReferences=new Map();
+ const mockProvider=new RunwayClient({mode:'test',secret:'fixture',referenceOrigins:['https://media.example.com']},async(url,init)=>{
+  const path=new URL(url).pathname;
+  if(path==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
+  if(path==='/v1/generate/video'){
+   submits++;remoteId=randomUUID();const body=JSON.parse(init.body),input=body.input;assert.ok(input.promptText.startsWith('TEST FIXTURE user edited motion\nScript:\n'));assert.ok(input.promptText.includes('Subtle motion'));assert.equal(body.model,undefined);leasedURL=localReferences.get(input.referenceImages[0].uri);
+   const downloaded=Buffer.from(await(await fetch(leasedURL)).arrayBuffer());assert.equal(digest(downloaded),e.sha256);
+   return Response.json({id:remoteId,dryRun:false,routing:{model:'gen4.5',provider:'runway',configId:body.configId,resolvedSettings:{optimizeFor:'quality',priceCeiling:10},estimatedCost:{credits:9}}});
+  }
+  statuses++;return Response.json({id:remoteId,status:'SUCCEEDED',output:['https://video.example.org/fixture.mp4']});
+ });
+ const bindBudget=mockProvider.withBudget.bind(mockProvider);
+ mockProvider.withBudget=(intent,cap)=>{const uri='https://media.example.com/'+intent.idempotencyKey;localReferences.set(uri,intent.referenceURL);return bindBudget({...intent,referenceURL:uri},cap);};
  const provider=new VideoProviderJobs(jobs,mockProvider,encryptionKey),creative=new CreativeJobs(jobs,new SkillRuntime(skillImage),text);
  const downloader=new VideoDownload(['https://video.example.org'],{fetch:async()=>{downloads++;return {status:200,headers:{'content-type':'video/mp4','content-length':String(clip.length)},bytes:clip};}});
  const pipeline=new VideoJobs(jobs,refs,creative,provider,downloader,new VideoRenderer(image));

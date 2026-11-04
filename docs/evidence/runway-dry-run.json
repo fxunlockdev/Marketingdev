@@ -1,0 +1,24 @@
+{
+  "checked_at": "2026-11-04T13:19:17.266Z",
+  "status": 200,
+  "dry_run": true,
+  "routing": {
+    "model": "seedance2_5",
+    "provider": "bytedance",
+    "configId": "desvio-video-quality-v1-2000",
+    "resolvedSettings": {
+      "optimizeFor": "quality",
+      "priceCeiling": 2000
+    },
+    "resolvedInput": {
+      "duration": 5,
+      "ratio": "1080:1920",
+      "resolution": "1080p"
+    },
+    "estimatedCost": {
+      "credits": 340
+    }
+  },
+  "router_quality": "quality",
+  "paid_calls": false
+}

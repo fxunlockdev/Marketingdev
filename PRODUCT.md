@@ -17,7 +17,7 @@
 1. **One consumer-facing product, built by us.** Customers see our UI, our URLs, our branding, our creative editor, our approval center, and our billing. They do not need to use or install Postiz, Codex, Claude Code, Cursor, Deep Agents Code, a terminal, or a vendor dashboard.
 2. **Postiz is an internal, replaceable publishing adapter** for *organic* social posts, connection handling where its interface safely supports it, scheduling, and available analytics. It is **not** our UI, Brand Brain, creative engine, primary CRM, or paid-ad platform.
 3. **GPT Images is the selected image-generation provider** through OpenAI's supported API/SDK; use provider/model capability detection rather than pinning a model identifier in business logic. Support image **editing** and image references, not just text-to-image.
-4. **Higgsfield is the selected video-generation provider** via its official server-side SDK/API. Treat video generation as an asynchronous external job; preserve job IDs, verify callbacks, poll/reconcile, save output in our object storage, and handle expiry/failure/cost.
+4. **Runway Model Router, optimized for quality, is the selected video-generation provider** via its official server-side SDK/API. Treat video generation as an asynchronous external job; preserve job IDs, verify callbacks, poll/reconcile, save output in our object storage, and handle expiry/failure/cost.
 5. **Our uploaded Marketing Skills are first-class runtime capabilities.** Load `SKILL.md` from our archive using Deep Agents; augment with approved brand context and narrowly scoped tools. **The Skill Harness runs inside our platform**; Codex is used to build and test it only.
 6. **Approve before publish or spend.** Generated content always goes through configurable review; all paid advertising launch/budget-changing actions require explicit privileged authorization. Do not silently auto-spend.
 7. **Brand facts require provenance and explicit verification.** Crawled sites and uploaded guidelines are evidence, not trusted instructions. Never let performance-memory summaries overwrite approved product facts/claims.
@@ -27,7 +27,7 @@
 
 ### 0.1 Definition of the product
 
-A brand owner signs up, enters their website, optionally uploads PDF/PPTX/DOCX/ZIP/images/catalogs, reviews AI-inferred brand knowledge with **Correct / Wrong / Edit** controls, confirms brand guidelines, then generates an integrated multi-channel campaign (captions, carousels, static ads, and Higgsfield video). They edit/approve assets, schedule organic posts through Postiz, review evidence-backed analytics, and use the performance-learning agent to improve future campaigns. Paid advertising is a distinct later service via authorized advertising APIs.
+A brand owner signs up, enters their website, optionally uploads PDF/PPTX/DOCX/ZIP/images/catalogs, reviews AI-inferred brand knowledge with **Correct / Wrong / Edit** controls, confirms brand guidelines, then generates an integrated multi-channel campaign (captions, carousels, static ads, and Runway video). They edit/approve assets, schedule organic posts through Postiz, review evidence-backed analytics, and use the performance-learning agent to improve future campaigns. Paid advertising is a distinct later service via authorized advertising APIs.
 
 ### 0.2 Reference business outcomes
 
@@ -52,7 +52,7 @@ A brand owner signs up, enters their website, optionally uploads PDF/PPTX/DOCX/Z
 | LinkedIn/social copy and ad copy | M3 | Our `social`, `ad-creative`, `copywriting` skills with validation |
 | Static images + reusable branded templates | M3 | GPT Images for visual content; editable Fabric.js layers for text/logos |
 | Carousels + data-driven variants | M3 | Repeatable templates, product feeds, multi-size export |
-| Higgsfield video ads | M4 | Storyboard, generation lifecycle, subtitles/overlay, revisions, export |
+| Runway video ads | M4 | Storyboard, generation lifecycle, subtitles/overlay, revisions, export |
 | Social account connection and scheduling | M3–M4 | Headless Postiz integration with per-tenant isolation proof |
 | Campaign dashboard + basic organic analytics | M4 | Synced platform metrics with provenance and freshness timestamps |
 | Creative QA and review/approval | M3–M4 | Policy checks, editor, explicit approval state machine |
@@ -68,7 +68,7 @@ A brand owner signs up, enters their website, optionally uploads PDF/PPTX/DOCX/Z
 
 **Flow B — Organic campaign:** User asks for a 30-day Instagram/LinkedIn plan → brand-aware strategy and channel-specific posts → static/carousel/video production → batch review → choose accounts/dates → schedule via Postiz → reconcile actual publish status → display analytics.
 
-**Flow C — Video campaign:** User asks for 15-second product video → `ad-creative` + `video` skills produce concept/script/storyboard → GPT Images creates safe referenced stills when needed → Higgsfield generates scenes → FFmpeg assembles scenes, subtitles, logo/CTA/music → user revises/regenerates a scene → approves export → organic schedule or paid-ad-ready download.
+**Flow C — Video campaign:** User asks for 15-second product video → `ad-creative` + `video` skills produce concept/script/storyboard → GPT Images creates safe referenced stills when needed → Runway generates scenes → FFmpeg assembles scenes, subtitles, logo/CTA/music → user revises/regenerates a scene → approves export → organic schedule or paid-ad-ready download.
 
 **Flow D — Learning:** Retrieve published performance and other authorized conversion data → map to creative versions and skill/model versions → normalize by channel/objective/time window → surface comparison and confidence → user accepts an experiment brief → create new variants without changing confirmed brand facts.
 
@@ -85,7 +85,7 @@ A brand owner signs up, enters their website, optionally uploads PDF/PPTX/DOCX/Z
 | **LangGraph** — https://github.com/langchain-ai/langgraph | Graph/state/checkpoint primitives *under* agent system; use when deterministic routing is required | Marketing-specific graph steps, resumability integration, business state transitions | `EMBED` through Deep Agents where sufficient; **do not build a second agent platform** · M3 |
 | **Portkey Gateway** — https://github.com/Portkey-AI/gateway | Gateway for compatible LLM calls, retries, fallback/routing/observability primitives | Tenant-aware rate/cost accounting, supported-model registry, error policy; native image/video adapters when gateway lacks operations | `RUN/EMBED + ADAPT` · M3 · MIT OSS core, verify version |
 | **OpenAI official SDK** — https://github.com/openai/openai-node ; https://github.com/openai/openai-python | Authenticated text/structured-output and GPT image generation/editing calls | Brand prompt compiler, reference images, image moderation/QA, cost logging, media persistence, revision history | `EMBED` · M3 · **API is paid; SDK being OSS does not make inference free** |
-| **Higgsfield official SDK** — https://github.com/higgsfield-ai/higgsfield-js ; https://github.com/higgsfield-ai/higgsfield-client | Video model request submission, status polling/result retrieval and optional webhooks | Video workflow adapter, storyboard, scene QA, rendering/postproduction, credit reservations, cancellation/retry, asset copy | `EMBED` server-side · M4 · paid hosted API, NOT OSS model |
+| **Runway official SDK** — https://docs.dev.runwayml.com/api/ ; https://docs.dev.runwayml.com/model-routers/ | Video model request submission, status polling/result retrieval and optional webhooks | Video workflow adapter, storyboard, scene QA, rendering/postproduction, credit reservations, cancellation/retry, asset copy | `EMBED` server-side · M4 · paid hosted API, NOT OSS model |
 | **Fabric.js** — https://github.com/fabricjs/fabric.js | Interactive editable 2D canvas scene graph, text/image transforms, layers, serializable designs, export primitives | Polished ad editor UI, templates, asset panel, brand controls, snapping/resize, undo history, variant generator, autosave, batch export | `EMBED` frontend/editor worker · M3 · MIT |
 | **FFmpeg** — https://github.com/FFmpeg/FFmpeg | Encoding/transcoding, concatenate clips, subtitle and audio overlays, thumbnails, multi-resolution exports | Creative timeline JSON, render service, progress, GPU/CPU worker fleet, export presets, copyright-safe audio use | `RUN` isolated media worker · M4 · LGPL/GPL build-dependent |
 | **Crawl4AI** — https://github.com/unclecode/crawl4ai | Web crawler, JS page handling/content extraction, URL/page data | Crawl scope/quotas, ownership checks where appropriate, SSRF guard, sources, dedupe, visual and catalog analysis, UX progress | `EMBED` dedicated ingestion worker · M2 · review attribution terms |
@@ -106,7 +106,7 @@ A brand owner signs up, enters their website, optionally uploads PDF/PPTX/DOCX/Z
 - **Postiz:** organic publishing and available social-account analytics; **not paid Meta campaigns** or independent attribution by default.
 - **Deep Agents:** interprets instructions and selects constrained tools; **not** the database of approved brand truth.
 - **LangGraph:** workflow primitives; **not** a second deployment requirement on top of Deep Agents unless proven necessary.
-- **Portkey:** compatible model routing; **not** an assurance that native OpenAI Images operations or Higgsfield asynchronous jobs are automatically covered. Keep direct provider adapters.
+- **Portkey:** compatible model routing; **not** an assurance that native OpenAI Images operations or Runway asynchronous jobs are automatically covered. Keep direct provider adapters.
 - **Fabric.js:** canvas drawing engine; **not** an out-of-the-box Canva clone.
 - **FFmpeg:** media operations; **not** a visual timeline application.
 - **Langfuse:** LLM execution observability and eval; **not** paid marketing ROAS attribution.
@@ -137,7 +137,7 @@ flowchart TB
   D[Deep Agents — marketing skills runtime]
   P[Portkey — supported text LLM routing]
   O[OpenAI SDK — GPT Image create/edit]
-  H[Higgsfield SDK — video jobs]
+  H[Runway SDK — video jobs]
   E[Fabric.js editor / FFmpeg renderer]
   C[Crawl4AI + Docling ingestion]
   L[Langfuse AI evaluations]
@@ -186,7 +186,7 @@ marketing-os/
     contracts/                     # Versioned schemas, Zod/OpenAPI/Pydantic
     ui/                            # Design system
     creative-project/              # Fabric.js project JSON schema + rendering API
-    adapters/                      # Postiz, OpenAI, Higgsfield, Portkey abstractions
+    adapters/                      # Postiz, OpenAI, Runway, Portkey abstractions
     skills-registry/               # Metadata/catalog/versions, not uncontrolled shell
     observability/                 # Tracing, cost and audit instrumentation
   infra/
@@ -216,7 +216,7 @@ Codex MUST perform these checks, record exact commit hashes, SDK/package version
 3. **Skill archive audit:** import `marketingskills-main (1).zip` as a versioned source artifact. It contains **52 `skills/<name>/SKILL.md` directories**, an MIT license by Corey Haines, plus references/evals, **66 Node CLI files under `tools/clis/`**, and contract tests. Preserve attribution and actual instructions. Scan for external integrations, network/credential access, partner-linked recommendations, possible prompt injection, scripts and side effects. Do not execute arbitrary bundled CLIs just because a skill mentions them.
 4. **Deep Agents proof of concept:** demonstrate loading `social`, `product-marketing`, `ad-creative`, `image`, `video` from an isolated virtual backend; verify selected skills reference files correctly, output structured JSON and invoke only whitelisted tools. Note SDK APIs may have changed.
 5. **OpenAI proof of concept:** use a server-side API key to generate and edit one image using an approved, currently supported GPT Image model; measure cost/output; test reference-image fidelity and error behavior.
-6. **Higgsfield proof of concept:** use official server-side SDK; generate a permitted short video with an actual video endpoint discovered from official docs; test submit/status/completion/callback, timeout, storage copy, provider quota and rate-limit errors. Do not copy image endpoint examples as if they are video endpoint schemas.
+6. **Runway proof of concept:** use official server-side SDK; generate a permitted short video with an actual video endpoint discovered from official docs; test submit/status/completion/callback, timeout, storage copy, provider quota and rate-limit errors. Do not copy image endpoint examples as if they are video endpoint schemas.
 7. **Postiz integration safety spike:** establish defensible tenant-to-integration mapping and demonstrate account A cannot read/schedule/publish account B. If the self-hosted API cannot provide per-workspace isolation or connection without its UI, explicitly choose one of: a tested isolated deployment strategy, a maintainable AGPL-compliant fork/extension, or another publishing provider. This is a **launch blocker**, not a TODO to ignore.
 8. **Model gateway necessity spike:** test Portkey for the chosen text workflow. If direct OpenAI text SDK gives simpler observability and cost at MVP scale, keep Portkey optional—avoid adding a proxy solely because it has GitHub stars.
 9. **Security baseline:** verify file parsing in isolated workers; crawler denies localhost/private/link-local destinations even after redirects; ensure there is no direct client access to model/provider keys.
@@ -253,7 +253,7 @@ Codex MUST perform these checks, record exact commit hashes, SDK/package version
 | Campaign strategist | Objective, audience, channel, schedule, offers; AI plan | Skills selected, user edits plan before generating |
 | Content studio | Generate/iterate platform-aware captions and creatives | Text + image + carousel + video request composer |
 | Image ad editor | Layer canvas, crop, replace background, logo, text, variants | Fabric.js + project JSON + render worker |
-| Video studio | Concept/script/storyboard/scenes, voice/captions, render | Higgsfield jobs + FFmpeg postproduction |
+| Video studio | Concept/script/storyboard/scenes, voice/captions, render | Runway jobs + FFmpeg postproduction |
 | Calendar & approval inbox | Review, approve/reject, assign owner, schedule | Our UI, Postiz adapter only after approval |
 | Integrations | Connect social accounts, inspect scopes/health | Tenant isolation and OAuth consent, no raw access keys |
 | Analytics | Per-post/channel/campaign measurements, last-synced | Metric definitions and source labels |
@@ -357,7 +357,7 @@ We implement a **Marketing Skill Registry** that indexes the validated frontmatt
 | Marketing strategy | `marketing-plan`, `content-strategy`, `product-marketing` | brand retrieval, text | Strategy, goals, assumptions, channels, calendar |
 | LinkedIn / social | `social`, `copywriting`, `copy-editing` | text, approved asset search | Channel post drafts, hooks, CTA, reviewer notes |
 | Static paid-ad-ready image | `ad-creative`, `image`, `product-marketing` | GPT Images, Fabric render, QA | Concept, editable project, variants, exported assets |
-| Video | `video`, `ad-creative`, `social` | text, GPT Images references, Higgsfield, FFmpeg | Script, shot list, video job, final video + timeline data |
+| Video | `video`, `ad-creative`, `social` | text, GPT Images references, Runway, FFmpeg | Script, shot list, video job, final video + timeline data |
 | Product carousel | `social`, `image`, `copywriting` | templates, image generation, canvas export | Array of editable slide projects and alt-text |
 | Iteration after results | `ad-creative`, `analytics`, `ab-testing` | metric retrieval (read-only), text, scoring | Evidence-backed hypothesis and new creative brief |
 | Paid ad planning | `ads`, `ad-creative`, `attribution` | ad-account insights (read-only initially) | Proposed ads/campaign plan requiring review |
@@ -378,7 +378,7 @@ A skill may be in a task plan without executing tools that its untrusted instruc
   "formats": ["1080x1350", "1080x1920"],
   "requested_variants": 3,
   "skill_candidates": ["product-marketing", "ad-creative", "image"],
-  "model_policy": {"image_provider": "openai", "video_provider": "higgsfield"},
+  "model_policy": {"image_provider": "openai", "video_provider": "runway"},
   "requires_user_approval": true,
   "budget": {"max_usd": 5.00},
   "idempotency_key": "org01:campaign01:job01"
@@ -433,7 +433,7 @@ interface ModelRouter {
 }
 ```
 
-**Recommended providers:** text via supported OpenAI model/Portkey; image create/edit via official OpenAI SDK and current Images/Responses API; video via official Higgsfield SDK. Do not route video through Portkey unless supported and tested. Gateway stores price snapshots/usage and reports retries, failures, model and latency. There is **no** promise of identical quality for provider fallbacks. If a requested model is unavailable, either choose an approved fallback with audit label or ask the user; never invisibly change the provider for a paid deliverable.
+**Recommended providers:** text via supported OpenAI model/Portkey; image create/edit via official OpenAI SDK and current Images/Responses API; video via official Runway SDK. Do not route video through Portkey unless supported and tested. Gateway stores price snapshots/usage and reports retries, failures, model and latency. There is **no** promise of identical quality for provider fallbacks. If a requested model is unavailable, either choose an approved fallback with audit label or ask the user; never invisibly change the provider for a paid deliverable.
 
 ### 9.2 Image generation with GPT Images
 
@@ -449,11 +449,11 @@ Use AI models for artwork and visual scenes; keep text/logo/CTAs as separately e
 - Template-based **dynamic variations** for product/audience/offer/CTA and sizes, with side-by-side comparison. Do not imply this automatically delivers Google/Meta dynamic creative ads; that requires ad platform APIs.
 - Server-side deterministic renderer matches client layout. Test font fallback, color correctness and legibility for major aspect ratios.
 
-### 9.4 Higgsfield video generation and FFmpeg composition
+### 9.4 Runway video generation and FFmpeg composition
 
-**Pipeline:** brief → `video` + `ad-creative` skill script → structured storyboard (scenes, durations, prompts, image references, voice/captions, CTA) → submit Higgsfield jobs for individual scenes using endpoints confirmed by capability discovery → status polling/validated webhook → download immediately to object storage → quality/consistency checks → FFmpeg composition/subtitles/audio/branding → review video → per-scene regeneration → final export.
+**Pipeline:** brief → `video` + `ad-creative` skill script → structured storyboard (scenes, durations, prompts, image references, voice/captions, CTA) → submit Runway jobs for individual scenes using endpoints confirmed by capability discovery → status polling/validated webhook → download immediately to object storage → quality/consistency checks → FFmpeg composition/subtitles/audio/branding → review video → per-scene regeneration → final export.
 
-- Support 9:16, 1:1, 16:9 output presets when provider/export pipeline allows; never submit unsupported dimensions to Higgsfield.
+- Support 9:16, 1:1, 16:9 output presets when provider/export pipeline allows; never submit unsupported dimensions to Runway.
 - Store provider request/job/result IDs; reconcile stalled jobs; limit retries to avoid duplicate billing. Use a separate render workflow for final export, not repeated video generation on copy-only changes.
 - Keep a **machine-editable project timeline** (scene order, trim, transitions, subtitles, voice/music tracks, overlays); V1 need not include a fully visual multitrack editor.
 - For UGC-style ads, require legitimate rights/consent for likeness, voices and testimonials. Clearly label synthetic representations where law/platform policy requires.
@@ -623,7 +623,7 @@ GET    /api/v1/analytics/brands/:brandId
 GET    /api/v1/insights/brands/:brandId
 POST   /api/v1/experiments
 GET    /api/v1/usage
-POST   /api/v1/webhooks/higgsfield        # verify provider authenticity
+# Runway task status is reconciled through authenticated polling; no webhook route.
 POST   /api/v1/webhooks/postiz            # verify provider authenticity
 ```
 
@@ -721,7 +721,7 @@ The experience must be a **single, original, responsive SaaS UI**, not a framed 
 
 ### 15.3 Product-level feature flags
 
-`brand_discovery`, `document_uploads`, `skill_runtime`, `gpt_images`, `higgsfield_video`, `creative_canvas`, `social_connections`, `postiz_publish`, `analytics_ingestion`, `learning_insights`, `paid_meta_ads`.
+`brand_discovery`, `document_uploads`, `skill_runtime`, `gpt_images`, `runway_video`, `creative_canvas`, `social_connections`, `postiz_publish`, `analytics_ingestion`, `learning_insights`, `paid_meta_ads`.
 
 Each flag supports internal-only/test tenants and kill switches. A flag must not bypass authorization or approval checks.
 
@@ -769,7 +769,7 @@ Customers own their connected accounts and have an explicit data deletion/export
 
 ## 17. Cost controls, quota management and billing
 
-The platform pays provider API costs. The customer doesn't need an OpenAI/Higgsfield account. Cost controls must be intrinsic, not a dashboard added after the first large bill.
+The platform pays provider API costs. The customer doesn't need an OpenAI/Runway account. Cost controls must be intrinsic, not a dashboard added after the first large bill.
 
 - Maintain a versioned provider/model pricing catalog and per-tenant currency policy; never hard-code a single cost per image/video because price changes with model/resolution/duration.
 - Before dispatch, estimate the maximum cost and **reserve** tenant credits atomically. After terminal outcome, settle estimated vs actual usage from reliable provider data; reconcile disputed provider costs without double-charging.
@@ -777,7 +777,7 @@ The platform pays provider API costs. The customer doesn't need an OpenAI/Higgsf
 - Tenant budgets: per-job max, daily/monthly spend caps, concurrent video limits, retry caps, quotas by plan; enforce in API **and** worker submission layer.
 - Implement distinct ledgers for **provider cost**, **customer credits**, **refunds/adjustments** and billing events. No negative-credit race conditions.
 - Use a payments provider for subscriptions/invoices (e.g., Stripe) behind a billing abstraction; no raw card data. Webhooks are verified and idempotent. Free trial and downgrade should retain user data according to published policy.
-- Offer low-resolution previews and draft copy before costly rendering; rerendering text/logo overlay should not call Higgsfield again.
+- Offer low-resolution previews and draft copy before costly rendering; rerendering text/logo overlay should not call Runway again.
 
 **Not an accurate implementation:** a front-end counter decremented when the button is clicked, without locking, ledger writes, async settlement or concurrency tests.
 
@@ -785,7 +785,7 @@ The platform pays provider API costs. The customer doesn't need an OpenAI/Higgsf
 
 ## 18. Performance, availability, and thousands-of-customers scale plan
 
-**Thousands of registered customers is not the same as thousands of concurrent Higgsfield jobs.** Codex must size by measured workload and model-provider quotas, not arbitrary instance counts.
+**Thousands of registered customers is not the same as thousands of concurrent Runway jobs.** Codex must size by measured workload and model-provider quotas, not arbitrary instance counts.
 
 ### 18.1 Architecture for scale
 
@@ -827,7 +827,7 @@ Record p50/p95/p99 UX/API response times, queue wait, task success rate, duplica
 
 ### M0 — Repository audit and architecture proof (mandatory; no product feature claims)
 
-**Tasks:** Import `PRODUCT.md` into repository; inspect Postiz tree and the supplied skills archive; pin dependency commits; start Postiz unchanged; test publicly documented API; check AGPL and tenant model; run isolated Deep Agents skill-reading experiment; validate GPT Image edit and Higgsfield video operations with mocks or configured dev keys; commit ADR and integration matrix.
+**Tasks:** Import `PRODUCT.md` into repository; inspect Postiz tree and the supplied skills archive; pin dependency commits; start Postiz unchanged; test publicly documented API; check AGPL and tenant model; run isolated Deep Agents skill-reading experiment; validate GPT Image edit and Runway video operations with mocks or configured dev keys; commit ADR and integration matrix.
 
 **Deliverables:** `docs/adr/0001-reuse-decisions.md`, `docs/POSTIZ_API_MATRIX.md`, `docs/SKILL_AUDIT.md`, `docs/PROVIDER_CAPABILITIES.md`, lockfile/commit manifest, running local Docker stack.
 
@@ -857,9 +857,9 @@ Record p50/p95/p99 UX/API response times, queue wait, task success rate, duplica
 
 **Gate:** Real provider integration against dev/sandbox environments where credentials are configured; deterministic mocks otherwise clearly labelled. **Cannot ship tenant-wide Postiz integration until isolated account control is proven.**
 
-### M4 — Higgsfield video, unified calendar and organic analytics
+### M4 — Runway video, unified calendar and organic analytics
 
-**Tasks:** Skill-driven storyboard, approved reference stills, Higgsfield submit/status/download adapter, FFmpeg composition, subtitles/end cards, scene revisions, video QA, cross-channel schedule UI, Postiz analytics sync, creative/version/performance linkage.
+**Tasks:** Skill-driven storyboard, approved reference stills, Runway submit/status/download adapter, FFmpeg composition, subtitles/end cards, scene revisions, video QA, cross-channel schedule UI, Postiz analytics sync, creative/version/performance linkage.
 
 **User demo:** Generate a 15-second brand video, replace a scene, export, approve, schedule it on one supported account, show actual publish/analytics state.
 
@@ -914,7 +914,7 @@ Next smallest demonstrable slice:
 | E2E-06 | GPT Image create/edit | Uses real OpenAI adapter in authorized env, asset stored, editor changes without recreating entire image | M3 |
 | E2E-07 | Carousel from product data | Dynamic template generates editable pages with accurate product variables | M3 |
 | E2E-08 | Instagram scheduling | Approved creative uploaded, posted/scheduled through **verified** Postiz operations | M3 |
-| E2E-09 | Higgsfield video job | Actual endpoint submission, correct async status, download, FFmpeg render, editable timeline metadata | M4 |
+| E2E-09 | Runway video job | Actual endpoint submission, correct async status, download, FFmpeg render, editable timeline metadata | M4 |
 | E2E-10 | Kill worker mid-video | Durable recovery without duplicate provider bill or missing credit settlement | M4 |
 | E2E-11 | Scheduled post timeout | No duplicate remote post; reconciliation or operator action required | M3–M4 |
 | E2E-12 | Analytics linkage | Real metrics attached to specific creative and publishing IDs; missing metrics labeled | M4–M5 |
@@ -979,7 +979,7 @@ These are **proposed application variables**. Codex must update the final `.env.
 
 ### 21.1 Mandatory adapter compliance tests
 
-For each adapter (Postiz, OpenAI, Higgsfield, Portkey if enabled, Docling, Crawl4AI): prove supported operations, input schema validation, mock contract tests, timeout/cancellation/retry handling, auth failure behavior, structured telemetry, idempotency/reconciliation rules, and cost/metering where relevant. Record vendor SDK/package versions in lockfiles and ADR.
+For each adapter (Postiz, OpenAI, Runway, Portkey if enabled, Docling, Crawl4AI): prove supported operations, input schema validation, mock contract tests, timeout/cancellation/retry handling, auth failure behavior, structured telemetry, idempotency/reconciliation rules, and cost/metering where relevant. Record vendor SDK/package versions in lockfiles and ADR.
 
 ---
 
@@ -994,7 +994,7 @@ For each adapter (Postiz, OpenAI, Higgsfield, Portkey if enabled, Docling, Crawl
 | LangGraph | https://github.com/langchain-ai/langgraph |
 | Portkey OSS Gateway | https://github.com/Portkey-AI/gateway |
 | OpenAI Node SDK / API docs | https://github.com/openai/openai-node · https://platform.openai.com/docs |
-| Official Higgsfield TypeScript SDK / docs | https://github.com/higgsfield-ai/higgsfield-js · https://docs.higgsfield.ai/ |
+| Official Runway TypeScript SDK / docs | https://docs.dev.runwayml.com/api/ · https://docs.dev.runwayml.com/model-routers/ |
 | Fabric.js | https://github.com/fabricjs/fabric.js |
 | FFmpeg | https://github.com/FFmpeg/FFmpeg |
 | Crawl4AI | https://github.com/unclecode/crawl4ai |
@@ -1018,11 +1018,11 @@ For each adapter (Postiz, OpenAI, Higgsfield, Portkey if enabled, Docling, Crawl
 1. This **`PRODUCT.md`** at repository root — source of truth for product behavior.
 2. A checked-out **Postiz** release (prefer independent sibling repo or pinned submodule), with git SHA and official deployment documentation.
 3. The supplied **`marketingskills-main (1).zip`** archive, to be imported into `vendor/marketing-skills/` with license, checksum, inventory and approved adapters.
-4. Dev environment capable of Docker Compose and supporting PostgreSQL, Temporal and a local S3-compatible store. Live OpenAI/Higgsfield keys are optional until provider integration testing.
+4. Dev environment capable of Docker Compose and supporting PostgreSQL, Temporal and a local S3-compatible store. Live OpenAI/Runway keys are optional until provider integration testing.
 
 ### First instruction to give Codex (copy and paste)
 
-> Implement the Marketing OS product specified in `PRODUCT.md` as a new, customer-facing, multi-tenant SaaS, using **Postiz only as hidden organic-publishing infrastructure**. Import and validate the 52 Marketing Skills; run them through a constrained Deep Agents runtime with tenant-specific approved Brand Brain context. Use OpenAI's GPT Images for image generation and Higgsfield's official video API for video generation; integrate their SDKs on the server. Reuse Crawl4AI, Docling, PostgreSQL/pgvector, Fabric.js, FFmpeg, Temporal and Langfuse as specified. **Begin by auditing the checked-out Postiz repository, the skills archive and current provider APIs and licenses; do not invent integration endpoints.** Write the ADR and integration test plan, then implement M1–M5 as small testable PRs, demonstrating the first end-to-end organic posting slice before expanding scope. No model/vendor coding app may be required of customers, no third-party dashboard is the customer UI, no cross-tenant access is acceptable, and no content is published or paid money spent without approved policy.
+> Implement the Marketing OS product specified in `PRODUCT.md` as a new, customer-facing, multi-tenant SaaS, using **Postiz only as hidden organic-publishing infrastructure**. Import and validate the 52 Marketing Skills; run them through a constrained Deep Agents runtime with tenant-specific approved Brand Brain context. Use OpenAI's GPT Images for image generation and Runway's official video API for video generation; integrate their SDKs on the server. Reuse Crawl4AI, Docling, PostgreSQL/pgvector, Fabric.js, FFmpeg, Temporal and Langfuse as specified. **Begin by auditing the checked-out Postiz repository, the skills archive and current provider APIs and licenses; do not invent integration endpoints.** Write the ADR and integration test plan, then implement M1–M5 as small testable PRs, demonstrating the first end-to-end organic posting slice before expanding scope. No model/vendor coding app may be required of customers, no third-party dashboard is the customer UI, no cross-tenant access is acceptable, and no content is published or paid money spent without approved policy.
 
 ### Immediate task list (in order)
 
@@ -1031,7 +1031,7 @@ For each adapter (Postiz, OpenAI, Higgsfield, Portkey if enabled, Docling, Crawl
 3. Generate `docs/adr/0001-reuse-decisions.md`, `docs/SECURITY_THREAT_MODEL.md`, and `docs/RELEASE_GATES.md` based on the actual versions.
 4. Scaffold frontend/API/worker packages, Docker dev dependencies, mocked provider SDK adapters, CI and contracts. Implement organization/brand/RBAC first.
 5. Build the **thin end-to-end vertical slice**: fake brand website fixture → evidence-linked draft → review/correction → approved profile → `social` + `image` skill → mocked GPT image asset → Fabric editable preview → approval → mocked Postiz schedule → status reconciliation.
-6. Replace mocks incrementally with real provider calls in tightly metered development tenants, add Higgsfield scenes/video at M4, and capture trace/test proof for each adapter.
+6. Replace mocks incrementally with real provider calls in tightly metered development tenants, add Runway scenes/video at M4, and capture trace/test proof for each adapter.
 7. Only after E2E stability, extend to production accounts and learning. If a critical product requirement cannot be implemented with a selected OSS component, document a decision and choose a replaceable adapter rather than faking it.
 
 **Definition of handoff completion:** Codex can start work with these inputs, identify the first PR, set up mock-based local development, and has unambiguous boundaries, contracts, quality gates, milestones and reference sources. **This document is not itself the implemented product.**
