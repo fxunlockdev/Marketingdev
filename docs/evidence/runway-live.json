@@ -1,0 +1,63 @@
+{
+  "checked_at": "2026-11-04T14:16:09.385Z",
+  "state": "LIVE_VERIFIED",
+  "passed": true,
+  "scope": "Two actual five-second Runway creations, through hosted chat with explicit prompt approval, saved private assets, decoded playback, reload and download controls. No social publishing.",
+  "results": [
+    {
+      "kind": "reel",
+      "conversation_id": "fd63d898-9e48-4a29-8e1f-1e7a7817d9f0",
+      "job_id": "7e266ce9-afd7-433a-a1f7-3ba41b21f049",
+      "version_id": "e200fd88-fd40-412b-98ea-d6cd70c65513",
+      "metadata": {
+        "width": 1080,
+        "height": 1920,
+        "duration": 5.033333
+      },
+      "routing": {
+        "model": "seedance2_5",
+        "provider": "bytedance",
+        "config_id": "desvio-video-quality-v1-2000",
+        "max_credits": 2000,
+        "optimize_for": "quality",
+        "estimated_credits": 340
+      }
+    },
+    {
+      "kind": "video",
+      "conversation_id": "b33c5af8-4fbd-4db7-91b9-21c1fcee6dc1",
+      "job_id": "1376b689-0f1f-49bd-a583-4ae71e1df24d",
+      "version_id": "d585cdd1-0613-439b-a69a-b28c7380e0f9",
+      "metadata": {
+        "width": 1024,
+        "height": 1024,
+        "duration": 5.033333
+      },
+      "routing": {
+        "model": "seedance2_5",
+        "provider": "bytedance",
+        "config_id": "desvio-video-quality-v1-2000",
+        "max_credits": 2000,
+        "optimize_for": "quality",
+        "estimated_credits": 340
+      }
+    }
+  ],
+  "estimated_credits": 680,
+  "limitations": [
+    "Quality-router provider completion took approximately 9 and 18 minutes in these tests; this is not instant generation.",
+    "Silent video; native narration/audio not enabled.",
+    "First-frame routing can follow reference aspect. A square source is preserved with padding in a vertical Reel; use a matching portrait reference for full-frame portrait output.",
+    "The test starting image already contains baked-in text; no new text overlays were requested. Use a clean reference for text-free footage.",
+    "Quality preference is model selection, not a guarantee of artifact-free results. Visual review remains required.",
+    "This evidence does not establish full production readiness, edit coverage or social publishing."
+  ],
+  "evidence": [
+    "runway-chat-live-reel.json",
+    "runway-chat-live-video.json",
+    "runway-provider-live.json",
+    "runway-media-normalization.json",
+    "runway-real-media-conversion.json",
+    "runway-media-recovery.json"
+  ]
+}
