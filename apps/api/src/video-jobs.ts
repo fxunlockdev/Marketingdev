@@ -19,7 +19,7 @@ export class VideoJobs {
  constructor(readonly jobs:AssetJobs,readonly references:VideoReferences,readonly creative:CreativeJobs,readonly provider:VideoProviderJobs,readonly download:VideoDownload,readonly renderer:VideoRenderer){}
  private transaction<T>(scope:JobScope,action:(db:any,j:any)=>Promise<T>){return this.jobs.transaction(scope,async(db,j)=>{if(j.kind!=='creative.video')throw new VideoStateError('VIDEO_JOB_KIND_DENIED');return action(db,j);});}
  private async finish(scope:JobScope,status:string,code:string|null){await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]);});await this.references.revoke(scope);return status;}
- private async providerStep(scope:JobScope){const phase=await this.provider.step(scope,async(db,j)=>{await this.references.verifySubmission(db,j);await assertLearningCurrent(db,(await db.query('SELECT memory_context FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0]?.memory_context);await this.checkSlot(db,j);});if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
+ private async providerStep(scope:JobScope,forceCancel=false){const phase=await this.provider.step(scope,async(db,j)=>{await this.references.verifySubmission(db,j);await assertLearningCurrent(db,(await db.query('SELECT memory_context FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0]?.memory_context);await this.checkSlot(db,j);},forceCancel);if(!['accepted','prepared','completed'].includes(phase))await this.references.revoke(scope);return phase;}
  private async checkSlot(db:any,j:any){
   const r=(await db.query('SELECT slot_id,slot_revision,creative_spec FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0];
   if(!r?.slot_id)return;
@@ -46,9 +46,12 @@ export class VideoJobs {
    let proof;
    try{if(!state.permitted)throw new VideoStateError('REFERENCE_ACCESS_REVOKED');proof=await this.references.verify(scope);}catch(e){
     if(!(e instanceof VideoStateError))throw e;
-    if(state.phase==='accepted'){
-     await this.transaction(scope,async(db,j)=>{await db.query('UPDATE app.jobs SET cancel_requested=true WHERE id=$1',[j.id]);});
-     await this.references.revoke(scope);const phase=await this.providerStep(scope);if(phase==='accepted')return phase;
+    if(state.phase&&state.phase!=='completed'){
+     // Re-read the durable phase under the provider lock: it may have advanced
+     // since this activity read it. Never overwrite an uncertain paid outcome.
+     await this.references.revoke(scope);
+     const phase=await this.providerStep(scope,true);
+     if(phase!=='completed')return phase;
     }
     return this.finish(scope,'canceled',e instanceof VideoStateError?e.code:'VIDEO_ACCESS_REVOKED');
    }
@@ -122,7 +125,9 @@ export class VideoJobs {
    });
    await this.references.revoke(scope);return outcome;
   }catch(error){
-      if(monthlyBudgetExceeded(error))error=new VideoStateError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
+   // Status GET failures are retryable, including after cancellation was requested.
+   if(error instanceof VideoStateError&&error.code==='VIDEO_STATUS_UNAVAILABLE')throw error;
+   if(monthlyBudgetExceeded(error))error=new VideoStateError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
    if(error instanceof VideoStateError&&error.code==='VIDEO_CALENDAR_CHANGED'){await this.provider.cancelPrepared(scope,error.code);return this.finish(scope,'canceled',error.code);}
    if(error instanceof CreativeError||error instanceof VideoStateError||error instanceof RunwayError){const code=error.code;return this.finish(scope,/UNKNOWN|REPLAY/.test(code)?'unknown':'rejected',code);}
    if(error instanceof VideoDownloadError&&error.code!=='VIDEO_DOWNLOAD_FAILED')return this.finish(scope,'rejected',error.code);

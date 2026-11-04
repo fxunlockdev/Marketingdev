@@ -1852,6 +1852,14 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
 
   await expect(media.getByRole('button',{name:'Draft video script',exact:true})).toHaveCount(0);
   await media.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for chat');
+  // Internal chat navigation must respect unsaved video fields, just like page unload.
+  page.once('dialog',dialog=>dialog.dismiss());
+  await page.getByRole('button',{name:'Start over',exact:false}).click();
+  await expect(media.getByLabel('Video prompt',{exact:true})).toHaveValue('TEST user edited video prompt for chat');
+  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Change the scene');
+  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
+  await page.getByRole('textbox',{name:'Message Desvio'}).fill('');
+
   await media.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
   await media.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
   await media.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();

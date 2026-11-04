@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-04T13:50:24.162Z",
+  "checked_at": "2026-11-04T15:00:17.703Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:32262b8bb0d7a356820c99b4e778f9d9c339af9ffd5ef41250b380345ce8aa6f",
+      "image_id": "sha256:f4e93b0c00a7cbc1d3ec4ab475a24f0d1894e8e88af32813c2556fde01289ace",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Runway trusted worker and tested 10-bit SDR normalization renderer; exact host identities verified separately."
+  "scope": "EGM journey recovery worker; unchanged pinned media runtimes. Exact host identities verified separately."
 }

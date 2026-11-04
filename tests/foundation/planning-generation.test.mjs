@@ -442,3 +442,27 @@ test('AI chat uses GPT-6, persists exact envelopes, asks focused questions and r
  transport=async()=>modelResponse({reply:'What would you like the image to show?',action:'answer',prompt:'',channel:'instagram',size:'1024x1024',sources:[],starts_on:null,text_mode:'none'});
  try{assert.equal(await handler.run(scope(clarify,q)),'succeeded');await assert.rejects(chat.execute(alice,clarify.id,q.id),/does not authorize/);assert.equal((await admin.query('SELECT count(*)::int AS n FROM delivery.chat_actions WHERE job_id=$1',[q.id])).rows[0].n,0);}finally{transport=undefined;}
 });
+
+
+test('AI chat follow-up targets the visible newest project even after an older image is saved again',async()=>{
+ const {Canvas}=await import('../../dist/canvas.js'),{ChatConversations}=await import('../../dist/chat-conversations.js');
+ const canvas=new Canvas(businesses,null),chat=new ChatConversations(canvas,planning),b=await fresh();await grant(b);
+ const thread=await canvas.createThread(alice,b.id,{title:'Image target regression'},`chat:${randomUUID()}`);
+ await admin.query('INSERT INTO app.chat_conversations(id,organization_id,brand_id,actor_id,title) VALUES($1,$2,$3,$4,$5)',[thread.id,org.id,b.id,alice,'Image target regression']);
+ const brainId=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1 ORDER BY approved_at DESC LIMIT 1',[b.id])).rows[0].id;
+ const projects=[];
+ for(let index=0;index<2;index++){
+  const project=randomUUID(),job=randomUUID(),media=randomUUID(),version=randomUUID();projects.push({project,version});
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.generate','succeeded')",[job,org.id,b.id,alice]);
+  await admin.query("INSERT INTO app.creative_projects(id,organization_id,brand_id,thread_id,title,created_by,created_at) VALUES($1,$2,$3,$4,'Fixture',$5,now()-$6::int*interval '1 day')",[project,org.id,b.id,thread.id,alice,2-index]);
+  await admin.query("INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,'fixture',$5,1,1024,1024)",[media,org.id,b.id,job,'a'.repeat(64)]);
+  // A was saved most recently, but B is the project the canvas displays.
+  await admin.query("INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,brain_id,media_id,design,caption,skill_manifest,sha256,created_by,created_at) VALUES($1,$2,$3,$4,$5,$6,'{\"layers\":[]}','fixture','{}',$7,$8,now()-$9::int*interval '1 hour')",[version,org.id,b.id,project,brainId,media,'b'.repeat(64),alice,index]);
+  await admin.query('UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1',[project,version]);
+ }
+ const displayed=(await canvas.thread(alice,b.id,thread.id)).projects[0];assert.equal(displayed.id,projects[1].project);
+ const key=randomUUID(),body={conversation_id:thread.id,message:'Make this image warmer'};await chat.saveOutbox(alice,b.id,{key,body});
+ const submitted=await chat.submit(alice,b.id,body,key);
+ const frozen=(await admin.query("SELECT input->'chat'->'current_image' AS image FROM app.planning_requests WHERE job_id=$1",[submitted.id])).rows[0].image;
+ assert.equal(frozen.project_id,displayed.id);assert.equal(frozen.id,displayed.latest_version_id);
+});

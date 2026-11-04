@@ -182,7 +182,7 @@ export class Canvas {
         planning_runs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,r.output_plan_id,r.scheduled_at,r.input->'preferences'->>'starts_on' AS starts_on FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.thread_id=$3 ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id,threadId])).rows,
         projects: (
           await db.query(
-            "SELECT id,title,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 AND archived_at IS NULL ORDER BY created_at DESC LIMIT 100",
+            "SELECT id,title,latest_version_id FROM app.creative_projects WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 AND archived_at IS NULL ORDER BY created_at DESC,id DESC LIMIT 100",
             [b.organization_id, id, threadId],
           )
         ).rows,

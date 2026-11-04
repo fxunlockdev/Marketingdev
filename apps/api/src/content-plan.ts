@@ -260,7 +260,7 @@ export class ContentPlan {
    const s=(await db.query('SELECT * FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND id=$3 FOR UPDATE',[b.organization_id,id,slotId])).rows[0];
    if(!s)throw new NotFoundException('Content slot not found');
    if(s.revision!==rev||s.state!=='cancelled')throw new ConflictException('This archived post changed. Refresh before restoring');
-   if((await db.query("SELECT 1 FROM app.publication_requests WHERE slot_id=$1 AND phase NOT IN ('rejected','canceled')",[slotId])).rowCount)throw new ConflictException('Resolve the existing publication before restoring this post');
+   if((await db.query("SELECT 1 WHERE app.slot_has_publication($1)",[slotId])).rowCount)throw new ConflictException('Resolve the existing publication before restoring this post');
    const state=s.creative_version_id||s.video_version_id||s.carousel_version_id?'draft_ready':'content_needed';
    const row=(await db.query('UPDATE app.content_slots SET state=$2,revision=revision+1,approved_by=NULL,approved_at=NULL,updated_at=now() WHERE id=$1 RETURNING *',[slotId,state])).rows[0];
    await this.event(db,user,row,'edited','Restored from archive as a draft');return row;
@@ -284,6 +284,7 @@ export class ContentPlan {
    if(!s)throw new NotFoundException('Content slot not found');
    if(s.revision!==rev)throw new ConflictException('This post changed. Reload before editing');
    if(s.state==='cancelled')throw new ConflictException('This content slot was cancelled');
+   if((await db.query('SELECT 1 WHERE app.slot_has_publication($1)',[slotId])).rowCount)throw new ConflictException('Resolve the existing publication before editing this post');
    if(s.state==='approved'&&v.reset_approval!==true)throw new ConflictException('Confirm that editing this approved post requires a new review');
    if(('creative_version_id' in v&&!['static','ad'].includes(s.format))||('video_version_id' in v&&s.format!=='video')||('carousel_version_id' in v&&s.format!=='carousel'))throw new BadRequestException('Match the saved media to the post format');
    const specification='creative_spec' in v?spec(v.creative_spec,s.format,s.channel):s.creative_spec??null;
@@ -322,7 +323,7 @@ export class ContentPlan {
   if(!s)throw new NotFoundException('Content slot not found');
   if(s.revision!==rev||s.creative_version_id!==(v.creative_version_id??null)||s.creative_sha256!==(v.creative_sha256??null)||s.video_version_id!==(v.video_version_id??null)||s.video_sha256!==(v.video_sha256??null)||(s.carousel_version_id??null)!==(v.carousel_version_id??null)||(s.carousel_sha256??null)!==(v.carousel_sha256??null))throw new ConflictException('Review the current post and creative version');
   if(['approved','rejected','changes_requested','reopen'].includes(decision)&&!(await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed)throw new ForbiddenException('Only a business owner or admin can decide reviews');
-  if(['reopen','cancelled'].includes(decision)&&(await db.query("SELECT 1 FROM app.publication_requests WHERE slot_id=$1 AND phase NOT IN ('rejected','canceled')",[slotId])).rowCount)throw new ConflictException('This post has an active or unresolved publication. Manage it in Publishing before changing its review or canceling the plan.');
+  if(['reopen','cancelled'].includes(decision)&&(await db.query("SELECT 1 WHERE app.slot_has_publication($1)",[slotId])).rowCount)throw new ConflictException('This post has an active or unresolved publication. Manage it in Publishing before changing its review or canceling the plan.');
   const allowed=decision==='reopen'?['approved','rejected','changes_requested'].includes(s.state):decision==='cancelled'?s.state!=='cancelled':decision==='pending_review'?['draft_ready','changes_requested'].includes(s.state):s.state==='pending_review';
   if(!allowed)throw new ConflictException('This post is not eligible for that review action');
   if(!['cancelled','reopen'].includes(decision)){

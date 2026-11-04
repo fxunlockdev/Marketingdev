@@ -1,0 +1,94 @@
+{
+  "checked_at": "2026-11-04T15:00:47.733Z",
+  "framework": {
+    "repository": "https://github.com/google/elephant-goldfish-model",
+    "commit": "113a3afc44e8f4f54722d7150d5701f65cc8ef7f",
+    "method": "Fresh-context read-only implementation-readiness reviews and follow-up; bounded audit, not formal convergence certification"
+  },
+  "scope": "Chat and media recovery, strategy entry, scoped brand permissions, publication holds and invite-only default",
+  "suites": [
+    {
+      "name": "contracts",
+      "command": "npm run test:contracts",
+      "pass": 356,
+      "fail": 0,
+      "log_sha256": "a25c08340ebc93a1f4fc31e53d062cc2ef277086f638939c9ee745eb804dd8db"
+    },
+    {
+      "name": "brand permissions",
+      "command": "node scripts/foundation-test.mjs --visual-reviews",
+      "pass": 11,
+      "fail": 0,
+      "log_sha256": "7b63989a04a4692051bed15cb1e7c0238233d650ea2c0d5cbdd0577bd4ef3f12"
+    },
+    {
+      "name": "tenancy",
+      "command": "node scripts/foundation-test.mjs --accounts",
+      "pass": 31,
+      "fail": 0,
+      "log_sha256": "9b1805d405390066a68418d1696c778027589feb0c6c040e2348e1e59a4d55ec"
+    },
+    {
+      "name": "calendar",
+      "command": "node scripts/foundation-test.mjs --planning",
+      "pass": 17,
+      "fail": 0,
+      "log_sha256": "1d108221fd36f7a8f4d7fc484995bcbf4c2a31096abd4e7aab2d014a439651ae"
+    },
+    {
+      "name": "publications",
+      "command": "node scripts/foundation-test.mjs --postforme",
+      "pass": 5,
+      "fail": 0,
+      "log_sha256": "bd019c149dac140ff67fdc98758a766a21da8f780cf275a6c50eff95fd871ec8"
+    },
+    {
+      "name": "video recovery",
+      "command": "node scripts/foundation-test.mjs --video-provider",
+      "pass": 19,
+      "fail": 0,
+      "log_sha256": "b6ed8ff2d58cc959f04fb3cb9cf75a00cd1ce89c6ac05e1ed008758457c51f60"
+    },
+    {
+      "name": "AI chat",
+      "command": "node scripts/foundation-test.mjs --ai-chat",
+      "pass": 2,
+      "fail": 0,
+      "log_sha256": "8bbe165ad6ab17bf8a6a25fba7e26069c00ae22f64148cf2cec6dd2c6d278947"
+    },
+    {
+      "name": "guided chat browser",
+      "command": "node scripts/foundation-test.mjs --create-chat-web",
+      "pass": 1,
+      "fail": 0,
+      "log_sha256": "358bd95c1c83029826bfa00a03cc6c11341db40e74ecbb1a2f89c4a2e4d52eb2"
+    },
+    {
+      "name": "media browser",
+      "command": "node scripts/foundation-test.mjs --video-recovery-web",
+      "pass": 1,
+      "fail": 0,
+      "log_sha256": "cc515e7a16a6a2b9c0241a01f275d0d55da06afd2a6eb1602fefa468b11c86ed"
+    }
+  ],
+  "total_pass": 443,
+  "api_typescript": "passed",
+  "web_typescript": "passed",
+  "web_build": "passed in browser suites",
+  "paid_providers": "simulated for this regression pass; prior live Runway evidence is separate",
+  "social_posts_published": 0,
+  "production_readiness_claimed": false,
+  "deployment": {
+    "environment": "dev",
+    "api": {
+      "id": "8ff1b21d-5d6f-439c-b578-ec020e619df1",
+      "status": "SUCCESS"
+    },
+    "web": {
+      "id": "1603a4d1-92e7-49ee-a375-c283f758b7dc",
+      "status": "SUCCESS"
+    },
+    "worker": "sha256:f4e93b0c00a7cbc1d3ec4ab475a24f0d1894e8e88af32813c2556fde01289ace",
+    "migration": "090_product_journey_guards.sql"
+  }
+}

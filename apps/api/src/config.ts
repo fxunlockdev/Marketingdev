@@ -15,6 +15,7 @@ export type Config = {
   mailEncryptionKey: string;
   pexelsApiKey?:string;
   higgsfieldImagesEnabled?:boolean;
+  publicSignupEnabled?:boolean;
   smtp?: {host:string;port:number;secure:boolean;user?:string;password?:string;from:string};
   storage: StorageConfig;
   renderImage?:string;
@@ -39,7 +40,7 @@ export function socialAuthorizationFromEnv(env:NodeJS.ProcessEnv):boolean {
 
 export function configFromEnv(env = process.env): Config {
   const mode = env.APP_MODE;
-  for(const flag of ['POSTFORME_ENABLED','POSTFORME_PUBLISHING_ENABLED'])if(env[flag]!==undefined&&!['true','false'].includes(env[flag]!))throw new Error(`${flag} must be true or false`);
+  for(const flag of ['POSTFORME_ENABLED','POSTFORME_PUBLISHING_ENABLED','PUBLIC_SIGNUP_ENABLED'])if(env[flag]!==undefined&&!['true','false'].includes(env[flag]!))throw new Error(`${flag} must be true or false`);
   if(env.POSTFORME_ENABLED==='true'&&!env.POSTFORME_API_KEY?.trim())throw new Error('POSTFORME_API_KEY is required when Postforme is enabled');
   if(env.POSTFORME_PUBLISHING_ENABLED==='true'&&env.POSTFORME_ENABLED!=='true')throw new Error('Postforme publishing requires Postforme connections');
   if(env.VIDEO_ENABLED!==undefined&&!['true','false'].includes(env.VIDEO_ENABLED))throw new Error('VIDEO_ENABLED must be true or false');
@@ -67,7 +68,7 @@ export function configFromEnv(env = process.env): Config {
   const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
   if(env.POSTIZ_PROVISIONING_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_PROVISIONING_ENABLED))throw new Error('POSTIZ_PROVISIONING_ENABLED must be true or false');
   const videoRenderImage=env.VIDEO_RUNTIME_IMAGE;if(videoRenderImage&&!/^sha256:[a-f0-9]{64}$/.test(videoRenderImage))throw new Error('VIDEO_RUNTIME_IMAGE must be an exact local image digest');
-  return {openaiApiKey:env.OPENAI_API_KEY?.trim()||undefined,postformeApiKey:env.POSTFORME_ENABLED==='true'?env.POSTFORME_API_KEY?.trim():undefined,postformePublishingEnabled:env.POSTFORME_PUBLISHING_ENABLED==='true',higgsfieldImagesEnabled:env.HIGGSFIELD_IMAGES_ENABLED==='true',pexelsApiKey:env.PEXELS_API_KEY?.trim()||undefined,socialAuthorizationEnabled:socialAuthorizationFromEnv(env),videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret, authIngressSecret,
+  return {publicSignupEnabled:env.PUBLIC_SIGNUP_ENABLED==='true',openaiApiKey:env.OPENAI_API_KEY?.trim()||undefined,postformeApiKey:env.POSTFORME_ENABLED==='true'?env.POSTFORME_API_KEY?.trim():undefined,postformePublishingEnabled:env.POSTFORME_PUBLISHING_ENABLED==='true',higgsfieldImagesEnabled:env.HIGGSFIELD_IMAGES_ENABLED==='true',pexelsApiKey:env.PEXELS_API_KEY?.trim()||undefined,socialAuthorizationEnabled:socialAuthorizationFromEnv(env),videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret, authIngressSecret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }

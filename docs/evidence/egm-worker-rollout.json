@@ -1,0 +1,8 @@
+{
+  "checked_at": "2026-11-04T15:01:05.156Z",
+  "passed": true,
+  "image": "sha256:f4e93b0c00a7cbc1d3ec4ab475a24f0d1894e8e88af32813c2556fde01289ace",
+  "backup_container": "desvio-worker-rollback-20261104-egm090",
+  "paid_calls": false,
+  "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Chat media provider acceptance recorded separately; social publishing excluded."
+}

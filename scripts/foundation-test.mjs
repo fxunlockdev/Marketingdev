@@ -61,7 +61,7 @@ try {
     authDatabaseUrl:url('desvio_auth',authPass), appDatabaseUrl:url('desvio_app',appPass),mailDatabaseUrl:url('desvio_mail',mailPass),
     storage:{endpoint:'http://127.0.0.1:1',region:'garage',bucket:'desvio-test',accessKeyId:'test',secretAccessKey:'test'},scanner:{host:'127.0.0.1',port:1},
     jobs:{workerDatabaseUrl:url('desvio_worker',workerPass),dispatcherDatabaseUrl:url('desvio_dispatcher',dispatchPass),address:'127.0.0.1:1',namespace:'desvio-test',taskQueue:'assets'},
-    mailEncryptionKey:randomBytes(32).toString('hex'),smtp:{host:'127.0.0.1',port:1,secure:false,from:'accounts@desvio.test'} };
+    publicSignupEnabled:true,mailEncryptionKey:randomBytes(32).toString('hex'),smtp:{host:'127.0.0.1',port:1,secure:false,from:'accounts@desvio.test'} };
   if (process.argv.includes('--generate-auth')) {
     await pool.query('CREATE SCHEMA auth');
     authMigrationPool = new Pool({ connectionString:url('postgres',password), options:'-c search_path=auth' });

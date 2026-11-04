@@ -56,7 +56,7 @@ For the selected Resend provider, set `MAIL_PROVIDER=resend`, `RESEND_API_KEY` a
 
 ### Temporary private dev access without email
 
-With owner authorization, staging can explicitly set `MAIL_PROVIDER=disabled`. Only already verified/operator-provisioned password accounts can sign in; public signup and email delivery are unavailable. The mail worker does not consume pending messages. This is not a production mode, default password or global email-verification bypass. Provision only the owner's requested address, keep any temporary password in a private local file, and change it through normal Profile controls. Switch to Resend and verify real delivery before enabling customer signup/invitations.
+With owner authorization, staging can explicitly set `MAIL_PROVIDER=disabled`. Only already verified/operator-provisioned password accounts can sign in; public signup and email delivery are unavailable. The mail worker does not consume pending messages. This is not a production mode, default password or global email-verification bypass. Provision only the owner's requested address, keep any temporary password in a private local file, and change it through normal Profile controls. Switch to Resend and verify real delivery before enabling customer signup/invitations. Public signup remains disabled unless `PUBLIC_SIGNUP_ENABLED=true` is explicitly set alongside working email. Keep this flag absent or `false` for the current manually provisioned access rollout; adding email credentials alone does not open registration. Recipient-bound invitation registration still needs its own verified journey before inviting new users.
 
 ### Dev provider credential location
 

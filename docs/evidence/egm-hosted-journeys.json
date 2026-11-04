@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-11-04T15:04:44.741Z",
+  "scope": "Hosted dev saved Runway reel playback, reload and unsaved feedback navigation; no generation or publishing",
+  "checks": [
+    "saved_runway_video_plays",
+    "unsaved_video_feedback_survives_canceled_navigation",
+    "chat_instruction_blocked_until_edits_resolved",
+    "saving_or_clearing_edits_unblocks_chat",
+    "saved_conversation_and_video_survive_reload"
+  ],
+  "metadata": {
+    "width": 1080,
+    "height": 1920,
+    "duration": 5.033333
+  },
+  "passed": true
+}

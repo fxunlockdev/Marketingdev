@@ -1,3 +1,4 @@
+import {authOptions} from '../../dist/auth.js';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mailConfig} from '../../dist/mail-config.js';
@@ -22,4 +23,12 @@ test('explicit no-email dev mode keeps verified password authentication and neve
  assert.equal(await worker.runOnce(),null);worker.close();
  await assert.rejects(queue.enqueue(db,'verify',{to:'owner@example.test',url:config.origin+'/verify'},new Date()),/disabled/);
  const options=authOptions(db,config,queue);assert.equal(options.emailAndPassword.enabled,true);assert.equal(options.emailAndPassword.requireEmailVerification,true);assert.equal(options.emailAndPassword.disableSignUp,true);
+});
+
+test('enabling email cannot silently enable public registration',()=>{
+ const config={origin:'https://desvio.test',authSecret:'x'.repeat(32),smtp:{host:'smtp.example.test',port:465,secure:true,from:'mail@example.test'}};
+ assert.equal(authOptions({},config).emailAndPassword.disableSignUp,true);
+ assert.equal(authOptions({},{...config,publicSignupEnabled:false}).emailAndPassword.disableSignUp,true);
+ assert.equal(authOptions({},{...config,publicSignupEnabled:true}).emailAndPassword.disableSignUp,false);
+ assert.equal(authOptions({},{...config,smtp:undefined,publicSignupEnabled:true}).emailAndPassword.disableSignUp,true);
 });

@@ -42,7 +42,7 @@ export class VideoProviderJobs {
    return {phase:'prepared'};
   });
  }
- async step(scope:JobScope,beforeSubmit?:(db:any,j:any)=>Promise<void>):Promise<string>{
+ async step(scope:JobScope,beforeSubmit?:(db:any,j:any)=>Promise<void>,forceCancel=false):Promise<string>{
   const state=await this.transaction(scope,async(db,j)=>{
    const r=(await db.query('SELECT * FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0];
    if(!r)throw new VideoStateError('VIDEO_INTENT_MISSING');
@@ -52,7 +52,7 @@ export class VideoProviderJobs {
    if(r.phase==='prepared'&&(!['queued','running','retrying'].includes(j.status)||new Date(r.deadline_at).getTime()<=Date.now()))
     return {done:await this.stop(db,j,'rejected','VIDEO_UNUSED_INTENT_EXPIRED_OR_STOPPED',true)};
    if(new Date(r.deadline_at).getTime()<=Date.now())return {done:await this.stop(db,j,'unknown','VIDEO_PROVIDER_DEADLINE')};
-   const permitted=await this.#jobs.permitted(db,j);
+   const permitted=!forceCancel&&await this.#jobs.permitted(db,j);
    if(r.phase==='prepared'){
     if(!permitted)return {done:await this.stop(db,j,'canceled','VIDEO_ACCESS_REVOKED_OR_CANCELED',true)};
     let g;try{g=await this.grant(db,j,r.model);}catch{return {done:await this.stop(db,j,'rejected','VIDEO_STAGING_APPROVAL_REQUIRED',true)};}

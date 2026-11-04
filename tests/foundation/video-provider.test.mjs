@@ -259,3 +259,43 @@ test('Runway replacement persists router decision, progress and output; paid tim
  const legacy=await fixture(),prepared=await prepare(legacy);const before=paid;
  assert.equal(await engine.step(prepared.s),'rejected');assert.equal((await row(prepared.s)).job_error,'VIDEO_LEGACY_PROVIDER_RECONCILIATION_REQUIRED');assert.equal((await row(prepared.s)).reservation_state,'released');assert.equal(paid,before);
 });
+
+
+test('video orchestration releases prepared holds and retries cancellation status failures without resubmitting',async()=>{
+ const {VideoJobs}=await import('../../dist/video-jobs.js');
+ // The planning request is irrelevant after cancellation; retain real jobs,
+ // provider operations, reservations and status transport for this regression.
+ const orchestrationJobs={permitted:(...args)=>jobs.permitted(...args),transaction:(scope,action)=>jobs.transaction(scope,(db,j)=>action({query:(sql,args)=>sql==='SELECT * FROM app.video_requests WHERE job_id=$1'?Promise.resolve({rows:[{}]}):db.query(sql,args)},j))};
+ const references={revoke:async()=>{},verify:async()=>{throw Error('Canceled work must not verify a reference');}};
+ const pipeline=new VideoJobs(orchestrationJobs,references,null,handler,null,null);
+ const f=await fixture(),prepared=await prepare(f),before=submits;
+ await admin.query('UPDATE app.jobs SET cancel_requested=true WHERE id=$1',[prepared.s.jobId]);
+ assert.equal(await pipeline.step(prepared.s),'canceled');
+ assert.equal((await row(prepared.s)).reservation_state,'released');assert.equal((await row(prepared.s)).phase,'canceled');assert.equal(submits,before);
+ const accepted=await prepare(f);assert.equal(await handler.step(accepted.s),'accepted');
+ await admin.query('UPDATE app.jobs SET cancel_requested=true WHERE id=$1',[accepted.s.jobId]);
+ behavior='statusFail';
+ await assert.rejects(pipeline.step(accepted.s),/VIDEO_STATUS_UNAVAILABLE/);
+ assert.equal((await row(accepted.s)).job_status,'running');assert.equal((await row(accepted.s)).phase,'accepted');
+ const sent=submits;behavior='';state='canceled';
+ assert.equal(await pipeline.step(accepted.s),'canceled');assert.equal(submits,sent);
+ assert.equal((await row(accepted.s)).reservation_state,'held');
+ for(const phase of ['accepted','submitting']){
+  const uncertain=await prepare(f);
+  if(phase==='accepted')await handler.step(uncertain.s);
+  else await admin.query("UPDATE app.video_operations SET phase='submitting' WHERE job_id=$1",[uncertain.s.jobId]);
+  await admin.query('UPDATE app.jobs SET cancel_requested=true WHERE id=$1',[uncertain.s.jobId]);
+  if(phase==='accepted')await admin.query("UPDATE app.video_operations SET deadline_at=now()-interval '1 second' WHERE job_id=$1",[uncertain.s.jobId]);
+  const submissions=submits;
+  assert.equal(await pipeline.step(uncertain.s),'unknown');assert.equal((await row(uncertain.s)).job_status,'unknown');assert.equal((await row(uncertain.s)).reservation_state,'held');assert.equal(submits,submissions);
+ }
+ // A revoked reference also cancels even when the user's membership is active.
+ const revoked=await prepare(f);await handler.step(revoked.s);
+ const {VideoStateError}=await import('../../dist/video-vault.js');
+ references.verify=async()=>{throw new VideoStateError('REFERENCE_ACCESS_REVOKED');};
+ const cancelBefore=cancels;behavior='cancelLost';state='in_progress';
+ assert.equal(await pipeline.step(revoked.s),'accepted');
+ behavior='statusFail';await assert.rejects(pipeline.step(revoked.s),/VIDEO_STATUS_UNAVAILABLE/);
+ behavior='';state='canceled';assert.equal(await pipeline.step(revoked.s),'canceled');assert.equal(cancels,cancelBefore+1);
+
+});

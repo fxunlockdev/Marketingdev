@@ -31,7 +31,7 @@ export class Assets {
         const id=randomUUID(),prefix=`${org}/${brand}/${id}`;
         asset=(await db.query(`INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key)
           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[id,org,brand,user,filename,value.contentType,value.bytes,value.sha256,`quarantine/${prefix}`,`assets/${prefix}/${value.sha256}`])).rows[0];
-        await db.query(`INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response) VALUES($1,$2,$3,$4,$5)`,[org,operation,key,hash,JSON.stringify({id})]);
+        await db.query(`INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response,brand_id) VALUES($1,$2,$3,$4,$5,$6)`,[org,operation,key,hash,JSON.stringify({id}),brand]);
       }
       return {id:asset.id,state:asset.state,upload:{url:await this.store.uploadURL(asset.quarantine_key,asset.expected_bytes,asset.content_type),method:'PUT',headers:{'content-type':asset.content_type,'content-length':String(asset.expected_bytes)},expiresIn:120}};
     },brand);
@@ -77,7 +77,7 @@ export class Assets {
       const job=randomUUID(),result={id:job,status:'queued'};
       await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind) VALUES($1,$2,$3,$4,$5,'document.extract')",[job,org,brand,id,user]);
       await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'document.extract')",[job,org,brand]);
-      await db.query('INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response) VALUES($1,$2,$3,$4,$5)',[org,operation,key,hash,JSON.stringify(result)]);
+      await db.query('INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response,brand_id) VALUES($1,$2,$3,$4,$5,$6)',[org,operation,key,hash,JSON.stringify(result),brand]);
       await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'document.submitted',$4)",[org,brand,user,job]);return result;
     },brand);
   }

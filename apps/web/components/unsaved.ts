@@ -1,19 +1,24 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 const editors=new Set<symbol>();
+const listeners=new Set<()=>void>();
+const subscribe=(listener:()=>void)=>{listeners.add(listener);return()=>{listeners.delete(listener);};};
+const notify=()=>{for(const listener of listeners)listener();};
+// Internal chat transitions must observe the same editor state as page navigation.
+export function useAnyUnsavedChanges(){return useSyncExternalStore(subscribe,hasUnsavedChanges,()=>false);}
 export function hasUnsavedChanges(){return editors.size>0;}
 export function confirmNavigation(){return !editors.size||window.confirm('Leave this page? Your unsaved changes will be lost.');}
 // Native navigation warning; never persists passwords, private files or grants in web storage.
 export function useUnsavedChanges(dirty: boolean) {
   useEffect(() => {
     if (!dirty) return;
-    const editor=Symbol();editors.add(editor);
+    const editor=Symbol();editors.add(editor);notify();
     const warn = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = "";
     };
     window.addEventListener("beforeunload", warn);
-    return () => {editors.delete(editor);window.removeEventListener("beforeunload", warn);};
+    return () => {editors.delete(editor);notify();window.removeEventListener("beforeunload", warn);};
   }, [dirty]);
 }
 

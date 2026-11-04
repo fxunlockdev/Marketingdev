@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import {Pool} from 'pg';
 import {TenantDatabase} from '../../dist/database.js';
+import {Assets} from '../../dist/assets.js';
 import {Workspaces} from '../../dist/workspaces.js';
 import {BrandBrain,canonicalJSON,hash} from '../../dist/brand-brain.js';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),app=new Pool({connectionString:config.appDatabaseUrl}),worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});
@@ -129,4 +130,30 @@ test('retained provenance must still match the immutable approved evidence diges
  await admin.query("UPDATE app.brand_visual_reviews SET suggestion=jsonb_set(suggestion,'{observation}','\"Tampered fixture\"') WHERE id=$1",[retained.review.id]);
  try{await assert.rejects(brain.read(owner,org.id,brand.id),/could not be verified/);await assert.rejects(approve(),/could not be verified/);}
  finally{await admin.query('UPDATE app.brand_visual_reviews SET suggestion=$2 WHERE id=$1',[retained.review.id,JSON.stringify(retained.suggestion)]);}
+});
+
+test('selected business Admin can approve brand knowledge without granting Editors or sibling access',async()=>{
+ const manager=randomUUID();await admin.query('INSERT INTO auth."user"(id,name,email,"emailVerified") VALUES($1,$2,$3,true)',[manager,'Selected admin',`${manager}@example.test`]);
+ await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'editor','selected')",[org.id,manager]);
+ await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'admin')",[org.id,other.id,manager]);
+ for(const [field,value] of [['brand_name','Other business'],['offering','Software'],['audience','Designers']]){const f=await brain.manual(manager,org.id,other.id,{field,value},randomUUID());await brain.review(manager,org.id,other.id,f.id,{revision:f.revision,decision:'correct'});}
+ const replayKey=randomUUID(),fact={field:'voice',value:'Clear and direct'};
+ const saved=await brain.manual(manager,org.id,other.id,fact,replayKey);
+ assert.deepEqual(await brain.manual(manager,org.id,other.id,fact,replayKey),saved);
+ await brain.review(manager,org.id,other.id,saved.id,{revision:saved.revision,decision:'correct'});
+ const assets=new Assets(database,{uploadURL:async()=> 'https://example.test/upload'}),upload={filename:'brand.png',contentType:'image/png',bytes:128,sha256:'a'.repeat(64)},uploadKey=randomUUID();
+ const reserved=await assets.reserve(manager,org.id,other.id,upload,uploadKey);
+ assert.equal((await assets.reserve(manager,org.id,other.id,upload,uploadKey)).id,reserved.id);
+ await assert.rejects(assets.reserve(manager,org.id,brand.id,upload,uploadKey));
+ const visible=await database.transaction(manager,org.id,false,db=>db.query('SELECT operation,brand_id FROM app.idempotency WHERE organization_id=$1',[org.id]),other.id);
+ assert.ok(visible.rows.length>=5);assert.ok(visible.rows.every(r=>r.brand_id===other.id));
+ await assert.rejects(database.transaction(manager,org.id,true,db=>db.query("INSERT INTO app.idempotency(organization_id,brand_id,operation,key,request_hash,response) VALUES($1,$2,'brand.create',$3,'fake','{}')",[org.id,other.id,randomUUID()]),other.id));
+ const revision=(await brain.read(manager,org.id,other.id)).revision;
+ const approved=await brain.approve(manager,org.id,other.id,{revision});assert.equal(approved.approved_by,manager);
+ await assert.rejects(brain.approve(manager,org.id,brand.id,{revision}));
+ for(const role of ['editor','reviewer','viewer']){
+  await admin.query('UPDATE app.business_memberships SET role=$2 WHERE user_id=$1',[manager,role]);
+  await assert.rejects(brain.approve(manager,org.id,other.id,{revision}));
+  await assert.rejects(database.transaction(manager,org.id,true,db=>db.query('INSERT INTO app.brand_brain_versions(id,organization_id,brand_id,review_revision,snapshot,sha256,approved_by) VALUES($1,$2,$3,$4,$5,$6,$7)',[randomUUID(),org.id,other.id,revision+1,JSON.stringify(approved.snapshot),approved.sha256,manager]),other.id));
+ }
 });

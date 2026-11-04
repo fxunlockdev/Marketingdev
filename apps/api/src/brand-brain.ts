@@ -235,8 +235,8 @@ export class BrandBrain {
       await this.audit(db, user, org, brand, "brain.manual_added", id);
       const result = { id, status: "unreviewed", revision: 1 };
       await db.query(
-        "INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response) VALUES($1,$2,$3,$4,$5)",
-        [org, operation, k, digest, JSON.stringify(result)],
+        "INSERT INTO app.idempotency(organization_id,operation,key,request_hash,response,brand_id) VALUES($1,$2,$3,$4,$5,$6)",
+        [org, operation, k, digest, JSON.stringify(result), brand],
       );
       return result;
     });
@@ -319,16 +319,8 @@ export class BrandBrain {
       await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
         `members:${org}`,
       ]);
-      const role = (
-        await db.query(
-          "SELECT role FROM app.memberships WHERE organization_id=$1 AND user_id=$2 AND active",
-          [org, user],
-        )
-      ).rows[0]?.role;
-      if (!["owner", "admin"].includes(role))
-        throw new ForbiddenException(
-          "Only a client owner or admin can approve brand facts",
-        );
+      const allowed=(await db.query('SELECT app.social_manager($1,$2) AS allowed',[org,brand])).rows[0]?.allowed;
+      if(!allowed)throw new ForbiddenException('Only a business owner or admin can approve brand facts');
       const current = await lockReview(db, org, brand);
       if (current !== revision)
         throw new ConflictException(

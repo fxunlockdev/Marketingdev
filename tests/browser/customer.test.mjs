@@ -1420,6 +1420,11 @@ test('Create chat persists author answers and denies another tenant (real databa
  await home.getByRole('textbox',{name:'Ask Desvio'}).fill('A post about our new collection');
  await expect(alice).toHaveURL(base+`/b/${firstBusiness}/overview`);
  for(const width of [1440,390]){await alice.setViewportSize({width,height:1000});assert.equal(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await alice.screenshot({path:`work/browser/home-chat-${width}.png`,fullPage:true});}
+ await home.getByRole('button',{name:/Add strategy/}).click();
+ await expect(alice).toHaveURL(/guided=1/);
+ await expect(alice.getByText('What should your strategy focus on?',{exact:true})).toBeVisible();
+ await alice.getByRole('button',{name:'↶ Start over',exact:true}).click();
+ await alice.getByRole('dialog').getByRole('button',{name:'Start over',exact:true}).click();
  await alice.goto(base+`/b/${firstBusiness}/create?guided=1`);
  await expect(alice.getByRole('heading',{name:'Your idea lands here.'})).toBeVisible();
  await alice.setViewportSize({width:924,height:540});
@@ -1480,7 +1485,7 @@ test('Create chat persists author answers and denies another tenant (real databa
  assert.ok(dateStyle.applyWidth>=dateStyle.applyScroll,'date action label is not clipped');
  await alice.screenshot({path:'work/browser/desvio-date-picker.png'});
  await alice.getByRole('dialog').getByRole('button',{name:'Next month'}).click();
- await alice.getByRole('dialog').getByRole('button',{name:/12 November 2026|November 12, 2026/}).click();
+ await alice.getByRole('dialog').locator('.desvio-date-grid button:not(.outside):not([disabled])').filter({hasText:/^12$/}).click();
  await alice.getByRole('button',{name:'Use this date',exact:true}).click();
  // Reset is durable before the local draft disappears.
  await alice.getByRole('button',{name:'↶ Start over',exact:true}).click();
