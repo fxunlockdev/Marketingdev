@@ -1840,7 +1840,14 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
    await expect(picker).toHaveCount(0);
   }else await flow.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
   const count=videoSubmits;
-  assert.equal(videoSubmits,count,'Choosing an image alone does not generate');
+  const promptBox=flow.getByRole('textbox',{name:'Your video prompt',exact:true});
+  await expect(promptBox).toHaveValue('TEST gentle botanical product film');
+  await promptBox.fill('   ');await expect(flow.getByRole('button',{name:'Generate video',exact:true})).toBeDisabled();
+  const editedPrompt=`TEST edited ${kind} direction: slow camera movement around the botanical soap, warm daylight, no text`;
+  await promptBox.fill(editedPrompt);
+  await expect(flow.getByRole('button',{name:'Generate video',exact:true})).toBeEnabled();
+  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[new URL(page.url()).searchParams.get('conversation')])).rows[0].n,0,'Review and edits do not start a video job');
+  assert.equal(videoSubmits,count,'Choosing an image and editing the prompt do not generate');
   await page.screenshot({path:`work/browser/chat-${kind}-image-choice.png`});
   if(kind==='reel'){
    await page.route('**/canvas/threads/*/videos',route=>route.abort('failed'));
@@ -1866,6 +1873,7 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   await page.goto(`${base}/b/${brand}/create?conversation=${chatId}`);
   const saved=(await admin.query('SELECT r.*,p.thread_id FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
   assert.equal(saved.length,1,'Lost acknowledgement does not duplicate generation');
+  assert.ok(saved[0].prompt.startsWith(editedPrompt),'The edited prompt is persisted and passed to the skills planner');
   assert.equal(saved[0].generation_authorized_by,saved[0].approved_by);
   assert.equal(saved[0].draft_revision,1);
   assert.deepEqual(saved[0].approved_brief,saved[0].plan.brief,'Existing skills plan is used by generation');

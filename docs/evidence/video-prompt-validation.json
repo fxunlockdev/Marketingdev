@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-11-04T17:00:40.046Z",
+  "scope": "Editable direction before explicit video generation",
+  "web_types": true,
+  "focused_browser_journey_passed": true,
+  "provider_mode": "MOCK transports; real local database, skill runtime and media renderer",
+  "checks": [
+    "reel and video prompts visible after image selection",
+    "optional prompt edits",
+    "blank prompts blocked",
+    "no job before Generate",
+    "edited prompt persisted for planning",
+    "lost response recovery without duplicate generation",
+    "skill evidence and playable saved output retained"
+  ],
+  "log_sha256": "64dd14c79e64416b06df9df8f766eb56a4a3446cc8451f89ad93aa3ab2213a42"
+}

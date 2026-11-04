@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-11-04T17:02:00.833Z",
+  "scope": "Hosted prompt UI with an existing conversation; video-list fixture hides its completed result; submissions intercepted, no new generation",
+  "checks": [
+    "prepared_prompt_visible",
+    "optional_edit",
+    "blank_prompt_blocked",
+    "no_submission_on_selection_or_edit",
+    "generate_sends_edited_prompt",
+    "rejected_submission_preserves_edit",
+    "desktop_mobile_no_overflow",
+    "no_javascript_errors"
+  ],
+  "viewports": [
+    {
+      "width": 1440,
+      "overflow": false
+    },
+    {
+      "width": 390,
+      "overflow": false
+    }
+  ],
+  "passed": true
+}
