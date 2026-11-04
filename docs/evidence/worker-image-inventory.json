@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-04T15:00:17.703Z",
+  "checked_at": "2026-11-04T15:31:32.193Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:f4e93b0c00a7cbc1d3ec4ab475a24f0d1894e8e88af32813c2556fde01289ace",
+      "image_id": "sha256:b15a72a2b0e9ee1e8a6a11de47e7a44905898a42a0dc2fe60c4b987ec0bda091",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "EGM journey recovery worker; unchanged pinned media runtimes. Exact host identities verified separately."
+  "scope": "Conversational video setup worker; unchanged pinned media runtimes. Exact host identities verified separately."
 }

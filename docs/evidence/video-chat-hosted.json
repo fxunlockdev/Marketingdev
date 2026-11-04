@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-11-04T15:38:46.458Z",
+  "scope": "Hosted dev conversational video setup with real GPT script preparation; saved Runway playback; no new paid video generation or publishing",
+  "checks": [
+    "real_ai_preserves_video_duration",
+    "no_document_reload",
+    "setup_in_chat_not_canvas",
+    "real_gpt_script_saved",
+    "generation_waits_for_explicit_approval",
+    "approval_checkbox_and_wrapped_text_fit_chat",
+    "script_and_reference_survive_reload",
+    "saved_runway_output_still_plays",
+    "mobile_no_horizontal_overflow"
+  ],
+  "conversation": "9dddb688-41ea-4f67-9039-61b613624f78",
+  "job": "fa697e41-132a-4452-a6cc-3b0ffa82fdaf",
+  "canceled_test_script": true,
+  "passed": true
+}

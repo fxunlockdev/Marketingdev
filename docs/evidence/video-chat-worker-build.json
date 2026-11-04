@@ -1,0 +1,7 @@
+{
+  "checked_at": "2026-11-04T15:25:24.935Z",
+  "image": "sha256:b15a72a2b0e9ee1e8a6a11de47e7a44905898a42a0dc2fe60c4b987ec0bda091",
+  "base": "sha256:f4e93b0c00a7cbc1d3ec4ab475a24f0d1894e8e88af32813c2556fde01289ace",
+  "artifact_sha256": "5a905a53d628a5c8c446979d8aac4b966397f0deb94dda2c98d2d678c1901bb7",
+  "source_manifest_sha256": "bd45b2cefcf51fac86577430fc0b219eb4ec1863ae6fc97647b658cbda1c674b"
+}

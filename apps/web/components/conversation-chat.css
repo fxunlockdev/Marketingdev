@@ -275,3 +275,36 @@
 .chat-video .video-recovery h3{text-wrap:balance;}
 .chat-video .video-recovery p{text-wrap:pretty;}
 .chat-video .video-recovery button{justify-self:start;min-height:44px;white-space:normal;}
+
+/* Video setup belongs to the conversation; the canvas remains a preview. */
+.desvio-redesign .chat-video-conversation-mount:empty{display:none}
+.desvio-redesign .chat-video-dialogue{display:grid;gap:20px;min-width:0;margin-top:24px}
+.desvio-redesign .chat-video-answer-card,.desvio-redesign .chat-video-dialogue .creative-review{margin:0 0 0 40px;padding:20px;border:1px solid #e5e1ef;border-radius:24px;background:#fff;display:grid;gap:16px;min-width:0}
+.desvio-redesign .chat-video-answer-card p,.desvio-redesign .chat-video-dialogue h4{margin:0;text-wrap:pretty}
+.desvio-redesign .chat-video-lengths{display:flex;flex-wrap:wrap;gap:8px}
+.desvio-redesign .chat-video-lengths button{min-height:44px;padding:10px 16px;background:#f5f3fa}
+.desvio-redesign .chat-video-lengths button[aria-pressed=true]{background:#17171a;color:white}
+.desvio-redesign .chat-video-reference-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.desvio-redesign .chat-video-reference{display:grid;gap:8px;padding:8px;border:1px solid #e5e1ef;border-radius:16px;text-align:left;background:#fff;min-width:0}
+.desvio-redesign .chat-video-reference .private-visual-presentation{display:block;width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:10px;background:#f5f3fa}
+.desvio-redesign .chat-video-reference img{width:100%;height:100%;object-fit:cover}
+.desvio-redesign .chat-video-reference>span:last-child{font-size:13px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
+.desvio-redesign .chat-video-dialogue button{white-space:normal;min-height:44px}
+.desvio-redesign .chat-video-dialogue .studio-projects{margin:0;padding:0}
+.desvio-redesign .chat-video-dialogue fieldset{display:grid;gap:16px;border:0;padding:0;margin:16px 0;min-width:0}
+.desvio-redesign .chat-video-dialogue .field{display:grid;gap:8px;margin:0 0 16px}
+.desvio-redesign .chat-video-dialogue :is(input:not([type=checkbox]),textarea,select){width:100%;min-width:0;box-sizing:border-box}
+.desvio-redesign .chat-video-dialogue .check-row{display:flex;align-items:flex-start;gap:10px;font-size:14px;line-height:1.5}
+.desvio-redesign .chat-video-dialogue .check-row input{margin-top:4px;flex-shrink:0}
+.desvio-redesign .chat-video-dialogue .chat-video-script-summary{display:grid;gap:12px}
+.desvio-redesign .chat-video-script-summary p{display:grid;gap:4px;margin:0}
+.desvio-redesign .chat-video-script-summary span{font-size:12px;color:#666173;font-variant-numeric:tabular-nums}
+.desvio-redesign .chat-video-script-editor summary{cursor:pointer;font-weight:600;padding:12px 0}
+.desvio-redesign .chat-video-dialogue .campaign-video-reference-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.desvio-redesign .chat-video-dialogue .campaign-video-reference-grid article{min-width:0}
+.desvio-redesign .chat-video-dialogue .campaign-video-reference-grid p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.desvio-redesign .chat-video-preview-hint{color:#666173;text-align:center;margin:0}
+.desvio-redesign .chat-video-image-dialog{width:min(760px,calc(100vw - 32px));max-height:85dvh;overflow:auto}
+.desvio-redesign .chat-video-dialogue .chat-video-management{margin-left:40px}
+@media(max-width:760px){.desvio-redesign .chat-video-answer-card,.desvio-redesign .chat-video-dialogue .creative-review{margin-left:0;padding:16px}.desvio-redesign .chat-video-dialogue .chat-video-management{margin-left:0}}
+.desvio-redesign .chat-video-dialogue .check-row input[type=checkbox]{width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;flex:0 0 18px;padding:0;margin:3px 0 0;appearance:auto}

@@ -1,0 +1,45 @@
+{
+  "checked_at": "2026-11-04T15:43:04.955489+00:00",
+  "scope": "Conversational video setup and stable message navigation; provider responses mocked in local browser tests",
+  "passed": true,
+  "suites": [
+    {
+      "name": "contracts",
+      "passed": 356,
+      "failed": 0,
+      "log_sha256": "4a7525cf206f05ed8c1a9e04842b974e1e959310377f8ae03724574ee6c4bd84"
+    },
+    {
+      "name": "chat recovery",
+      "passed": 2,
+      "failed": 0,
+      "log_sha256": "b748f75ca19d6823fb28b29d285c58668bb627f0def08aa794b3589a9c0cd24c"
+    },
+    {
+      "name": "carousel, reel and video browser journey",
+      "passed": 1,
+      "failed": 0,
+      "log_sha256": "b1037e7e71c0f2f6ff49a8b44b3896237691a9b14e4e4749becea858f79885e1"
+    }
+  ],
+  "source_manifest_sha256": "2adb4f81ebee3fa536f9922eb4b264d0702b505694520d55ae1f4258c19f4d4f",
+  "checks": [
+    "video setup renders in chat, not canvas",
+    "document retained when entering and sending video request",
+    "upload and explicit image approval",
+    "network rejection inside image modal can retry after closing",
+    "definitive 409 unlocks another image choice",
+    "accepted but lost response recovers exactly one job",
+    "script and reference recover after reload",
+    "script retry remains idempotent",
+    "generation waits for explicit approval",
+    "playable reel and video output",
+    "unsaved script edits block navigation and new instructions",
+    "saved history and private transcript recovery",
+    "mobile overflow check",
+    "approval checkbox and wrapped consent fit chat column"
+  ],
+  "hosted_evidence": "docs/evidence/video-chat-hosted.json",
+  "dev_web_deployment": "13c21491-a177-4a50-94f7-d2258d175778",
+  "dev_worker_image": "sha256:b15a72a2b0e9ee1e8a6a11de47e7a44905898a42a0dc2fe60c4b987ec0bda091"
+}

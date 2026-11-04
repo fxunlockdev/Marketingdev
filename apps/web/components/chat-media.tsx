@@ -1,4 +1,6 @@
 "use client";
+import {createPortal} from 'react-dom';
+import {ChatVideoSetup} from './chat-video-setup';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
 import {CampaignImages} from './campaign-images';
@@ -7,9 +9,7 @@ import {Notice} from './primitives';
 import {CreativeProject} from './canvas';
 import {CanvasCarousels,CarouselImage} from './carousels';
 import {ChatFormatPreview} from './chat-format-preview';
-import {BrandReferences} from './brand-references';
-import {CampaignVideoReference,type GeneratedVideoReference} from './campaign-video-reference';
-import {CanvasVideos,VideoRequest,VideoReview} from './video-canvas';
+import {CanvasVideos,VideoReview} from './video-canvas';
 type Business={id:string;name:string;role:string;has_approved_brand:boolean;organization_id?:string};
 const active=(status:string)=>['queued','running','retrying'].includes(status);
 export function ChatCarousel({business,run,slides,onDirty,onRefresh}:{business:Business;run:any;slides:any[];onDirty:(dirty:boolean)=>void;onRefresh:()=>void}){
@@ -26,20 +26,25 @@ export function ChatCarousel({business,run,slides,onDirty,onRefresh}:{business:B
  {version&&!editing&&<><p>{version.caption}</p><details className="chat-media-details"><summary>Caption, slide order & review</summary><CanvasCarousels key={`${run.project_id}:${revision}`} businessId={business.id} projectId={run.project_id} initiallyOpen onDirty={onDirty} onOpenSlide={(_,project)=>{const next=slides.findIndex(s=>s.project_id===project);if(next>=0){setPosition(next);setEditing(true);}}}/></details></>}
  </section>;
 }
-export function ChatVideo({business,threadId,turn}:{business:Business;threadId:string;turn:any}){
- const [management,setManagement]=useState(false),controls=useRef<HTMLDivElement>(null);
- const [reference,setReference]=useState<GeneratedVideoReference|{brand_reference_id:string;source_sha256:string;label:string}>(),[state,setState]=useState<any>(),[error,setError]=useState<unknown>();
+export function ChatVideo({business,threadId,turn,chatTarget}:{business:Business;threadId:string;turn:any;chatTarget?:HTMLElement|null}){
+ const [management,setManagement]=useState(false);
+ const [state,setState]=useState<any>(),[error,setError]=useState<unknown>();
  useEffect(()=>{let live=true,timer:ReturnType<typeof setTimeout>;const load=async()=>{try{const v=await api(`/api/v1/businesses/${business.id}/videos`);if(live){setState(v);setError(undefined);}}catch(e){if(live)setError(e);}if(live)timer=setTimeout(load,3000);};void load();return()=>{live=false;clearTimeout(timer);};},[business.id,threadId]);
  const placement=turn.output.placement??'feed',title=placement==='reel'?'reel':placement==='story'?'video story':'video';
  const project=state?.projects.find((p:any)=>p.thread_id===threadId&&new Date(p.created_at)>=new Date(turn.created_at));
  const started=!!project,run=state?.runs.find((r:any)=>r.project_id===project?.id),version=state?.versions.find((v:any)=>v.id===project?.latest_version_id);
  const scriptFailed=run?.status==='rejected'&&run.error_code==='VIDEO_PLAN_OUTPUT_INVALID';
  const videoStatus=scriptFailed?'Script needs attention':run?.cancel_requested&&active(run.status)?'Canceling':run?.awaiting_approval&&active(run.status)?'Review script':run&&active(run.status)?'Creating':run?.status==='unknown'?'Needs attention':run?.status==='failed'?'Generation stopped':run?.status??'Draft';
- const referenceId=reference?('brand_reference_id' in reference?reference.brand_reference_id:reference.export_id):'';
- return <section className="chat-media chat-video" aria-label={`Your ${title}`}>{!project?.latest_version_id&&<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} shape={turn.output.size==='1024x1024'?'square':turn.output.size==='1024x1536'?'portrait':'landscape'} channel={turn.output.channel} status={videoStatus}/>}{project?.latest_version_id&&<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} channel={turn.output.channel} status={run&&active(run.status)?'Revising':version?.status?.replaceAll('_',' ')??'Draft'}><div className="chat-saved-video"><VideoReview key={project.latest_version_id} business={business} id={project.latest_version_id} previewOnly/></div></ChatFormatPreview>}{!project?.latest_version_id&&state?.configured&&<button className="chat-video-next" onClick={()=>controls.current?.scrollIntoView({block:'start'})}>{scriptFailed?'Review script issue':run?.awaiting_approval?'Review video script':started?'View generation progress':'Choose a starting image'} →</button>}<div className="chat-video-controls" ref={controls}><header><div><p className="hint">{placement==='feed'?'Video':'Vertical · 9:16'}</p><h2>{started?`Your ${title}`:`Create your ${title}`}</h2></div></header><Notice error={error}/>
- {!state?<p role="status">Checking video availability…</p>:!state.configured?<p role="status">Video generation is unavailable for this workspace. Your conversation is saved.</p>:!started&&<><p>Choose the starting image. Then review the script here before generating your {title}.</p><CampaignVideoReference businessId={business.id} onSelect={setReference}/><BrandReferences businessId={business.id} writable={['owner','admin','editor'].includes(business.role)} visualPicker uploadWorkspace={business.organization_id?{id:business.organization_id,name:business.name,role:business.role}:undefined} onVideo={setReference}/>
- {reference&&<VideoRequest key={`${turn.id}:${referenceId}`} business={business} threadId={threadId} reference={reference} initiallyOpen initialPrompt={turn.output.prompt} initialChannel={turn.output.channel} initialDuration={turn.output.duration_seconds??5} creativeSpec={{placement,aspect:placement!=='feed'?'vertical':turn.output.size==='1024x1024'?'square':turn.output.size==='1024x1536'?'portrait':'landscape',slide_count:null}} requestId={`chat-video:${turn.id}:${referenceId}`} onSubmitted={()=>void api(`/api/v1/businesses/${business.id}/videos`).then(setState).catch(setError)}/>}</>}
- {project?.latest_version_id?<details className="chat-video-management" onToggle={e=>{if(e.currentTarget.open)setManagement(true);}}><summary>Edit, review & history</summary>{management&&<CanvasVideos business={business} threadId={threadId} compact/>}</details>:<CanvasVideos business={business} threadId={threadId} compact/>}</div></section>;
+ const conversation=<section className="chat-video-dialogue" aria-label="Video conversation"><Notice error={error}/>
+ {!state?<p role="status">Checking video availability…</p>:!state.configured?<p role="status">Video generation is unavailable for this workspace. Your conversation is saved.</p>:!started&&<ChatVideoSetup business={business} threadId={threadId} turn={turn} onSubmitted={()=>void api(`/api/v1/businesses/${business.id}/videos`).then(setState).catch(setError)}/>}
+ {project?.latest_version_id&&<div className="create-message assistant"><span className="create-avatar" aria-hidden="true">d.</span><p>Your video is ready in the canvas. Play it to review the result, or open the controls below to request changes.</p></div>}
+ {project?.latest_version_id?<details className="chat-video-management" onToggle={e=>{if(e.currentTarget.open)setManagement(true);}}><summary>Edit, review & history</summary>{management&&<CanvasVideos business={business} threadId={threadId} projectId={project?.id} compact conversational/>}</details>:project?<CanvasVideos business={business} threadId={threadId} projectId={project.id} compact conversational/>:null}
+ </section>;
+ return <section className="chat-media chat-video" aria-label={`Your ${title}`}>
+ {!project?.latest_version_id?<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} shape={turn.output.size==='1024x1024'?'square':turn.output.size==='1024x1536'?'portrait':'landscape'} channel={turn.output.channel} status={videoStatus}/>:<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} channel={turn.output.channel} status={run&&active(run.status)?'Revising':version?.status?.replaceAll('_',' ')??'Draft'}><div className="chat-saved-video"><VideoReview key={project.latest_version_id} business={business} id={project.latest_version_id} previewOnly/></div></ChatFormatPreview>}
+ {!project?.latest_version_id&&<p className="chat-video-preview-hint">{started?'Your video will appear here when it is ready.':'Choose your starting image in the conversation to begin.'}</p>}
+ {chatTarget?createPortal(conversation,chatTarget):conversation}
+ </section>;
 }
 
 /** Resume the exact saved guided post; never create a replacement calendar slot. */

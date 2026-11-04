@@ -1814,66 +1814,96 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
  assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/create-chat/conversations/${conversation}`)).status(),404);
  for(const kind of ['reel','video']){
   await page.goto(`${base}/b/${brand}/create`);await page.getByRole('button',{name:kind==='reel'?'Reel':'Video',exact:true}).click();
+  await page.evaluate(()=>{window.__videoChatDocument='same-document';});
   await page.getByRole('textbox',{name:'Message Desvio'}).fill(`Create a ${kind} about botanical soap for mindful households, 3 seconds`);
   await page.getByRole('button',{name:'Send message',exact:true}).click();
   const media=page.getByRole('region',{name:`Your ${kind}`,exact:true});await expect(media).toBeVisible({timeout:60000});
-  await media.getByRole('button',{name:'Choose a starting image →',exact:true}).click();
+  assert.equal(await page.evaluate(()=>window.__videoChatDocument),'same-document','Opening video does not reload the page');
+  const flow=page.getByRole('region',{name:'Video conversation',exact:true});
+  await expect(flow).toBeVisible();
+  assert.equal(await media.locator('textarea,fieldset').count(),0,'Canvas contains no setup form');
+  await expect(flow.getByRole('button',{name:'3s',exact:true})).toHaveAttribute('aria-pressed','true');
   if(kind==='reel'){
-   await media.getByText('Add product photos',{exact:true}).click();
-   await media.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'chat-video-product.png',mimeType:'image/png',buffer:png});
-   await media.getByRole('button',{name:'Upload file',exact:true}).click();
-   const approval=media.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
+   await flow.getByRole('button',{name:'Upload or approve another image',exact:true}).click();
+   const picker=page.getByRole('dialog',{name:'Choose a video image',exact:true});
+   await picker.getByText('Add product photos',{exact:true}).click();
+   await picker.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'chat-video-product.png',mimeType:'image/png',buffer:png});
+   await picker.getByRole('button',{name:'Upload file',exact:true}).click();
+   const approval=picker.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
    await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
    await approval.getByLabel('Reference name',{exact:true}).fill('Chat video product');
    await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
    await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
   }
-  await media.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
-  await expect(media.getByLabel('Video length (seconds)',{exact:true})).toHaveValue('3');
+  await page.screenshot({path:`work/browser/chat-${kind}-image-choice.png`});
   const count=videoSubmits;
-  await media.getByRole('button',{name:'Draft video script',exact:true}).click();
-  await expect(media.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
-  await expect(media.getByLabel('Video format',{exact:true})).toContainText(kind==='reel'?'Reel':'Feed video');
+  if(kind==='reel'){
+   await page.route('**/canvas/threads/*/videos',route=>route.abort('failed'));
+   await page.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
+   const picker=page.getByRole('dialog',{name:'Choose a video image',exact:true});
+   await expect(picker.getByRole('button',{name:'Retry saved video setup',exact:true})).toBeVisible();
+   await picker.getByRole('button',{name:'Close image picker',exact:true}).click();
+   await expect(picker).toHaveCount(0);
+   await page.unroute('**/canvas/threads/*/videos');
+   await flow.getByRole('button',{name:'Retry saved video setup',exact:true}).click();
+  }else{
+   await page.route('**/canvas/threads/*/videos',route=>route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({message:'The reference approval has changed'})}));
+   await flow.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
+   await expect(flow.locator('.notice.error')).toBeVisible();
+   await expect(flow.getByRole('button',{name:'3s',exact:true})).toBeEnabled();
+   await expect(flow.getByRole('button',{name:'Use Chat video product for video',exact:true})).toBeEnabled();
+   await page.unroute('**/canvas/threads/*/videos');
+   await page.route('**/canvas/threads/*/videos',async route=>{await route.fetch();await route.abort('failed');});
+   await flow.getByRole('button',{name:'Use Chat video product for video',exact:true}).click();
+  }
+  await flow.getByText('Edit script & caption',{exact:true}).click({timeout:60000});
+  if(kind==='video')await page.unroute('**/canvas/threads/*/videos');
+  await expect(flow.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
+  await expect(flow.getByLabel('Video format',{exact:true})).toContainText(kind==='reel'?'Reel':'Feed video');
   assert.equal(videoSubmits,count,'No paid video generation before script approval');
-  await page.reload();await expect(media.getByLabel('Video prompt',{exact:true})).toBeVisible();
+  await page.reload();await flow.getByText('Edit script & caption',{exact:true}).click();await expect(flow.getByLabel('Video prompt',{exact:true})).toBeVisible();
   if(kind==='reel'){
    const chatId=new URL(page.url()).searchParams.get('conversation'),prior=(await admin.query('SELECT r.job_id,r.project_id FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows[0];
    await admin.query("UPDATE app.jobs SET status='rejected',error_code='VIDEO_PLAN_OUTPUT_INVALID' WHERE id=$1",[prior.job_id]);await admin.query('UPDATE app.video_requests SET plan=NULL WHERE job_id=$1',[prior.job_id]);
-   await expect(media.getByRole('button',{name:'Retry script preparation',exact:true})).toBeVisible({timeout:15000});
+   await expect(flow.getByRole('button',{name:'Retry script preparation',exact:true})).toBeVisible({timeout:15000});
    await expect(media.getByText('Script needs attention',{exact:true})).toBeVisible();
-   await expect(media.getByRole('button',{name:'View generation progress →',exact:true})).toHaveCount(0);
+   await expect(flow.getByRole('button',{name:'View generation progress →',exact:true})).toHaveCount(0);
    let lostRetry=false;await page.route('**/video-jobs/*/retry-script',async route=>{if(lostRetry){await route.continue();return;}lostRetry=true;await route.fetch();await route.abort('failed');});
-   await media.getByRole('button',{name:'Retry script preparation',exact:true}).click();
-   await expect(media.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
-   await expect(media.locator('.notice.error')).toHaveCount(0,{timeout:15000});
+   await flow.getByRole('button',{name:'Retry script preparation',exact:true}).click();
+   await flow.getByText('Edit script & caption',{exact:true}).click();
+   await expect(flow.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});
+   await expect(flow.locator('.notice.error')).toHaveCount(0,{timeout:15000});
    assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_requests WHERE project_id=$1',[prior.project_id])).rows[0].n,2);assert.equal(videoSubmits,count);
    await page.unroute('**/video-jobs/*/retry-script');
   }
 
-  await expect(media.getByRole('button',{name:'Draft video script',exact:true})).toHaveCount(0);
-  await media.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for chat');
+  await expect(flow.getByRole('button',{name:'Draft video script',exact:true})).toHaveCount(0);
+  await flow.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for chat');
   // Internal chat navigation must respect unsaved video fields, just like page unload.
   page.once('dialog',dialog=>dialog.dismiss());
   await page.getByRole('button',{name:'Start over',exact:false}).click();
-  await expect(media.getByLabel('Video prompt',{exact:true})).toHaveValue('TEST user edited video prompt for chat');
+  await expect(flow.getByLabel('Video prompt',{exact:true})).toHaveValue('TEST user edited video prompt for chat');
   await page.getByRole('textbox',{name:'Message Desvio'}).fill('Change the scene');
   await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
   await page.getByRole('textbox',{name:'Message Desvio'}).fill('');
 
-  await media.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
-  await media.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
-  await media.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+  await flow.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline using product');
+  const generationConsent=flow.getByLabel('I approve this prompt and authorize video generation using the configured allowance.');
+  const consentBox=await generationConsent.boundingBox();assert.ok(consentBox&&consentBox.width<=24&&consentBox.height<=24,'Consent checkbox keeps its compact size inside chat');
+  assert.ok(await generationConsent.locator('..').evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Consent text fits the chat column');
+  await generationConsent.check();
+  await flow.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
   await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});
   await expect(media.locator('.chat-saved-video video')).toBeVisible({timeout:30000});
   await expect.poll(()=>media.locator('.chat-saved-video video').evaluate(el=>el.readyState),{timeout:30000}).toBeGreaterThanOrEqual(2);
   if(kind==='reel'){const box=await media.locator('.chat-saved-video video').boundingBox();assert.ok(Math.abs(box.width/box.height-9/16)<.02,'The saved reel keeps its vertical canvas dimensions');}
-  await media.getByText('Edit, review & history',{exact:true}).click();await expect(media.getByLabel('Saved video version',{exact:true})).toBeVisible();
-  await media.getByLabel('Video feedback',{exact:true}).fill('Keep this review note while I inspect the canvas');
-  await media.getByText('Edit, review & history',{exact:true}).click();
-  await media.getByText('Edit, review & history',{exact:true}).click();
-  await expect(media.getByLabel('Video feedback',{exact:true})).toHaveValue('Keep this review note while I inspect the canvas');
-  await media.getByLabel('Video feedback',{exact:true}).fill('');
-  await media.getByText('Edit, review & history',{exact:true}).click();await expect(media.getByRole('link',{name:'Download video',exact:true})).toHaveCount(1);
+  await flow.getByText('Edit, review & history',{exact:true}).click();await expect(flow.getByLabel('Saved video version',{exact:true})).toBeVisible();
+  await flow.getByLabel('Video feedback',{exact:true}).fill('Keep this review note while I inspect the canvas');
+  await flow.getByText('Edit, review & history',{exact:true}).click();
+  await flow.getByText('Edit, review & history',{exact:true}).click();
+  await expect(flow.getByLabel('Video feedback',{exact:true})).toHaveValue('Keep this review note while I inspect the canvas');
+  await flow.getByLabel('Video feedback',{exact:true}).fill('');
+  await flow.getByText('Edit, review & history',{exact:true}).click();await expect(media.getByRole('link',{name:'Download video',exact:true})).toHaveCount(1);
   assert.equal(videoSubmits,count+1);
   const chatId=new URL(page.url()).searchParams.get('conversation');
   const spec=(await admin.query('SELECT r.creative_spec FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id WHERE p.thread_id=$1',[chatId])).rows;
@@ -1881,10 +1911,10 @@ test('AI canvas creates carousel slides and playable reels and videos in the sam
   await page.reload();await expect(media.getByRole('link',{name:'Download video',exact:true})).toBeVisible();
   let failVideoRead=true;
   await page.route('**/videos',async route=>{if(failVideoRead&&route.request().method()==='GET'){await route.abort('failed');return;}await route.continue();});
-  await expect(media.locator('.chat-video-controls > .notice.error')).toBeVisible({timeout:15000});
+  await expect(flow.locator(':scope > .notice.error')).toBeVisible({timeout:15000});
   await expect(media.locator('.chat-saved-video video')).toBeVisible();
   failVideoRead=false;
-  await expect(media.locator('.chat-video-controls > .notice.error')).toHaveCount(0,{timeout:15000});
+  await expect(flow.locator(':scope > .notice.error')).toHaveCount(0,{timeout:15000});
   await page.unroute('**/videos');
   await page.screenshot({path:`work/browser/chat-${kind}-complete.png`});
   assert.equal(videoSubmits,count+1,'Reload never resubmits the paid generation');
