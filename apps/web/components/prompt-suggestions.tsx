@@ -66,7 +66,7 @@ export function PromptSuggestions({brand,name,draft,format='',limit,insert,focus
  return <section className={s.ideas} aria-label="Prompt ideas" onKeyDown={e=>{if(e.key==='Escape'&&opened){e.preventDefault();cancel();}}}>
  <span className={s.label}>Prompt ideas</span><div className={s.choices}>{choices.map(idea=>{
   function open(){setPreview({key:requestKey,idea,text:composeIdea(draft,idea,name,format)});}
-  return <button type="button" key={idea.title} aria-expanded={opened?.idea.title===idea.title} onPointerEnter={e=>{if(e.pointerType==='mouse')open();}} onClick={open}>{idea.title}<span aria-hidden="true">↗</span></button>;
+  return <button type="button" key={idea.title} aria-expanded={opened?.idea.title===idea.title} onPointerMove={e=>{if(e.pointerType==='mouse'&&opened?.idea.title!==idea.title)open();}} onClick={open}>{idea.title}<span aria-hidden="true">↗</span></button>;
  })}</div>
  {opened&&<div className={s.preview}><strong>{opened.idea.title}</strong><p>{opened.text}</p><div className={s.actions}><button type="button" onClick={cancel}>Cancel</button><button type="button" onClick={()=>{setInserted(true);insert(opened.text);focus();}}>Insert</button></div></div>}
  </section>;
