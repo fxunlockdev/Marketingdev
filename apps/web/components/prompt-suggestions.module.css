@@ -1,8 +1,39 @@
-.ideas.ideas{flex:none;min-width:0;max-width:750px;margin:4px 6px 8px;color:#282531;text-align:left}
-.label{font-size:12px;font-weight:600;color:#625e71}.choices,.actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}.choices{margin-top:4px}
-.ideas.ideas button{margin:0;min-height:32px;padding:6px 12px;border:1px solid #dfdbea;border-radius:18px;background:#fbfaff;color:#383242;font-weight:600;font-family:inherit;font-size:13px;line-height:1.35;cursor:pointer}
-.choices button span{padding-left:6px;color:#60519b}.ideas button:focus-visible{outline:2px solid #6755e5;outline-offset:2px}
-.preview{margin-top:6px;background:#f7f5ff;border:1px solid #ddd8f3;border-radius:16px;padding:12px 14px}.preview strong{font-size:14px}
-.preview p{margin:6px 0 10px;font-size:14px;line-height:1.5;white-space:pre-line;overflow-wrap:anywhere;max-height:min(22dvh,175px);overflow-y:auto;color:#403a4c}
-.actions{justify-content:flex-end}.ideas .actions button:last-child{background:#403191;border-color:#403191;color:white}
+.ideas.ideas{
+ position:relative;z-index:2;flex:none;min-width:0;max-width:750px;
+ margin:4px 6px 8px;color:#282531;text-align:left
+}
+.label{font-size:12px;font-weight:500;color:#696575}
+.choices,.actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.choices{margin-top:4px}
+.ideas.ideas button{
+ margin:0;min-height:32px;padding:6px 12px;border:1px solid #e6e3eb;border-radius:18px;
+ background:#fcfbfd;color:#514b5d;font:inherit;font-weight:500;font-size:13px;line-height:1.35;
+ cursor:pointer;touch-action:manipulation
+}
+.choices button span{display:inline-block;margin-left:5px;color:#706783}
+.ideas .choices button[aria-expanded=true]{background:#f2eff9;border-color:#d8d2e6;color:#3b3153}
+.ideas button:focus-visible{outline:2px solid #6755e5;outline-offset:2px}
+.preview{
+ position:absolute;inset:auto 0 calc(100% + 7px);box-sizing:border-box;width:min(100%,440px);
+ background:#fdfcfe;border:1px solid #e4e0eb;border-radius:16px;
+ padding:12px 14px;box-shadow:0 5px 20px rgb(37 27 65 / 9%);color:#34303e
+}
+.preview strong{font-size:13px;font-weight:600}
+.preview p{margin:6px 0 10px;font-size:14px;line-height:1.5;white-space:pre-line;overflow-wrap:anywhere;
+ max-height:min(20dvh,150px);overflow-y:auto;color:#4b4654}
+.actions{justify-content:flex-end}
+.ideas .actions button{background:transparent;border-color:transparent}
+.ideas .actions button:last-child{background:#eeeaf7;color:#46365e}
 :global([aria-label="Create with Desvio"])>.ideas .label{color:#d5d2dc}
+:global([aria-label="Create with Desvio"])>.ideas .preview{inset:calc(100% + 7px) 0 auto}
+@media(hover:hover){
+ .ideas .choices button:hover,.ideas .actions button:hover{background:#f4f1f8;color:#342945}
+ .ideas .actions button:last-child:hover{background:#e4ddef}
+}
+@media(prefers-reduced-motion:no-preference){
+ .preview{animation:reveal 145ms cubic-bezier(.2,.75,.3,1) both}
+ .ideas button{transition:background-color 130ms ease,border-color 130ms ease,color 130ms ease}
+ .choices button span{transition:transform 140ms ease}
+ .choices button:hover span{transform:translate(1px,-1px)}
+}
+@keyframes reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}

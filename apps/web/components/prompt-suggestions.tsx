@@ -11,7 +11,10 @@ export function PromptSuggestions({brand,name,draft,format='',limit,insert,focus
  const endpoint='/api/v1/businesses/'+brand+'/create-chat/prompt-suggestions';
  const [context,setContext]=useState<Context>(),[dismissed,setDismissed]=useState(false),[inserted,setInserted]=useState(false);
  const [tailored,setTailored]=useState<{key:string;idea:Idea}>(),[preview,setPreview]=useState<{key:string;idea:Idea;text:string}>();
+ const hoverTimer=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
+ function stopHover(){clearTimeout(hoverTimer.current);hoverTimer.current=undefined;}
  const requestKey=JSON.stringify([brand,format,draft]);
+ useEffect(()=>stopHover,[requestKey]);
  const hasTopic=hasPromptTopic(draft);
  const local=libraryIdeas(draft,context?.context??name,format);
  const sample=local[0]?.direction??'';
@@ -65,9 +68,14 @@ export function PromptSuggestions({brand,name,draft,format='',limit,insert,focus
  if(!draft.trim()||!context||dismissed||inserted||(!choices.length&&!opened))return null;
  return <section className={s.ideas} aria-label="Prompt ideas" onKeyDown={e=>{if(e.key==='Escape'&&opened){e.preventDefault();cancel();}}}>
  <span className={s.label}>Prompt ideas</span><div className={s.choices}>{choices.map(idea=>{
-  function open(){setPreview({key:requestKey,idea,text:composeIdea(draft,idea,name,format)});}
-  return <button type="button" key={idea.title} aria-expanded={opened?.idea.title===idea.title} onPointerMove={e=>{if(e.pointerType==='mouse'&&opened?.idea.title!==idea.title)open();}} onClick={open}>{idea.title}<span aria-hidden="true">↗</span></button>;
+  function open(){stopHover();setPreview({key:requestKey,idea,text:composeIdea(draft,idea,name,format)});}
+  return <button type="button" key={idea.title} aria-expanded={opened?.idea.title===idea.title} onPointerMove={e=>{
+   if(e.pointerType==='mouse'&&opened?.idea.title!==idea.title&&hoverTimer.current===undefined){
+    const chip=e.currentTarget;
+    hoverTimer.current=setTimeout(()=>{stopHover();if(chip.isConnected&&chip.matches(':hover'))open();},180);
+   }
+  }} onPointerLeave={stopHover} onClick={open}>{idea.title}<span aria-hidden="true">↗</span></button>;
  })}</div>
- {opened&&<div className={s.preview}><strong>{opened.idea.title}</strong><p>{opened.text}</p><div className={s.actions}><button type="button" onClick={cancel}>Cancel</button><button type="button" onClick={()=>{setInserted(true);insert(opened.text);focus();}}>Insert</button></div></div>}
+ {opened&&<div key={opened.idea.title} className={s.preview}><strong>{opened.idea.title}</strong><p>{opened.text}</p><div className={s.actions}><button type="button" onClick={cancel}>Cancel</button><button type="button" onClick={()=>{setInserted(true);insert(opened.text);focus();}}>Insert</button></div></div>}
  </section>;
 }

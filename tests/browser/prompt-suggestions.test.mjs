@@ -36,7 +36,7 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   await home.fill('   ');await expect(ideas).toHaveCount(0);
   await home.fill('Make a video for the cafe');
   await expect(ideas.getByRole('button',{name:'Insert',exact:true})).toHaveCount(0);
-  await page.getByRole('button',{name:/The first pour/}).click();
+  await page.getByRole('button',{name:/The first pour/}).press('Enter');
   await page.getByRole('button',{name:'Insert',exact:true}).click();
   await expect(home).toHaveValue(/cafe Hold close on the espresso/);
   assert(new URL(page.url()).pathname.endsWith('/overview'));
@@ -55,7 +55,17 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
    }return performance.now()-start;
   },brief);
   await expect.poll(()=>lookups).toBe(1);
-  await region.getByRole('button',{name:/Arriving/}).hover();
+  const before=await input.boundingBox();
+  const chip=region.getByRole('button',{name:/Arriving/});
+  await chip.hover();await page.mouse.move(1,1);await page.waitForTimeout(230);
+  await expect(region.getByRole('button',{name:'Insert',exact:true})).toHaveCount(0);
+  await chip.hover();
+  await expect(region.getByRole('button',{name:'Insert',exact:true})).toBeVisible();
+  const after=await input.boundingBox();assert(Math.abs(before.y-after.y)<1);
+  const panel=region.locator('p').locator('..');
+  assert.notEqual(await panel.evaluate(el=>getComputedStyle(el).animationName),'none');
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await panel.evaluate(el=>getComputedStyle(el).animationName),'none');
   const settled=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/prompt-suggestions'));
   releaseAI();await settled;
   await expect(region.getByText(/Open low beside/)).toBeVisible();

@@ -327,3 +327,9 @@
  .desvio-redesign .conversation-screen:is(.is-topic,.is-start) .create-composer:has(textarea:not(:placeholder-shown)){height:auto;max-height:none}
  .desvio-redesign .conversation-screen:is(.is-topic,.is-start) .create-composer:has(textarea:not(:placeholder-shown)) textarea{field-sizing:content;height:auto;max-height:min(22dvh,140px);white-space:pre-wrap}
 }
+
+.desvio-redesign .conversation-screen .create-composer.text-enabled:focus-within{
+ outline:2px solid #6a5cff;
+ outline-offset:0;
+ box-shadow:0 4px 14px rgb(78 61 147 / 8%);
+}
