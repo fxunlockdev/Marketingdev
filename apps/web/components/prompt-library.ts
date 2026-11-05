@@ -47,6 +47,15 @@ export function libraryIdeas(draft:string,context:string,format:string):Idea[]{
  const source=' '+(hasSubject?typed:normalize(context))+' ';
  const scored=catalog.map(shot=>({shot,score:Math.max(0,...shot.terms.map(term=>source.includes(' '+term+' ')?term.length:0))})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
  const still=/\b(image|photo|photograph|poster|carousel)\b/.test(typed)||(!/\b(video|reel|film)\b/.test(typed)&&['image','carousel'].includes(format));
+ if(!scored.length){
+  if(!hasSubject&&!context.trim())return [];
+  if(hasSubject&&typed.length<5)return [];
+  return still?[{title:'Frame the subject',direction:'Choose one focal detail. Keep its silhouette clear and use the surroundings to give a sense of scale.'}]
+   :[{title:hasSubject?'From detail to scene':'Introduce your business',direction:'Begin on a distinctive detail of the subject and reveal how it fits into its surroundings. Hold the final composition long enough to recognize it.'}];
+ }
+ if(!still&&/\b(locked|fixed|static camera|stationary|tripod|no camera (motion|movement)|camera still)\b/.test(typed)){
+  return [{title:'A locked-off study',direction:'Hold the requested framing throughout. Let small changes within the scene draw the eye to the subject.'}];
+ }
  if(still&&scored.length){
   const details:Record<string,string>={
    'An architectural reveal':'Frame the facade from a low three-quarter angle. Keep verticals straight, and use raking light to pick out the materials.',
