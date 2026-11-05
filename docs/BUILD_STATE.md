@@ -1,3 +1,13 @@
+## Live canvas generation loading | 5 November 2026
+
+Image and video requests now show a shared canvas progress card with a right-to-left activity line, elapsed time from persisted job creation, and Prepare / Generate / Save stages. Existing artwork stays visible during revisions. Only provider-reported video progress produces a percentage. Reduced motion, offscreen/background pausing, reconnects, cancellation, failed jobs and reload recovery are covered. The old image workflow percentage was removed.
+
+Estimated ready windows use the current business's recent completed generations, with at least three valid samples. Video samples exclude workflows requiring manual script approval, which could include arbitrary review wait. Insufficient history shows stage and elapsed time; overruns explicitly say the estimate has been exceeded. This is an estimated range, not a promised countdown. Current authenticated dev reads return an image estimate from 15 completions and no video estimate yet.
+
+API/web builds and two timing contract tests passed. The full carousel/reel/video workflow passed with real local database, Temporal, renderer and storage and mocked paid providers. A committed browser regression passes on local and hosted builds for both media at 1440px and 390px, covering stages, elapsed time, reload, overrun, connection recovery, cancellation, failure, reduced motion and real versus indeterminate percentage. Desktop and mobile screenshots reviewed. Authenticated hosted API reads verify timing and timestamps; anonymous reads are denied. No new paid generation or publishing occurred.
+
+Exact dev deployments succeeded: API `8557cb24-a4b3-4390-8d4d-0d9c10ad4c36`, web `5be3c2de-6a46-4a1c-b792-a0cb8cb9adaf`. No migration, configuration or worker rollout required. Evidence: `generation-progress-validation.json` and `generation-progress-hosted.json`. This is scoped loading UX verification, not a claim of full production readiness.
+
 ## Runway quality routing and real media acceptance — 4 November 2026
 
 New videos and Reels use Runway Model Router with a quality preference and the existing immutable credit cap. Runway chooses the eligible model; both paid test receipts selected Seedance 2.5 through Runway. GPT image/carousel generation remains separate. The settings-only Railway service may display Offline; the actual trusted worker is running, has the Runway secret, and has active Temporal pollers. API deployment `200c9982-4b0a-4048-8321-002aa7126dbc` was observed SUCCESS with video enabled and the new renderer pin.

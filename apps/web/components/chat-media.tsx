@@ -1,5 +1,6 @@
 "use client";
 import {createPortal} from 'react-dom';
+import {GenerationProgress} from './generation-progress';
 import {ChatVideoSetup} from './chat-video-setup';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
@@ -40,8 +41,11 @@ export function ChatVideo({business,threadId,turn,chatTarget}:{business:Business
  {project?.latest_version_id&&<div className="create-message assistant"><span className="create-avatar" aria-hidden="true">d.</span><p>Your video is ready in the canvas. Play it to review the result, or open the controls below to request changes.</p></div>}
  {project?.latest_version_id?<details className="chat-video-management" onToggle={e=>{if(e.currentTarget.open)setManagement(true);}}><summary>Edit, review & history</summary>{management&&<CanvasVideos business={business} threadId={threadId} projectId={project?.id} compact conversational/>}</details>:project?<CanvasVideos business={business} threadId={threadId} projectId={project.id} compact conversational/>:null}
  </section>;
+ const loading=run&&(active(run.status)||run.status==='unknown');
+ const progress=loading?<GenerationProgress media="video" run={run} stage={run.provider_phase==='completed'?2:['prepared','submitting','accepted'].includes(run.provider_phase)?1:0} timing={state?.timing} disconnected={!!error}/>:null;
  return <section className="chat-media chat-video" aria-label={`Your ${title}`}>
- {!project?.latest_version_id?<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} shape={turn.output.size==='1024x1024'?'square':turn.output.size==='1024x1536'?'portrait':'landscape'} channel={turn.output.channel} status={videoStatus}/>:<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} channel={turn.output.channel} status={run&&active(run.status)?'Revising':version?.status?.replaceAll('_',' ')??'Draft'}><div className="chat-saved-video"><VideoReview key={project.latest_version_id} business={business} id={project.latest_version_id} previewOnly/></div></ChatFormatPreview>}
+ {progress}
+ {!project?.latest_version_id?(!loading?<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} shape={turn.output.size==='1024x1024'?'square':turn.output.size==='1024x1536'?'portrait':'landscape'} channel={turn.output.channel} status={videoStatus}/>:null):<ChatFormatPreview kind={placement==='feed'?'video':placement} brand={business.name} channel={turn.output.channel} status={run&&active(run.status)?'Revising':version?.status?.replaceAll('_',' ')??'Draft'}><div className="chat-saved-video"><VideoReview key={project.latest_version_id} business={business} id={project.latest_version_id} previewOnly/></div></ChatFormatPreview>}
  {!project?.latest_version_id&&<p className="chat-video-preview-hint">{started?'Your video will appear here when it is ready.':'Choose your starting image in the conversation to begin.'}</p>}
  {chatTarget?createPortal(conversation,chatTarget):conversation}
  </section>;

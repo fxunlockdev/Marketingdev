@@ -1,0 +1,67 @@
+{
+  "checked_at": "2026-11-05T02:03:59.528235+00:00",
+  "scope": "Canvas image/video loading, no paid generation or publishing",
+  "deployments": {
+    "api": {
+      "id": "8557cb24-a4b3-4390-8d4d-0d9c10ad4c36",
+      "status": "SUCCESS"
+    },
+    "web": {
+      "id": "5be3c2de-6a46-4a1c-b792-a0cb8cb9adaf",
+      "status": "SUCCESS"
+    }
+  },
+  "hosted_ui_with_mocked_status": {
+    "checked_at": "2026-11-05T02:02:22.272Z",
+    "origin": "https://desvio-dev-web-dev.up.railway.app",
+    "provider_mode": "UI fixtures only, no provider calls",
+    "checks": [
+      "real_provider_percentage_only",
+      "video: stage updates, elapsed timer, reload persistence, timeout, reconnect, cancellation, failure, insufficient history, reduced motion, right-to-left sweep",
+      "image: stage updates, elapsed timer, reload persistence, timeout, reconnect, cancellation, failure, insufficient history, reduced motion, right-to-left sweep"
+    ],
+    "viewports": [
+      {
+        "media": "video",
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "media": "video",
+        "width": 390,
+        "overflow": false
+      },
+      {
+        "media": "image",
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "media": "image",
+        "width": 390,
+        "overflow": false
+      }
+    ],
+    "passed": true
+  },
+  "real_readonly_api": {
+    "checked_at": "2026-11-05T02:02:46.166Z",
+    "origin": "https://desvio-dev-web-dev.up.railway.app",
+    "mode": "Authenticated read-only deployed API, no paid generation",
+    "video_timing": null,
+    "image_timing": {
+      "min_seconds": 60,
+      "max_seconds": 120,
+      "sample_count": 15,
+      "source": "recent_generations"
+    },
+    "video_timestamps_valid": true,
+    "anonymous_reads_denied": true,
+    "passed": true
+  },
+  "limitations": [
+    "Historical estimates are not exact provider countdowns.",
+    "Video estimate is currently null because fewer than three comparable automatic generations completed.",
+    "No new paid provider generation was performed for this display-only release."
+  ]
+}

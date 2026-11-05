@@ -1,0 +1,46 @@
+{
+  "checked_at": "2026-11-05T02:03:59.529999+00:00",
+  "build": "API TypeScript and web type check passed; hosted production builds succeeded",
+  "contract_tests": {
+    "command": "node --test tests/contracts/generation-timing.test.mjs",
+    "passed": 2
+  },
+  "full_workflow": {
+    "command": "node scripts/foundation-test.mjs --video-recovery-web",
+    "passed": 1,
+    "providers": "MOCK",
+    "database_temporal_renderer_storage": "real local dependencies"
+  },
+  "browser_regression": {
+    "command": "DESVIO_UI_BASE=http://localhost:3207 node --test tests/browser/generation-progress.test.mjs",
+    "passed": 1,
+    "api": "MOCK fixtures",
+    "checks": [
+      "real_provider_percentage_only",
+      "video: stage updates, elapsed timer, reload persistence, timeout, reconnect, cancellation, failure, insufficient history, reduced motion, right-to-left sweep",
+      "image: stage updates, elapsed timer, reload persistence, timeout, reconnect, cancellation, failure, insufficient history, reduced motion, right-to-left sweep"
+    ],
+    "viewports": [
+      {
+        "media": "video",
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "media": "video",
+        "width": 390,
+        "overflow": false
+      },
+      {
+        "media": "image",
+        "width": 1440,
+        "overflow": false
+      },
+      {
+        "media": "image",
+        "width": 390,
+        "overflow": false
+      }
+    ]
+  }
+}

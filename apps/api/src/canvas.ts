@@ -1,3 +1,4 @@
+import {generationTimingEstimate} from './generation-timing.js';
 import {parseCreateDraft} from './create-chat-draft.js';
 import {normalizeCreativeSpec,creativeSourceSize,creativeDimensions} from "./campaign-formats.js";
 import {approvedLearning} from './learning-context.js';
@@ -167,6 +168,7 @@ export class Canvas {
       if (!thread) throw new NotFoundException("Conversation not found");
       return {
         thread,
+        image_timing: generationTimingEstimate((await db.query("SELECT extract(epoch FROM (v.created_at-j.created_at)) AS seconds FROM app.creative_requests r JOIN app.jobs j ON j.id=r.job_id JOIN app.creative_versions v ON v.id=r.output_version_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND j.status='succeeded' AND j.created_at>now()-interval '30 days' ORDER BY j.created_at DESC LIMIT 20",[b.organization_id,id])).rows.map((r:any)=>r.seconds),'image'),
         messages: (
           await db.query(
             "SELECT id,job_id,role,content,created_at FROM app.canvas_messages WHERE organization_id=$1 AND brand_id=$2 AND thread_id=$3 ORDER BY created_at,id LIMIT 200",
