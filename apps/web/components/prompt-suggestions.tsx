@@ -29,14 +29,21 @@ export function PromptSuggestions({brand,name,draft,format='',limit,insert,focus
  useEffect(()=>{
   if(dismissed||inserted||!context||draft.trim().length<5||draft.length>800||preview?.key===requestKey)return;
   let live=true,timer:ReturnType<typeof setTimeout>;
+  let cooldowns=0;
   const receive=(result:Result,attempt:number)=>{
    if(!live)return;
    if(result.idea){setTailored({key:requestKey,idea:result.idea});return;}
+   if(result.status==='cooldown'&&cooldowns<5){
+    cooldowns++;
+    active.current.delete(requestKey);
+    timer=setTimeout(requestIdea,12000);
+    return;
+   }
    if(result.id&&['queued','running','retrying'].includes(result.status)&&attempt<16){
     timer=setTimeout(()=>void api<Result>(endpoint+'/'+result.id).then(r=>receive(r,attempt+1)).catch(()=>{}),Math.min(2400,600+attempt*180));
    }
   };
-  timer=setTimeout(()=>{
+  function requestIdea(){
    let promise=active.current.get(requestKey);
    if(!promise){
     if(active.current.size>=12)active.current.delete(active.current.keys().next().value!);
@@ -44,7 +51,8 @@ export function PromptSuggestions({brand,name,draft,format='',limit,insert,focus
     active.current.set(requestKey,promise);
    }
    void promise.then(r=>receive(r,0)).catch(()=>{});
-  },650);
+  }
+  timer=setTimeout(requestIdea,650);
   return ()=>{live=false;clearTimeout(timer);};
  },[context,dismissed,inserted,draft,format,endpoint,sample,preview?.key,requestKey]);
  const choices=(tailored?.key===requestKey?[tailored.idea,...local.filter(i=>i.title!==tailored.idea.title)]:local).slice(0,2)

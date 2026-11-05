@@ -53,7 +53,8 @@ export class PromptSuggestions {
    const prior=(await db.query('SELECT j.id,j.status,r.output FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.request_key=$1 AND j.requested_by=$2',[key,user])).rows[0];
    if(prior)return response(prior);
    const limits=(await db.query("SELECT count(*)::int AS count, bool_or(j.created_at>now()-interval '12 seconds' OR (j.status IN ('queued','running','retrying') AND j.created_at>now()-interval '2 minutes')) AS busy FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.requested_by=$1 AND j.brand_id=$2 AND j.created_at>now()-interval '1 day' AND r.input->'chat' ? 'prompt_suggestion'",[user,brand])).rows[0];
-   if(limits.busy||limits.count>=16)return empty;
+   if(limits.count>=16)return empty;
+   if(limits.busy)return {...empty,status:'cooldown'};
    if(!(await db.query("SELECT 1 FROM app.planning_grants WHERE provider='openai' AND enabled AND expires_at>now() LIMIT 1")).rowCount)return empty;
    const input={task:'content_plan',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map(({id,field,value}:any)=>({id,field,value}))},chat:{prompt_suggestion:cue}};
    const id=randomUUID();

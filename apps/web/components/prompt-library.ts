@@ -46,7 +46,8 @@ export function libraryIdeas(draft:string,context:string,format:string):Idea[]{
  const hasSubject=typed.split(' ').some(word=>word.length>1&&!['create','make','generate','video','image','post','reel','carousel','story','an','of','for','my','our','the','about','please','want','to','luxury'].includes(word));
  const source=' '+(hasSubject?typed:normalize(context))+' ';
  const scored=catalog.map(shot=>({shot,score:Math.max(0,...shot.terms.map(term=>source.includes(' '+term+' ')?term.length:0))})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
- const still=/\b(image|photo|photograph|poster|carousel)\b/.test(typed)||(!/\b(video|reel|film)\b/.test(typed)&&['image','carousel'].includes(format));
+ const motion=/\b(video|reel|film|animate|animation)\b/.test(typed)||['reel','video'].includes(format);
+ const still=!motion&&(/\b(image|photo|photograph|poster|carousel)\b/.test(typed)||['image','carousel'].includes(format));
  if(!scored.length){
   if(!hasSubject&&!context.trim())return [];
   if(hasSubject&&typed.length<5)return [];

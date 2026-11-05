@@ -6,7 +6,8 @@ const origin=process.env.DESVIO_UI_BASE;
 test('composer suggestions preserve the draft and stay dismissed', {skip:!origin,timeout:90000},async()=>{
  const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1440,height:920}});
  const brand='11111111-1111-4111-8111-111111111111',business={id:brand,organization_id:brand,name:'Courtyard Studio',role:'owner',has_approved_brand:true};
- let dismissed=false,sends=0,lookups=0;
+ let dismissed=false,sends=0,lookups=0,releaseAI;
+ const slowAI=new Promise(resolve=>{releaseAI=resolve;});
  await page.route('**/api/**',async r=>{
   const u=new URL(r.request().url()).pathname;let data={};
   if(u.endsWith('/get-session'))data={user:{id:'one',name:'Owner',emailVerified:true}};
@@ -17,13 +18,20 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   else if(u.endsWith('/generation-notifications'))data={notifications:[]};
   else if(u.endsWith('/dismiss')){dismissed=true;}
   else if(u.endsWith('/prompt-suggestions')){
-   if(r.request().method()==='POST'){lookups++;data={id:null,status:'succeeded',idea:{title:'The first light arrives',direction:'Follow the farm path into the morning light.'}};}
+   if(r.request().method()==='POST'){lookups++;if(lookups===1)await slowAI;data=lookups===2?{id:null,status:'cooldown',idea:null}:{id:null,status:'succeeded',idea:{title:'The first light arrives',direction:'Follow the farm path into the morning light.'}};}
    else data={context:'Residential real estate',preference_key:'user-brand',dismissed};
   }
   await r.fulfill({json:data});
  });
  try{
   const url=origin+'/b/'+brand;
+  await page.goto(url+'/overview');
+  const home=page.getByRole('textbox',{name:'Ask Desvio'});
+  await home.fill('Make a video for the cafe');
+  await page.getByRole('button',{name:/The first pour/}).hover();
+  await page.getByRole('button',{name:'Insert',exact:true}).click();
+  await expect(home).toHaveValue(/cafe Hold close on the espresso/);
+  assert(new URL(page.url()).pathname.endsWith('/overview'));
   await page.goto(url+'/create?start=video');
   const input=page.getByRole('textbox',{name:'Message Desvio'}),region=page.getByRole('region',{name:'Prompt ideas'});
   await expect(region.getByRole('button',{name:/architectural reveal/i})).toBeVisible();
@@ -36,7 +44,10 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
     if(performance.now()-start>3000)throw Error('No match');await new Promise(requestAnimationFrame);
    }return performance.now()-start;
   },brief);
+  await expect.poll(()=>lookups).toBe(1);
   await region.getByRole('button',{name:/Arriving/}).hover();
+  const settled=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().endsWith('/prompt-suggestions'));
+  releaseAI();await settled;
   await expect(region.getByText(/Open low beside/)).toBeVisible();
   mkdirSync('work/browser',{recursive:true});
   await page.screenshot({path:'work/browser/prompt-ideas-preview.png'});
@@ -44,7 +55,7 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   await region.getByRole('button',{name:'Insert',exact:true}).click();
   await expect(input).toHaveValue(/young families\nOpen low beside/);await expect(input).toBeFocused();assert.equal(sends,0);
   await page.reload();await input.fill(brief);
-  await expect(region.getByRole('button',{name:/The first light arrives/})).toBeVisible();
+  await expect(region.getByRole('button',{name:/The first light arrives/})).toBeVisible({timeout:17000});
   await page.setViewportSize({width:390,height:844});await region.getByRole('button',{name:/The first light arrives/}).click();
   await region.getByRole('button',{name:'Cancel',exact:true}).click();await expect(input).toHaveValue(brief);
   await input.fill('restaurant');await expect(region).toHaveCount(0);
