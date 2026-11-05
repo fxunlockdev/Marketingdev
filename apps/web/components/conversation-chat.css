@@ -322,3 +322,8 @@
 .desvio-redesign .chat-video-options[open] summary{margin-bottom:8px}
 .desvio-redesign .chat-video-quick-create .chat-video-generate{background:#17171a;color:#fff;justify-self:start;padding:10px 24px}
 @media(max-width:760px){.desvio-redesign .chat-video-quick-create{margin-left:0}}
+
+@supports (field-sizing:content){
+ .desvio-redesign .conversation-screen:is(.is-topic,.is-start) .create-composer:has(textarea:not(:placeholder-shown)){height:auto;max-height:none}
+ .desvio-redesign .conversation-screen:is(.is-topic,.is-start) .create-composer:has(textarea:not(:placeholder-shown)) textarea{field-sizing:content;height:auto;max-height:min(22dvh,140px);white-space:pre-wrap}
+}
