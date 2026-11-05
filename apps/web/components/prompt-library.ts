@@ -41,18 +41,22 @@ const shots:Shot[]=[
 export type Idea={title:string;direction:string};
 const normalize=(s:string)=>s.normalize('NFKD').replace(/\p{M}/gu,'').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
 const catalog=shots.map(([title,terms,direction])=>({title,terms:terms.split('|'),direction}));
+const starterWords='create make generate design write show give need want would like can could you me i we us please a an the some new quick short long luxury cinematic about of for my our this that to in on with and video videos film image images photo post posts reel reels carousel story campaign strategy'.split(' ');
+const starterFragments=new Set(starterWords.flatMap(word=>Array.from({length:word.length},(_,i)=>word.slice(0,i+1))));
+export function hasPromptTopic(draft:string){
+ return normalize(draft).split(' ').some(word=>word.length>=3&&!starterFragments.has(word));
+}
 export function libraryIdeas(draft:string,context:string,format:string):Idea[]{
+ if(!hasPromptTopic(draft))return [];
  const typed=normalize(draft);
- const hasSubject=typed.split(' ').some(word=>word.length>1&&!['create','make','generate','video','image','post','reel','carousel','story','an','of','for','my','our','the','about','please','want','to','luxury'].includes(word));
- const source=' '+(hasSubject?typed:normalize(context))+' ';
+ const source=' '+(/\b(my|our) (brand|business|company)\b/.test(typed)?typed+' '+normalize(context):typed)+' ';
  const scored=catalog.map(shot=>({shot,score:Math.max(0,...shot.terms.map(term=>source.includes(' '+term+' ')?term.length:0))})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
  const motion=/\b(video|reel|film|animate|animation)\b/.test(typed)||['reel','video'].includes(format);
  const still=!motion&&(/\b(image|photo|photograph|poster|carousel)\b/.test(typed)||['image','carousel'].includes(format));
  if(!scored.length){
-  if(!hasSubject&&!context.trim())return [];
-  if(hasSubject&&typed.length<5)return [];
+  if(typed.length<5)return [];
   return still?[{title:'Frame the subject',direction:'Choose one focal detail. Keep its silhouette clear and use the surroundings to give a sense of scale.'}]
-   :[{title:hasSubject?'From detail to scene':'Introduce your business',direction:'Begin on a distinctive detail of the subject and reveal how it fits into its surroundings. Hold the final composition long enough to recognize it.'}];
+   :[{title:'From detail to scene',direction:'Begin on a distinctive detail of the subject and reveal how it fits into its surroundings. Hold the final composition long enough to recognize it.'}];
  }
  if(!still&&/\b(locked|fixed|static camera|stationary|tripod|no camera (motion|movement)|camera still)\b/.test(typed)){
   return [{title:'A locked-off study',direction:'Hold the requested framing throughout. Let small changes within the scene draw the eye to the subject.'}];
@@ -72,7 +76,6 @@ export function libraryIdeas(draft:string,context:string,format:string):Idea[]{
  }
  return scored.slice(0,2).map(({shot})=>({title:shot.title,direction:shot.direction}));
 }
-export function composeIdea(draft:string,format:string,idea:Idea,brand:string){
- const lead=draft.trim()||('Create '+(format==='image'?'an image':'a '+(format||'video'))+' for '+brand+'.');
- return lead+'\n'+idea.direction;
+export function composeIdea(draft:string,idea:Idea){
+ return draft.trim()+'\n'+idea.direction;
 }
