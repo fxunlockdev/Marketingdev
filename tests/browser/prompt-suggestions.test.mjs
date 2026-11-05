@@ -35,7 +35,7 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   await home.fill('   ');await expect(ideas).toHaveCount(0);
   await home.fill('Make a video for the cafe');
   await expect(ideas.getByRole('button',{name:'Insert',exact:true})).toHaveCount(0);
-  await page.getByRole('button',{name:/The first pour/}).hover();
+  await page.getByRole('button',{name:/The first pour/}).click();
   await page.getByRole('button',{name:'Insert',exact:true}).click();
   await expect(home).toHaveValue(/cafe Hold close on the espresso/);
   assert(new URL(page.url()).pathname.endsWith('/overview'));
