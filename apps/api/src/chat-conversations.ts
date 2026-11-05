@@ -1,4 +1,5 @@
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
+import {PromptSuggestions} from './prompt-suggestions.js';
 import {randomUUID} from 'node:crypto';
 import {Canvas} from './canvas.js';
 import {CarouselGeneration} from './carousel-generation.js';
@@ -11,6 +12,7 @@ import {CHAT_MODEL,validateChatDecision} from './chat-contracts.js';
 const active=['queued','running','retrying','unknown'];
 const recallTerms=(message:string)=>[...new Set((message.toLowerCase().match(/[a-z0-9]{3,}/g)??[]).filter(w=>!new Set(['the','and','for','that','this','with','remember','created','create','campaign','post','image','about','from','you','our','was','were','had','have','did','what','please','can','show']).has(w)))].slice(0,16).join(' | ')||'__no_recall_terms__';
 export class ChatConversations {
+ get suggestions(){return new PromptSuggestions(this.canvas);}
  constructor(readonly canvas:Canvas,readonly planning:Planning,readonly carousels?:CarouselGeneration){}
  outbox(user:string,brand:string){return this.canvas.scope(user,brand,false,async db=>({request:(await db.query('SELECT request_key AS key,body FROM app.chat_outbox')).rows[0]??null}));}
  saveOutbox(user:string,brand:string,body:unknown){

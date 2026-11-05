@@ -16,7 +16,7 @@ export class GeminiPlanner {
  readonly sdk?:GoogleGenAI;
  constructor(key?:string,sdk?:GoogleGenAI){this.sdk=sdk??(key?new GoogleGenAI({apiKey:key,vertexai:false,httpOptions:{apiVersion:'v1beta',timeout:120000,retryOptions:{attempts:1}}}):undefined);}
  get configured(){return !!this.sdk;}
- plannerRequest(request:PlannerRequest,model:string,maxOutputTokens:4000|16000=16000){
+ plannerRequest(request:PlannerRequest,model:string,maxOutputTokens:512|4000|16000=16000){
   if(!/^gemini-[a-zA-Z0-9._-]{1,90}$/.test(model)||!Number.isInteger(request.step)||request.step<1||request.step>3||!request.messages.length||request.messages.length>30||request.tools.length>1||request.tools.some(t=>t?.type!=='function'||t.function?.name!=='read_file'))fail();
   const contents:Content[]=[],system:string[]=[],calls=new Map<string,{name:string;id?:string}>();
   for(const m of request.messages){
@@ -47,7 +47,7 @@ export class GeminiPlanner {
   const size=Buffer.byteLength(canonicalJSON(body));if(size>400000)throw new CreativeError('SKILL_INPUT_LIMIT');
   return {body,sha256:hash(canonicalJSON({provider:'gemini',...body})),maxInputTokens:size+2048,maxOutputTokens};
  }
- async plan(request:PlannerRequest,model:string,maxOutputTokens:4000|16000=16000):Promise<PlannerResponse>{
+ async plan(request:PlannerRequest,model:string,maxOutputTokens:512|4000|16000=16000):Promise<PlannerResponse>{
   if(!this.sdk)throw new CreativeError('PLAN_PROVIDER_NOT_CONFIGURED');
   const response=await this.sdk.models.generateContent(this.plannerRequest(request,model,maxOutputTokens).body);
   const candidate=response.candidates?.[0];

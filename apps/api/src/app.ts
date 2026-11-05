@@ -330,6 +330,10 @@ class ContentPlanController {
 @UseGuards(SessionGuard)
 class CanvasController {
  constructor(@Inject(Canvas) private readonly service:Canvas,@Inject(ChatConversations) private readonly chat:ChatConversations){}
+ @Get('create-chat/prompt-suggestions') suggestionContext(@Req() r:AuthRequest,@Param('id') id:string){return this.chat.suggestions.context(r.actorId,id);}
+ @Put('create-chat/prompt-suggestions/dismiss') dismissPromptSuggestions(@Req() r:AuthRequest,@Param('id') id:string){return this.chat.suggestions.dismiss(r.actorId,id);}
+ @Post('create-chat/prompt-suggestions') suggestPrompt(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.chat.suggestions.prepare(r.actorId,id,body);}
+ @Get('create-chat/prompt-suggestions/:job') readPromptSuggestion(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.chat.suggestions.read(r.actorId,id,job);}
  @Get('create-chat/outbox') chatOutbox(@Req() r:AuthRequest,@Param('id') id:string){return this.chat.outbox(r.actorId,id);}
  @Put('create-chat/outbox') saveChatOutbox(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.chat.saveOutbox(r.actorId,id,body);}
  @Post('create-chat/outbox/:key/discard') discardChat(@Req() r:AuthRequest,@Param('id') id:string,@Param('key') key:string){return this.chat.discard(r.actorId,id,key);}

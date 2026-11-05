@@ -23,7 +23,7 @@ export class CreativeProvider {
   get configured() {
     return !!this.sdk;
   }
-  plannerRequest(request: PlannerRequest, model: string, maxOutputTokens:4000|16000=4000) {
+  plannerRequest(request: PlannerRequest, model: string, maxOutputTokens:512|4000|16000=4000) {
     if (
       !Number.isInteger(request.step) ||
       request.step < 1 ||
@@ -80,6 +80,7 @@ export class CreativeProvider {
       })),
       parallel_tool_calls: false,
       ...(model==='gpt-6-sol'?{reasoning:{effort:'low' as const}}:{}),
+      ...(request.prompt_suggestion?{text:{format:{type:'json_schema' as const,name:'composer_idea',strict:true,schema:{type:'object',additionalProperties:false,required:['title','direction'],properties:{title:{type:'string'},direction:{type:'string'}}}}}}:{}),
       ...(request.chat_response?{reasoning:{effort:'low' as const},text:{format:{type:'json_schema' as const,name:'desvio_chat',strict:true,schema:chatSchema}}}:{}),
       ...(request.video_plan?{text:{format:{type:'json_schema' as const,name:'desvio_video_brief',strict:true,schema:videoBriefSchema(request.video_plan.fact_ids,request.video_plan.duration_seconds)}}}:{}),
       ...(request.creative_fact_ids?{text:{format:{type:'json_schema' as const,name:'desvio_creative_brief',strict:true,schema:creativeBriefSchema(request.creative_fact_ids)}}}:{}),
@@ -93,7 +94,7 @@ export class CreativeProvider {
       maxOutputTokens,
     };
   }
-  async plan(request: PlannerRequest, model: string, maxOutputTokens:4000|16000=4000): Promise<PlannerResponse> {
+  async plan(request: PlannerRequest, model: string, maxOutputTokens:512|4000|16000=4000): Promise<PlannerResponse> {
     if (!this.sdk) throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const response = await this.sdk.responses.create(
       this.plannerRequest(request, model, maxOutputTokens).body,

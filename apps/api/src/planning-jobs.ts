@@ -1,3 +1,4 @@
+import {suggestionMessage,readIdea} from './prompt-suggestions.js';
 import {CHAT_MODEL,CHAT_RATES,chatRequest,validateChatDecision} from './chat-contracts.js';
 import {planningReferences,assertPlanningReferences} from './planning-references.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
@@ -16,7 +17,7 @@ const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class PlanningJobs {
  constructor(readonly jobs:AssetJobs,readonly runtime:SkillRuntime,readonly provider:CreativeProvider,readonly gemini:GeminiPlanner=new GeminiPlanner()){}
  finish(db:any,j:any,status:string,code:string|null=null){return db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]).then(()=>status);}
- async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:4000|16000=16000){
+ async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:512|4000|16000=16000){
   const provider=providerName==='gemini'?this.gemini:this.provider;
   const wire=provider.plannerRequest(message,model,maxOutputTokens);
   const prepared=await this.jobs.transaction(scope,async(db,j)=>{
@@ -43,6 +44,7 @@ export class PlanningJobs {
    if(!grant)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
    if((bound.input.chat?CHAT_MODEL:grant.model)!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
    const cost=Math.ceil(wire.maxInputTokens*Number(bound.input.chat?CHAT_RATES.input:grant.input_micros_per_token)+wire.maxOutputTokens*Number(bound.input.chat?CHAT_RATES.output:grant.output_micros_per_token));
+   if(bound.input.chat?.prompt_suggestion&&cost>50000)throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
    const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM (SELECT reserved_micros FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2 AND $3='openai') reservations",[j.organization_id,j.brand_id,providerName])).rows[0].n);
    if(!Number.isSafeInteger(cost)||cost<=0||exceedsAllowance(cost+used,grant.budget_micros))throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
    if(loop){const loopUsed=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.planning_calls WHERE loop_id=$1',[loop.id])).rows[0].n);if(cost+loopUsed>Number(loop.budget_micros))throw new CreativeError('PLAN_LOOP_BUDGET_EXHAUSTED');}
@@ -100,6 +102,15 @@ export class PlanningJobs {
    const {request,input,model}=prepared;
    if((input as any).chat){
     const context=(input as any).chat;
+    if(context.prompt_suggestion){
+     const facts=input.brand.facts.slice(0,12).map(({field,value})=>({field,value:String(value).slice(0,240)}));
+     const result=readIdea((await this.call(scope,suggestionMessage(context.prompt_suggestion,facts),model,'openai',512)).content);
+     return this.jobs.transaction(scope,async(db,j)=>{
+      if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
+      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(result)]);
+      return this.finish(db,j,'succeeded');
+     });
+    }
     const response=request.output??validateChatDecision(JSON.parse((await this.call(scope,chatRequest({...context,brand:input.brand}),model,'openai',4000)).content),context);
     validateChatDecision(response,context);
     return await this.jobs.transaction(scope,async(db,j)=>{
