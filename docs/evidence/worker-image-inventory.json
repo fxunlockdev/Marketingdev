@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-04T16:27:00.683Z",
+  "checked_at": "2026-11-05T13:38:10.499Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:5eb7ae8477646fd6d975e86d15e910b6e69ab76efe8f9fdc4023f75479430cfc",
+      "image_id": "sha256:a9b377ea512a685dead67bf88a739e753cff89882a76a5800481fd65147f2387",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Conversational video setup worker; unchanged pinned media runtimes. Exact host identities verified separately."
+  "scope": "Composer prompt suggestions worker; unchanged pinned media runtimes. Exact host identities verified separately."
 }

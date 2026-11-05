@@ -6,7 +6,7 @@ const origin=process.env.DESVIO_UI_BASE;
 test('composer suggestions preserve the draft and stay dismissed', {skip:!origin,timeout:90000},async()=>{
  const browser=await chromium.launch();const page=await browser.newPage({viewport:{width:1440,height:920}});
  const brand='11111111-1111-4111-8111-111111111111',business={id:brand,organization_id:brand,name:'Courtyard Studio',role:'owner',has_approved_brand:true};
- let dismissed=false,sends=0,lookups=0,releaseAI;
+ let dismissed=false,sends=0,lookups=0,releaseAI,sentMessage;
  const slowAI=new Promise(resolve=>{releaseAI=resolve;});
  await page.route('**/api/**',async r=>{
   const u=new URL(r.request().url()).pathname;let data={};
@@ -14,6 +14,7 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   else if(u==='/api/v1/businesses')data={businesses:[business]};
   else if(u.endsWith('/overview'))data={counts:{},upcoming_posts:[],activity:[],recommendations:[],generation_activity:[],campaigns:[],performance:{available_count:0,published_count:0,items:[],posts:[]},next_actions:[]};
   else if(u.endsWith('/outbox')){if(r.request().method()==='PUT')sends++;data={request:null};}
+  else if(u.endsWith('/create-chat/messages')){sentMessage=r.request().postDataJSON().message;data={conversation_id:'22222222-2222-4222-8222-222222222222',id:'33333333-3333-4333-8333-333333333333'};}
   else if(u.endsWith('/history'))data={conversations:[]};
   else if(u.endsWith('/generation-notifications'))data={notifications:[]};
   else if(u.endsWith('/dismiss')){dismissed=true;}
@@ -54,13 +55,17 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   await expect(input).toHaveValue(brief);assert.equal(sends,0);
   await region.getByRole('button',{name:'Insert',exact:true}).click();
   await expect(input).toHaveValue(/young families\nOpen low beside/);await expect(input).toBeFocused();assert.equal(sends,0);
-  await page.reload();await input.fill(brief);
+  const inserted=await input.inputValue();
+  await page.getByRole('button',{name:'Send message',exact:true}).click();
+  await expect.poll(()=>sentMessage).toBe('Create a video.\n'+inserted);
+  assert.equal(sends,1);
+  await page.goto(url+'/create?start=video');await input.fill(brief);
   await expect(region.getByRole('button',{name:/The first light arrives/})).toBeVisible({timeout:17000});
   await page.setViewportSize({width:390,height:844});await region.getByRole('button',{name:/The first light arrives/}).click();
   await region.getByRole('button',{name:'Cancel',exact:true}).click();await expect(input).toHaveValue(brief);
   await input.fill('restaurant');await expect(region).toHaveCount(0);
   await page.goto(url+'/overview');await expect(page.getByRole('textbox',{name:'Ask Desvio'})).toBeVisible();await expect(region).toHaveCount(0);assert(dismissed);
   await page.evaluate(()=>localStorage.clear());await page.reload();await expect(page.getByRole('textbox',{name:'Ask Desvio'})).toBeVisible();await expect(region).toHaveCount(0);
-  assert(lookups>0);assert.equal(sends,0);console.log('Local keyword to visible choice (ms)',latency);
+  assert(lookups>0);assert.equal(sends,1);console.log('Local keyword to visible choice (ms)',latency);
  }finally{await browser.close();}
 });
