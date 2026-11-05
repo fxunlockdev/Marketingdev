@@ -30,6 +30,7 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   const home=page.getByRole('textbox',{name:'Ask Desvio'});
   const ideas=page.getByRole('region',{name:'Prompt ideas'});
   await expect(home).toBeVisible();await expect(ideas).toHaveCount(0);
+  await home.fill('create');await expect(ideas.getByRole('button',{name:/architectural reveal/i})).toBeVisible();
   await home.fill('Make a video for the cafe');
   await page.getByRole('button',{name:/The first pour/}).hover();
   await home.fill('   ');await expect(ideas).toHaveCount(0);
@@ -42,7 +43,8 @@ test('composer suggestions preserve the draft and stay dismissed', {skip:!origin
   await page.goto(url+'/create?start=video');
   const input=page.getByRole('textbox',{name:'Message Desvio'}),region=page.getByRole('region',{name:'Prompt ideas'});
   await expect(input).toBeEnabled();await expect(region).toHaveCount(0);
-  await input.fill('Create a video');await page.waitForTimeout(800);await expect(region).toHaveCount(0);assert.equal(lookups,0);
+  await input.fill('create');await expect(region.getByRole('button',{name:/architectural reveal/i})).toBeVisible();
+  await input.fill('Create a video');await page.waitForTimeout(800);await expect(region).toBeVisible();assert.equal(lookups,0);
   const brief='Create a mountain farm stay video for young families';
   const latency=await input.evaluate(async(el,brief)=>{
    const start=performance.now();

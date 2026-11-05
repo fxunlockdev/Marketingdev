@@ -47,14 +47,15 @@ export function hasPromptTopic(draft:string){
  return normalize(draft).split(' ').some(word=>word.length>=3&&!starterFragments.has(word));
 }
 export function libraryIdeas(draft:string,context:string,format:string):Idea[]{
- if(!hasPromptTopic(draft))return [];
  const typed=normalize(draft);
- const source=' '+(/\b(my|our) (brand|business|company)\b/.test(typed)?typed+' '+normalize(context):typed)+' ';
+ if(!typed)return [];
+ const starter=!hasPromptTopic(draft);
+ const source=' '+(starter?normalize(context):/\b(my|our) (brand|business|company)\b/.test(typed)?typed+' '+normalize(context):typed)+' ';
  const scored=catalog.map(shot=>({shot,score:Math.max(0,...shot.terms.map(term=>source.includes(' '+term+' ')?term.length:0))})).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
  const motion=/\b(video|reel|film|animate|animation)\b/.test(typed)||['reel','video'].includes(format);
  const still=!motion&&(/\b(image|photo|photograph|poster|carousel)\b/.test(typed)||['image','carousel'].includes(format));
  if(!scored.length){
-  if(typed.length<5)return [];
+  if(!starter&&typed.length<5)return [];
   return still?[{title:'Frame the subject',direction:'Choose one focal detail. Keep its silhouette clear and use the surroundings to give a sense of scale.'}]
    :[{title:'From detail to scene',direction:'Begin on a distinctive detail of the subject and reveal how it fits into its surroundings. Hold the final composition long enough to recognize it.'}];
  }
@@ -76,6 +77,11 @@ export function libraryIdeas(draft:string,context:string,format:string):Idea[]{
  }
  return scored.slice(0,2).map(({shot})=>({title:shot.title,direction:shot.direction}));
 }
-export function composeIdea(draft:string,idea:Idea){
- return draft.trim()+'\n'+idea.direction;
+export function composeIdea(draft:string,idea:Idea,brand:string,format:string){
+ const text=draft.trim();
+ const medium=format||'video';
+ const lead=/^(?:c|cr|cre|crea|creat|create|make|generate|design)$/i.test(text)
+  ? 'Create '+(medium==='image'?'an ':'a ')+medium+' for '+brand+'.'
+  : text;
+ return lead+'\n'+idea.direction;
 }
