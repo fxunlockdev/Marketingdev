@@ -1,0 +1,131 @@
+/* Shared chrome only. Artwork, dragging and exported creative styles are untouched. */
+.desvio-redesign.desvio-polished {
+  --motion-quick: 120ms;
+  --motion-settle: 180ms;
+  --ease-settle: cubic-bezier(.2, .8, .2, 1);
+  --surface-soft: #f6f5fa;
+  --focus-ring: #6a5cff;
+  --panel-gap: 20px;
+}
+
+/* Immediate press feedback, with no transition that delays an action. */
+.desvio-redesign.desvio-polished :is(.v5-shell, .create-chat-screen, .auth-layout) :is(button, a.button, summary) {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition: transform var(--motion-quick) var(--ease-settle), opacity var(--motion-quick) ease;
+}
+.desvio-redesign.desvio-polished :is(.v5-shell, .create-chat-screen, .auth-layout) :is(button, a.button):active:not(:disabled):not([aria-disabled=true]) {
+  transform: scale(.98);
+}
+.desvio-redesign.desvio-polished :is(button, a, summary):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+.desvio-redesign.desvio-polished :is(button, a.button)[aria-disabled=true],
+.desvio-redesign.desvio-polished button:disabled { cursor: not-allowed; }
+.desvio-redesign.desvio-polished button.danger:hover:not(:disabled) {
+  background: #ffe7eb;
+  color: #9f2638;
+  border-color: #e8bcc3;
+}
+
+@media (min-width: 761px) {
+  .desvio-redesign.desvio-polished .v5-sidebar { overflow: hidden; }
+  .desvio-redesign.desvio-polished .v5-sidebar>nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+  .desvio-redesign.desvio-polished .v5-sidebar>.v5-account { flex: none; }
+}
+
+/* Keep navigation anchored. Lift only controls that open another surface. */
+@media (hover: hover) and (pointer: fine) {
+  .desvio-redesign.desvio-polished :is(.header-create, .chat-start-card, .reference-business-choice, .upcoming-post):hover:not(:disabled) {
+    transform: translateY(-2px);
+  }
+  .desvio-redesign.desvio-polished .chat-start-card .chat-start-chevron { transition: transform var(--motion-settle) var(--ease-settle); }
+  .desvio-redesign.desvio-polished .chat-start-card:hover .chat-start-chevron { transform: translateX(3px); }
+}
+.desvio-redesign.desvio-polished :is(.reference-business-choice, .upcoming-post) {
+  transition: transform var(--motion-settle) var(--ease-settle);
+}
+.desvio-redesign.desvio-polished .v5-sidebar nav a { min-height: 40px; }
+.desvio-redesign.desvio-polished .v5-sidebar .nav-group { margin-top: 16px; font-size: 12px; }
+.desvio-redesign.desvio-polished .v5-main { padding-top: 12px; }
+.desvio-redesign.desvio-polished .v5-page-title { padding: 4px 10px; margin-bottom: 28px; }
+.desvio-redesign.desvio-polished .v5-page-title p { line-height: 1.6; max-width: 72ch; }
+.desvio-redesign.desvio-polished :is(.v5-panel, .brand-kit-content, .learning-facts-panel) { border: 1px solid #e7e5ed80; }
+.desvio-redesign.desvio-polished :is(.section-heading, .heading-row) { gap: 16px; }
+.desvio-redesign.desvio-polished :is(.actions, .plan-actions, .publication-record-actions) { gap: 12px; }
+.desvio-redesign.desvio-polished .field { min-width: 0; }
+.desvio-redesign.desvio-polished .field :is(input, select, textarea) { max-width: 100%; }
+.desvio-redesign.desvio-polished :is(.status, .plan-state, .conversation-canvas-strip, .calendar-period) { font-variant-numeric: tabular-nums; }
+
+/* More readable cards, with space around related controls rather than nested gaps. */
+.desvio-redesign.desvio-polished .learnings-workspace[data-view=facts] { gap: var(--panel-gap); }
+.desvio-redesign.desvio-polished .learnings-workspace .performance-lessons>header { padding: 0; }
+.desvio-redesign.desvio-polished .learnings-workspace .performance-lessons>header h2 { margin-top: 0; }
+.desvio-redesign.desvio-polished .learning-facts-panel .memory-facts>div { padding: 18px; }
+.desvio-redesign.desvio-polished .brand-media-collection {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: 16px;
+}
+.desvio-redesign.desvio-polished .brand-media-collection .reference-list>li>strong,
+.desvio-redesign.desvio-polished .brand-media-collection .brand-media-tile>summary { font-size: 14px; line-height: 1.45; }
+.desvio-redesign.desvio-polished .brand-media-collection .reference-list>li>button { width: 100%; min-height: 42px; }
+.desvio-redesign.desvio-polished .brand-media-collection .reference-management { font-size: 12px; }
+.desvio-redesign.desvio-polished .brand-media-library .media-library-controls { padding: 0; margin-block: 20px; }
+.desvio-redesign.desvio-polished .brand-media-library .media-library-controls button { min-height: 40px; font-size: 13px; }
+.desvio-redesign.desvio-polished .connections-redesign .social-network-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  gap: 16px;
+}
+.desvio-redesign.desvio-polished .connections-redesign .social-network-card { min-height: 260px; }
+
+/* Calendar controls keep an honest touch target even with a compact week view. */
+.desvio-redesign.desvio-polished .content-workspace .calendar-period button { min-width: 40px; min-height: 40px; }
+.desvio-redesign.desvio-polished .calendar-view-toggle { padding: 4px; gap: 4px; }
+.desvio-redesign.desvio-polished .calendar-view-toggle button { min-height: 38px; }
+.desvio-redesign.desvio-polished .calendar-more-options>summary { min-height: 40px; display: flex; align-items: center; }
+.desvio-redesign.desvio-polished .calendar-options-content>.field { flex: 1 1 160px; min-width: 0; }
+.desvio-redesign.desvio-polished .calendar-workspace .plan-grid-week { gap: 8px; }
+.desvio-redesign.desvio-polished .calendar-workspace .plan-grid-week .plan-day { padding: 12px 7px; border-radius: 14px; }
+.desvio-redesign.desvio-polished .calendar-workspace .plan-grid-week .plan-day>h2 { font-size: 12px; margin-bottom: 16px; }
+.desvio-redesign.desvio-polished .calendar-workspace .plan-grid-week .plan-card { padding: 8px; gap: 8px; }
+.desvio-redesign.desvio-polished .calendar-workspace .plan-grid-week .plan-card>strong { font-size: 12px; line-height: 1.4; }
+.desvio-redesign.desvio-polished .calendar-workspace .plan-grid-week :is(.calendar-card-heading, .calendar-card-channel) { font-size: 11px; }
+
+/* The first creation card must not run into the header divider. */
+.desvio-redesign.desvio-polished .conversation-screen.is-start .create-chat-log { padding-top: 16px; }
+.desvio-redesign.desvio-polished .chat-start-menu { gap: 20px; }
+.desvio-redesign.desvio-polished .chat-start-cards { gap: 10px; }
+.desvio-redesign.desvio-polished .chat-start-shortcuts { gap: 8px; }
+.desvio-redesign.desvio-polished .chat-start-shortcuts button { min-height: 40px; height: auto; padding-block: 7px; }
+.desvio-redesign.desvio-polished .chat-start-menu h2 { font-size: 12px; }
+.desvio-redesign.desvio-polished .conversation-screen .create-composer:focus-within { outline: 0; box-shadow: 0 0 0 4px #6a5cff20; }
+.desvio-redesign.desvio-polished .conversation-screen .create-composer { border-color: var(--focus-ring); }
+.desvio-redesign.desvio-polished .conversation-history li button { align-items: flex-start; }
+.desvio-redesign.desvio-polished .conversation-screen.is-start .create-chat-panel>header .chat-start-history { width: 40px; height: 40px; }
+.desvio-redesign.desvio-polished .conversation-screen.is-start .create-chat-panel>header button:last-child { width: 40px; height: 40px; }
+
+/* Entrance motion is reserved for overlays. Persistent lists do not replay on polls. */
+@keyframes desvio-surface-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes desvio-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+.desvio-redesign.desvio-polished dialog[open] { animation: desvio-surface-in var(--motion-settle) var(--ease-settle); }
+.desvio-redesign.desvio-polished dialog[open]::backdrop { animation: desvio-backdrop-in var(--motion-settle) ease; }
+.desvio-redesign.desvio-polished .create-confirm-scrim>section { animation: desvio-surface-in var(--motion-settle) var(--ease-settle); }
+
+@media (max-width: 760px) {
+  .desvio-redesign.desvio-polished .v5-page-title { padding-inline: 8px; margin-bottom: 20px; }
+  .desvio-redesign.desvio-polished .brand-media-collection { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .desvio-redesign.desvio-polished .brand-media-collection .reference-list>li>strong { font-size: 13px; overflow-wrap: anywhere; }
+  .desvio-redesign.desvio-polished .brand-media-collection .reference-list>li>button { padding: 10px 8px; font-size: 12px; }
+  .desvio-redesign.desvio-polished .chat-start-menu { padding-left: 8px; }
+  .desvio-redesign.desvio-polished .conversation-screen.is-start .create-composer textarea { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desvio-redesign.desvio-polished :is(.v5-shell, .create-chat-screen, .auth-layout) :is(button, a.button, summary),
+  .desvio-redesign.desvio-polished :is(.reference-business-choice, .upcoming-post, .chat-start-chevron) { transition: none; }
+  .desvio-redesign.desvio-polished :is(.v5-shell, .create-chat-screen, .auth-layout) :is(button, a.button):active,
+  .desvio-redesign.desvio-polished :is(.header-create, .chat-start-card, .reference-business-choice, .upcoming-post):hover,
+  .desvio-redesign.desvio-polished .chat-start-card:hover .chat-start-chevron { transform: none !important; }
+  .desvio-redesign.desvio-polished dialog[open], .desvio-redesign.desvio-polished dialog[open]::backdrop,
+  .desvio-redesign.desvio-polished .create-confirm-scrim>section { animation: none; }
+}

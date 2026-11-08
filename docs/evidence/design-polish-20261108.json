@@ -1,0 +1,204 @@
+{
+  "date": "2026-11-08",
+  "scope": "Shared product chrome, motion, layout and Agentation local review",
+  "agentation": {
+    "version": "3.1.2",
+    "annotation_created_and_copied": true,
+    "remote_sync": false,
+    "production_toolbar_absent": true
+  },
+  "build": "passed, isolated production snapshot",
+  "browser_tests": [
+    "design-polish.test.mjs: passed",
+    "prompt-suggestions.test.mjs: passed"
+  ],
+  "page_audit": [
+    {
+      "route": "overview",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "create",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "campaigns",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-plan",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "review",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "brand-kit",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-preferences",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "connections",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "memory",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "publishing",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "archive",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "team",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/brands",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/profile",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/billing",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "overview",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "create",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "campaigns",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-plan",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "review",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "brand-kit",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-preferences",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "connections",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "memory",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "publishing",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "archive",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "team",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/brands",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/profile",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/billing",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    }
+  ],
+  "limitations": [
+    "Read-only hosted data projected into a local production build; account initialize mocked and other writes blocked.",
+    "Local cross-origin private media previews were not a generation or media-delivery acceptance test.",
+    "No new paid generation, OAuth consent or social publication.",
+    "Final integrations grid adjustment will be checked on the deployed build."
+  ],
+  "deployment": "pending"
+}

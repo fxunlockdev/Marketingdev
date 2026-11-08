@@ -1,5 +1,5 @@
 "use client";
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {api,ApiError} from './api';
 import {useAnyUnsavedChanges} from './unsaved';
@@ -117,14 +117,23 @@ export function ConversationChat({business}:{business:Business}){
  {action==='strategy'&&<a className="conversation-campaign" href={`/b/${business.id}/create?guided=1&start=strategy`}>Choose and authorize your recurring strategy →</a>}
 
  </div></div>
- {history&&<ChatHistory onClose={()=>setHistory(false)}><header><h2>Conversation history</h2><button aria-label="Close history" onClick={()=>setHistory(false)}>×</button></header><label htmlFor="chat-history-search">Search this business’s conversations</label><input id="chat-history-search" autoFocus placeholder="Try a campaign or an idea…" value={search} onChange={e=>setSearch(e.target.value)}/><Notice error={historyError}/>{!!historyError&&<button onClick={()=>setRefresh(n=>n+1)}>Reload history</button>}<ul>{items.map(c=><li key={c.id}><button onClick={()=>{if(busy||!leaveEdits())return;choose(c.id);}}><strong>{chatDisplayText(c.title)}</strong><span>{new Date(c.updated_at).toLocaleDateString()}</span></button></li>)}</ul>{!historyError&&!items.length&&<p>No saved conversations found.</p>}<p>Only your conversations for {business.name} appear here.</p></ChatHistory>}
+ {history&&<ChatHistory onClose={()=>setHistory(false)}><header><h2>Conversation history</h2><button aria-label="Close history" onClick={()=>setHistory(false)}>×</button></header><label htmlFor="chat-history-search">Search this business’s conversations</label><input id="chat-history-search" placeholder="Try a campaign or an idea…" value={search} onChange={e=>setSearch(e.target.value)}/><Notice error={historyError}/>{!!historyError&&<button onClick={()=>setRefresh(n=>n+1)}>Reload history</button>}<ul>{items.map(c=><li key={c.id}><button onClick={()=>{if(busy||!leaveEdits())return;choose(c.id);}}><strong>{chatDisplayText(c.title)}</strong><span>{new Date(c.updated_at).toLocaleDateString()}</span></button></li>)}</ul>{!historyError&&!items.length&&<p>No saved conversations found.</p>}<p>Only your conversations for {business.name} appear here.</p></ChatHistory>}
  </section>;
 }
 function Message({role,text,sources=[]}:{role:string;text:string;sources?:{id:string}[]}){
  // Verified history links below the message replace internal citation identifiers.
  const display=sources.reduce((value,source)=>value.replaceAll(` [${source.id}]`,'').replaceAll(`[${source.id}]`,''),text);
  return <div className={`create-message ${role}`}>{role==='assistant'&&<span className="create-avatar" aria-hidden="true">d.</span>}<p>{chatDisplayText(display)}</p></div>}
-function ChatHistory({onClose,children}:{onClose:()=>void;children:React.ReactNode}){const ref=useRef<HTMLDialogElement>(null);useEffect(()=>{const previous=document.activeElement as HTMLElement;ref.current?.showModal();return()=>{ref.current?.close();previous?.focus();};},[]);return <dialog className="conversation-history" ref={ref} aria-label="Conversation history" onCancel={e=>{e.preventDefault();onClose();}}>{children}</dialog>}
+function ChatHistory({onClose,children}:{onClose:()=>void;children:React.ReactNode}){
+ const ref=useRef<HTMLDialogElement>(null);
+ useLayoutEffect(()=>{
+  const dialog=ref.current,previous=document.activeElement as HTMLElement;
+  dialog?.showModal();
+  dialog?.querySelector<HTMLInputElement>('input')?.focus();
+  return()=>{dialog?.close();if(previous?.isConnected)previous.focus();};
+ },[]);
+ return <dialog className="conversation-history" ref={ref} aria-label="Conversation history" onCancel={e=>{e.preventDefault();onClose();}}>{children}</dialog>;
+}
 
 
 

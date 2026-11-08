@@ -5,3 +5,5 @@ Website extraction and rendered evidence use [Crawl4AI](https://github.com/uncle
 Robots rules use [robots-parser](https://github.com/samclarke/robots-parser), version 3.0.1, MIT. Its license is retained under vendor/licenses/robots-parser-LICENSE.
 
 This supplements docs/THIRD_PARTY_LOCK.md and existing vendor/marketing-skills/LICENSE. It is not a claim that Postiz licensing, every browser/native dependency or the production distribution's complete notice bundle is cleared.
+
+Local design review uses [Agentation](https://github.com/benjitaylor/agentation), version 3.1.2, Copyright (c) 2026 Benji Taylor, under PolyForm Shield 1.0.0. The license is retained in vendor/licenses/agentation-LICENSE. It is opt-in in development, with remote annotation syncing disabled.
