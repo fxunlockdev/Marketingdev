@@ -195,10 +195,209 @@
     }
   ],
   "limitations": [
-    "Read-only hosted data projected into a local production build; account initialize mocked and other writes blocked.",
-    "Local cross-origin private media previews were not a generation or media-delivery acceptance test.",
-    "No new paid generation, OAuth consent or social publication.",
-    "Final integrations grid adjustment will be checked on the deployed build."
+    "Page audits are read-only: account initialize mocked and writes blocked. Browser interaction tests use mocked API fixtures.",
+    "No new paid generation, OAuth consent or social publication."
   ],
-  "deployment": "pending"
+  "deployment": {
+    "id": "744ec1a8-f899-40ee-a498-edd5908f55ca",
+    "status": "SUCCESS",
+    "environment": "dev",
+    "service": "web",
+    "source_commit": "58edab5",
+    "isolated_snapshot": true,
+    "url": "https://desvio-dev-web-dev.up.railway.app"
+  },
+  "hosted_page_audit": [
+    {
+      "route": "overview",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "create",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "campaigns",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-plan",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "review",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "brand-kit",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-preferences",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "connections",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "memory",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "publishing",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "archive",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "team",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/brands",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/profile",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/billing",
+      "width": 1440,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "overview",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "create",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "campaigns",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-plan",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "review",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "brand-kit",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "content-preferences",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "connections",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "memory",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "publishing",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "archive",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "team",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/brands",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/profile",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    },
+    {
+      "route": "/billing",
+      "width": 390,
+      "rendered": true,
+      "page_overflow": false
+    }
+  ],
+  "hosted_browser_tests": {
+    "design-polish.test.mjs": "passed with mocked API fixtures against deployed assets",
+    "prompt-suggestions.test.mjs": "passed with mocked API fixtures against deployed assets"
+  },
+  "hosted_visual_checks": [
+    "Home and creation desktop/mobile screenshots inspected",
+    "Integrations: four equal desktop cards and one mobile column",
+    "Brand Kit mobile media cards and private previews inspected",
+    "Desktop account controls remain visible",
+    "Production Agentation toolbar absent"
+  ]
 }
