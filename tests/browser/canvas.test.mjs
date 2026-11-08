@@ -486,7 +486,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   await page.setViewportSize({width:1440,height:1000});
 
   await selectOption(page.getByLabel('Creativity',{exact:true}),'creative');
-  await expect(page.getByLabel('Creativity',{exact:true}).locator('option')).toHaveText(['Normal','Creative','Super creative']);
+  await expect(selectField(page.getByLabel('Creativity',{exact:true})).locator('option')).toHaveText(['Normal','Creative','Super creative']);
   await page.getByRole('button',{name:'Add assets',exact:true}).click();await page.getByText('Brand image references',{exact:true}).click();
   await page.getByText('Add product photos',{exact:true}).click();
   await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'canvas-product.jpg',mimeType:'image/jpeg',buffer:photoBytes});
@@ -1302,7 +1302,7 @@ test('uploaded product photo starts video without static generation, then feedba
  await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,before+1);
  await approvePrompt();await expect.poll(()=>videoSubmits,{timeout:60000}).toBe(before+2);
  await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[binding.project_id])).rows[0].n),{timeout:150000}).toBe(2);
- await expect(page.getByLabel(/^Saved video version/).locator('option')).toHaveCount(2);
+ await expect(selectField(page.getByLabel(/^Saved video version/)).locator('option')).toHaveCount(2);
  await expect(page.getByRole('button',{name:'Send video for review',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Send video for review',exact:true}).click();
  await expect(page.getByLabel('I reviewed this saved video and caption.')).toBeEnabled();await page.getByLabel('I reviewed this saved video and caption.').check();
@@ -1425,7 +1425,7 @@ test('Archive displays generated carousels with saved slide history and restores
  const publications=Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n);
  await panel.getByRole('button',{name:'Archive carousel',exact:true}).click();
  await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
- const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(history.getByLabel('Saved media version',{exact:true}).locator('option')).toHaveCount(2);await expect(history.getByRole('img')).toHaveCount(2);
+ const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(selectField(history.getByLabel('Saved media version',{exact:true})).locator('option')).toHaveCount(2);await expect(history.getByRole('img')).toHaveCount(2);
  await expect.poll(()=>history.getByRole('img').evaluateAll(images=>images.every(img=>img.complete&&img.naturalWidth>0))).toBe(true);
  await selectOption(history.getByLabel('Saved media version',{exact:true}),original.id);await expect(history.getByRole('img')).toHaveCount(2);await expect(history.getByRole('button',{name:'Approve carousel',exact:true})).toHaveCount(0);
  await page.screenshot({path:'work/browser/canvas-carousel-archive.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
@@ -1442,10 +1442,10 @@ test('Archive displays generated video history, plays saved media and restores a
  const request=page.getByRole('region',{name:'Creative conversation',exact:true});await request.getByLabel('Describe your creative',{exact:true}).fill('TEST archive video history');await request.getByLabel('Video length (seconds)',{exact:true}).fill('3');await request.getByRole('button',{name:'Send',exact:true}).click();
  async function approveArchivePrompt(){await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for archive');await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline for archive');await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();}
  await approveArchivePrompt();await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});const project=(await admin.query('SELECT id FROM app.video_projects WHERE brand_id=$1 ORDER BY created_at DESC LIMIT 1',[brand])).rows[0];
- await page.getByLabel('Video feedback',{exact:true}).fill('TEST softer movement for archive revision');await page.getByRole('button',{name:'Draft a revised video from feedback',exact:true}).click();await approveArchivePrompt();await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[project.id])).rows[0].n),{timeout:150000}).toBe(2);await expect(page.getByLabel(/^Saved video version/).locator('option')).toHaveCount(2);
+ await page.getByLabel('Video feedback',{exact:true}).fill('TEST softer movement for archive revision');await page.getByRole('button',{name:'Draft a revised video from feedback',exact:true}).click();await approveArchivePrompt();await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[project.id])).rows[0].n),{timeout:150000}).toBe(2);await expect(selectField(page.getByLabel(/^Saved video version/)).locator('option')).toHaveCount(2);
  const before=(await admin.query('SELECT id,sha256,status FROM app.video_versions WHERE project_id=$1 ORDER BY created_at,id',[project.id])).rows;const publications=Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n);
  await page.getByRole('button',{name:'Archive video',exact:true}).click();await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
- const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(history.getByLabel('Saved media version',{exact:true}).locator('option')).toHaveCount(2);
+ const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(selectField(history.getByLabel('Saved media version',{exact:true})).locator('option')).toHaveCount(2);
  const failedDownload=`**/video-versions/${before[0].id}/download`;await page.route(failedDownload,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'TEST transient video download failure'})}));
  await selectOption(history.getByLabel('Saved media version',{exact:true}),before[0].id);await expect(history.getByRole('button',{name:'Reload video preview',exact:true})).toBeVisible();await expect(history.getByText('Video preview unavailable',{exact:true})).toBeVisible();await expect(history.locator('video')).toHaveCount(0);
  await page.unroute(failedDownload);await history.getByRole('button',{name:'Reload video preview',exact:true}).click();

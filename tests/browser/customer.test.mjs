@@ -1025,7 +1025,7 @@ test('business Team invites through real email, accepts selected access, changes
  await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),'admin');await alice.getByRole('button',{name:'Save role',exact:true}).click();
  await bob.reload();await expect(bob.getByRole('button',{name:'Send invitation',exact:true})).toBeVisible();
  await expect(bob.getByRole('link',{name:'account team settings',exact:true})).toHaveCount(0);await bob.getByRole('combobox',{name:'Businesses they can access',exact:true}).click();await expect(bob.getByRole('option')).toHaveCount(1);await bob.keyboard.press('Escape');
- await expect(bob.getByLabel('Business role',{exact:true}).locator('option[value="admin"]')).toHaveCount(0);
+ await expect(selectField(bob.getByLabel('Business role',{exact:true})).locator('option[value="admin"]')).toHaveCount(0);
  await bob.getByLabel('Teammate’s email').fill('delegated-browser@example.test');await selectOption(bob.getByLabel('Business role',{exact:true}),'reviewer');await bob.getByRole('button',{name:'Send invitation',exact:true}).click();
  await expect(bob.getByText('Invitation saved and email queued.',{exact:false})).toBeVisible();assert.ok(await emailLink('delegated-browser@example.test','Your Desvio client invitation'));
  await bob.getByRole('button',{name:'Revoke invitation to delegated-browser@example.test',exact:true}).click();await expect(bob.getByText('Invitation revoked for every business included in that invitation.',{exact:true})).toBeVisible();

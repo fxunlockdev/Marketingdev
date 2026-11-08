@@ -251,7 +251,7 @@ test('Instagram Reel offers only its channel account and persists exact approved
  await page.setViewportSize({width:1280,height:900});await page.goto(url(brand)+'?slot='+f.slot.id);
  await expect(page.getByLabel('Exact approved video to be published')).toBeVisible();
  const account=page.getByLabel('Publish to',{exact:true});
- await expect(account.locator('option')).toHaveText(['Choose a Instagram account','MOCK Instagram profile · Instagram']);
+ await expect(selectField(account).locator('option')).toHaveText(['Choose a Instagram account','MOCK Instagram profile · Instagram']);
  await selectOption(account,instagramChannelId);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
  await expect(page.getByLabel(/I authorize this exact video/)).toBeEnabled();
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
@@ -299,7 +299,7 @@ test('Facebook approved image offers only its Page and publishes once after expl
  await admin.query("INSERT INTO app.publication_grants VALUES($1,$2,$3,now()+interval '1 day',100,'TEST FIXTURE: no live authorization')",[org.id,brand.id,fb]);
  const f=await approvedPost('Facebook browser','facebook'),count=submissions;remoteState='PUBLISHED';
  await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByRole('img',{name:'Exact approved image to be published'})).toBeVisible();
- const account=page.getByLabel('Publish to',{exact:true});await expect(account.locator('option')).toHaveText(['Choose a Facebook account','MOCK Facebook Page · Facebook']);
+ const account=page.getByLabel('Publish to',{exact:true});await expect(selectField(account).locator('option')).toHaveText(['Choose a Facebook account','MOCK Facebook Page · Facebook']);
  await selectOption(account,fb);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
  await page.getByLabel(/I authorize this exact image/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();
  await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.equal(digest(lastUpload),f.e.sha256);
