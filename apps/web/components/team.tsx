@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import "./settings-layout.css";
 import { api, type Workspace } from "./api";
@@ -119,7 +120,7 @@ export function TeamScreen({
             </Field>
             <Field label="Workspace role">
               {(id) => (
-                <select
+                <DesvioSelect
                   id={id}
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
@@ -129,7 +130,7 @@ export function TeamScreen({
                   {org.role === "owner" && (
                     <option value="admin">Admin — brands & team</option>
                   )}
-                </select>
+                </DesvioSelect>
               )}
             </Field>
             <button className="primary" disabled={busy}>
@@ -190,7 +191,7 @@ export function TeamScreen({
                   <div className="member-edit">
                     <Field label={`Role for ${member.name}`}>
                       {(id) => (
-                        <select
+                        <DesvioSelect
                           id={id}
                           value={targetRole}
                           onChange={(e) => setTargetRole(e.target.value)}
@@ -203,7 +204,7 @@ export function TeamScreen({
                               {r}
                             </option>
                           ))}
-                        </select>
+                        </DesvioSelect>
                       )}
                     </Field>
                     <div className="actions">

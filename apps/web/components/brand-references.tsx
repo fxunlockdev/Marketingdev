@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import {useEffect,useState} from 'react';
 import {api,type Workspace} from './api';
 import {BrandFiles} from './uploads';
@@ -53,7 +54,7 @@ function ApproveReference({businessId,visual,disabled,onSaved}:{businessId:strin
   <PrivateVisual businessId={businessId} visualId={visual.id} label={`Inspect ${title}`} alt={title}/>
   <label className="reference-choice"><input type="checkbox" checked={cropping} disabled={disabled||busy} onChange={e=>{setCropping(e.target.checked);setConsent(false);}}/>Use part of this image</label>
   {cropping&&<fieldset><legend>Choose your crop</legend>
-   <label>Crop shape<select value={shape} disabled={disabled||busy} onChange={e=>{const value=e.target.value;setShape(value);setConsent(false);if(value==='custom')return;const ratio=value==='square'?1:value==='portrait'?4/5:16/9,width=Math.min(visual.width,Math.floor(visual.height*ratio)),height=Math.min(visual.height,Math.floor(width/ratio));setCrop({left:Math.floor((visual.width-width)/2),top:Math.floor((visual.height-height)/2),width,height});}}><option value="custom">Custom crop</option><option value="square">Square</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
+   <label>Crop shape<DesvioSelect value={shape} disabled={disabled||busy} onChange={e=>{const value=e.target.value;setShape(value);setConsent(false);if(value==='custom')return;const ratio=value==='square'?1:value==='portrait'?4/5:16/9,width=Math.min(visual.width,Math.floor(visual.height*ratio)),height=Math.min(visual.height,Math.floor(width/ratio));setCrop({left:Math.floor((visual.width-width)/2),top:Math.floor((visual.height-height)/2),width,height});}}><option value="custom">Custom crop</option><option value="square">Square</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></DesvioSelect></label>
    <details open={shape==='custom'}><summary>Adjust crop position and size</summary><p>Source size: {visual.width} × {visual.height} pixels.</p>
    {(['left','top','width','height'] as const).map(k=><label key={k}>{({left:'Crop left',top:'Crop top',width:'Crop width',height:'Crop height'})[k]}<input type="number" min={k==='left'||k==='top'?0:1} max={k==='left'||k==='width'?visual.width:visual.height} step="1" value={Number.isFinite(crop[k])?crop[k]:''} disabled={disabled||busy} onChange={e=>{setCrop({...crop,[k]:e.target.valueAsNumber});setShape('custom');setConsent(false);}}/></label>)}
    </details>

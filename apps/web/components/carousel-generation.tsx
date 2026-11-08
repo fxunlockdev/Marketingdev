@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import {directedPrompt,type Creativity} from './creative-direction';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
@@ -22,8 +23,8 @@ export function CarouselGeneration({businessId,canEdit,onOpen,onSlide}:{business
  {canEdit&&<form onSubmit={e=>{e.preventDefault();void generate();}}><fieldset disabled={busy||running||held}><legend>Carousel brief</legend>
  <Field label="Carousel idea">{id=><textarea id={id} required maxLength={3600} value={prompt} onChange={e=>{setPrompt(e.target.value);changed();}}/>}</Field>
  <Field label="Number of carousel slides">{id=><input id={id} type="number" min={2} max={10} required value={count} onChange={e=>{setCount(Number(e.target.value));changed();}}/>}</Field>
- <Field label="Generate carousel for">{id=><select id={id} value={channel} onChange={e=>{setChannel(e.target.value);changed();}}><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select>}</Field>
- <Field label="Carousel creativity">{id=><select id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);changed();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></select>}</Field>
+ <Field label="Generate carousel for">{id=><DesvioSelect id={id} value={channel} onChange={e=>{setChannel(e.target.value);changed();}}><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></DesvioSelect>}</Field>
+ <Field label="Carousel creativity">{id=><DesvioSelect id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);changed();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></DesvioSelect>}</Field>
  <p className="hint">Create a coordinated set of images for your story.</p><button type="submit" className="primary" disabled={!prompt.trim()||!data}>Generate carousel</button>
  </fieldset></form>}
  {running&&<p role="status">Your carousel is being prepared. You can leave this page and return later.</p>}{held&&<p role="status">A generation result needs reconciliation. Further generation is paused to prevent duplicate charges.</p>}

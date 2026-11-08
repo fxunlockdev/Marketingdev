@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import {GenerationNotification} from './generation-notification';
 import {ProjectArchiveControl} from './project-archive-control';
 import {directedPrompt,type Creativity} from './creative-direction';
@@ -22,10 +23,10 @@ export function VideoRequest({business,threadId,reference,ensureThread,initially
  <p>Review your video idea and script before creating the video.</p>
  {error!==undefined&&<Notice error={error}/>}<p role="status">{notice}</p>
  {!enabled?<p>Video generation is not configured yet.</p>:<fieldset disabled={busy||slotLoading||!['owner','admin','editor'].includes(business.role)}>
- <Field label="Video creativity">{id=><select id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);key.current=crypto.randomUUID();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></select>}</Field>
+ <Field label="Video creativity">{id=><DesvioSelect id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);key.current=crypto.randomUUID();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></DesvioSelect>}</Field>
  <Field label="Video idea">{id=><textarea id={id} value={prompt} maxLength={3600} onChange={e=>{setPrompt(e.target.value);key.current=crypto.randomUUID();}}/>}</Field>
  <Field label="Video length (seconds)">{id=><input id={id} type="number" min={3} max={15} value={duration} onChange={e=>{setDuration(Number(e.target.value));key.current=crypto.randomUUID();}}/>}</Field>
- <Field label="Video channel">{id=><select id={id} disabled={!!slot||!!creativeSpec} value={channel} onChange={e=>{setChannel(e.target.value);key.current=crypto.randomUUID();}}><option value="instagram">Instagram</option><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option></select>}</Field>
+ <Field label="Video channel">{id=><DesvioSelect id={id} disabled={!!slot||!!creativeSpec} value={channel} onChange={e=>{setChannel(e.target.value);key.current=crypto.randomUUID();}}><option value="instagram">Instagram</option><option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option></DesvioSelect>}</Field>
  <button type="button" disabled={!prompt.trim()||duration<3||duration>15} onClick={()=>void submit()}>{busy?'Preparing…':'Draft video script'}</button>
  </fieldset>}</details>;
 }
@@ -67,7 +68,7 @@ function VideoDraft({business,jobId,onSaved,conversational=false}:{business:Busi
 }
 function VideoHistory({business,latest,versions}:{business:Business;latest:string;versions:any[]}){
  const [selected,setSelected]=useState(latest);useEffect(()=>setSelected(latest),[latest]);
- return <><Field label="Saved video version">{id=><select id={id} value={selected} onChange={e=>setSelected(e.target.value)}>{versions.map((v,i)=><option key={v.id} value={v.id}>{v.id===latest?'Latest':'Previous'} · {v.status.replaceAll('_',' ')} · {new Date(v.created_at).toLocaleString()}</option>)}</select>}</Field><VideoReview key={selected} business={business} id={selected} historical={selected!==latest}/></>;
+ return <><Field label="Saved video version">{id=><DesvioSelect id={id} value={selected} onChange={e=>setSelected(e.target.value)}>{versions.map((v,i)=><option key={v.id} value={v.id}>{v.id===latest?'Latest':'Previous'} · {v.status.replaceAll('_',' ')} · {new Date(v.created_at).toLocaleString()}</option>)}</DesvioSelect>}</Field><VideoReview key={selected} business={business} id={selected} historical={selected!==latest}/></>;
 }
 export function VideoReview({business,id,historical=false,previewOnly=false,onReady}:{business:Business;id:string;historical?:boolean;previewOnly?:boolean;onReady?:(ready:boolean)=>void}){
  const readyCallback=useRef(onReady);readyCallback.current=onReady;
@@ -98,7 +99,7 @@ function VideoCalendar({business,version,id}:{business:Business;version:any;id:s
   setSaved(`/b/${business.id}/content-plan?start=${starts}&slot=${result.slots[0].id}`);}
  }catch(e){setError(e);}finally{setBusy(false);}}
  if(version.slot_id)return <p>{error!==undefined&&<Notice error={error}/>}<a href={saved||undefined}>Open linked video post in calendar</a></p>;
- return <details><summary>Add video to calendar</summary><p>This adds a draft for review. It does not schedule or publish it.</p>{error!==undefined&&<Notice error={error}/>}<fieldset disabled={busy||!!saved}><Field label="Video calendar plan">{field=><select id={field} value={planId} onChange={e=>{setPlanId(e.target.value);setLocal('');key.current=crypto.randomUUID();}}><option value="">New plan</option>{plans.map(p=><option key={p.id} value={p.id}>{p.title} · {p.starts_on} · {p.duration_days} days</option>)}</select>}</Field><Field label={`Video calendar time (${timezone})`}>{field=><input id={field} type="datetime-local" value={local} onChange={e=>{setLocal(e.target.value);key.current=crypto.randomUUID();}}/>}</Field><button type="button" disabled={!local} onClick={()=>void save()}>Add saved video to calendar</button></fieldset>{saved&&<a href={saved}>Open video in calendar</a>}</details>;
+ return <details><summary>Add video to calendar</summary><p>This adds a draft for review. It does not schedule or publish it.</p>{error!==undefined&&<Notice error={error}/>}<fieldset disabled={busy||!!saved}><Field label="Video calendar plan">{field=><DesvioSelect id={field} value={planId} onChange={e=>{setPlanId(e.target.value);setLocal('');key.current=crypto.randomUUID();}}><option value="">New plan</option>{plans.map(p=><option key={p.id} value={p.id}>{p.title} · {p.starts_on} · {p.duration_days} days</option>)}</DesvioSelect>}</Field><Field label={`Video calendar time (${timezone})`}>{field=><input id={field} type="datetime-local" value={local} onChange={e=>{setLocal(e.target.value);key.current=crypto.randomUUID();}}/>}</Field><button type="button" disabled={!local} onClick={()=>void save()}>Add saved video to calendar</button></fieldset>{saved&&<a href={saved}>Open video in calendar</a>}</details>;
 }
 export function CanvasVideoContext({businessId}:{businessId:string}){
  const [slot,setSlot]=useState<any>(),[error,setError]=useState<unknown>();

@@ -1,0 +1,422 @@
+[
+  {
+    "name": "create",
+    "index": 0,
+    "viewport": 1440,
+    "inside": true,
+    "width": 198,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "create",
+    "index": 1,
+    "viewport": 1440,
+    "inside": true,
+    "width": 198,
+    "height": 156.59375,
+    "options": 3,
+    "checkboxes": 0
+  },
+  {
+    "name": "create",
+    "index": 2,
+    "viewport": 1440,
+    "inside": true,
+    "width": 198,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 0,
+    "viewport": 1440,
+    "inside": true,
+    "width": 744,
+    "height": 54,
+    "options": 1,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 1,
+    "viewport": 1440,
+    "inside": true,
+    "width": 206,
+    "height": 264,
+    "options": 6,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 2,
+    "viewport": 1440,
+    "inside": true,
+    "width": 207,
+    "height": 138,
+    "options": 3,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 3,
+    "viewport": 1440,
+    "inside": true,
+    "width": 744,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 4,
+    "viewport": 1440,
+    "inside": true,
+    "width": 744,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "team",
+    "index": 0,
+    "viewport": 1440,
+    "inside": true,
+    "width": 180,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "team",
+    "index": 1,
+    "viewport": 1440,
+    "inside": true,
+    "width": 535,
+    "height": 222,
+    "options": 5,
+    "checkboxes": 0
+  },
+  {
+    "name": "team",
+    "index": 2,
+    "viewport": 1440,
+    "inside": true,
+    "width": 535,
+    "height": 54,
+    "options": 1,
+    "checkboxes": 1
+  },
+  {
+    "name": "content-preferences",
+    "index": 0,
+    "viewport": 1440,
+    "inside": true,
+    "width": 180,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-preferences",
+    "index": 1,
+    "viewport": 1440,
+    "inside": true,
+    "width": 673,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-preferences",
+    "index": 2,
+    "viewport": 1440,
+    "inside": true,
+    "width": 673,
+    "height": 138,
+    "options": 3,
+    "checkboxes": 3
+  },
+  {
+    "name": "content-preferences",
+    "index": 3,
+    "viewport": 1440,
+    "inside": true,
+    "width": 673,
+    "height": 340,
+    "options": 420,
+    "checkboxes": 0
+  },
+  {
+    "name": "brand-kit",
+    "index": 0,
+    "viewport": 1440,
+    "inside": true,
+    "width": 180,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-plan",
+    "index": 0,
+    "viewport": 1440,
+    "inside": true,
+    "width": 180,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-plan",
+    "index": 1,
+    "viewport": 1440,
+    "inside": true,
+    "width": 398,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-plan",
+    "index": 2,
+    "viewport": 1440,
+    "inside": true,
+    "width": 266,
+    "height": 340,
+    "options": 8,
+    "checkboxes": 0
+  },
+  {
+    "name": "review",
+    "index": 0,
+    "viewport": 1440,
+    "inside": true,
+    "width": 180,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "review",
+    "index": 1,
+    "viewport": 1440,
+    "inside": true,
+    "width": 500,
+    "height": 138,
+    "options": 3,
+    "checkboxes": 0
+  },
+  {
+    "name": "create",
+    "index": 0,
+    "viewport": 390,
+    "inside": true,
+    "width": 180,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "create",
+    "index": 1,
+    "viewport": 390,
+    "inside": true,
+    "width": 180,
+    "height": 175.1875,
+    "options": 3,
+    "checkboxes": 0
+  },
+  {
+    "name": "create",
+    "index": 2,
+    "viewport": 390,
+    "inside": true,
+    "width": 180,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 0,
+    "viewport": 390,
+    "inside": true,
+    "width": 334,
+    "height": 72.59375,
+    "options": 1,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 1,
+    "viewport": 390,
+    "inside": true,
+    "width": 180,
+    "height": 264,
+    "options": 6,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 2,
+    "viewport": 390,
+    "inside": true,
+    "width": 180,
+    "height": 138,
+    "options": 3,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 3,
+    "viewport": 390,
+    "inside": true,
+    "width": 334,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "campaignspostnew",
+    "index": 4,
+    "viewport": 390,
+    "inside": true,
+    "width": 334,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "team",
+    "index": 0,
+    "viewport": 390,
+    "inside": true,
+    "width": 196,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "team",
+    "index": 1,
+    "viewport": 390,
+    "inside": true,
+    "width": 332,
+    "height": 222,
+    "options": 5,
+    "checkboxes": 0
+  },
+  {
+    "name": "team",
+    "index": 2,
+    "viewport": 390,
+    "inside": true,
+    "width": 332,
+    "height": 54,
+    "options": 1,
+    "checkboxes": 1
+  },
+  {
+    "name": "content-preferences",
+    "index": 0,
+    "viewport": 390,
+    "inside": true,
+    "width": 196,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-preferences",
+    "index": 1,
+    "viewport": 390,
+    "inside": true,
+    "width": 334,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-preferences",
+    "index": 2,
+    "viewport": 390,
+    "inside": true,
+    "width": 334,
+    "height": 138,
+    "options": 3,
+    "checkboxes": 3
+  },
+  {
+    "name": "content-preferences",
+    "index": 3,
+    "viewport": 390,
+    "inside": true,
+    "width": 334,
+    "height": 340,
+    "options": 420,
+    "checkboxes": 0
+  },
+  {
+    "name": "brand-kit",
+    "index": 0,
+    "viewport": 390,
+    "inside": true,
+    "width": 196,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-plan",
+    "index": 0,
+    "viewport": 390,
+    "inside": true,
+    "width": 196,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-plan",
+    "index": 1,
+    "viewport": 390,
+    "inside": true,
+    "width": 180,
+    "height": 180,
+    "options": 4,
+    "checkboxes": 0
+  },
+  {
+    "name": "content-plan",
+    "index": 2,
+    "viewport": 390,
+    "inside": true,
+    "width": 280,
+    "height": 340,
+    "options": 8,
+    "checkboxes": 0
+  },
+  {
+    "name": "review",
+    "index": 0,
+    "viewport": 390,
+    "inside": true,
+    "width": 196,
+    "height": 96,
+    "options": 2,
+    "checkboxes": 0
+  },
+  {
+    "name": "review",
+    "index": 1,
+    "viewport": 390,
+    "inside": true,
+    "width": 180,
+    "height": 138,
+    "options": 3,
+    "checkboxes": 0
+  }
+]

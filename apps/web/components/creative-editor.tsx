@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import {paintCurvedText} from '../lib/curved-text.mjs';
 import {TextCurveControls} from './text-curve-controls';
 import {ChatLayerControls} from './chat-layer-controls';
@@ -286,7 +287,7 @@ export function CreativeEditor({
         <legend>Text layers</legend><div className="creative-text-actions"><button type="button" disabled={!design.layers.some(l=>l.text.trim())} onClick={()=>onChange(readableDesign(design))}>Improve text contrast</button><button type="button" disabled={!design.layers.length} onClick={()=>onChange({...design,layers:[]})}>Remove all image text</button></div><p className="hint">Use a short headline or leave the image clean. Save your changes to update the post.</p>
         <Field label="Selected layer">
           {(id) => (
-            <select
+            <DesvioSelect
               id={id}
               value={layer?.id ?? ""}
               onChange={(e) => {
@@ -306,7 +307,7 @@ export function CreativeEditor({
                   {i + 1}. {l.id}
                 </option>
               ))}
-            </select>
+            </DesvioSelect>
           )}
         </Field>
         {layer && (
@@ -325,7 +326,7 @@ export function CreativeEditor({
             <div className="creative-fields">
               <Field label="Font">
                 {(id) => (
-                  <select
+                  <DesvioSelect
                     id={id}
                     value={layer.fontFamily}
                     onChange={(e) =>
@@ -335,13 +336,13 @@ export function CreativeEditor({
                     {DESIGN_FONT_FAMILIES.map((f) => (
                       <option key={f}>{f}</option>
                     ))}
-                  </select>
+                  </DesvioSelect>
                 )}
               </Field>
               {number("Font size", layer.fontSize, 8, 200, (n) =>
                 update({ fontSize: n }),
               )}
-              <Field label="Text weight">{id => <select id={id} value={layer.fontWeight ?? 400} onChange={e=>update({fontWeight:Number(e.target.value) as FontWeight})}>{designFontWeights(layer.fontFamily).map(weight=><option key={weight} value={weight}>{({100:"Thin",200:"Extra light",300:"Light",400:"Regular",500:"Medium",600:"Semibold",700:"Bold",800:"Extra bold",900:"Black"})[weight]}</option>)}</select>}</Field>
+              <Field label="Text weight">{id => <DesvioSelect id={id} value={layer.fontWeight ?? 400} onChange={e=>update({fontWeight:Number(e.target.value) as FontWeight})}>{designFontWeights(layer.fontFamily).map(weight=><option key={weight} value={weight}>{({100:"Thin",200:"Extra light",300:"Light",400:"Regular",500:"Medium",600:"Semibold",700:"Bold",800:"Extra bold",900:"Black"})[weight]}</option>)}</DesvioSelect>}</Field>
               <Field label="Contrast backing">{id => <input id={id} type="checkbox" checked={!!layer.backing} onChange={e=>update({backing:e.target.checked?{fill:'#111111',opacity:0.88,padding:Math.min(16,layer.x,layer.y,design.width-layer.x-layer.width)}:undefined})}/>}</Field>
               {layer.backing && <>
                 <Field label="Backing color">{id => <input id={id} type="color" value={layer.backing!.fill} onChange={e=>update({backing:{...layer.backing!,fill:e.target.value}})}/>}</Field>
@@ -360,7 +361,7 @@ export function CreativeEditor({
               </Field>
               <Field label="Alignment">
                 {(id) => (
-                  <select
+                  <DesvioSelect
                     id={id}
                     value={layer.align}
                     onChange={(e) => update({ align: e.target.value as any })}
@@ -368,7 +369,7 @@ export function CreativeEditor({
                     {["left", "center", "right"].map((f) => (
                       <option key={f}>{f}</option>
                     ))}
-                  </select>
+                  </DesvioSelect>
                 )}
               </Field>
               {number(

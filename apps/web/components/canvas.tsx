@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import chatStyles from "./canvas-chat.module.css";
 import {GeneratedReplacement} from "./generated-replacement";
 import {GenerationNotification} from './generation-notification';
@@ -347,7 +348,7 @@ export function CanvasScreen({ business }: { business: Business }) {
             <h2>Your creatives</h2>
             <Field label="Creative">
               {(id) => (
-                <select
+                <DesvioSelect
                   id={id}
                   value={projectId}
                   onChange={(e) => {
@@ -365,7 +366,7 @@ export function CanvasScreen({ business }: { business: Business }) {
                         {p.title.split(/\s+Creative direction:/)[0]}
                       </option>
                     ))}
-                </select>
+                </DesvioSelect>
               )}
             </Field>
           </div>
@@ -493,12 +494,12 @@ export function CanvasScreen({ business }: { business: Business }) {
               </Field></div>
               <div className={chatStyles.toolbar}><button type="button" className={chatStyles.add} aria-label="Add assets" aria-controls="canvas-assets" aria-expanded={assetsOpen} onClick={()=>setAssetsOpen(value=>!value)}>+</button>
               <div className="studio-options">
-              <Field label="Creativity">{id=><select id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);submitKey.current=crypto.randomUUID();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></select>}</Field>
+              <Field label="Creativity">{id=><DesvioSelect id={id} value={creativity} onChange={e=>{setCreativity(e.target.value as Creativity);submitKey.current=crypto.randomUUID();}}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></DesvioSelect>}</Field>
 
               </div>
               <button className={`primary ${chatStyles.send}`} disabled={!prompt.trim()||dirty} type="submit" aria-label={busy?"Saving request…":edit?"Generate revision":"Send"}><span aria-hidden="true">↑</span></button></div>
               <details className={chatStyles.more} open={requestType!=="image"}><summary>Options</summary>
-              {!edit&&<Field label="Create">{id=><select id={id} value={intent} onChange={e=>{setIntent(e.target.value);submitKey.current=crypto.randomUUID();}}><option value="auto">Auto</option><option value="image">Image</option><option value="plan">Content plan</option><option value="carousel">Carousel</option><option value="video">Video</option></select>}</Field>}
+              {!edit&&<Field label="Create">{id=><DesvioSelect id={id} value={intent} onChange={e=>{setIntent(e.target.value);submitKey.current=crypto.randomUUID();}}><option value="auto">Auto</option><option value="image">Image</option><option value="plan">Content plan</option><option value="carousel">Carousel</option><option value="video">Video</option></DesvioSelect>}</Field>}
               {!edit&&<p className="composer-intent">{requestType==='plan'?'Planning your content':requestType==='video'?'Drafting a video script for your review':requestType==='carousel'?'Creating a carousel':'Creating an image'}</p>}
               {requestType==='plan'&&<Field label="Plan starts on (optional)">{id=><input id={id} type="date" value={planStart} onChange={e=>{setPlanStart(e.target.value);submitKey.current=crypto.randomUUID();}}/>}</Field>}
               {requestType==='carousel'&&<Field label="Slides">{id=><input id={id} type="number" min={2} max={10} value={carouselCount} onChange={e=>{setCarouselCount(Number(e.target.value));submitKey.current=crypto.randomUUID();}}/>}</Field>}
@@ -507,7 +508,7 @@ export function CanvasScreen({ business }: { business: Business }) {
                 <div className="composer-settings"><div className="studio-options">
                   <Field label="Channel">
                     {(id) => (
-                      <select
+                      <DesvioSelect
                         id={id}
                         value={channel}
                         onChange={(e) => {
@@ -517,12 +518,12 @@ export function CanvasScreen({ business }: { business: Business }) {
                       >
                         <option value="instagram">Instagram</option>
                         <option value="linkedin">LinkedIn</option><option value="facebook">Facebook</option>
-                      </select>
+                      </DesvioSelect>
                     )}
                   </Field>
                   <Field label="Creative type">
                     {(id) => (
-                      <select
+                      <DesvioSelect
                         id={id}
                         value={format}
                         onChange={(e) => {
@@ -532,12 +533,12 @@ export function CanvasScreen({ business }: { business: Business }) {
                       >
                         <option value="static">Social image</option>
                         <option value="ad">Ad creative</option>
-                      </select>
+                      </DesvioSelect>
                     )}
                   </Field>
                   <Field label="Image shape">
                     {(id) => (
-                      <select
+                      <DesvioSelect
                         id={id}
                         value={size}
                         onChange={(e) => {
@@ -548,7 +549,7 @@ export function CanvasScreen({ business }: { business: Business }) {
                         <option value="1024x1024">Square</option>
                         <option value="1024x1536">Portrait</option>
                         <option value="1536x1024">Landscape</option>
-                      </select>
+                      </DesvioSelect>
                     )}
                   </Field>
                 </div><button type="button" onClick={()=>{setHasCarousels(true);setOpenCarousels(true);}}>Combine saved images into a carousel</button></div>
@@ -753,7 +754,7 @@ export function CreativeProject({
       <div className="creative-toolbar">
         <Field label="Saved version">
           {(id) => (
-            <select
+            <DesvioSelect
               id={id}
               disabled={busy}
               value={selected}
@@ -765,7 +766,7 @@ export function CreativeProject({
                   {v.id === data.project.latest_version_id ? " · Latest" : ""}
                 </option>
               ))}
-            </select>
+            </DesvioSelect>
           )}
         </Field>
         <span className="status neutral">

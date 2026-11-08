@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api, type Workspace } from "./api";
@@ -107,7 +108,7 @@ function Session({ pathname }: { pathname: string }) {
           <span className="eyebrow">CLIENT WORKSPACE</span>
           <Field label="Switch client">
             {(id) => (
-              <select
+              <DesvioSelect
                 id={id}
                 value={org?.id ?? ""}
                 onChange={(e) =>
@@ -122,7 +123,7 @@ function Session({ pathname }: { pathname: string }) {
                     {w.name}
                   </option>
                 ))}
-              </select>
+              </DesvioSelect>
             )}
           </Field>
         </div>

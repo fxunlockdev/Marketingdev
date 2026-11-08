@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {api} from './api';
@@ -40,7 +41,7 @@ export function CampaignNewPost({businessId,initialPlan,autoOpen=false}:{busines
    <Notice error={error}/>
    <div className="campaign-compose-scroll"><fieldset disabled={busy||uploading} className="campaign-compose-body">
     <label className="campaign-compose-campaign">Campaign
-     <select aria-label="Campaign" value={planId} onChange={e=>setPlanId(e.target.value)}>{plans.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select>
+     <DesvioSelect aria-label="Campaign" value={planId} onChange={e=>setPlanId(e.target.value)}>{plans.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</DesvioSelect>
     </label>
     {!plans.length&&<p><a href={`/b/${businessId}/campaign-new`}>Create your first campaign</a> to start adding posts.</p>}
     <div className="campaign-compose-fields">
@@ -51,8 +52,8 @@ export function CampaignNewPost({businessId,initialPlan,autoOpen=false}:{busines
     {format!=='blog'&&<CampaignPostReferences businessId={businessId} selection={references} onChange={setReferences} disabled={busy} onBusy={setUploading}/>}
     {open&&planId&&<CampaignPostIdeas key={`${businessId}:${planId}:${format}:${channel}`} businessId={businessId} planId={planId} format={format} channel={channel} onChoose={setTopic}/>}
     <div className="campaign-compose-options">
-     <label>Post format<select aria-label="Post format" value={format} onChange={e=>{setFormat(e.target.value);if(['story','reel'].includes(e.target.value)&&channel==='linkedin')setChannel('instagram');}}>{POST_FORMATS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
-     {format!=='blog'&&<label>Channel<select aria-label="Channel" value={channel} onChange={e=>setChannel(e.target.value)}><option value="instagram">Instagram</option><option value="facebook">Facebook</option>{!['story','reel'].includes(format)&&<option value="linkedin">LinkedIn</option>}</select></label>}
+     <label>Post format<DesvioSelect aria-label="Post format" value={format} onChange={e=>{setFormat(e.target.value);if(['story','reel'].includes(e.target.value)&&channel==='linkedin')setChannel('instagram');}}>{POST_FORMATS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</DesvioSelect></label>
+     {format!=='blog'&&<label>Channel<DesvioSelect aria-label="Channel" value={channel} onChange={e=>setChannel(e.target.value)}><option value="instagram">Instagram</option><option value="facebook">Facebook</option>{!['story','reel'].includes(format)&&<option value="linkedin">LinkedIn</option>}</DesvioSelect></label>}
      <div className="campaign-compose-schedule"><span>Posting on</span><DesvioDatePicker label="Posting on" value={when} onChange={setWhen} time timezone={plan?.timezone??'UTC'} disabled={busy||uploading}/></div>
     </div>
     <small className="campaign-compose-timezone">Times in {plan?.timezone?.replaceAll('_',' ')??'UTC'}</small>

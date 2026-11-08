@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import {useEffect,useState} from 'react';
 import {CAMPAIGN_STYLES,CAMPAIGN_FONTS,type CampaignDesign} from '../../api/src/campaign-design';
 import {api} from './api';
@@ -15,7 +16,7 @@ export function CampaignDesignPicker({businessId,kind,value,onChange,name}:{busi
  const previewFont=(id:string)=>id==='brand'?brandTypography:resolveBrandTypography(BRAND_FONT_PAIRINGS.find(pair=>pair.id===id)?.id);
  const reference=references?.find(r=>r.id===image);
  return <fieldset className="campaign-design-options"><legend>{kind==='style'?'Choose a visual direction':'Choose your typography'}</legend><p>See how your campaign could look. Pick the one that feels like your brand.</p>
- <Notice error={error}/>{error?<button type="button" onClick={()=>setReload(n=>n+1)}>Retry preview images</button>:references===undefined?<p role="status">Loading your brand images…</p>:references.length>0?<div className="campaign-preview-toolbar"><div className="campaign-preview-field"><label htmlFor="campaign-preview-image">Preview image</label><select id="campaign-preview-image" value={image} onChange={e=>setImage(e.target.value)}>{references.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</select></div><button type="button" onClick={()=>setReload(n=>n+1)}>Refresh images</button></div>:<p className="hint">No approved brand images yet. You can still choose a style below.</p>}
+ <Notice error={error}/>{error?<button type="button" onClick={()=>setReload(n=>n+1)}>Retry preview images</button>:references===undefined?<p role="status">Loading your brand images…</p>:references.length>0?<div className="campaign-preview-toolbar"><div className="campaign-preview-field"><label htmlFor="campaign-preview-image">Preview image</label><DesvioSelect id="campaign-preview-image" value={image} onChange={e=>setImage(e.target.value)}>{references.map(r=><option key={r.id} value={r.id}>{r.label}</option>)}</DesvioSelect></div><button type="button" onClick={()=>setReload(n=>n+1)}>Refresh images</button></div>:<p className="hint">No approved brand images yet. You can still choose a style below.</p>}
  <div className="campaign-design-grid">{(kind==='style'?CAMPAIGN_STYLES:CAMPAIGN_FONTS).map(option=><label key={option.id} className={`campaign-design-choice ${value[kind]===option.id?'selected':''}`}>
   <input type="radio" aria-label={option.name} name={`campaign-${kind}`} value={option.id} checked={value[kind]===option.id} onChange={()=>onChange({...value,[kind]:option.id})}/>
   <span className={`campaign-design-preview ${reference?'has-brand-image':''} preview-${kind==='style'?option.id:value.style} font-${kind==='font'?option.id:value.font}`} aria-hidden="true">

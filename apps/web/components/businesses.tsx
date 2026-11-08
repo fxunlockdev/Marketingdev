@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect,DesvioMultiSelect} from './desvio-select';
 import {CreateChat} from './create-chat';
 import {Strategies} from "./strategies";
 import {GenerationBalance} from "./generation-balance";
@@ -201,7 +202,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         <div className="workspace-switcher"><Wordmark />
           {businesses.length === 0 ? <span className="workspace-context">Your workspace</span> : <div className="workspace-business"><span className="workspace-business-initial" aria-hidden="true">{(business?.name??"All").slice(0,1)}</span><Field label="Business">
             {(id) => (
-              <select
+              <DesvioSelect
                 id={id}
                 aria-label="Business"
                 value={business?.id ?? ""}
@@ -219,7 +220,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
                     {b.name}
                   </option>
                 ))}
-              </select>
+              </DesvioSelect>
             )}
           </Field></div>}
         </div>
@@ -991,20 +992,20 @@ export function BrandOnboarding({ business }: { business: Business }) {
             These preferences do not connect channels or authorize publication.
           </p>
           <Field label="What stage is your business at?">
-            {(id) => <select id={id} disabled={!writable} value={state.business_stage ?? ""} onChange={e => change("business_stage", e.target.value)}>
+            {(id) => <DesvioSelect id={id} disabled={!writable} value={state.business_stage ?? ""} onChange={e => change("business_stage", e.target.value)}>
               <option value="">Choose a stage (optional)</option>
               <option value="pre_launch">Preparing to launch</option>
               <option value="launching">Just launched</option>
               <option value="growing">Growing our customer base</option>
               <option value="established">Established and expanding</option>
-            </select>}
+            </DesvioSelect>}
           </Field>
           <Field label="What would success look like over the next 90 days?" hint="Optional. This guides your content; it is a target, not a promised result.">
             {(id, hint) => <textarea id={id} aria-describedby={hint} disabled={!writable} maxLength={600} value={state.growth_expectation ?? ""} placeholder="For example: attract 20 qualified enquiries a month for our new service." onChange={e => change("growth_expectation", e.target.value)} />}
           </Field>
           <Field label="Primary goal">
             {(id) => (
-              <select
+              <DesvioSelect
                 id={id}
                 disabled={!writable}
                 value={state.goal}
@@ -1015,7 +1016,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
                     {g[0].toUpperCase() + g.slice(1)}
                   </option>
                 ))}
-              </select>
+              </DesvioSelect>
             )}
           </Field>
           <Field label="Posts per week">
@@ -1034,27 +1035,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
           <Field label="Time zone">
             {(id) => <TimeZoneSelect id={id} disabled={!writable} value={state.timezone} onChange={value=>change("timezone",value)} />}
           </Field>
-          <fieldset>
-            <legend>Preferred channels</legend>
-            {["linkedin", "instagram", "facebook"].map((c) => (
-              <label className="checkbox-field" key={c}>
-                <input
-                  type="checkbox"
-                  disabled={!writable}
-                  checked={state.channels.includes(c)}
-                  onChange={(e) =>
-                    change(
-                      "channels",
-                      e.target.checked
-                        ? [...state.channels, c]
-                        : state.channels.filter((x: string) => x !== c),
-                    )
-                  }
-                />
-                {c === "linkedin" ? "LinkedIn" : c === "facebook" ? "Facebook" : "Instagram"}
-              </label>
-            ))}
-          </fieldset>
+          <DesvioMultiSelect label="Preferred channels" value={state.channels} options={['linkedin','instagram','facebook'].map(value=>({value,label:value==='linkedin'?'LinkedIn':value==='instagram'?'Instagram':'Facebook'}))} onChange={next=>change('channels',next)} disabled={!writable}/>
           <Field label="Topics or claims to avoid">
             {(id) => (
               <textarea
@@ -1259,7 +1240,7 @@ function BrandReview({
             <div className="fact-inputs">
               <Field label="Brand field">
                 {(id) => (
-                  <select
+                  <DesvioSelect
                     id={id}
                     value={field}
                     onChange={(e) => setField(e.target.value)}
@@ -1280,7 +1261,7 @@ function BrandReview({
                         {f.replaceAll("_", " ")}
                       </option>
                     ))}
-                  </select>
+                  </DesvioSelect>
                 )}
               </Field>
               {field!=="fonts"&&<Field label="Fact">
@@ -1387,7 +1368,7 @@ function FindingGroup({findings,path,writable,onSaved,onSaving}:{findings:any[];
   const [selected,setSelected]=useState<string>();
   const chosen=options.find(f=>f.id===selected)??preferredFinding(options);
   return <div className="finding-group">
-    {options.length>1&&<Field label={`Choose your ${chosen.field.replaceAll('_',' ')} description`}>{id=><select id={id} value={chosen.id} onChange={e=>setSelected(e.target.value)} disabled={!writable}>{options.map((f:any,i:number)=><option key={f.id} value={f.id}>Description {i+1}: {f.value.slice(0,90)}</option>)}</select>}</Field>}
+    {options.length>1&&<Field label={`Choose your ${chosen.field.replaceAll('_',' ')} description`}>{id=><DesvioSelect id={id} value={chosen.id} onChange={e=>setSelected(e.target.value)} disabled={!writable}>{options.map((f:any,i:number)=><option key={f.id} value={f.id}>Description {i+1}: {f.value.slice(0,90)}</option>)}</DesvioSelect>}</Field>}
     <Finding key={chosen.id} finding={chosen} alternatives={active.filter(f=>f.id!==chosen.id)} path={path} writable={writable} onSaved={onSaved} onSaving={onSaving}/>
   </div>;
 }

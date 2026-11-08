@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 import {chromium, expect} from '@playwright/test';
 const origin=process.env.DESVIO_UI_BASE;
 const brand='11111111-1111-4111-8111-111111111111',plan='33333333-3333-4333-8333-333333333333';
+async function choose(control,value){
+ const label=await control.evaluate((el,v)=>Array.from(el.closest('.ds-select').querySelector('select').options).find(o=>o.value===v).textContent,value);
+ await control.click();await control.page().getByRole('option',{name:label,exact:true}).click();
+}
 async function fixture(){
  const browser=await chromium.launch(),page=await browser.newPage({viewport:{width:1440,height:1000}}),submitted=[];
  await page.route('**/api/**',async route=>{
@@ -17,7 +21,7 @@ async function fixture(){
   await route.fulfill({json:data});
  });
  await page.goto(`${origin}/b/${brand}/campaigns?post=new`);
- const dialog=page.getByRole('dialog',{name:'New Post',exact:true});await expect(dialog).toBeVisible();await expect(dialog.getByLabel('Campaign',{exact:true})).not.toHaveValue('');
+ const dialog=page.getByRole('dialog',{name:'New Post',exact:true});await expect(dialog).toBeVisible();await expect(dialog.getByRole('combobox',{name:'Campaign',exact:true})).toContainText('Courtyard Studio');
  return {browser,page,dialog,submitted,close:async()=>{await page.unrouteAll({behavior:'ignoreErrors'});await browser.close();}};
 }
 test('New Post keeps fields, inset arrows and actions usable at desktop, tablet, mobile and short heights',{skip:!origin,timeout:90000},async()=>{
@@ -27,8 +31,8 @@ test('New Post keeps fields, inset arrows and actions usable at desktop, tablet,
    await page.setViewportSize(size);
    const layout=await dialog.evaluate(el=>{const r=el.getBoundingClientRect(),h=el.querySelector('header').getBoundingClientRect(),field=el.querySelector('.campaign-compose-campaign').getBoundingClientRect(),footer=el.querySelector(':scope>footer').getBoundingClientRect();return {inside:r.left>=0&&r.right<=innerWidth+1&&r.top>=0&&r.bottom<=innerHeight+1,footerVisible:footer.bottom<=innerHeight&&footer.top>=h.bottom,horizontalOverflow:el.scrollWidth>el.clientWidth+1,fieldBelowHeading:field.top>=h.bottom,bodyScrollable:el.querySelector('fieldset').clientHeight>30};});
    assert(layout.inside&&layout.footerVisible&&layout.bodyScrollable,JSON.stringify({size,layout}));assert.equal(layout.horizontalOverflow,false); // The header stays separate while the body scrolls.
-   await dialog.getByLabel('Campaign',{exact:true}).scrollIntoViewIfNeeded();
-   assert(await dialog.getByLabel('Campaign',{exact:true}).evaluate(el=>parseFloat(getComputedStyle(el).paddingRight)>=40));
+   await dialog.getByRole('combobox',{name:'Campaign',exact:true}).scrollIntoViewIfNeeded();
+   assert(await dialog.getByRole('combobox',{name:'Campaign',exact:true}).evaluate(el=>{const r=el.getBoundingClientRect(),icon=el.querySelector('.ds-select-chevron').getBoundingClientRect();return r.right-icon.right>=12;}));
    await dialog.getByRole('button',{name:'Posting on',exact:true}).click();
    const date=page.getByRole('dialog',{name:'Posting on',exact:true});await expect(date).toBeVisible();
    const box=await date.boundingBox();assert(box.x>=0&&box.x+box.width<=size.width+1&&box.y>=0&&box.y+box.height<=size.height+1);
@@ -47,11 +51,11 @@ test('expanded context, typography, reference picker and format changes preserve
   await dialog.getByRole('button',{name:'Room to grow',exact:false}).click();await expect(dialog.getByLabel('Topic',{exact:true})).toHaveValue('A welcoming residence for young families');
   await dialog.getByRole('button',{name:'Add context'}).click();await dialog.getByLabel('Creative direction',{exact:false}).fill('Warm light and natural camera movement');
   await dialog.getByRole('button',{name:'Media library',exact:true}).click();await expect(dialog.getByText('No approved images yet. Upload your first image above.')).toBeVisible();
-  await dialog.locator('summary').filter({hasText:'Image text & fonts'}).click();await dialog.getByLabel('Font direction').selectOption('custom');await dialog.getByLabel('Title font',{exact:true}).selectOption('Lora');
+  await dialog.locator('summary').filter({hasText:'Image text & fonts'}).click();await choose(dialog.getByRole('combobox',{name:'Font direction',exact:true}),'custom');await choose(dialog.getByRole('combobox',{name:'Title font',exact:true}),'Lora');
   for(const format of ['static','carousel','story','reel','video','blog']){
-   await dialog.getByLabel('Post format').selectOption(format);
+   await choose(dialog.getByRole('combobox',{name:'Post format',exact:true}),format);
    if(format==='carousel')await dialog.getByLabel('Slides',{exact:false}).fill('5');
-   if(format!=='blog')await dialog.getByLabel('Channel',{exact:true}).selectOption('facebook');
+   if(format!=='blog')await choose(dialog.getByRole('combobox',{name:'Channel',exact:true}),'facebook');
    await dialog.getByRole('button',{name:'Create Post',exact:true}).click();await expect.poll(()=>submitted.length).toBe(['static','carousel','story','reel','video','blog'].indexOf(format)+1);
    const {body}=submitted.at(-1);assert.equal(body.brief,'A welcoming residence for young families');assert.equal(body.context,'Warm light and natural camera movement');assert(body.planned_at);
    if(format==='blog'){assert(!('creative_spec' in body));assert(!('channel' in body));}

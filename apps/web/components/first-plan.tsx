@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
 import {api} from './api';
@@ -15,7 +16,7 @@ export function FirstPlan({businessId,cadence,timezone,disabled,beforeSubmit}:{b
  const pending=job&&['queued','running','retrying','succeeded'].includes(job.status);
  return <section className="first-plan-setup" aria-label="Your first plan">
  {pending?<div className="brand-preparing"><h2>Building your calendar</h2><p role="status">Your brand is confirmed. We’re preparing your day-by-day content plan.</p><p>You can leave and return; your request is saved.</p><Notice error={error}/>{error!==undefined&&<a href={`/b/${businessId}/campaigns`}>Open Campaigns</a>}</div>:job?<div role="alert"><h3>Your calendar needs attention</h3><p>Your brand is saved. We couldn’t finish this plan. Check its status in Campaigns before starting another.</p><p>{job.error_code} · {job.id}</p><a href={`/b/${businessId}/campaigns`}>Open Campaigns</a></div>:<>
- <h3>Choose your starting point</h3><div className="first-plan-options"><Field label="Plan duration">{id=><select id={id} value={days} disabled={busy||!!request.current} onChange={e=>{setDays(Number(e.target.value));setVideos('');}}><option value={7}>1 week</option><option value={14}>2 weeks</option><option value={30}>30 days</option></select>}</Field><Field label="Video ideas">{id=><input id={id} type="number" min={0} max={Math.min(count,30)} value={videos} disabled={busy||!!request.current} onChange={e=>setVideos(e.target.value)} placeholder="Optional"/>}</Field></div>
+ <h3>Choose your starting point</h3><div className="first-plan-options"><Field label="Plan duration">{id=><DesvioSelect id={id} value={days} disabled={busy||!!request.current} onChange={e=>{setDays(Number(e.target.value));setVideos('');}}><option value={7}>1 week</option><option value={14}>2 weeks</option><option value={30}>30 days</option></DesvioSelect>}</Field><Field label="Video ideas">{id=><input id={id} type="number" min={0} max={Math.min(count,30)} value={videos} disabled={busy||!!request.current} onChange={e=>setVideos(e.target.value)} placeholder="Optional"/>}</Field></div>
  <p>{count} posts · {Math.max(0,count-(Number(videos)||0))} static ideas · {Number(videos)||0} video storylines</p><p className="hint">Review and refine your plan in Campaigns. You approve video prompts before generation and posts before publishing.</p><Notice error={error}/><button className="primary" disabled={disabled||busy} onClick={()=>void submit()}>{busy?'Saving your brand…':request.current?'Check my calendar request':'Confirm & create my calendar'}</button>
  </>}
  </section>;

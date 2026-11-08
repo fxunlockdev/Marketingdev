@@ -1,4 +1,5 @@
 "use client";
+import {DesvioSelect} from './desvio-select';
 import "./post-details-spacing.css";
 import {useRouter} from 'next/navigation';
 import {postFormatLabel} from './post-format';
@@ -344,7 +345,7 @@ export function ContentWorkspace({
               }}
             >
               <Field label="Plan duration (days)">{id=><input id={id} type="number" min={1} max={90} required value={planDays} onChange={e=>{setPlanDays(Number(e.target.value));setPostCount(Number(e.target.value));}}/>}</Field>
-              <Field label="Plan creativity">{id=><select id={id} value={planningCreativity} onChange={e=>setPlanningCreativity(e.target.value as Creativity)}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></select>}</Field>
+              <Field label="Plan creativity">{id=><DesvioSelect id={id} value={planningCreativity} onChange={e=>setPlanningCreativity(e.target.value as Creativity)}><option value="normal">Normal</option><option value="creative">Creative</option><option value="super">Super creative</option></DesvioSelect>}</Field>
               <Field label="Videos in this plan">{id=><input id={id} type="number" min={0} max={Math.min(postCount,30)} required value={videoCount} onChange={e=>setVideoCount(Number(e.target.value))}/>}</Field>
               <Field label="Draft post count">{id=><input id={id} type="number" min={1} max={90} required value={postCount} onChange={e=>setPostCount(Number(e.target.value))}/>}</Field>
               <Field label="Plan starts on">
@@ -456,7 +457,7 @@ export function ContentWorkspace({
           {inbox ? (
             <Field label="Date range">
               {(id) => (
-                <select
+                <DesvioSelect
                   id={id}
                   value={days}
                   onChange={(e) => filter(() => setDays(e.target.value))}
@@ -464,13 +465,13 @@ export function ContentWorkspace({
                   <option value="1">One day</option>
                   <option value="7">Next 7 days</option>
                   <option value="30">Next 30 days</option>
-                </select>
+                </DesvioSelect>
               )}
             </Field>
           ) : (
             <Field label="Calendar view">
               {(id) => (
-                <select
+                <DesvioSelect
                   id={id}
                   value={view}
                   onChange={(e) => filter(() => setView(e.target.value))}
@@ -479,7 +480,7 @@ export function ContentWorkspace({
                   <option value="month">Month</option>
                   <option value="week">Visual week</option>
                   <option value="list">30-day list</option>
-                </select>
+                </DesvioSelect>
               )}
             </Field>
           )}
@@ -499,7 +500,7 @@ export function ContentWorkspace({
       </nav>
           <Field label="Post status">
             {(id) => (
-              <select
+              <DesvioSelect
                 id={id}
                 value={state}
                 onChange={(e) => filter(() => setState(e.target.value))}
@@ -518,7 +519,7 @@ export function ContentWorkspace({
                       {v}
                     </option>
                   ))}
-              </select>
+              </DesvioSelect>
             )}
           </Field>
             {(channel || state) && <button onClick={()=>filter(()=>{setChannel('');setState('');})}>Clear filters</button>}
@@ -1103,7 +1104,7 @@ export function SlotPanel({
                   {candidates.length > 1 && (
                     <Field label="This time occurs twice — choose an offset">
                       {(id) => (
-                        <select
+                        <DesvioSelect
                           id={id}
                           required
                           value={instant}
@@ -1119,7 +1120,7 @@ export function SlotPanel({
                               · {t}
                             </option>
                           ))}
-                        </select>
+                        </DesvioSelect>
                       )}
                     </Field>
                   )}

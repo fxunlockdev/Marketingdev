@@ -1,5 +1,7 @@
 "use client";
-import {useEffect,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {Combobox} from '@base-ui/react/combobox';
+import './desvio-select.css';
 import './time-zone-select.css';
 
 const common=['UTC','Asia/Kuala_Lumpur','Asia/Kolkata','America/New_York','Europe/London','Asia/Singapore'];
@@ -8,18 +10,20 @@ const cityName=(zone:string)=>zone==='UTC'?'UTC':zone.split('/').slice(1).join('
 const validZone=(zone:string)=>{try{if(!zone)return false;new Intl.DateTimeFormat('en',{timeZone:zone});return true;}catch{return false;}};
 
 export function TimeZoneSelect({id,value,onChange,disabled}:{id:string;value:string;onChange:(value:string)=>void;disabled:boolean}){
- const [zones,setZones]=useState(common);
- const [query,setQuery]=useState('');
- const [open,setOpen]=useState(false);
+ const [zones,setZones]=useState(common),host=useRef<HTMLDivElement>(null),[container,setContainer]=useState<HTMLElement|null>(null);
+ useLayoutEffect(()=>setContainer(host.current?.closest('dialog')??null),[]);
  useEffect(()=>{const intl=Intl as typeof Intl & {supportedValuesOf?:(key:string)=>string[]};setZones([...new Set([...common,...(intl.supportedValuesOf?.('timeZone')??[])])].sort());},[]);
- const normalized=query.trim().toLowerCase().replaceAll('_',' ');
- const options=[...zones.map(zone=>({city:cityName(zone),zone})),...Object.entries(cityAliases).map(([city,zone])=>({city,zone}))];
- const candidates=normalized?options:common.map(zone=>({city:cityName(zone),zone}));
- const matches=candidates.filter((option,index)=>candidates.findIndex(item=>item.city===option.city&&item.zone===option.zone)===index).filter(option=>normalized?`${option.city} ${option.zone.replaceAll('_',' ')}`.toLowerCase().includes(normalized):common.includes(option.zone)).sort((a,b)=>Number(b.city.toLowerCase()===normalized)-Number(a.city.toLowerCase()===normalized)||a.city.localeCompare(b.city)).slice(0,6);
- const choose=(zone:string)=>{onChange(zone);setQuery('');setOpen(false);};
- return <div className="time-zone-search" onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setOpen(false);}}>
-  <input id={id} type="search" value={query} disabled={disabled} placeholder="Search a city, e.g. Mumbai" autoComplete="off" aria-describedby={`${id}-selected`} onFocus={()=>setOpen(true)} onChange={event=>{setQuery(event.target.value);setOpen(true);}} onKeyDown={event=>{if(event.key==='Escape')setOpen(false);if(event.key==='Enter'){event.preventDefault();if(matches.length===1)choose(matches[0].zone);}}}/>
-  <p id={`${id}-selected`} className="time-zone-selection">{validZone(value)?<>Selected: <strong>{cityName(value)}</strong> <span>({value.replaceAll('_',' ')})</span></>:'Choose a city to set your time zone.'}</p>
-  {open&&!disabled&&<div className="time-zone-results"><p className="time-zone-results-label">{normalized?'Matching cities':'Popular cities'}</p>{matches.length?<ul>{matches.map(option=><li key={`${option.city}-${option.zone}`}><button type="button" onClick={()=>choose(option.zone)}><strong>{option.city}</strong><span>{option.zone.replaceAll('_',' ')}</span></button></li>)}</ul>:<p className="time-zone-no-results">No matching city. Try a nearby major city or a time zone such as Europe/London.</p>}</div>}
+ const options=[...new Set([...zones,value].filter(Boolean))].map(zone=>({value:zone,label:`${cityName(zone)} · ${zone.replaceAll('_',' ')}`,keywords:Object.entries(cityAliases).filter(([,v])=>v===zone).map(([city])=>city).join(' ')}));
+ const selected=options.find(o=>o.value===value)??null;
+ return <div className="ds-select ds-time-zone" ref={host}>
+  <Combobox.Root items={options} value={selected} disabled={disabled} onValueChange={option=>{if(option)onChange(option.value);}} isItemEqualToValue={(a,b)=>a.value===b.value} filter={(item,query)=>`${item.label} ${item.keywords}`.toLowerCase().includes(query.trim().toLowerCase().replaceAll('_',' '))}>
+   <Combobox.Trigger id={id} className="ds-select-trigger" aria-describedby={`${id}-selected`}><span className="ds-select-value">{selected?cityName(selected.value):'Choose a time zone'}</span><Combobox.Icon className="ds-select-chevron"><span aria-hidden="true">⌄</span></Combobox.Icon></Combobox.Trigger>
+   <Combobox.Portal container={container??undefined}><Combobox.Positioner className="ds-select-positioner" sideOffset={6} collisionBoundary={container??undefined}><Combobox.Popup className="ds-select-popup ds-search-popup" onKeyDown={event=>{if(event.key==='Escape')event.stopPropagation();}}>
+    <div className="ds-select-search"><Combobox.Input aria-label="Search cities or time zones" placeholder="Search a city or time zone…"/></div>
+    <Combobox.Empty className="ds-select-empty">No matching city. Try a nearby major city.</Combobox.Empty>
+    <Combobox.List className="ds-select-list">{(option:{value:string;label:string})=><Combobox.Item key={option.value} value={option} className="ds-select-option"><span className="ds-select-option-label">{option.label}</span><Combobox.ItemIndicator className="ds-select-tick">✓</Combobox.ItemIndicator></Combobox.Item>}</Combobox.List>
+   </Combobox.Popup></Combobox.Positioner></Combobox.Portal>
+  </Combobox.Root>
+  <p id={`${id}-selected`} className="time-zone-selection">{validZone(value)?value.replaceAll('_',' '):'Choose a city to set your time zone.'}</p>
  </div>;
 }
