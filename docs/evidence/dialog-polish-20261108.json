@@ -1,0 +1,1479 @@
+{
+  "date": "2026-11-08",
+  "scope": "Post composer and shared responsive form layout",
+  "source_commit": "6e4e55c",
+  "deployment": {
+    "environment": "dev",
+    "service": "web",
+    "id": "06bcedac-eb5d-46db-a8ee-3cabb629404e",
+    "observed_status": "SUCCESS"
+  },
+  "changes": [
+    "Separate full-width campaign selector below dialog header",
+    "One-column topic and compact reference selector",
+    "Scrollable form body with reachable fixed footer",
+    "Shared themed date picker with nested dialog isolation",
+    "Expandable image typography controls",
+    "Shared select arrow inset and close-button sizing",
+    "Responsive Brand Kit section layout and Create menu styling"
+  ],
+  "build": {
+    "command": "npm run build:web",
+    "result": "passed",
+    "source": "isolated snapshot containing committed changes only"
+  },
+  "regression_tests": {
+    "files": [
+      "tests/browser/dialog-layout.test.mjs",
+      "tests/browser/design-polish.test.mjs"
+    ],
+    "local_production": {
+      "passed": 3,
+      "failed": 0
+    },
+    "hosted_production": {
+      "passed": 3,
+      "failed": 0
+    },
+    "api_mode": "mocked API fixtures; verifies UI state and outgoing payload, not actual generation",
+    "viewports": [
+      "1440x1000",
+      "768x800",
+      "390x844",
+      "320x568",
+      "844x390"
+    ],
+    "coverage": [
+      "Nested date dialog bounds and Escape handling",
+      "Invalid hour correction and valid date application",
+      "Reachable footer and close button",
+      "Inset dropdown arrows",
+      "Context and custom font persistence",
+      "Image, carousel, story, reel, video and blog submission payloads",
+      "Keyboard and reduced-motion behavior"
+    ]
+  },
+  "hosted_read_only_expanded_states": [
+    {
+      "state": "new-post",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-references",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-date",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        },
+        {
+          "name": "Posting on",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-fonts",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Text on image",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Font direction",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Title font",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Title weight",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Supporting font",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Supporting weight",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "create-menu",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "create-new-title",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": []
+    },
+    {
+      "state": "campaign-step-two",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Duration",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Image posts shape",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "brand-style",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "brand-voice",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "brand-profile",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "calendar-options",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Calendar view",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "calendar-filters",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Calendar view",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post status",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "review-options",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Date range",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "preferences-fields",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "team-fields",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Business role",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "profile-confirmation",
+      "width": 1440,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "new-post",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-references",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-date",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        },
+        {
+          "name": "Posting on",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-fonts",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Text on image",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Font direction",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Title font",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Title weight",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Supporting font",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Supporting weight",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "create-menu",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "create-new-title",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": []
+    },
+    {
+      "state": "campaign-step-two",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Duration",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Image posts shape",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "brand-style",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "brand-voice",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "brand-profile",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "calendar-options",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Calendar view",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "calendar-filters",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Calendar view",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post status",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "review-options",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Date range",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "preferences-fields",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "team-fields",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Business role",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "profile-confirmation",
+      "width": 768,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "new-post",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-references",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-date",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        },
+        {
+          "name": "Posting on",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "new-post-fonts",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "new-post-heading",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": [
+        {
+          "label": "CampaignRunwal Realty: Inspiring Life in Mumb",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post formatStill imageCarousel PostFeed Video",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "ChannelInstagramFacebookLinkedIn",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Text on image",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Font direction",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Title font",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Title weight",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Supporting font",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Supporting weight",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "create-menu",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [
+        {
+          "name": "create-new-title",
+          "inside": true,
+          "horizontalOverflow": false
+        }
+      ],
+      "controls": []
+    },
+    {
+      "state": "campaign-step-two",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Duration",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Image posts shape",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "brand-style",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "brand-voice",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "brand-profile",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "calendar-options",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Calendar view",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "calendar-filters",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Calendar view",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Post status",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "review-options",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Date range",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "preferences-fields",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    },
+    {
+      "state": "team-fields",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Business role",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "profile-confirmation",
+      "width": 390,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": []
+    }
+  ],
+  "production_page_audit": {
+    "count": 30,
+    "api_mode": "authenticated dev GET reads with isolated local production web",
+    "results": [
+      {
+        "route": "overview",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Your content, at a glance.",
+          "Welcome back, Vilol",
+          "Upcoming posts",
+          "Your campaigns",
+          "Recent activity",
+          "Recent post results",
+          "Ideas from your performance",
+          "Generation activity \u00b7 last 30 days"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "create",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Make content",
+          "Get things done",
+          "Your idea lands here."
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "campaigns",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Campaigns",
+          "New Post",
+          "Create new",
+          "Week of Oct 19, 2026"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "content-plan",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Calendar",
+          "Nov 8 \u2013 Nov 14, 2026",
+          "Sun, Nov 8",
+          "Mon, Nov 9",
+          "Tue, Nov 10",
+          "Wed, Nov 11",
+          "Thu, Nov 12",
+          "Fri, Nov 13",
+          "Sat, Nov 14"
+        ],
+        "overflowing": [
+          {
+            "tag": "SPAN",
+            "class": ""
+          }
+        ]
+      },
+      {
+        "route": "review",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Approvals",
+          "Nov 8 \u2013 Dec 7, 2026",
+          "Nothing waiting here"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "brand-kit",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Brand Kit",
+          "Media Library",
+          "Product photos"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "content-preferences",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Content Preferences",
+          "Your goal",
+          "Where and when",
+          "Keep it on brand"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "connections",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Connections",
+          "Social accounts"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "memory",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Learnings",
+          "Performance lessons",
+          "Brand knowledge"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "publishing",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Insights",
+          "Ready to publish",
+          "Publishing activity"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "archive",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Archived posts",
+          "Luxury real estate\n\nAdditional creative direction: Luxury lifestyle",
+          "Luxury real estate\n\nAdditional creative direction: Luxury lifestyle",
+          "Luxury real estate\n\nAdditional creative direction: Luxury lifestyle",
+          "Looking for the perfect home or business address in Mumbai?",
+          "Your new home or workspace in Mumbai deserves more than just four walls\u2014it deserves a story."
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "team",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Team",
+          "Invite a teammate",
+          "People with access",
+          "Invitations",
+          "Access history"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "/brands",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Your brands",
+          "tsq",
+          "A new business belongs here",
+          "A little context. Better creative."
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "/profile",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Profile",
+          "Personal details",
+          "Change password",
+          "Two-factor authentication",
+          "Active sessions"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "/billing",
+        "width": 1440,
+        "overflow": false,
+        "headings": [
+          "Billing",
+          "1 of 3 businesses"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "overview",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Your content, at a glance.",
+          "Welcome back, Vilol",
+          "Upcoming posts",
+          "Your campaigns",
+          "Recent activity",
+          "Recent post results",
+          "Ideas from your performance",
+          "Generation activity \u00b7 last 30 days"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "create",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Make content",
+          "Get things done",
+          "Your idea lands here."
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "campaigns",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Campaigns",
+          "New Post",
+          "Create new",
+          "Week of Oct 19, 2026"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "content-plan",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Calendar",
+          "Nov 8 \u2013 Nov 14, 2026",
+          "Sun, Nov 8",
+          "Mon, Nov 9",
+          "Tue, Nov 10",
+          "Wed, Nov 11",
+          "Thu, Nov 12",
+          "Fri, Nov 13",
+          "Sat, Nov 14"
+        ],
+        "overflowing": [
+          {
+            "tag": "SECTION",
+            "class": "plan-day "
+          },
+          {
+            "tag": "SECTION",
+            "class": "plan-day "
+          },
+          {
+            "tag": "H2",
+            "class": ""
+          },
+          {
+            "tag": "SECTION",
+            "class": "plan-day "
+          },
+          {
+            "tag": "H2",
+            "class": ""
+          },
+          {
+            "tag": "SECTION",
+            "class": "plan-day "
+          },
+          {
+            "tag": "H2",
+            "class": ""
+          },
+          {
+            "tag": "SECTION",
+            "class": "plan-day "
+          }
+        ]
+      },
+      {
+        "route": "review",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Approvals",
+          "Nov 8 \u2013 Dec 7, 2026",
+          "Nothing waiting here"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "brand-kit",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Brand Kit",
+          "Media Library",
+          "Product photos"
+        ],
+        "overflowing": [
+          {
+            "tag": "BUTTON",
+            "class": ""
+          },
+          {
+            "tag": "BUTTON",
+            "class": ""
+          }
+        ]
+      },
+      {
+        "route": "content-preferences",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Content Preferences",
+          "Your goal",
+          "Where and when",
+          "Keep it on brand"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "connections",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Connections",
+          "Social accounts"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "memory",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Learnings",
+          "Performance lessons",
+          "Brand knowledge"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "publishing",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Insights",
+          "Ready to publish",
+          "Publishing activity"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "archive",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Archived posts",
+          "Luxury real estate\n\nAdditional creative direction: Luxury lifestyle",
+          "Luxury real estate\n\nAdditional creative direction: Luxury lifestyle",
+          "Luxury real estate\n\nAdditional creative direction: Luxury lifestyle",
+          "Looking for the perfect home or business address in Mumbai?",
+          "Your new home or workspace in Mumbai deserves more than just four walls\u2014it deserves a story."
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "team",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Team",
+          "Invite a teammate",
+          "People with access",
+          "Invitations",
+          "Access history"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "/brands",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Your brands",
+          "tsq",
+          "A new business belongs here",
+          "A little context. Better creative."
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "/profile",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Profile",
+          "Personal details",
+          "Change password",
+          "Two-factor authentication",
+          "Active sessions"
+        ],
+        "overflowing": []
+      },
+      {
+        "route": "/billing",
+        "width": 390,
+        "overflow": false,
+        "headings": [
+          "Billing",
+          "1 of 3 businesses"
+        ],
+        "overflowing": []
+      }
+    ],
+    "notes": [
+      "Calendar week grid and Brand Kit navigation intentionally scroll within their containers; neither causes page-level overflow.",
+      "Private image loading was verified separately on the hosted origin."
+    ]
+  },
+  "hosted_saved_media": [
+    {
+      "state": "saved-creative",
+      "width": 1440,
+      "imageLoadError": false,
+      "loadedImages": 1,
+      "canvasCount": 2,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Saved version",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Selected layer",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "saved-creative-controls",
+      "width": 1440,
+      "imageLoadError": false,
+      "loadedImages": 1,
+      "canvasCount": 2,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Saved version",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Selected layer",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "saved-creative",
+      "width": 390,
+      "imageLoadError": false,
+      "loadedImages": 1,
+      "canvasCount": 2,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Saved version",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Selected layer",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    },
+    {
+      "state": "saved-creative-controls",
+      "width": 390,
+      "imageLoadError": false,
+      "loadedImages": 1,
+      "canvasCount": 2,
+      "pageOverflow": false,
+      "dialogs": [],
+      "controls": [
+        {
+          "label": "Saved version",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        },
+        {
+          "label": "Selected layer",
+          "rightPadding": 44,
+          "appearance": "none",
+          "inside": true
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "No new paid generation, publishing, invites or customer content mutations were performed.",
+    "UI regression submission is intercepted and does not prove a new generation completes.",
+    "This scoped layout pass does not assert full production readiness."
+  ]
+}

@@ -1,3 +1,11 @@
+## Post composer and shared form layout | 8 November 2026
+
+Fixed the screenshot-reported New Post layout: campaign selection now sits below the title, topic and references follow one reading column, form options align, typography expands on demand, and a scrolling body keeps the footer accessible. The shared Desvio date picker replaces the browser-native date field. Scoped legacy header/footer styles prevent them leaking into the nested calendar. Shared dropdowns reserve space for inset arrows; dialog close buttons, Create menu cards, and Brand Kit tablet sections now keep consistent spacing.
+
+Source `6e4e55c` is pushed to dev. Exact web deployment `06bcedac-eb5d-46db-a8ee-3cabb629404e` was observed SUCCESS. An isolated production build passed. Three browser regressions pass against both local production and the hosted bundle, using mocked APIs for safe submission validation. They cover five viewport sizes, nested date validation/Escape behavior, footer reachability, keyboard/reduced motion, and preservation of context, font and format payloads. A prior four-test run also covered prompt suggestions.
+
+Read-only authenticated verification covered 45 expanded states across desktop/tablet/mobile on the hosted deployment, with no page or dialog overflow and no clipped select controls. A separate 30-view sweep covered 15 pages on desktop/mobile using real dev GET data with the local production bundle. Hosted saved-media checks confirmed artwork loading and reachable controls at desktop/mobile sizes. No paid generation, social publishing, invitations or customer content changes were performed. This is scoped UI verification, not full production readiness. Evidence: `docs/evidence/dialog-polish-20261108.json`; local screenshots under `work/dialog-audit/hosted-final`.
+
 ## Live canvas generation loading | 5 November 2026
 
 Image and video requests now show a shared canvas progress card with a right-to-left activity line, elapsed time from persisted job creation, and Prepare / Generate / Save stages. Existing artwork stays visible during revisions. Only provider-reported video progress produces a percentage. Reduced motion, offscreen/background pausing, reconnects, cancellation, failed jobs and reload recovery are covered. The old image workflow percentage was removed.
