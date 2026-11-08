@@ -129,3 +129,62 @@
   .desvio-redesign.desvio-polished dialog[open], .desvio-redesign.desvio-polished dialog[open]::backdrop,
   .desvio-redesign.desvio-polished .create-confirm-scrim>section { animation: none; }
 }
+
+/* Shared form controls reserve a real inset for their affordance, including in dialogs. */
+body.desvio-redesign.desvio-polished :is(.v5-main, dialog, .create-chat-screen) select:not([multiple]):not([size]) {
+  appearance: none;
+  -webkit-appearance: none;
+  /* Legacy field shorthands must not consume the reserved arrow area. */
+  padding-right: 44px !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235b5769' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-position: right 14px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  text-overflow: ellipsis;
+}
+body.desvio-redesign.desvio-polished :is(.v5-main, dialog) :is(label, fieldset) { min-width: 0; }
+body.desvio-redesign.desvio-polished :is(.v5-main, dialog) :is(input, textarea, select):focus-visible {
+  outline: 2px solid #6a5cff;
+  outline-offset: 2px;
+}
+@media (forced-colors: active) {
+  body.desvio-redesign.desvio-polished :is(.v5-main, dialog, .create-chat-screen) select:not([multiple]):not([size]) { appearance: auto; background-image: none; }
+}
+
+/* Close controls remain recognizable and reachable in every dialog header. */
+body.desvio-redesign.desvio-polished dialog header > button[aria-label^="Close"] {
+  display: inline-flex; align-items: center; justify-content: center;
+  flex: 0 0 40px; width: 40px; min-width: 40px; height: 40px; min-height: 40px;
+  padding: 0; margin: 0; border: 0; border-radius: 50%;
+  background: #f4f3f8; color: #17171a; font-size: 22px; line-height: 1;
+}
+body.desvio-redesign.desvio-polished .create-new-dialog header { gap: 20px; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav > a { border: 0; border-radius: 20px; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav > a:nth-child(1) { background: #f0edff; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav > a:nth-child(2) { background: #fff3b6; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav > a:nth-child(3) { background: #d8e9d0; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav > a > span:first-child { background: #fff; border-radius: 16px; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav > a > div { min-width: 0; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav strong { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: 24px; }
+/* Size the nested brand editor by its available space, not the window alone. */
+body.desvio-redesign.desvio-polished .brand-kit-content { container: brand-editor / inline-size; }
+body.desvio-redesign.desvio-polished .brand-kit-content .brand-profile-review { padding: 0; border: 0; border-radius: 0; }
+body.desvio-redesign.desvio-polished .brand-profile-review > .section-heading { flex-wrap: wrap; gap: 16px; }
+body.desvio-redesign.desvio-polished .brand-profile-review > .section-heading > div { flex: 1 1 220px; min-width: 0; }
+body.desvio-redesign.desvio-polished .brand-profile-review > .section-heading > button { flex: none; }
+body.desvio-redesign.desvio-polished .brand-profile-section > * { min-width: 0; }
+@container brand-editor (max-width: 640px) {
+  body.desvio-redesign.desvio-polished .brand-profile-review .brand-profile-section { grid-template-columns: minmax(0,1fr); gap: 16px; padding: 24px 0; }
+  body.desvio-redesign.desvio-polished .brand-profile-section > header p { max-width: none; }
+  body.desvio-redesign.desvio-polished .brand-profile-review .finding-card { padding: 16px; }
+}
+@media (max-width: 1100px) {
+  body.desvio-redesign.desvio-polished .brand-kit-layout { grid-template-columns: minmax(0,1fr); gap: 16px; }
+  body.desvio-redesign.desvio-polished .brand-kit-navigation { position: static; display: flex; flex-direction: row; overflow-x: auto; max-width: 100%; margin: 0; border-radius: 20px; }
+  body.desvio-redesign.desvio-polished .brand-kit-navigation button { flex: none; white-space: nowrap; }
+}
+@media (max-width: 480px) {
+  body.desvio-redesign.desvio-polished .create-new-dialog { padding: 20px; }
+  body.desvio-redesign.desvio-polished .create-new-dialog nav > a { gap: 12px; padding: 16px; }
+  body.desvio-redesign.desvio-polished .create-new-dialog nav > a > span:first-child { width: 40px; height: 40px; font-size: 24px; }
+}

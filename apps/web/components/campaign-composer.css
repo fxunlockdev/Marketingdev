@@ -1,48 +1,96 @@
-/* Composer uses the supplied compact dialog language; only its content scrolls. */
-.desvio-redesign dialog.campaign-new-post{width:min(880px,calc(100vw - 32px));max-width:880px;max-height:calc(100dvh - 32px);padding:0;overflow:hidden;border-radius:28px}
-.desvio-redesign dialog.campaign-new-post[open]{display:flex;flex-direction:column}
-.desvio-redesign .campaign-new-post>header{flex:none;padding:22px 24px 14px;margin:0;gap:12px;grid-template-columns:auto minmax(0,1fr) 36px}
-.desvio-redesign .campaign-new-post>header h2{font-size:30px}
-.desvio-redesign .campaign-new-post>header>label{grid-column:2;grid-row:1;display:grid;gap:4px;font-size:12px;padding:0 8px}
-.desvio-redesign .campaign-new-post>header>button{grid-column:3;grid-row:1;align-self:start}
-.desvio-redesign .campaign-new-post>.campaign-compose-intro{flex:none;margin:0;padding:0 24px 12px;font-size:14px}
-.desvio-redesign .campaign-new-post>fieldset{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;margin:0;padding:8px 24px 20px}
-.desvio-redesign .campaign-new-post>.notice{margin:0 24px 12px}
-.desvio-redesign .campaign-new-post .campaign-compose-row{grid-template-columns:144px minmax(0,1fr);gap:20px}
-.desvio-redesign .campaign-new-post .campaign-compose-fields{gap:10px;align-content:start}
-.desvio-redesign .campaign-new-post .campaign-compose-options{display:grid;grid-template-columns:1fr 1.45fr 1fr;gap:12px;align-items:end}
-.desvio-redesign .campaign-new-post .campaign-compose-options>label{min-width:0;display:grid;gap:6px;align-content:end;margin:0;font-size:13px;font-weight:500}
-.desvio-redesign .campaign-new-post .campaign-compose-options>label:nth-child(2){order:3}
-.desvio-redesign .campaign-new-post .campaign-compose-options>label:nth-child(3){order:2}
-.desvio-redesign .campaign-new-post .campaign-compose-options{grid-template-columns:1fr 1fr 1.5fr}
-.desvio-redesign dialog.campaign-new-post :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),select,textarea){width:100%;min-width:0;max-width:100%;height:auto;min-height:42px;padding:9px 12px;font-size:14px;font-weight:400;line-height:22px;border:1px solid #e5e2ed;border-radius:12px;background:#f8f7fb}
-.desvio-redesign dialog.campaign-new-post textarea{height:auto;min-height:88px;resize:vertical}
-.desvio-redesign .campaign-new-post .campaign-compose-timezone{margin-top:-2px;font-size:12px;color:#64616f}
-.desvio-redesign .campaign-new-post .campaign-post-ideas{padding:2px 0 8px}
-.desvio-redesign .campaign-new-post .campaign-post-ideas ul{margin:6px 0 0}
-.desvio-redesign .campaign-new-post .campaign-post-ideas li button{padding:10px;gap:4px}
-.desvio-redesign .campaign-new-post .campaign-post-ideas li small{-webkit-line-clamp:2}
-.desvio-redesign .campaign-new-post .campaign-reference-picker{margin-top:18px;padding-top:16px}
-.desvio-redesign .campaign-new-post>footer{flex:none;position:relative;display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:16px;margin:0;padding:14px 24px;border-top:1px solid #eeedf3;background:#fff}
-.desvio-redesign .campaign-new-post>footer>span{font-size:13px;color:#64616f}
-.desvio-redesign .campaign-new-post>footer>button{flex:none;min-height:42px;padding:10px 22px}
-@media(max-width:650px){
-.desvio-redesign dialog.campaign-new-post{width:calc(100vw - 16px);max-height:calc(100dvh - 16px);border-radius:24px}
-.desvio-redesign .campaign-new-post>header{padding:18px 18px 12px;grid-template-columns:1fr 36px}
-.desvio-redesign .campaign-new-post>header h2{font-size:28px}
-.desvio-redesign .campaign-new-post>header>button{grid-column:2}
-.desvio-redesign .campaign-new-post>header>label{grid-column:1/-1;grid-row:2;padding:0}
-.desvio-redesign .campaign-new-post>.campaign-compose-intro{padding-inline:18px}
-.desvio-redesign .campaign-new-post>fieldset{padding:4px 18px 18px}
-.desvio-redesign .campaign-new-post .campaign-compose-row{grid-template-columns:minmax(0,1fr);gap:12px}
-.desvio-redesign .campaign-new-post .campaign-compose-visual{display:none}
-.desvio-redesign .campaign-new-post .campaign-compose-options{grid-template-columns:1fr 1fr;gap:12px}
-.desvio-redesign .campaign-new-post .campaign-compose-options>label:nth-child(2){grid-column:1/-1}
-.desvio-redesign dialog.campaign-new-post :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),select,textarea){font-size:16px}
-.desvio-redesign .campaign-new-post>footer{padding:12px 18px;gap:12px}
-.desvio-redesign .campaign-new-post>footer>span{max-width:180px;font-size:12px}
+/* One reading column. The title and actions stay visible while the form scrolls. */
+.desvio-redesign dialog.campaign-new-post {
+  width: min(800px, calc(100vw - 32px));
+  max-width: 800px;
+  max-height: calc(100dvh - 32px);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 28px;
 }
-
-.desvio-redesign .campaign-new-post>footer>span{flex:1;min-width:0}
-.desvio-redesign .campaign-new-post>footer>button.primary{width:auto;flex:none;background:#17171a;color:#fff}
-.desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row{display:flex;flex-direction:row;align-items:center;justify-content:space-between;width:100%}
+.desvio-redesign dialog.campaign-new-post[open] { display: flex; flex-direction: column; }
+.desvio-redesign .campaign-new-post>header {
+  display: flex; flex-wrap: nowrap; align-items: flex-start; justify-content: space-between;
+  flex: none; padding: 24px 28px 20px; margin: 0; gap: 24px;
+  border-bottom: 1px solid #eeedf3;
+}
+.desvio-redesign .campaign-new-post>header>div { min-width: 0; }
+.desvio-redesign .campaign-new-post>header h2 { font-size: 30px; margin: 0 0 8px; white-space: normal; }
+.desvio-redesign .campaign-new-post>header p { font-size: 14px; line-height: 1.5; color: #64616f; margin: 0; }
+.desvio-redesign .campaign-new-post>header>button { flex: none; margin: 0; }
+.desvio-redesign .campaign-new-post>.notice { margin: 12px 28px 0; }
+.desvio-redesign .campaign-new-post>.campaign-compose-scroll {
+  flex: 1 1 auto; min-height: 0; min-width: 0; overflow: auto;
+  overscroll-behavior: contain; scrollbar-gutter: stable;
+  margin: 0; padding: 24px 28px; display: block;
+}
+.desvio-redesign .campaign-new-post .campaign-compose-body { min-width: 0; margin: 0; padding: 0; border: 0; }
+.desvio-redesign .campaign-new-post .campaign-compose-body>label,
+.desvio-redesign .campaign-new-post .campaign-compose-fields>label {
+  display: grid; gap: 8px; min-width: 0; margin: 0; font-size: 13px; font-weight: 600;
+}
+.desvio-redesign .campaign-new-post .campaign-compose-fields { display: grid; gap: 10px; margin-top: 22px; }
+.desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; margin: 0; }
+.desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row label { margin: 0; }
+.desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row button { min-height: 36px; padding: 7px 12px; font-size: 12px; background: #f4f3f8; }
+.desvio-redesign .campaign-new-post .campaign-compose-fields>label { margin-top: 8px; }
+.desvio-redesign .campaign-new-post .campaign-compose-options {
+  display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1.45fr);
+  gap: 16px; align-items: end; margin-top: 24px;
+}
+.desvio-redesign .campaign-new-post .campaign-compose-options>label,
+.desvio-redesign .campaign-new-post .campaign-compose-schedule { min-width: 0; display: grid; gap: 8px; align-content: end; margin: 0; font-size: 13px; font-weight: 600; }
+.desvio-redesign dialog.campaign-new-post .campaign-compose-body :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),select,textarea) {
+  width: 100%; min-width: 0; max-width: 100%; min-height: 46px;
+  padding: 11px 14px; font-size: 14px; font-weight: 400; line-height: 22px;
+  border: 1px solid #e5e2ed; border-radius: 12px; background-color: #f8f7fb;
+}
+.desvio-redesign dialog.campaign-new-post .campaign-compose-fields textarea { height: auto; min-height: 96px; resize: vertical; }
+.desvio-redesign .campaign-new-post .campaign-compose-schedule>.desvio-date-trigger {
+  width: 100%; min-height: 46px; gap: 8px; padding: 11px 14px;
+  border: 1px solid #e5e2ed; border-radius: 12px; background: #f8f7fb;
+  font-size: 14px; font-weight: 400; line-height: 22px; text-align: left;
+}
+.desvio-redesign .campaign-new-post .campaign-compose-schedule>.desvio-date-trigger svg { flex: none; width: 18px; height: 18px; }
+.desvio-redesign .campaign-new-post .campaign-compose-timezone { display: block; margin-top: 10px; font-size: 12px; color: #64616f; }
+.desvio-redesign .campaign-new-post .campaign-compose-slides { margin-top: 20px; }
+.desvio-redesign .campaign-new-post .campaign-compose-slides input { max-width: 140px; }
+.desvio-redesign .campaign-new-post .campaign-post-ideas { padding: 0; margin-top: 24px; }
+.desvio-redesign .campaign-new-post .campaign-post-ideas ul { margin: 12px 0 0; gap: 12px; }
+.desvio-redesign .campaign-new-post .campaign-post-ideas li button { padding: 14px; gap: 8px; border-radius: 16px; }
+.desvio-redesign .campaign-new-post .campaign-post-ideas li small { -webkit-line-clamp: 2; }
+.desvio-redesign .campaign-new-post .campaign-reference-picker { margin: 20px 0 0; padding: 16px; border: 1px solid #e7e5ed; border-radius: 16px; background: #fcfbfe; }
+.desvio-redesign .campaign-new-post .campaign-reference-picker .hint { margin: 10px 0 0; }
+.desvio-redesign .campaign-new-post .campaign-reference-selected { margin-top: 14px; }
+.desvio-redesign .campaign-new-post .campaign-reference-library { margin-top: 16px; padding: 4px; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork { border-top: 1px solid #eeedf3; margin-top: 24px; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork>summary { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 14px 0; cursor: pointer; font-size: 14px; font-weight: 600; list-style: none; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork>summary::-webkit-details-marker { display: none; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork>summary:after { content: '+'; font-size: 20px; font-weight: 400; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork[open]>summary:after { content: '−'; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork>summary span { margin-left: auto; color: #64616f; font-size: 12px; font-weight: 400; }
+.desvio-redesign .campaign-new-post .post-artwork-choices { margin: 0; padding: 4px 0; border: 0; gap: 10px; }
+.desvio-redesign .campaign-new-post .post-artwork-choices>h3 { display: none; }
+.desvio-redesign .campaign-new-post .post-artwork-choices>label { margin-top: 8px; }
+.desvio-redesign .campaign-new-post>footer { flex: none; position: relative; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; margin: 0; padding: 18px 28px; border-top: 1px solid #eeedf3; background: #fff; }
+.desvio-redesign .campaign-new-post>footer>span { flex: 1; min-width: 0; font-size: 12px; color: #64616f; }
+.desvio-redesign .campaign-new-post>footer>button.primary { width: auto; flex: none; min-height: 44px; padding: 11px 24px; background: #17171a; color: #fff; }
+@media(max-width:650px) {
+  .desvio-redesign dialog.campaign-new-post { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 22px; }
+  .desvio-redesign .campaign-new-post>header { padding: 20px; gap: 16px; }
+  .desvio-redesign .campaign-new-post>header h2 { font-size: 28px; }
+  .desvio-redesign .campaign-new-post>.campaign-compose-scroll { padding: 20px; }
+  .desvio-redesign .campaign-new-post .campaign-compose-options { grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 16px; }
+  .desvio-redesign .campaign-new-post .campaign-compose-schedule { grid-column: 1/-1; }
+  .desvio-redesign .campaign-new-post .campaign-reference-toolbar>div { flex-wrap: wrap; }
+  .desvio-redesign .campaign-new-post .campaign-reference-toolbar button { flex: 1 1 auto; }
+  .desvio-redesign dialog.campaign-new-post .campaign-compose-body :is(input,select,textarea),
+  .desvio-redesign .campaign-new-post .campaign-compose-schedule>.desvio-date-trigger { font-size: 16px; }
+  .desvio-redesign .campaign-new-post>footer { padding: 16px 20px; gap: 12px; }
+  .desvio-redesign .campaign-new-post>footer>button.primary { padding-inline: 20px; }
+}
+@media(max-height:540px) {
+  .desvio-redesign .campaign-new-post>header { padding-block: 12px; }
+  .desvio-redesign .campaign-new-post>header p { display: none; }
+  .desvio-redesign .campaign-new-post>footer { padding-block: 12px; }
+}

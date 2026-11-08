@@ -6,7 +6,7 @@ import {PostArtworkChoices} from './post-artwork-choices';
 import type {PostArtwork} from '../../api/src/post-artwork';
 import {CampaignPostIdeas} from './campaign-post-ideas';
 import {Notice} from './primitives';
-import {SavedReferencePreviews} from './brand-references';
+import {DesvioDatePicker} from './desvio-date-picker';
 import {CampaignPostReferences} from './campaign-post-references';
 import {localCandidates,localMinute,addDays} from '../../api/src/local-calendar';
 import './campaign-post.css';
@@ -30,9 +30,37 @@ export function CampaignNewPost({businessId,initialPlan,autoOpen=false}:{busines
   const result=await api(`/api/v1/businesses/${businessId}/content-plans/${planId}/${format==='blog'?'blogs':'posts'}`,body,'POST',key.current);
   dialog.current?.close();router.push(['static','story','carousel'].includes(format)?`/b/${businessId}/campaign-review?plan=${planId}&stage=generating`:`/b/${businessId}/campaign-post?${format==='blog'?'blog':'slot'}=${result.id}`);
  }catch(e){setError(e);}finally{setBusy(false);}}
- return <><button className="primary" onClick={()=>{setOpen(true);dialog.current?.showModal();}}>＋ New Post</button><dialog className="campaign-new-post" ref={dialog} aria-labelledby="new-post-heading" onClose={()=>setOpen(false)} onCancel={e=>{if(busy||uploading)e.preventDefault();}}><header><h2 id="new-post-heading">New Post</h2><label>Campaign<select aria-label="Campaign" value={planId} disabled={busy||uploading} onChange={e=>setPlanId(e.target.value)}>{plans.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select></label><button aria-label="Close new post" disabled={busy||uploading} onClick={()=>dialog.current?.close()}>×</button></header>
- <p className="campaign-compose-intro">Start with a topic or choose an idea below.</p><Notice error={error}/>
- {!plans.length&&<p><a href={`/b/${businessId}/campaign-new`}>Create your first campaign</a> to start adding posts.</p>}
- <fieldset disabled={busy||uploading}><div className="campaign-compose-row"><div className="campaign-compose-visual">{references.length?<SavedReferencePreviews businessId={businessId} ids={references.slice(0,1)}/>:<span>Choose a reference image<br/><small>or create from your topic</small></span>}</div><div className="campaign-compose-fields"><div className="heading-row"><label htmlFor="campaign-topic">Topic</label><button type="button" onClick={()=>setContextOpen(v=>!v)}>＋ Add Context</button></div><textarea rows={3} id="campaign-topic" placeholder="What should this post be about?" maxLength={2000} value={topic} onChange={e=>setTopic(e.target.value)}/>{open&&planId&&<CampaignPostIdeas key={`${businessId}:${planId}:${format}:${channel}`} businessId={businessId} planId={planId} format={format} channel={channel} onChoose={setTopic}/>} {contextOpen&&<label>Creative direction<textarea value={context} maxLength={1800} placeholder="Describe what you want to see: scene, mood, colours, text or specific changes…" onChange={e=>setContext(e.target.value)}/><small>Your context guides the generated creative.</small></label>}<div className="campaign-compose-options"><label>Post format<select value={format} onChange={e=>{setFormat(e.target.value);if(['story','reel'].includes(e.target.value)&&channel==='linkedin')setChannel('instagram');}}>{POST_FORMATS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label><label>Posting on<input type="datetime-local" value={when} onChange={e=>setWhen(e.target.value)}/></label>{format!=='blog'&&<label>Channel<select value={channel} onChange={e=>setChannel(e.target.value)}><option value="instagram">Instagram</option><option value="facebook">Facebook</option>{!['story','reel'].includes(format)&&<option value="linkedin">LinkedIn</option>}</select></label>}</div>{format==='carousel'&&<label>Slides<input type="number" min={2} max={10} value={slides} onChange={e=>setSlides(Number(e.target.value))}/><small>One coordinated story across every slide.</small></label>}{['static','carousel','story'].includes(format)&&<PostArtworkChoices value={artwork} onChange={setArtwork}/>}<small className="campaign-compose-timezone">Times in {plan?.timezone?.replaceAll('_',' ')}</small>{plan&&!when&&<small>Choose a posting time within this campaign, or select a future campaign.</small>}</div></div>{format!=='blog'&&<CampaignPostReferences businessId={businessId} selection={references} onChange={setReferences} disabled={busy} onBusy={setUploading}/>}</fieldset>
- <footer><span>Your post stays a draft until you approve it.</span><button className="primary" disabled={busy||uploading||!plan||!topic.trim()||!when} onClick={()=>void save()}>{busy?'Saving…':'Create Post'}</button></footer></dialog></>;
+ return <>
+  <button className="primary" onClick={()=>{setOpen(true);dialog.current?.showModal();}}>＋ New Post</button>
+  <dialog className="campaign-new-post" ref={dialog} aria-labelledby="new-post-heading" aria-describedby="new-post-intro" onClose={()=>setOpen(false)} onCancel={e=>{if(busy||uploading)e.preventDefault();}}>
+   <header>
+    <div><h2 id="new-post-heading">New Post</h2><p id="new-post-intro">Start with your topic. Make it yours with images and ideas.</p></div>
+    <button type="button" aria-label="Close new post" disabled={busy||uploading} onClick={()=>dialog.current?.close()}>×</button>
+   </header>
+   <Notice error={error}/>
+   <div className="campaign-compose-scroll"><fieldset disabled={busy||uploading} className="campaign-compose-body">
+    <label className="campaign-compose-campaign">Campaign
+     <select aria-label="Campaign" value={planId} onChange={e=>setPlanId(e.target.value)}>{plans.map(p=><option key={p.id} value={p.id}>{p.title}</option>)}</select>
+    </label>
+    {!plans.length&&<p><a href={`/b/${businessId}/campaign-new`}>Create your first campaign</a> to start adding posts.</p>}
+    <div className="campaign-compose-fields">
+     <div className="heading-row"><label htmlFor="campaign-topic">Topic</label><button type="button" aria-expanded={contextOpen} aria-controls="campaign-creative-context" onClick={()=>setContextOpen(v=>!v)}>{contextOpen?'Hide context':'＋ Add context'}</button></div>
+     <textarea rows={3} id="campaign-topic" placeholder="What should this post be about?" maxLength={2000} value={topic} onChange={e=>setTopic(e.target.value)}/>
+     {contextOpen&&<label id="campaign-creative-context">Creative direction<textarea value={context} maxLength={1800} placeholder="Describe the scene, mood, colours or specific details…" onChange={e=>setContext(e.target.value)}/><small>Your context guides the generated creative.</small></label>}
+    </div>
+    {format!=='blog'&&<CampaignPostReferences businessId={businessId} selection={references} onChange={setReferences} disabled={busy} onBusy={setUploading}/>}
+    {open&&planId&&<CampaignPostIdeas key={`${businessId}:${planId}:${format}:${channel}`} businessId={businessId} planId={planId} format={format} channel={channel} onChoose={setTopic}/>}
+    <div className="campaign-compose-options">
+     <label>Post format<select aria-label="Post format" value={format} onChange={e=>{setFormat(e.target.value);if(['story','reel'].includes(e.target.value)&&channel==='linkedin')setChannel('instagram');}}>{POST_FORMATS.map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></label>
+     {format!=='blog'&&<label>Channel<select aria-label="Channel" value={channel} onChange={e=>setChannel(e.target.value)}><option value="instagram">Instagram</option><option value="facebook">Facebook</option>{!['story','reel'].includes(format)&&<option value="linkedin">LinkedIn</option>}</select></label>}
+     <div className="campaign-compose-schedule"><span>Posting on</span><DesvioDatePicker label="Posting on" value={when} onChange={setWhen} time timezone={plan?.timezone??'UTC'} disabled={busy||uploading}/></div>
+    </div>
+    <small className="campaign-compose-timezone">Times in {plan?.timezone?.replaceAll('_',' ')??'UTC'}</small>
+    {plan&&!when&&<small>Choose a posting time within this campaign, or select a future campaign.</small>}
+    {format==='carousel'&&<label className="campaign-compose-slides">Slides<input type="number" min={2} max={10} value={slides} onChange={e=>setSlides(Number(e.target.value))}/><small>One coordinated story across every slide.</small></label>}
+    {['static','carousel','story'].includes(format)&&<details className="campaign-compose-artwork"><summary>Image text & fonts<span>{artwork.text==='none'?'No image text':artwork.typography?'Custom fonts':'Brand fonts'}</span></summary><PostArtworkChoices value={artwork} onChange={setArtwork}/></details>}
+   </fieldset></div>
+   <footer><span>Your post stays a draft until you approve it.</span><button className="primary" disabled={busy||uploading||!plan||!topic.trim()||!when} onClick={()=>void save()}>{busy?'Saving…':'Create Post'}</button></footer>
+  </dialog>
+ </>;
 }
