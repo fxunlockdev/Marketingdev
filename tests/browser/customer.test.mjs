@@ -1,3 +1,4 @@
+import {selectOption,selectField,setSelectedOption} from './select-control.mjs';
 import { test, before, after, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawn, execFileSync } from "node:child_process";
@@ -234,7 +235,7 @@ async function createBusiness(name) {
 async function addFact(field, value) {
   const manual = alice.locator("details").filter({has: alice.getByText("Add a detail the website does not cover", {exact:true})});
   if (!(await manual.evaluate(el => el.open))) await manual.locator("summary").click();
-  await alice.getByLabel("Brand field", { exact: true }).selectOption(field);
+  await selectOption(alice.getByLabel("Brand field", { exact: true }),field);
   await alice.getByLabel("Fact", { exact: true }).fill(value);
   await alice
     .getByRole("button", { name: "Add for review", exact: true })
@@ -243,8 +244,8 @@ async function addFact(field, value) {
   // Adding an alternative must not silently replace the currently selected description.
   await expect(async()=>{
     if(await choices.count()){
-      const option=choices.locator('option').filter({hasText:value.slice(0,90)});
-      if(await option.count())await choices.selectOption(await option.getAttribute('value'));
+      const option=selectField(choices).locator('option').filter({hasText:value.slice(0,90)});
+      if(await option.count())await selectOption(choices,await option.getAttribute('value'));
     }
     await expect(alice.locator('.finding-card').filter({hasText:value})).toBeVisible();
   }).toPass({timeout:8000});
@@ -325,13 +326,13 @@ test("three-step manual fallback saves evidence, corrections, goals and immutabl
       exact: true,
     }),
   ).toBeVisible();
-  await alice.getByLabel("Primary goal").selectOption("leads");
-  await alice.getByLabel("Time zone", { exact: true }).fill("Kuala Lumpur");
-  await alice.getByRole("button", { name: "Kuala Lumpur Asia/Kuala Lumpur", exact: true }).click();
+  await selectOption(alice.getByLabel("Primary goal"),"leads");
+  await alice.getByLabel("Time zone", { exact: true }).click();await alice.getByRole("combobox",{name:"Search cities or time zones"}).fill("Kuala Lumpur");
+  await alice.getByRole("option", { name: "Kuala Lumpur · Asia/Kuala Lumpur", exact: true }).click();
   await expect(alice.locator(".time-zone-selection")).toContainText("Asia/Kuala Lumpur");
   await alice.getByRole("button", { name: "Save goals", exact: true }).click();
   await alice.reload();
-  await expect(alice.getByLabel("Primary goal")).toHaveValue("leads");
+  await expect(selectField(alice.getByLabel("Primary goal"))).toHaveValue("leads");
   await alice.getByRole("button", { name: "Save brand without a plan" }).click();
   await expect(
     alice.getByRole("heading", { name: "Your brand is ready." }),
@@ -463,7 +464,7 @@ test('Brand Kit edits persist and approval excludes unsaved drafts',async()=>{
  await alice.getByRole('button',{name:'Brand Style',exact:true}).click();
  await expect(alice.getByRole('heading',{name:'Colors and typography',exact:true})).toBeVisible();
  await alice.getByText('Add a detail the website does not cover',{exact:true}).click();
- await alice.getByLabel('Brand field',{exact:true}).selectOption('fonts');
+ await selectOption(alice.getByLabel('Brand field',{exact:true}),'fonts');
  await alice.getByRole('button',{name:'Modern Aa DM Sans',exact:true}).click();
  await alice.getByRole('button',{name:'Add for review',exact:true}).click();
  const fonts=alice.locator('.finding-card').filter({has:alice.getByRole('heading',{name:'fonts',exact:true})});
@@ -548,9 +549,7 @@ test("three saved businesses, server fourth rejection, selector isolation and ca
   await expect(alice.locator(".memory-facts")).toContainText(
     "Botanical refill packs for stores",
   );
-  await alice
-    .getByLabel("Business", { exact: true })
-    .selectOption(secondBusiness);
+  await selectOption(alice.getByLabel("Business", {exact:true}),secondBusiness);
   await expect(
     alice.getByText("Confirm your brand profile to start building its knowledge.", { exact: false }),
   ).toBeVisible();
@@ -863,15 +862,15 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   await expect(
     alice.getByText("Your brand changed. Review your suggested direction."),
   ).toBeVisible();
-  await expect(alice.getByLabel("Primary goal")).toHaveValue("leads");
+  await expect(selectField(alice.getByLabel("Primary goal"))).toHaveValue("leads");
   await expect(alice.getByLabel("Posts per week")).toHaveValue("4");
   await expect(alice.getByText('Why these suggestions?',{exact:true})).toHaveCount(0);
   await expect(alice.locator('.availability-card')).not.toContainText(chunk.id);
   await expect(alice.locator('.availability-card')).toContainText('Appointment software is offered to dental practices.');
-  await alice.getByLabel("Primary goal").selectOption("sales");
+  await selectOption(alice.getByLabel("Primary goal"),"sales");
   await alice.getByRole("button", { name: "Save goals", exact: true }).click();
   await alice.reload();
-  await expect(alice.getByLabel("Primary goal")).toHaveValue("sales");
+  await expect(selectField(alice.getByLabel("Primary goal"))).toHaveValue("sales");
   const denied = await bob.request.get(
     `${base}/api/v1/businesses/${target.id}/intake`,
   );
@@ -1015,19 +1014,19 @@ test('retained visual styles stay editable without AI and unsaved edits survive 
 
 test('business Team invites through real email, accepts selected access, changes roles and removes only that business',async()=>{
  await alice.goto(base+`/b/${firstBusiness}/team`);await expect(alice.getByRole('heading',{name:'Team',exact:true})).toBeVisible();
- await alice.getByLabel('Teammate’s email').fill('browser-bob@example.test');await alice.getByLabel('Business role',{exact:true}).selectOption('viewer');await alice.getByRole('button',{name:'Send invitation',exact:true}).click();
+ await alice.getByLabel('Teammate’s email').fill('browser-bob@example.test');await selectOption(alice.getByLabel('Business role',{exact:true}),'viewer');await alice.getByRole('button',{name:'Send invitation',exact:true}).click();
  await expect(alice.getByText('Invitation saved and email queued.',{exact:false})).toBeVisible();const link=await emailLink('browser-bob@example.test','Your Desvio client invitation');
  await bob.goto(link);await bob.getByRole('button',{name:'Accept invitation',exact:true}).click();await expect(bob.getByRole('heading',{name:/^(Add your first business|Choose a business|Your content, at a glance\.)$/})).toBeVisible();await bob.goto(base+'/brands');await expect(bob.locator('.v5-business-card')).toHaveCount(2);
- await alice.getByRole('button',{name:'Refresh team',exact:true}).click();await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption('editor');await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByText('Business role saved.',{exact:true})).toBeVisible();
+ await alice.getByRole('button',{name:'Refresh team',exact:true}).click();await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),'editor');await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByText('Business role saved.',{exact:true})).toBeVisible();
  await alice.reload();await expect(alice.getByRole('region',{name:'People with access'}).getByText('editor',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-desktop.png',fullPage:true});
  await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-mobile.png',fullPage:true});
- for(const role of ['reviewer','analyst']){await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption(role);await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByRole('region',{name:'People with access'}).getByText(role,{exact:true})).toBeVisible();}
+ for(const role of ['reviewer','analyst']){await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),role);await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByRole('region',{name:'People with access'}).getByText(role,{exact:true})).toBeVisible();}
  await bob.goto(base+`/b/${firstBusiness}/team`);await expect(bob.getByRole('heading',{name:'Team',exact:true})).toBeVisible();await expect(bob.getByRole('button',{name:'Send invitation'})).toHaveCount(0);
- await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await alice.getByLabel('Role for Sam Rivera').selectOption('admin');await alice.getByRole('button',{name:'Save role',exact:true}).click();
+ await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),'admin');await alice.getByRole('button',{name:'Save role',exact:true}).click();
  await bob.reload();await expect(bob.getByRole('button',{name:'Send invitation',exact:true})).toBeVisible();
- await expect(bob.getByRole('link',{name:'account team settings',exact:true})).toHaveCount(0);await expect(bob.getByRole('group',{name:'Businesses they can access'}).getByRole('checkbox')).toHaveCount(1);
+ await expect(bob.getByRole('link',{name:'account team settings',exact:true})).toHaveCount(0);await bob.getByRole('combobox',{name:'Businesses they can access',exact:true}).click();await expect(bob.getByRole('option')).toHaveCount(1);await bob.keyboard.press('Escape');
  await expect(bob.getByLabel('Business role',{exact:true}).locator('option[value="admin"]')).toHaveCount(0);
- await bob.getByLabel('Teammate’s email').fill('delegated-browser@example.test');await bob.getByLabel('Business role',{exact:true}).selectOption('reviewer');await bob.getByRole('button',{name:'Send invitation',exact:true}).click();
+ await bob.getByLabel('Teammate’s email').fill('delegated-browser@example.test');await selectOption(bob.getByLabel('Business role',{exact:true}),'reviewer');await bob.getByRole('button',{name:'Send invitation',exact:true}).click();
  await expect(bob.getByText('Invitation saved and email queued.',{exact:false})).toBeVisible();assert.ok(await emailLink('delegated-browser@example.test','Your Desvio client invitation'));
  await bob.getByRole('button',{name:'Revoke invitation to delegated-browser@example.test',exact:true}).click();await expect(bob.getByText('Invitation revoked for every business included in that invitation.',{exact:true})).toBeVisible();
  assert.deepEqual((await new AxeBuilder({page:bob}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await bob.screenshot({path:'work/browser/delegated-business-team.png',fullPage:true});
@@ -1119,9 +1118,9 @@ test('Studio overview keeps real counts, working routes, narrow layouts and redu
  await expect(alice.getByRole('region',{name:'Post details',exact:true})).toBeVisible();
  await expect(alice.getByLabel('Creative brief',{exact:true})).toHaveValue('TEST upcoming botanical story');
  await alice.goto(`${base}/b/${firstBusiness}/content-plan?start=${day}`);
- await expect(alice.getByLabel('Calendar view',{exact:true})).toHaveValue('week');
+ await expect(selectField(alice.getByLabel('Calendar view',{exact:true}))).toHaveValue('week');
  await alice.getByText('Calendar options',{exact:true}).click();
- await alice.getByLabel('Calendar view',{exact:true}).selectOption('day');
+ await selectOption(alice.getByLabel('Calendar view',{exact:true}),'day');
  await alice.getByText('Calendar options',{exact:true}).click();
  const daily=alice.getByRole('region',{name:'Posts for selected day'});
  await expect(daily.getByRole('heading',{name:'TEST upcoming botanical story'})).toBeVisible();
@@ -1137,7 +1136,7 @@ test('Studio overview keeps real counts, working routes, narrow layouts and redu
  await alice.getByRole('button',{name:'Next day',exact:true}).click();
  await expect(alice.getByRole('heading',{name:'Space for your next ideas'})).toBeVisible();
  await alice.getByText('Calendar options',{exact:true}).click();
- await alice.getByLabel('Calendar view',{exact:true}).selectOption('month');
+ await selectOption(alice.getByLabel('Calendar view',{exact:true}),'month');
  await alice.getByText('Calendar options',{exact:true}).click();
  await expect(alice.getByRole('list',{name:'Days in this view'})).toBeVisible();
  const otherPlan=await alice.request.post(`${base}/api/v1/businesses/${firstBusiness}/content-plans`,{headers:{origin:base,'idempotency-key':randomUUID()},data:{title:'TEST overlapping campaign',objective:'Check campaign filtering',starts_on:day,timezone:'UTC',slots:[{channel:'instagram',format:'static',planned_at:day+'T13:00:00Z',brief:'TEST separate campaign post'}]}});
@@ -1297,7 +1296,7 @@ test('first-plan confirmation resumes its saved request then opens the campaign 
  await alice.route('**'+root+'/content-plan/generate',generate);await alice.route('**'+root+'/content-plan/jobs',jobs);await alice.route('**'+root+'/content-plans/'+plan,detail);
  try{
  await alice.goto(`${base}/b/${b.id}/onboarding`);
- await alice.getByLabel('Plan duration',{exact:true}).selectOption('7');await alice.getByLabel('Video ideas',{exact:true}).fill('');await expect(alice.getByLabel('Video ideas',{exact:true})).toHaveValue('');await alice.getByLabel('Video ideas',{exact:true}).fill('1');
+ await selectOption(alice.getByLabel('Plan duration',{exact:true}),'7');await alice.getByLabel('Video ideas',{exact:true}).fill('');await expect(alice.getByLabel('Video ideas',{exact:true})).toHaveValue('');await alice.getByLabel('Video ideas',{exact:true}).fill('1');
  await alice.getByRole('button',{name:'Confirm & create my calendar',exact:true}).click();
  await expect(alice).toHaveURL(`${base}/b/${b.id}/onboarding`);await expect(alice.getByRole('heading',{name:'Building your calendar',exact:true})).toBeVisible();
  await alice.reload();await expect(alice).toHaveURL(`${base}/b/${b.id}/onboarding`);await expect(alice.getByRole('heading',{name:'Building your calendar',exact:true})).toBeVisible();
@@ -1309,7 +1308,7 @@ test('first-plan confirmation resumes its saved request then opens the campaign 
  test('Content Preferences saves defaults and preserves drafts on a stale save',async()=>{
  await alice.goto(base+`/b/${firstBusiness}/content-preferences`);
  await expect(alice.getByRole('heading',{name:'Content Preferences',exact:true})).toBeVisible();
- await alice.getByRole('checkbox',{name:'Instagram',exact:true}).check();
+ await setSelectedOption(alice.getByRole('combobox',{name:'Preferred channels',exact:true}),'Instagram',true);
  await alice.getByLabel('Posts per week',{exact:true}).fill('7');
  await alice.getByLabel('Topics or claims to avoid',{exact:true}).fill('No exaggerated savings claims');
  await alice.getByRole('button',{name:'Save preferences',exact:true}).click();
@@ -1353,12 +1352,12 @@ test('campaign builder reviews details and resumes the same uncertain request af
  await expect(alice.getByRole('heading',{name:'What’s your campaign about?',exact:true})).toBeVisible();
  await alice.getByLabel('Campaign name',{exact:true}).fill('A fresh start');await alice.getByLabel('Theme',{exact:true}).fill('Introduce our refill range with practical everyday tips.');
  await alice.getByLabel('Call to action (optional)',{exact:true}).fill('Explore the range');await alice.getByLabel('Target link (optional)',{exact:true}).fill('www.example.com/refills');
- await alice.getByRole('button',{name:'Continue',exact:true}).click();await alice.getByRole('checkbox',{name:'Instagram',exact:true}).check();await alice.getByRole('checkbox',{name:'LinkedIn',exact:true}).uncheck();
- await alice.getByLabel('Image posts',{exact:true}).fill('1');await alice.getByLabel('Image posts shape',{exact:true}).selectOption('portrait');
+ await alice.getByRole('button',{name:'Continue',exact:true}).click();await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'Instagram',true);await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'LinkedIn',false);
+ await alice.getByLabel('Image posts',{exact:true}).fill('1');await selectOption(alice.getByLabel('Image posts shape',{exact:true}),'portrait');
  await alice.getByLabel('Carousels',{exact:true}).fill('1');await alice.getByLabel('Slides per carousel',{exact:true}).fill('4');
  await alice.getByLabel('Image stories',{exact:true}).fill('1');await alice.getByLabel('Reels',{exact:true}).fill('1');await alice.getByLabel('Video stories',{exact:true}).fill('1');await alice.getByLabel('Video posts',{exact:true}).fill('1');
- await alice.getByRole('checkbox',{name:'LinkedIn',exact:true}).check();await alice.getByRole('group',{name:'Choose a platform',exact:true}).getByRole('button',{name:'LinkedIn',exact:true}).click();await expect(alice.getByLabel('Reels',{exact:true})).toHaveCount(0);await expect(alice.getByLabel('Image stories',{exact:true})).toHaveCount(0);await expect(alice.getByLabel('Video stories',{exact:true})).toHaveCount(0);
- await alice.getByRole('checkbox',{name:'LinkedIn',exact:true}).uncheck();await expect(alice.getByLabel('Slides per carousel',{exact:true})).toHaveValue('4');
+ await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'LinkedIn',true);await alice.getByRole('group',{name:'Choose a platform',exact:true}).getByRole('button',{name:'LinkedIn',exact:true}).click();await expect(alice.getByLabel('Reels',{exact:true})).toHaveCount(0);await expect(alice.getByLabel('Image stories',{exact:true})).toHaveCount(0);await expect(alice.getByLabel('Video stories',{exact:true})).toHaveCount(0);
+ await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'LinkedIn',false);await expect(alice.getByLabel('Slides per carousel',{exact:true})).toHaveValue('4');
  await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/campaign-format-mix-mobile.png',fullPage:true});await alice.getByRole('button',{name:'Continue',exact:true}).click();
  await expect(alice.getByRole('heading',{name:'Find your visual style',exact:true})).toBeVisible();
  await alice.getByRole('radio',{name:/Editorial/}).check();await alice.getByRole('button',{name:'Continue',exact:true}).click();

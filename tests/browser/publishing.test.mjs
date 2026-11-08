@@ -1,3 +1,4 @@
+import {selectOption,selectField} from './select-control.mjs';
 import {prepareVideoImage} from '../../scripts/video-runtime-image.mjs';
 import {publishingVideo} from '../fixtures/publishing-video.mjs';
 import {spawn} from 'node:child_process';
@@ -123,7 +124,7 @@ async function overviewResults(browserPage=page,business=brand){
 }
 
 const card=f=>activity().getByRole('listitem').filter({has:page.getByText(f.v.caption,{exact:true})});
-async function choose(f){await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByRole('heading',{name:'Confirm publication'})).toBeVisible();await expect(page.getByRole('img',{name:'Exact approved image to be published'})).toBeVisible();await page.getByLabel('Publish to',{exact:true}).selectOption(channelId);await expect(page.getByLabel(/I authorize this exact image/)).toBeEnabled();}
+async function choose(f){await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByRole('heading',{name:'Confirm publication'})).toBeVisible();await expect(page.getByRole('img',{name:'Exact approved image to be published'})).toBeVisible();await selectOption(page.getByLabel('Publish to',{exact:true}),channelId);await expect(page.getByLabel(/I authorize this exact image/)).toBeEnabled();}
 async function confirm(){await page.getByLabel(/I authorize this exact image/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();}
 
 test('approved image → exact account/time consent → persisted publishing result, history and real overview counts',async()=>{
@@ -136,7 +137,7 @@ test('lost provider acknowledgement is held and cannot be submitted again after 
  const f=fixtures[1];mode='postLost';await choose(f);const before=submissions;await confirm();await expect(card(f).getByText('Outcome uncertain',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,before+1);await page.reload();await expect(card(f).getByText('Outcome uncertain',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Ready to publish'}).getByText(f.v.caption,{exact:true})).toHaveCount(0);await expect(card(f).getByRole('button',{name:'Check post status'})).toHaveCount(0);
 });
 test('broken preview and changed approval prevent confirmation; no publish is implied by viewing an image',async()=>{
- const f=fixtures[2],before=submissions,pattern=config.storage.endpoint+'/**';await page.route(pattern,route=>route.fulfill({contentType:'image/png',body:'CORRUPT TEST IMAGE'}));await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByText('The approved image failed its integrity check.',{exact:true})).toBeVisible();await expect(page.getByLabel(/I authorize this exact image/)).toBeDisabled();await page.unroute(pattern);await page.getByRole('button',{name:'Reload approved image'}).click();await page.getByLabel('Publish to',{exact:true}).selectOption(channelId);await expect(page.getByLabel(/I authorize this exact image/)).toBeEnabled();
+ const f=fixtures[2],before=submissions,pattern=config.storage.endpoint+'/**';await page.route(pattern,route=>route.fulfill({contentType:'image/png',body:'CORRUPT TEST IMAGE'}));await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByText('The approved image failed its integrity check.',{exact:true})).toBeVisible();await expect(page.getByLabel(/I authorize this exact image/)).toBeDisabled();await page.unroute(pattern);await page.getByRole('button',{name:'Reload approved image'}).click();await selectOption(page.getByLabel('Publish to',{exact:true}),channelId);await expect(page.getByLabel(/I authorize this exact image/)).toBeEnabled();
  await plans.edit(alice.id,brand.id,f.slot.id,{revision:f.slot.revision,brief:'Changed since preview',reset_approval:true});await expect(page.getByText('This post changed or already has a publication request.',{exact:false})).toBeVisible({timeout:10000});await expect(page.getByRole('button',{name:'Confirm and schedule'})).toBeDisabled();assert.equal(submissions,before);await page.getByRole('button',{name:'Close confirmation'}).click();
 });
 test('cancel before submission uses the real queued job; an ambiguous client response cannot double-submit',async()=>{
@@ -146,7 +147,7 @@ test('cancel before submission uses the real queued job; an ambiguous client res
 test('status checks preserve history, business switching isolates records, and readonly members cannot publish',async()=>{
  const f=fixtures[0];await page.goto(url(brand));mode='listMissing';await card(f).getByRole('button',{name:'Check post status'}).click();await expect(card(f).getByText('Post not found',{exact:true})).toBeVisible({timeout:30000});await card(f).getByRole('button',{name:'Status history'}).click();await expect(card(f).getByRole('list').getByText('Published',{exact:true})).toBeVisible();mode='';
  await reader.goto(url(brand));await expect(reader.getByText('You can view publishing activity.',{exact:false})).toBeVisible();await expect(reader.getByRole('button',{name:'Review and schedule'})).toHaveCount(0);await expect(reader.getByRole('button',{name:'Check post status'})).toHaveCount(0);await other.goto(url(brand));await expect(other.getByRole('heading',{name:'Business unavailable'})).toBeVisible();
- await page.getByLabel('Business',{exact:true}).selectOption(sibling.id);await expect(page.getByText('No publishing requests match this view.',{exact:true})).toBeVisible();await expect(page.getByText(f.v.caption,{exact:true})).toHaveCount(0);await page.getByRole('link',{name:'Home',exact:true}).click();await expect(page.getByRole('link',{name:/^Published posts 0 View/})).toBeVisible();await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/overview-mobile.png',fullPage:true});assert.deepEqual(pageErrors,[]);assert.ok(!(await page.content()).includes(credential));assert.ok(!logs.includes(credential));assert.deepEqual(await page.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});
+ await selectOption(page.getByLabel('Business',{exact:true}),sibling.id);await expect(page.getByText('No publishing requests match this view.',{exact:true})).toBeVisible();await expect(page.getByText(f.v.caption,{exact:true})).toHaveCount(0);await page.getByRole('link',{name:'Home',exact:true}).click();await expect(page.getByRole('link',{name:/^Published posts 0 View/})).toBeVisible();await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.evaluate(()=>{if(document.activeElement instanceof HTMLElement)document.activeElement.blur();window.scrollTo(0,0);});await page.screenshot({path:'work/browser/overview-mobile.png',fullPage:true});assert.deepEqual(pageErrors,[]);assert.ok(!(await page.content()).includes(credential));assert.ok(!logs.includes(credential));assert.deepEqual(await page.evaluate(()=>({local:Object.keys(localStorage),session:Object.keys(sessionStorage)})),{local:[],session:[]});
 });
 
 // Seeded provider output is intentionally not a generation test. Keep its
@@ -165,7 +166,7 @@ test('approved video preview → explicit exact-media consent → one MP4 upload
  remoteState='PUBLISHED';const count=submissions,mediaPattern=config.storage.endpoint+'/**';await page.route(mediaPattern,route=>route.fulfill({contentType:'video/mp4',body:'CORRUPT TEST VIDEO'}));await page.goto(url(brand)+'?slot='+f.slot.id);
  await expect(page.getByText('The approved video failed its integrity check.',{exact:true})).toBeVisible();await expect(page.getByLabel(/I authorize this exact video/)).toBeDisabled();assert.equal(submissions,count);await page.unroute(mediaPattern);await page.getByRole('button',{name:'Reload approved video'}).click();
  await expect(page.getByRole('heading',{name:'Confirm publication'})).toBeVisible();await expect(page.getByLabel('Exact approved video to be published')).toBeVisible();
- await page.getByLabel('Publish to',{exact:true}).selectOption(channelId);await expect(page.getByLabel(/I authorize this exact video/)).toBeEnabled();await expect(page.getByRole('button',{name:'Confirm and schedule'})).toBeDisabled();
+ await selectOption(page.getByLabel('Publish to',{exact:true}),channelId);await expect(page.getByLabel(/I authorize this exact video/)).toBeEnabled();await expect(page.getByRole('button',{name:'Confirm and schedule'})).toBeDisabled();
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-video-confirm.png'});
  await page.getByLabel(/I authorize this exact video/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.deepEqual(lastUpload,f.bytes);
  await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
@@ -176,9 +177,9 @@ test('performance shows saved metrics, filters posts and distinguishes upstream 
  await page.goto(url(brand));await page.getByRole('button',{name:'Performance',exact:true}).click();const panel=page.getByRole('region',{name:'Post performance',exact:true});
  await expect(panel.getByRole('cell',{name:'120',exact:true}).first()).toBeVisible({timeout:30000});
  await overviewResults();const results=page.getByRole('region',{name:'Recent post results',exact:true});await expect(results.getByText(/120/).first()).toBeVisible();await expect(results.getByText(/not summed or ranked/)).toBeVisible();await page.goto(url(brand));await page.getByRole('button',{name:'Performance',exact:true}).click();
- await panel.getByLabel('Performance channel',{exact:true}).selectOption('instagram');await expect(panel.getByText('Your results will appear here',{exact:true})).toBeVisible();
- await panel.getByLabel('Performance channel',{exact:true}).selectOption('linkedin');await panel.getByLabel('Performance format',{exact:true}).selectOption('video');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);
- await panel.getByLabel('Performance format',{exact:true}).selectOption('');
+ await selectOption(panel.getByLabel('Performance channel',{exact:true}),'instagram');await expect(panel.getByText('Your results will appear here',{exact:true})).toBeVisible();
+ await selectOption(panel.getByLabel('Performance channel',{exact:true}),'linkedin');await selectOption(panel.getByLabel('Performance format',{exact:true}),'video');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);
+ await selectOption(panel.getByLabel('Performance format',{exact:true}),'');
  mode='analyticsFail';const record=(await publisher.list(alice.id,brand.id)).publications.find(r=>r.observed_state==='published');
  const check=await publisher.reconcile(alice.id,brand.id,record.id,randomUUID());await handler.reconcile(scope(check));await panel.getByRole('button',{name:'Refresh saved metrics'}).click();
  await expect(panel.getByText('The latest metrics check failed.',{exact:false})).toBeVisible();
@@ -232,11 +233,11 @@ test('carousel preview checks every saved slide before consent, publishes once a
  await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByText('Slide 1 failed its integrity check.',{exact:true})).toBeVisible();await expect(page.getByLabel(/I authorize this exact carousel/)).toBeDisabled();assert.equal(submissions,count);
  await page.unroute(mediaPattern);await page.getByRole('button',{name:'Reload approved carousel'}).click();
  const slides=page.getByRole('list',{name:'Approved carousel slides'});await expect(slides.getByRole('img')).toHaveCount(2);await expect(slides.getByRole('img').nth(0)).toHaveAttribute('alt','First slide');await expect(slides.getByRole('img').nth(1)).toHaveAttribute('alt','Second slide');
- await page.getByLabel('Publish to',{exact:true}).selectOption(channelId);await expect(page.getByLabel(/I authorize this exact carousel/)).toBeEnabled();await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
+ await selectOption(page.getByLabel('Publish to',{exact:true}),channelId);await expect(page.getByLabel(/I authorize this exact carousel/)).toBeEnabled();await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-carousel-confirm.png'});
  await page.getByLabel(/I authorize this exact carousel/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.equal(uploads,uploadCount+2);
  await page.reload();await expect(card(f).getByText('Published',{exact:true})).toBeVisible();assert.equal(submissions,count+1);
- await page.getByRole('button',{name:'Performance',exact:true}).click();const panel=page.getByRole('region',{name:'Post performance',exact:true});await panel.getByLabel('Performance format',{exact:true}).selectOption('carousel');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);await expect(panel.getByRole('heading',{name:/Carousel/})).toBeVisible();
+ await page.getByRole('button',{name:'Performance',exact:true}).click();const panel=page.getByRole('region',{name:'Post performance',exact:true});await selectOption(panel.getByLabel('Performance format',{exact:true}),'carousel');await expect(panel.getByRole('heading',{level:3})).toHaveCount(1);await expect(panel.getByRole('heading',{name:/Carousel/})).toBeVisible();
 });
 
 
@@ -251,7 +252,7 @@ test('Instagram Reel offers only its channel account and persists exact approved
  await expect(page.getByLabel('Exact approved video to be published')).toBeVisible();
  const account=page.getByLabel('Publish to',{exact:true});
  await expect(account.locator('option')).toHaveText(['Choose a Instagram account','MOCK Instagram profile · Instagram']);
- await account.selectOption(instagramChannelId);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
+ await selectOption(account,instagramChannelId);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
  await expect(page.getByLabel(/I authorize this exact video/)).toBeEnabled();
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);
  await page.getByRole('region',{name:'Confirm publication'}).screenshot({path:'work/browser/publishing-instagram-confirm.png'});
@@ -280,7 +281,7 @@ test('Instagram calendar review prepares the actual JPEG, requires its approval,
  const saved=(await exports.list(alice.id,brand.id,v.id)).exports.find(e=>e.format==='instagram-jpeg');assert.ok(saved);
  await page.getByRole('link',{name:'Review publishing options →'}).click();
  await expect(page.getByRole('img',{name:'Exact approved image to be published'})).toBeVisible();
- await page.getByLabel('Publish to',{exact:true}).selectOption(instagramChannelId);
+ await selectOption(page.getByLabel('Publish to',{exact:true}),instagramChannelId);
  await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
  await page.getByLabel(/I authorize this exact image/).check();remoteState='PUBLISHED';const count=submissions;
  await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();await expect(card({v}).getByText('Published',{exact:true})).toBeVisible({timeout:30000});
@@ -299,7 +300,7 @@ test('Facebook approved image offers only its Page and publishes once after expl
  const f=await approvedPost('Facebook browser','facebook'),count=submissions;remoteState='PUBLISHED';
  await page.goto(url(brand)+'?slot='+f.slot.id);await expect(page.getByRole('img',{name:'Exact approved image to be published'})).toBeVisible();
  const account=page.getByLabel('Publish to',{exact:true});await expect(account.locator('option')).toHaveText(['Choose a Facebook account','MOCK Facebook Page · Facebook']);
- await account.selectOption(fb);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
+ await selectOption(account,fb);await expect(page.getByRole('button',{name:'Confirm and schedule',exact:true})).toBeDisabled();
  await page.getByLabel(/I authorize this exact image/).check();await page.getByRole('button',{name:'Confirm and schedule',exact:true}).click();
  await expect(card(f).getByText('Published',{exact:true})).toBeVisible({timeout:30000});assert.equal(submissions,count+1);assert.equal(digest(lastUpload),f.e.sha256);
  await page.reload();await expect(card(f).getByText('MOCK Facebook Page · Facebook',{exact:true})).toBeVisible();assert.equal(submissions,count+1);

@@ -1,3 +1,4 @@
+import {selectOption,selectField} from './select-control.mjs';
 const reconnectTargets=new Map();
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
@@ -66,7 +67,7 @@ test('business setup → private authorization → consent → clean callback �
 test('refresh shows actual failed/missing observations without erasing the saved account; business switch isolates results',async()=>{
  failList=true;await alice.getByRole('button',{name:'Refresh accounts'}).click();await expect(alice.getByText('The latest account check could not finish.',{exact:false})).toBeVisible({timeout:30000});await expect(alice.getByRole('heading',{name:'Avery at Northstar'})).toBeVisible();failList=false;
  const org=(await admin.query('SELECT remote_organization_id FROM app.postiz_accounts WHERE brand_id=$1',[brandA.id])).rows[0].remote_organization_id;const saved=accounts.get(org);accounts.set(org,[]);await alice.getByRole('button',{name:'Refresh accounts'}).click();await expect(alice.getByText('Not found on last check',{exact:true})).toBeVisible({timeout:30000});accounts.set(org,saved);await alice.getByRole('button',{name:'Refresh accounts'}).click();await expect(alice.getByText('Account found',{exact:true})).toBeVisible({timeout:30000});
- await alice.getByLabel('Business',{exact:true}).selectOption(brandB.id);await expect(alice.getByRole('heading',{name:'No social accounts yet'})).toBeVisible();await expect(alice.getByRole('heading',{name:'Avery at Northstar'})).toHaveCount(0);await bob.goto(connections(brandA));await expect(bob.getByRole('heading',{name:'Business unavailable'})).toBeVisible();
+ await selectOption(alice.getByLabel('Business',{exact:true}),brandB.id);await expect(alice.getByRole('heading',{name:'No social accounts yet'})).toBeVisible();await expect(alice.getByRole('heading',{name:'Avery at Northstar'})).toHaveCount(0);await bob.goto(connections(brandA));await expect(bob.getByRole('heading',{name:'Business unavailable'})).toBeVisible();
 });
 
 test('local cancel and declined provider consent show genuine canceled outcomes without exchanging a code',async()=>{

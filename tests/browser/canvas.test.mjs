@@ -1,3 +1,4 @@
+import {selectOption,selectField} from './select-control.mjs';
 import {HiggsfieldReplacementJobs} from '../../dist/higgsfield-replacement-jobs.js';
 import {HiggsfieldImageClient} from '../../dist/higgsfield-image-client.js';
 import {ImageReplacementVault} from '../../dist/image-replacement-vault.js';
@@ -484,7 +485,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   await expect(page.getByLabel('Describe your creative',{exact:true})).toHaveValue('Create an image for my next launch');
   await page.setViewportSize({width:1440,height:1000});
 
-  await page.getByLabel('Creativity',{exact:true}).selectOption('creative');
+  await selectOption(page.getByLabel('Creativity',{exact:true}),'creative');
   await expect(page.getByLabel('Creativity',{exact:true}).locator('option')).toHaveText(['Normal','Creative','Super creative']);
   await page.getByRole('button',{name:'Add assets',exact:true}).click();await page.getByText('Brand image references',{exact:true}).click();
   await page.getByText('Add product photos',{exact:true}).click();
@@ -492,7 +493,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   await page.getByRole('button',{name:'Upload file',exact:true}).click();
   const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
   await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
-  await approval.getByLabel('Use part of this image',{exact:true}).check();await approval.getByRole('combobox',{name:/^Crop shape/}).selectOption('square');
+  await approval.getByLabel('Use part of this image',{exact:true}).check();await selectOption(approval.getByRole('combobox',{name:/^Crop shape/}),'square');
   await approval.getByRole('button',{name:'Preview selected crop',exact:true}).click();await expect(approval.getByRole('img',{name:'Selected reference crop',exact:true})).toBeVisible();
   await approval.getByLabel('Reference name',{exact:true}).fill('Botanical brand reference');
   await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
@@ -524,7 +525,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   ).rows[0];
   assert.equal(job.status, "succeeded");
   await page.getByLabel("Layer text").fill("Made for your everyday ritual");
-  await page.getByLabel("Font", { exact: true }).selectOption("DM Serif Display");
+  await selectOption(page.getByLabel("Font", { exact: true }),"DM Serif Display");
   await page.getByLabel("Font size").fill("60");
   await page.getByLabel("Left position").fill("80");
   await page
@@ -541,7 +542,7 @@ test("Canvas browser creates a real queued job, renders a private creative and s
   await expect(page.getByLabel("Layer text")).toHaveValue(
     "Made for your everyday ritual",
   );
-  await expect(page.getByLabel("Font", { exact: true })).toHaveValue("DM Serif Display");
+  await expect(selectField(page.getByLabel("Font", { exact: true }))).toHaveValue("DM Serif Display");
   await expect(page.getByLabel("Left position")).toHaveValue("80");
   const savedThreadURL=page.url();
   assert.ok(new URL(savedThreadURL).searchParams.get('thread'));
@@ -640,7 +641,7 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   await expect(page.getByLabel('Video idea',{exact:true})).toHaveValue(/TEST planned script/);
   await page.getByLabel('Video idea',{exact:true}).fill('TEST animate this brand image');
   await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
-  await page.getByLabel('Video creativity',{exact:true}).selectOption('normal');
+  await selectOption(page.getByLabel('Video creativity',{exact:true}),'normal');
   await page.getByRole('button',{name:'Draft video script',exact:true}).click();
   await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,0);
   await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt');
@@ -792,7 +793,7 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.route('**/overview',async route=>{await delay(1200);await route.continue();});
  await page.goto(`${base}/b/${brand}/content-plan`);
  await page.getByRole('button',{name:'Create content plan',exact:true}).click();
- await page.getByLabel('Calendar view',{exact:true}).selectOption('month');
+ await selectOption(page.getByLabel('Calendar view',{exact:true}),'month');
  await page.getByLabel('Plan starts on').fill('2026-11-01');
  await page.getByLabel('Anything to focus on?').fill('TEST FIXTURE: explain refillable soap');
  await page.getByRole('button',{name:'Generate draft plan',exact:true}).click();
@@ -822,7 +823,7 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  assert.ok(postSlot.creative_version_id);assert.equal(postSlot.state,'draft_ready');
  assert.equal(referenceUploads,calendarReferenceUploads+1);
  await page.getByRole('button',{name:'Close post',exact:true}).click();
- await page.getByLabel('Calendar view',{exact:true}).selectOption('list');
+ await selectOption(page.getByLabel('Calendar view',{exact:true}),'list');
  const thumbnail=page.locator('.plan-list-card').filter({has:page.getByText('TEST FIXTURE hook 1',{exact:true})}).locator('.post-thumbnail');
  await thumbnail.scrollIntoViewIfNeeded();
  await expect(thumbnail).toBeVisible();
@@ -929,14 +930,14 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
  await page.getByText('Plan content in Canvas',{exact:true}).click();
  await page.getByRole('button',{name:'Plan settings',exact:true}).click();
- await page.getByLabel('Plan creativity',{exact:true}).selectOption('normal');
+ await selectOption(page.getByLabel('Plan creativity',{exact:true}),'normal');
  await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
  await expect(page.getByText('Plan content in Canvas',{exact:true})).toHaveCount(1);
  await page.getByLabel('Set days and post counts myself',{exact:true}).check();
  await page.getByLabel('Planning days',{exact:true}).fill('4');
  await page.getByLabel('Videos in this plan',{exact:true}).fill('2');
  await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2026-12-01');
- await page.getByLabel('Repeat this plan',{exact:true}).selectOption('3');
+ await selectOption(page.getByLabel('Repeat this plan',{exact:true}),'3');
  await page.getByLabel('Total loop planning budget (USD)',{exact:true}).fill('5');
  await page.getByLabel('Allow recurring AI planning charges', {exact:false}).check();
  await page.getByRole('button',{name:'Plan my content',exact:true}).click();
@@ -956,14 +957,14 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  try{
   await stylePage.goto(`${base}/b/${brand}/campaign-new`);await expect(stylePage.locator('.generation-balance summary')).toContainText('credits');await stylePage.locator('.generation-balance summary').click();await expect(stylePage.locator('.generation-balance-detail')).toContainText('16,000 credits used');await expect(stylePage.locator('.generation-balance-detail')).toContainText('Shared across your businesses');await stylePage.locator('.generation-balance summary').click();await stylePage.getByLabel('Campaign name',{exact:true}).fill('Everyday, thoughtfully made');await stylePage.getByLabel('Theme',{exact:true}).fill('Introduce the everyday collection.');
   await stylePage.getByRole('button',{name:'Continue',exact:true}).click();
-  await stylePage.getByLabel('Start date',{exact:true}).fill('2028-02-01');await stylePage.getByRole('button',{name:'Use monthly mix',exact:true}).click();await expect(stylePage.getByLabel('Image posts',{exact:true})).toHaveValue('15');await expect(stylePage.getByLabel('Video posts',{exact:true})).toHaveValue('3');await stylePage.getByRole('group',{name:'Choose a platform',exact:true}).getByRole('button',{name:'Instagram',exact:true}).click();await expect(stylePage.getByLabel('Image posts',{exact:true})).toHaveValue('14');await expect(stylePage.getByLabel('Reels',{exact:true})).toHaveValue('2');await expect(stylePage.getByLabel('Duration',{exact:true})).toHaveValue('29');await expect(stylePage.getByText('34 posts over 29 days',{exact:false})).toBeVisible();
+  await stylePage.getByLabel('Start date',{exact:true}).fill('2028-02-01');await stylePage.getByRole('button',{name:'Use monthly mix',exact:true}).click();await expect(stylePage.getByLabel('Image posts',{exact:true})).toHaveValue('15');await expect(stylePage.getByLabel('Video posts',{exact:true})).toHaveValue('3');await stylePage.getByRole('group',{name:'Choose a platform',exact:true}).getByRole('button',{name:'Instagram',exact:true}).click();await expect(stylePage.getByLabel('Image posts',{exact:true})).toHaveValue('14');await expect(stylePage.getByLabel('Reels',{exact:true})).toHaveValue('2');await expect(selectField(stylePage.getByLabel('Duration',{exact:true}))).toHaveValue('29');await expect(stylePage.getByText('34 posts over 29 days',{exact:false})).toBeVisible();
   await stylePage.getByLabel('Image posts',{exact:true}).fill('13');await stylePage.getByRole('button',{name:'Back',exact:true}).click();await stylePage.getByRole('button',{name:'Continue',exact:true}).click();await stylePage.getByRole('group',{name:'Choose a platform',exact:true}).getByRole('button',{name:'Instagram',exact:true}).click();await expect(stylePage.getByLabel('Image posts',{exact:true})).toHaveValue('13');await stylePage.getByRole('button',{name:'Use monthly mix',exact:true}).click();
   await stylePage.screenshot({path:'work/browser/campaign-monthly-mix.png',fullPage:true});
   await stylePage.getByRole('button',{name:'Continue',exact:true}).click();
-  await stylePage.getByLabel('Preview image',{exact:true}).selectOption(approved.body.id);await expect(stylePage.getByLabel('Preview image',{exact:true})).toHaveValue(approved.body.id);await stylePage.locator('.campaign-design-choice').last().scrollIntoViewIfNeeded();
+  await selectOption(stylePage.getByLabel('Preview image',{exact:true}),approved.body.id);await expect(selectField(stylePage.getByLabel('Preview image',{exact:true}))).toHaveValue(approved.body.id);await stylePage.locator('.campaign-design-choice').last().scrollIntoViewIfNeeded();
   await expect.poll(()=>stylePage.locator('.campaign-design-preview img').count()).toBe(4);assert.ok(await stylePage.locator('.campaign-design-preview img').evaluateAll(images=>images.every(image=>image.naturalWidth>0)));
   await stylePage.getByRole('radio',{name:'Editorial',exact:true}).check();await stylePage.evaluate(()=>scrollTo(0,0));await stylePage.screenshot({path:'work/browser/campaign-photo-styles.png',fullPage:true});
-  await stylePage.getByRole('button',{name:'Continue',exact:true}).click();await stylePage.getByRole('radio',{name:'Classic',exact:true}).check();await expect(stylePage.getByLabel('Preview image',{exact:true})).toHaveValue(approved.body.id);
+  await stylePage.getByRole('button',{name:'Continue',exact:true}).click();await stylePage.getByRole('radio',{name:'Classic',exact:true}).check();await expect(selectField(stylePage.getByLabel('Preview image',{exact:true}))).toHaveValue(approved.body.id);
   await stylePage.setViewportSize({width:390,height:844});await stylePage.locator('.campaign-design-choice').last().scrollIntoViewIfNeeded();await expect.poll(()=>stylePage.locator('.campaign-design-preview img').count()).toBe(3);
   assert.ok(await stylePage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:stylePage}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await stylePage.evaluate(()=>scrollTo(0,0));await stylePage.screenshot({path:'work/browser/campaign-photo-fonts-mobile.png',fullPage:true});
   await stylePage.getByRole('button',{name:'Back',exact:true}).click();await expect(stylePage.getByRole('radio',{name:'Editorial',exact:true})).toBeChecked();
@@ -1071,7 +1072,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await expect(page.getByRole('heading',{name:'Calendar',exact:true,level:1})).toBeFocused();
  assert.equal(new URL(page.url()).searchParams.has('slot'),false);
  await page.setViewportSize({width:1440,height:1000});
- await page.getByLabel('Calendar view',{exact:true}).selectOption('week');
+ await selectOption(page.getByLabel('Calendar view',{exact:true}),'week');
  await expect(page.locator('.calendar-activity')).not.toHaveAttribute('open');
  await expect(page.locator('.plan-grid-week .plan-day')).toHaveCount(7);
  await expect(page.locator('.plan-grid-week .post-thumbnail svg')).toHaveCount(2,{timeout:15000});
@@ -1079,10 +1080,10 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await expect(page.getByLabel('Post status',{exact:true})).not.toBeVisible();
  await page.locator('.calendar-filters > summary').click();
  await expect(page.getByLabel('Post status',{exact:true})).toBeVisible();
- await page.getByLabel('Post status',{exact:true}).selectOption('draft_ready');
+ await selectOption(page.getByLabel('Post status',{exact:true}),'draft_ready');
  await expect(page.locator('.calendar-filters > summary')).toContainText('Active');
  await page.getByRole('button',{name:'Clear filters',exact:true}).click();
- await expect(page.getByLabel('Post status',{exact:true})).toHaveValue('');
+ await expect(selectField(page.getByLabel('Post status',{exact:true}))).toHaveValue('');
  await page.locator('.calendar-filters > summary').click();
  await expect(page.locator('.plan-grid-week .post-thumbnail svg')).toHaveCount(2,{timeout:15000});
  await page.screenshot({path:'work/browser/calendar-week-desktop.png',fullPage:true});
@@ -1103,7 +1104,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await expect.poll(()=>homeCreative.evaluate(node=>node instanceof HTMLImageElement?node.complete&&node.naturalWidth>0:!!node.querySelector('image')?.getAttribute('href'))).toBeTruthy();
  assert.ok(await homeCreative.evaluate(node=>{const box=node instanceof HTMLImageElement?{width:node.naturalWidth,height:node.naturalHeight}:node.viewBox.baseVal;const ratio=node.parentElement.style.aspectRatio.split('/').map(Number);return ratio.length===2&&Math.abs(ratio[0]/ratio[1]-box.width/box.height)<0.01;}));
 
- await expect(page.locator('.workspace-switcher').getByRole('combobox',{name:'Business',exact:true})).toHaveValue(brand);
+ await expect(selectField(page.locator('.workspace-switcher').getByRole('combobox',{name:'Business',exact:true}))).toHaveValue(brand);
  await expect(page.locator('.workspace-page-title')).toContainText('Welcome back,');
  await expect(page.getByRole('link',{name:'View calendar',exact:true})).toHaveAttribute('href',`/b/${brand}/content-plan`);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
@@ -1194,14 +1195,14 @@ test('Canvas composes generated slides as one carousel, reviews exact pixels, re
  }
  await page.reload();await page.getByText('Options',{exact:true}).click();await page.getByRole('button',{name:'Combine saved images into a carousel',exact:true}).click();const panel=page.getByRole('region',{name:'Carousels',exact:true});
  await panel.getByLabel('Carousel title',{exact:true}).fill('TEST botanical story');await panel.getByLabel('Shared carousel caption',{exact:true}).fill('A single story across two slides.');
- for(let i=0;i<2;i++){await panel.getByRole('button',{name:'Add slide',exact:true}).click();await panel.getByLabel(`Saved image for slide ${i+1}`,{exact:true}).selectOption(slides[i]);await panel.getByLabel(`Alt text for slide ${i+1}`,{exact:true}).fill(`Botanical slide ${i+1}`);}
+ for(let i=0;i<2;i++){await panel.getByRole('button',{name:'Add slide',exact:true}).click();await selectOption(panel.getByLabel(`Saved image for slide ${i+1}`,{exact:true}),slides[i]);await panel.getByLabel(`Alt text for slide ${i+1}`,{exact:true}).fill(`Botanical slide ${i+1}`);}
  const corruptPreview='**/creative-exports/'+slides[0]+'/download';await page.route(corruptPreview,async route=>{const response=await route.fetch(),grant=await response.json();await route.fulfill({response,json:{...grant,sha256:'0'.repeat(64)}});});
  await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(panel.getByText('Carousel saved as a draft. Review the complete slide order and caption.',{exact:true})).toBeVisible();
  const review=panel.getByRole('region',{name:'Review carousel',exact:true}),consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});
  await expect(review.getByText('Slide integrity check failed.',{exact:true})).toBeVisible();await expect(consent).toBeDisabled();await page.unroute(corruptPreview);await review.getByRole('button',{name:'Reload slide preview',exact:true}).click();
  await expect(review.getByRole('button',{name:'Send carousel for review',exact:true})).toBeDisabled();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(review.getByRole('button',{name:'Approve carousel',exact:true})).toBeVisible();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
  await panel.getByRole('button',{name:'Move slide 2 up',exact:true}).click();await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
- const id=await panel.getByLabel('Saved carousel',{exact:true}).inputValue();await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await panel.getByLabel('Saved carousel',{exact:true}).selectOption(id);await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
+ const id=await selectField(panel.getByLabel('Saved carousel',{exact:true})).inputValue();await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await selectOption(panel.getByLabel('Saved carousel',{exact:true}),id);await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
  await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-carousel-mobile.png',fullPage:true});
  const sibling=(await admin.query('SELECT id FROM app.brands WHERE organization_id=$1 AND id<>$2 LIMIT 1',[org,brand])).rows[0]??(await post('/api/v1/businesses',{name:'Carousel isolation test'},randomUUID())).body;assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/carousels/${id}`)).status(),404);
  assert.deepEqual(errors,[]);
@@ -1212,7 +1213,7 @@ test('Canvas generates an entire carousel, reopens it for editing and reviews sa
  await page.setViewportSize({width:1280,height:900});await page.goto(`${base}/b/${brand}/canvas`);
  const panel=page.getByRole('region',{name:'Carousels',exact:true});
  const generation=panel.getByRole('region',{name:'Generate a carousel',exact:true});
- const composer=page.getByRole('region',{name:'Creative conversation',exact:true});await composer.getByLabel('Describe your creative',{exact:true}).fill('TEST create a carousel with a coordinated refill story');await composer.getByLabel('Slides',{exact:true}).fill('2');await composer.getByLabel('Creativity',{exact:true}).selectOption('super');
+ const composer=page.getByRole('region',{name:'Creative conversation',exact:true});await composer.getByLabel('Describe your creative',{exact:true}).fill('TEST create a carousel with a coordinated refill story');await composer.getByLabel('Slides',{exact:true}).fill('2');await selectOption(composer.getByLabel('Creativity',{exact:true}),'super');
  await composer.getByRole('button',{name:'Send',exact:true}).click();
  await expect(generation.getByRole('button',{name:'Review generated carousel',exact:true})).toBeVisible({timeout:60000});
  await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();
@@ -1426,7 +1427,7 @@ test('Archive displays generated carousels with saved slide history and restores
  await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
  const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(history.getByLabel('Saved media version',{exact:true}).locator('option')).toHaveCount(2);await expect(history.getByRole('img')).toHaveCount(2);
  await expect.poll(()=>history.getByRole('img').evaluateAll(images=>images.every(img=>img.complete&&img.naturalWidth>0))).toBe(true);
- await history.getByLabel('Saved media version',{exact:true}).selectOption(original.id);await expect(history.getByRole('img')).toHaveCount(2);await expect(history.getByRole('button',{name:'Approve carousel',exact:true})).toHaveCount(0);
+ await selectOption(history.getByLabel('Saved media version',{exact:true}),original.id);await expect(history.getByRole('img')).toHaveCount(2);await expect(history.getByRole('button',{name:'Approve carousel',exact:true})).toHaveCount(0);
  await page.screenshot({path:'work/browser/canvas-carousel-archive.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
  await history.getByRole('button',{name:'Restore carousel',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived Canvas creations',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived Canvas creations',exact:true})).toBeVisible();
  assert.deepEqual((await admin.query('SELECT id,sha256,status FROM app.carousel_versions WHERE project_id=$1 ORDER BY id',[project.id])).rows,before);assert.equal((await admin.query('SELECT archived_at FROM app.carousel_projects WHERE id=$1',[project.id])).rows[0].archived_at,null);
@@ -1446,7 +1447,7 @@ test('Archive displays generated video history, plays saved media and restores a
  await page.getByRole('button',{name:'Archive video',exact:true}).click();await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
  const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(history.getByLabel('Saved media version',{exact:true}).locator('option')).toHaveCount(2);
  const failedDownload=`**/video-versions/${before[0].id}/download`;await page.route(failedDownload,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'TEST transient video download failure'})}));
- await history.getByLabel('Saved media version',{exact:true}).selectOption(before[0].id);await expect(history.getByRole('button',{name:'Reload video preview',exact:true})).toBeVisible();await expect(history.getByText('Video preview unavailable',{exact:true})).toBeVisible();await expect(history.locator('video')).toHaveCount(0);
+ await selectOption(history.getByLabel('Saved media version',{exact:true}),before[0].id);await expect(history.getByRole('button',{name:'Reload video preview',exact:true})).toBeVisible();await expect(history.getByText('Video preview unavailable',{exact:true})).toBeVisible();await expect(history.locator('video')).toHaveCount(0);
  await page.unroute(failedDownload);await history.getByRole('button',{name:'Reload video preview',exact:true}).click();
  const video=history.locator('video');await expect(video).toBeVisible();await expect.poll(()=>video.evaluate(v=>v.readyState>=2&&v.videoWidth>0),{timeout:60000}).toBe(true);await video.evaluate(async v=>{v.muted=true;await v.play();});await expect.poll(()=>video.evaluate(v=>v.currentTime),{timeout:10000}).toBeGreaterThan(0);await video.evaluate(v=>v.pause());await expect(history.getByRole('button',{name:'Approve final video',exact:true})).toHaveCount(0);
  await page.screenshot({path:'work/browser/canvas-video-archive.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
@@ -1498,7 +1499,7 @@ test('Strategy launch groups a real campaign and dispatches capped images from H
  await expect(card.locator('.post-thumbnail svg image')).toBeVisible({timeout:90000});
  const strategy=(await admin.query('SELECT id FROM app.content_strategies WHERE brand_id=$1 AND name=$2',[brand,'TEST visual strategy'])).rows[0];assert.ok(strategy);assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.strategy_image_requests WHERE strategy_id=$1',[strategy.id])).rows[0].n,3);
  await admin.query("UPDATE app.jobs SET status='rejected',error_code='EXPORT_RENDER_FAILED' WHERE id=(SELECT job_id FROM app.strategy_image_requests WHERE strategy_id=$1 LIMIT 1)",[strategy.id]);await page.reload();await expect(card.getByText('Images need attention',{exact:true})).toBeVisible();await expect(card.getByText(/Open the campaign to review the issue/)).toBeVisible();await expect(card.getByRole('button',{name:'Create campaign images',exact:true})).toHaveCount(0);await expect(card.getByRole('link',{name:'Review campaign',exact:true})).toBeVisible();await page.getByRole('article').filter({has:page.getByRole('heading',{name:'Lifestyle content',exact:true})}).getByRole('button',{name:'Set up strategy'}).click();
- await page.getByLabel('Strategy name',{exact:true}).fill('TEST scheduled strategy');await page.getByLabel('Campaign schedule',{exact:true}).selectOption('4');await expect.poll(async()=>Number(await page.getByLabel('Planning credit cap',{exact:true}).inputValue())).toBe(strategyPlanning*4);const weeklyCap=Number(await page.getByLabel('Strategy credit cap',{exact:true}).inputValue());await page.getByLabel('I authorize 4 weekly campaign plans',{exact:false}).check();await page.getByRole('button',{name:'Launch strategy',exact:true}).click();
+ await page.getByLabel('Strategy name',{exact:true}).fill('TEST scheduled strategy');await selectOption(page.getByLabel('Campaign schedule',{exact:true}),'4');await expect.poll(async()=>Number(await page.getByLabel('Planning credit cap',{exact:true}).inputValue())).toBe(strategyPlanning*4);const weeklyCap=Number(await page.getByLabel('Strategy credit cap',{exact:true}).inputValue());await page.getByLabel('I authorize 4 weekly campaign plans',{exact:false}).check();await page.getByRole('button',{name:'Launch strategy',exact:true}).click();
  const recurring=page.getByRole('article').filter({has:page.getByRole('heading',{name:'TEST scheduled strategy',exact:true})});await expect(recurring.getByRole('listitem')).toHaveCount(4);await recurring.getByRole('button',{name:'Stop future campaigns',exact:true}).click();await expect(recurring.getByText(`${strategyPlanning*4} / ${weeklyCap} credits allocated · Stopped`,{exact:true})).toBeVisible();
  await page.reload();await expect(recurring.getByText(`${strategyPlanning*4} / ${weeklyCap} credits allocated · Stopped`,{exact:true})).toBeVisible();await page.locator('.strategy-banner').last().scrollIntoViewIfNeeded();await expect(page.locator('.strategy-banner img')).toHaveCount(4);await page.getByRole('heading',{name:'Your strategies',exact:true}).scrollIntoViewIfNeeded();await page.screenshot({path:'work/browser/strategies-desktop.png',fullPage:true});
  const scan=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(scan.violations,[]);
@@ -1591,8 +1592,8 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await expect(page.getByRole('button',{name:'Post details',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Add text layer',exact:true}).click();
  await page.getByLabel('Layer text',{exact:true}).fill('A little everyday care');
- await page.getByLabel('Font',{exact:true}).selectOption('Lora');
- await page.getByLabel('Text weight',{exact:true}).selectOption('600');
+ await selectOption(page.getByLabel('Font',{exact:true}),'Lora');
+ await selectOption(page.getByLabel('Text weight',{exact:true}),'600');
  await page.getByLabel('Font size',{exact:true}).fill('48');
  await page.getByRole('button',{name:'White text',exact:true}).click();
  await page.getByRole('button',{name:'Align center',exact:true}).click();
@@ -1620,7 +1621,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await expect(page.locator('.conversation-saved-image')).toHaveCount(1);
  await expect(page.locator('.conversation-saved-image')).toHaveAttribute('data-version-id',savedAttachment);
  await expect(page.getByLabel('Layer text',{exact:true})).toHaveValue('A little everyday care');
- await expect(page.getByLabel('Font',{exact:true})).toHaveValue('Lora');
+ await expect(selectField(page.getByLabel('Font',{exact:true}))).toHaveValue('Lora');
  await expect(page.getByLabel('Text weight',{exact:true})).toHaveValue('600');
  await expect(page.getByRole('switch',{name:'Contrast backing',exact:true})).toBeChecked();
  await expect(page.getByLabel('Bend',{exact:false})).toHaveValue('-65');

@@ -1,12 +1,9 @@
+import {selectOption as choose} from './select-control.mjs';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {chromium, expect} from '@playwright/test';
 const origin=process.env.DESVIO_UI_BASE;
 const brand='11111111-1111-4111-8111-111111111111',plan='33333333-3333-4333-8333-333333333333';
-async function choose(control,value){
- const label=await control.evaluate((el,v)=>Array.from(el.closest('.ds-select').querySelector('select').options).find(o=>o.value===v).textContent,value);
- await control.click();await control.page().getByRole('option',{name:label,exact:true}).click();
-}
 async function fixture(){
  const browser=await chromium.launch(),page=await browser.newPage({viewport:{width:1440,height:1000}}),submitted=[];
  await page.route('**/api/**',async route=>{
