@@ -21,3 +21,19 @@ export async function loadPrivateImage(endpoint:string,signal:AbortSignal,maxByt
  }
  throw new Error('This image could not load. Please retry.');
 }
+
+/** Small authenticated display derivative. Original download remains the recovery
+ * path during a rolling deploy or a temporary preview-processing failure. */
+export async function loadPrivatePreview(endpoint:string,originalEndpoint:string,signal:AbortSignal):Promise<Blob>{
+ signal.throwIfAborted();
+ try{
+  const response=await fetch(endpoint,{credentials:'same-origin',cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(15000)])});
+  if(response.status===401||response.status===403)throw new Error('Preview access denied');
+  if(!response.ok){if(response.status===404||response.status>=500)return loadPrivateImage(originalEndpoint,signal);throw new Error('Preview unavailable');}
+  if(response.headers.get('content-type')?.split(';')[0]!=='image/webp'||!response.body)throw new Error('Preview type could not be verified');
+  const reader=response.body.getReader(),chunks:Uint8Array[]=[];let size=0;
+  try{while(true){const {done,value}=await reader.read();if(done)break;size+=value.length;if(size>1024*1024)throw new Error('Preview exceeds size limit');chunks.push(value);}}finally{await reader.cancel().catch(()=>{});reader.releaseLock();}
+  signal.throwIfAborted();
+  return new Blob(chunks as BlobPart[],{type:'image/webp'});
+ }catch(error){if(signal.aborted)throw error;throw new Error('This preview could not load. Please retry.');}
+}

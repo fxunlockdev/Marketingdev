@@ -567,6 +567,15 @@ export class Canvas {
     };
     return scoped?action(scoped.db,scoped.b):this.scope(user,id,true,action,v.decision!=='in_review');
   }
+  async mediaPreview(user:string,id:string,mediaId:string){
+    mediaId=uuid(mediaId);
+    const media=await this.scope(user,id,false,async(db,b)=>{
+      const row=(await db.query('SELECT object_key,sha256 FROM app.creative_media WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,mediaId])).rows[0];
+      if(!row)throw new NotFoundException('Creative image not found');
+      return row;
+    });
+    return this.store.previews.get(media.object_key,media.sha256);
+  }
   media(user: string, id: string, mediaId: string) {
     mediaId = uuid(mediaId);
     return this.scope(user, id, false, async (db, b) => {

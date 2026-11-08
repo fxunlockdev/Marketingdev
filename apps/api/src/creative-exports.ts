@@ -36,6 +36,15 @@ export class CreativeExports {
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.export')",[job,b.organization_id,id]);return {id:job,status:'queued'};
   });
  }
+ async preview(user:string,id:string,exportId:string){
+  exportId=uuid(exportId);
+  const saved=await this.canvas.scope(user,id,false,async db=>{
+   const row=(await db.query('SELECT object_key,sha256 FROM app.creative_exports WHERE id=$1',[exportId])).rows[0];
+   if(!row)throw new NotFoundException('Saved export not found');
+   return row;
+  });
+  return this.canvas.store.previews.get(saved.object_key,saved.sha256);
+ }
  download(user:string,id:string,exportId:string){exportId=uuid(exportId);return this.canvas.scope(user,id,false,async(db)=>{
   const e=(await db.query('SELECT object_key,sha256,bytes,format FROM app.creative_exports WHERE id=$1',[exportId])).rows[0];if(!e)throw new NotFoundException('Saved export not found');return {url:await this.canvas.store.downloadURL(e.object_key,e.format==='png'?'desvio-final.png':'desvio-instagram.jpg',e.format==='png'?'image/png':'image/jpeg'),sha256:e.sha256,bytes:e.bytes,expires_in:60};
  });}

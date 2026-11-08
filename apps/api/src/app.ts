@@ -288,6 +288,7 @@ class ExportController {
  constructor(@Inject(CreativeExports) private readonly service:CreativeExports){}
  @Get('creative-versions/:versionId/exports') list(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.list(r.actorId,id,v);}
  @Post('creative-versions/:versionId/exports') submit(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.submit(r.actorId,id,v,body,key);}
+ @Get('creative-exports/:exportId/preview') async preview(@Req() r:AuthRequest,@Param('id') id:string,@Param('exportId') e:string){const result=await this.service.preview(r.actorId,id,e);return new StreamableFile(result.bytes,{type:'image/webp',length:result.bytes.length,disposition:'inline'});}
  @Get('creative-exports/:exportId/download') download(@Req() r:AuthRequest,@Param('id') id:string,@Param('exportId') e:string){return this.service.download(r.actorId,id,e);}
  @Post('creative-exports/:exportId/approve') approve(@Req() r:AuthRequest,@Param('id') id:string,@Param('exportId') e:string,@Body() body:unknown){return this.service.approve(r.actorId,id,e,body);}
  @Post('export-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
@@ -355,6 +356,7 @@ class CanvasController {
  @Get('creative-projects/:projectId') project(@Req() r:AuthRequest,@Param('id') id:string,@Param('projectId') p:string){return this.service.project(r.actorId,id,p);}
  @Post('creative-projects/:projectId/versions') save(@Req() r:AuthRequest,@Param('id') id:string,@Param('projectId') p:string,@Body() body:unknown){return this.service.save(r.actorId,id,p,body);}
  @Post('creative-versions/:versionId/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown){return this.service.review(r.actorId,id,v,body);}
+ @Get('creative-media/:mediaId/preview') async mediaPreview(@Req() r:AuthRequest,@Param('id') id:string,@Param('mediaId') m:string){const result=await this.service.mediaPreview(r.actorId,id,m);return new StreamableFile(result.bytes,{type:'image/webp',length:result.bytes.length,disposition:'inline'});}
  @Get('creative-media/:mediaId') media(@Req() r:AuthRequest,@Param('id') id:string,@Param('mediaId') m:string){return this.service.media(r.actorId,id,m);}
  @Post('creative-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
 }

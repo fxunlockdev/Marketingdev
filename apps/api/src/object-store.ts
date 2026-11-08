@@ -1,3 +1,4 @@
+import {ImagePreviews} from './image-previews.js';
 import {S3Client,GetObjectCommand,PutObjectCommand,DeleteObjectCommand} from '@aws-sdk/client-s3';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
 import {createHash} from 'node:crypto';
@@ -11,6 +12,7 @@ export const digest=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('h
 export class InvalidAsset extends Error {constructor(readonly code:string){super(code);}}
 export class ObjectStore {
   readonly client:S3Client;
+  readonly previews=new ImagePreviews(key=>this.read(key));
   constructor(readonly config:StorageConfig) {
     this.client=new S3Client({endpoint:config.endpoint,region:config.region,forcePathStyle:true,maxAttempts:1,
       credentials:{accessKeyId:config.accessKeyId,secretAccessKey:config.secretAccessKey},requestChecksumCalculation:'WHEN_REQUIRED',responseChecksumValidation:'WHEN_REQUIRED'});
@@ -65,5 +67,5 @@ export class ObjectStore {
   async removeQuarantine(key:string) {
     await this.client.send(new DeleteObjectCommand({Bucket:this.config.bucket,Key:key}),{abortSignal:AbortSignal.timeout(15000)});
   }
-  close(){this.client.destroy();}
+  close(){this.previews.clear();this.client.destroy();}
 }
