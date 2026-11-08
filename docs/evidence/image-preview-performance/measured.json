@@ -1,0 +1,120 @@
+{
+  "original_image_bytes": [
+    2131233,
+    2355919,
+    2567086
+  ],
+  "original_image_transfer_ms": [
+    3396,
+    1681,
+    2196
+  ],
+  "rows": [
+    {
+      "samples": [
+        {
+          "ms": 1432,
+          "bytes": 92796,
+          "width": 640,
+          "height": 640
+        },
+        {
+          "ms": 374,
+          "bytes": 92796,
+          "width": 640,
+          "height": 640
+        }
+      ],
+      "anonymous_status": 401,
+      "other_business_status": 404
+    },
+    {
+      "samples": [
+        {
+          "ms": 947,
+          "bytes": 50746,
+          "width": 640,
+          "height": 640
+        },
+        {
+          "ms": 304,
+          "bytes": 50746,
+          "width": 640,
+          "height": 640
+        }
+      ]
+    },
+    {
+      "samples": [
+        {
+          "ms": 512,
+          "bytes": 56840,
+          "width": 640,
+          "height": 640
+        },
+        {
+          "ms": 371,
+          "bytes": 56840,
+          "width": 640,
+          "height": 640
+        }
+      ]
+    }
+  ],
+  "pending": [
+    {
+      "state": "content_needed",
+      "generation_status": null,
+      "has_saved_version": false
+    }
+  ],
+  "api_deployment": "3a33a82d-e65e-4463-936d-449244e15064",
+  "api_deployment_status": "SUCCESS",
+  "code_commit": "68fbe6f",
+  "web_deployment": {
+    "id": "1ea1ec5b-968f-425e-b3f3-06b5c94da625",
+    "status": "SUCCESS"
+  },
+  "hosted_browser": {
+    "preview_requests": [
+      {
+        "path": "/api/v1/businesses/77ab73a3-67c7-447c-a339-d2f9b160042b/creative-media/f1b61a2a-9d36-4365-8234-3d740b31af61/preview",
+        "duration": 357.09999999403954,
+        "bytes": 51046,
+        "size": 50746
+      },
+      {
+        "path": "/api/v1/businesses/77ab73a3-67c7-447c-a339-d2f9b160042b/creative-media/f0495546-62cb-41e6-a246-fbd920e51b21/preview",
+        "duration": 338.90000000596046,
+        "bytes": 93096,
+        "size": 92796
+      },
+      {
+        "path": "/api/v1/businesses/77ab73a3-67c7-447c-a339-d2f9b160042b/creative-media/66b3d3f1-8a39-4a1f-b437-bcf64f9205eb/preview",
+        "duration": 344.2000000178814,
+        "bytes": 57140,
+        "size": 56840
+      }
+    ],
+    "original_media_grants": 0,
+    "cards": [
+      {
+        "text": "Where Everyday Life, Business, and Leisure Converge in MumbaiTap to glimpse vibrant community living and follow us for exclusive walkthroughs",
+        "image": true
+      },
+      {
+        "text": "A Day in Subtle Luxury at Runwal RealtySee more lifestyle stories in our highlights. What's your ideal day at home or a",
+        "image": true
+      },
+      {
+        "text": "\u25a7Carousel",
+        "image": false
+      },
+      {
+        "text": "Subtle Luxury, Affordably Yours in MumbaiFind your space that feels like home. Explore our Mumbai and MMR offerings.",
+        "image": true
+      }
+    ],
+    "fixture_browser_tests_passed": 2
+  }
+}
