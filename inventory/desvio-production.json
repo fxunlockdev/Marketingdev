@@ -1,0 +1,27 @@
+{
+  "source_sha256": "798197f505211564c98842de357163f4b0ac13a9bb7a5e907ef65f7db883da8b",
+  "archive_sha256": "ad1d3336d4e6c8c64ab4fa7d0a44c5c2d278a135ee4c3d3ffb7611802c853e8c",
+  "skill_sha256": "df95511f1326d0e1338ea3ba32ab4bbcbc3efba98e389e279b9ace93e98901dc",
+  "tree_sha256": "d5cff52315b2328ad324b18acc74ca5667ac7ac15d85210ac91eb126b56df823",
+  "files": {
+    "desvio-production/SKILL.md": "df95511f1326d0e1338ea3ba32ab4bbcbc3efba98e389e279b9ace93e98901dc",
+    "desvio-production/references/art-direction-and-grid.md": "4538218815f56865b9fab7c100e30b893163ad3e4c66393bdfde87687bae963e",
+    "desvio-production/references/brand-strategy-and-customer-research.md": "de8f3933d2cfa444c4dc6f03df9d3b6dcb828ccb9d00606608f7588917ac3750",
+    "desvio-production/references/calendar-recurring-production-and-publishing.md": "555623aaceaa2ef96d49520b4bbd6baa80870e4165b9fab6df3fe1d8215c0a25",
+    "desvio-production/references/composition-and-legibility.md": "64ca82d28568609b422527293ba892ec714d6edd197bba05cff70e2e26238529",
+    "desvio-production/references/context-and-scope.md": "742aacf8b80bd8c53516213e22b53a490d967a00d12c86c8a7d1c79a00fae42e",
+    "desvio-production/references/copywriting-and-editorial-quality.md": "a00b39bdab98026dc6c0ae40c382b21b3338d31cd1c6e9b624ad01cd027b5149",
+    "desvio-production/references/creative-style-directions.md": "a1db0c0886d496b6582973b879dbcfbfb34c02a9330c377696e5f56c8c42bd41",
+    "desvio-production/references/feedback-versions-and-handoffs.md": "dc3310551feea39c2a4602ef8402a8cabe31702fdb1615e3c609a42bcdff3c3f",
+    "desvio-production/references/final-quality-checklist.md": "0685865c6eb1e62f24d53dd10b4333313d6dcaec65d277bec776648835ad7e75",
+    "desvio-production/references/identity-and-physical-realism.md": "67f5c762d9bf8012e83c33e26432177ba858676e8614ade44dca87de8d953054",
+    "desvio-production/references/image-generation-and-visual-production.md": "9f99dd8a3dc3232b66ae2e55c6b0ab3e1b6d268a957c002440eda7165fccb143",
+    "desvio-production/references/logo-design-and-identity-systems.md": "53de4a51f6f06408e9a6f4629061d3c41597820df3b7e1bd83d992029a1da54e",
+    "desvio-production/references/production-and-approval.md": "faed6bb63ba60ccefd6c3c11487ab569366f05147bc9420ef44e0f69e8bdd767",
+    "desvio-production/references/resolution-and-release.md": "73a09a97fe688844c60525d7a966bf9d5958e02f0e2152668299c8912afc2789",
+    "desvio-production/references/strategy-and-claims.md": "56dc407a1cb826190a0057d3b84daf76c9a6f8eed77fe18053ea8e3a15bd1480"
+  },
+  "license": "Owner supplied private production guidance; no redistribution license granted",
+  "helpers_executed": false,
+  "scoped_references_status": "Preserved outside runtime; require explicit tenant/brand/project approval before application"
+}

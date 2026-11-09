@@ -1,3 +1,4 @@
+import {hasCurrentProductionRules} from './production-skill-pin.js';
 import {validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
 import {validateInsightResult,type InsightInput} from './insight-contracts.js';
 import {scheduleGeneratedPlan,validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
@@ -137,6 +138,7 @@ export class SkillRuntime {
               if (pending || value.model_calls !== step)
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               try {
+                if (!hasCurrentProductionRules(value)) throw new CreativeError("SKILL_LOAD_INCOMPLETE");
                 done(undefined, validate(value));
               } catch (error) {
                 done(error as Error);

@@ -1,0 +1,60 @@
+{
+  "checked_at": "2026-11-09T10:59:25.015Z",
+  "worker": "sha256:15036a646e5683e29f57e14e1e548f58289551513e202d86389698403980c149",
+  "skills": "sha256:74569029d36c1ae4c7a7cdb0a2217e85dcd4ebaf8cb48eb28ade3914af95d0a5",
+  "passed": [
+    {
+      "task": "plan",
+      "model_calls": 1,
+      "skill": {
+        "name": "desvio-production",
+        "skill_sha256": "df95511f1326d0e1338ea3ba32ab4bbcbc3efba98e389e279b9ace93e98901dc",
+        "tree_sha256": "d5cff52315b2328ad324b18acc74ca5667ac7ac15d85210ac91eb126b56df823"
+      },
+      "reference_reads": 11
+    },
+    {
+      "task": "carouselPlan",
+      "model_calls": 1,
+      "skill": {
+        "name": "desvio-production",
+        "skill_sha256": "df95511f1326d0e1338ea3ba32ab4bbcbc3efba98e389e279b9ace93e98901dc",
+        "tree_sha256": "d5cff52315b2328ad324b18acc74ca5667ac7ac15d85210ac91eb126b56df823"
+      },
+      "reference_reads": 10
+    },
+    {
+      "task": "videoPlan",
+      "model_calls": 1,
+      "skill": {
+        "name": "desvio-production",
+        "skill_sha256": "df95511f1326d0e1338ea3ba32ab4bbcbc3efba98e389e279b9ace93e98901dc",
+        "tree_sha256": "d5cff52315b2328ad324b18acc74ca5667ac7ac15d85210ac91eb126b56df823"
+      },
+      "reference_reads": 8
+    },
+    {
+      "task": "contentPlan",
+      "model_calls": 1,
+      "skill": {
+        "name": "desvio-production",
+        "skill_sha256": "df95511f1326d0e1338ea3ba32ab4bbcbc3efba98e389e279b9ace93e98901dc",
+        "tree_sha256": "d5cff52315b2328ad324b18acc74ca5667ac7ac15d85210ac91eb126b56df823"
+      },
+      "reference_reads": 8
+    },
+    {
+      "task": "insights",
+      "model_calls": 1,
+      "skill": {
+        "name": "desvio-production",
+        "skill_sha256": "df95511f1326d0e1338ea3ba32ab4bbcbc3efba98e389e279b9ace93e98901dc",
+        "tree_sha256": "d5cff52315b2328ad324b18acc74ca5667ac7ac15d85210ac91eb126b56df823"
+      },
+      "reference_reads": 4
+    }
+  ],
+  "paid_calls": false,
+  "model": "MOCK",
+  "runtime": "actual isolated AMD64 Docker"
+}

@@ -13,3 +13,9 @@ dist/
 *.tsbuildinfo
 playwright-report/
 test-results/
+
+# Owner production methods and client instructions are private runtime inputs.
+inputs/desvio-owner-rules-*.md
+inputs/desvio-scoped-rules/
+inputs/desvio-production.zip
+skills/desvio-production/

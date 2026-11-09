@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-05T13:38:10.499Z",
+  "checked_at": "2026-11-09T11:00:51.915Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:a9b377ea512a685dead67bf88a739e753cff89882a76a5800481fd65147f2387",
+      "image_id": "sha256:15036a646e5683e29f57e14e1e548f58289551513e202d86389698403980c149",
       "architecture": "amd64",
       "user": "node"
     },
@@ -15,7 +15,7 @@
     },
     {
       "role": "skills",
-      "image_id": "sha256:27cb8f5907fa7bc372d26474ec853c56ca56d90e1ed756238689a5ac3a52b9f5",
+      "image_id": "sha256:74569029d36c1ae4c7a7cdb0a2217e85dcd4ebaf8cb48eb28ade3914af95d0a5",
       "architecture": "amd64",
       "user": "65534:65534"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Composer prompt suggestions worker; unchanged pinned media runtimes. Exact host identities verified separately."
+  "scope": "Owner shared production guidance: new trusted worker and skills images verified on dev. All other runtime pins unchanged. Private client rules not mounted."
 }

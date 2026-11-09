@@ -1,5 +1,7 @@
+import {PRODUCTION_SKILL} from "./production-skill-pin.js";
 // Generated from the SHA-verified owner archive.
 export const INSIGHT_SKILLS = {
+ "desvio-production": PRODUCTION_SKILL,
   "ab-testing": {
     "skill_sha256": "fba679be14a9b21a06cde009caf17a652b92040c6f78a520a5d4baec0a5bd5da",
     "tree_sha256": "fdf776d8364cf8681e3d08518f5e230c6bdf20ece7841524046f90f796cedba0"

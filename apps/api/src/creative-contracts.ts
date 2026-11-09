@@ -1,3 +1,4 @@
+import {validStoredSkillSet} from './production-skill-pin.js';
 import type {LearningContext} from './learning-context.js';
 import { CREATIVE_SKILLS } from "./creative-skill-pins.js";
 export class CreativeError extends Error {
@@ -69,6 +70,7 @@ export type SkillResult = {
 export const selectedSkills = (format: CreativeInput["format"]) =>
   [
     "brand-engine",
+    "desvio-production",
     "image",
     "product-marketing",
     "social",
@@ -148,11 +150,7 @@ export function validateSkillResult(
     !Number.isInteger(value.model_calls) ||
     value.model_calls < 1 ||
     value.model_calls > 3 ||
-    !Array.isArray(value.skills) ||
-    value.skills
-      .map((s: any) => s.name)
-      .sort()
-      .join(",") !== selectedSkills(input.format).join(",") ||
+    !validStoredSkillSet(value.skills, selectedSkills(input.format)) ||
     !Array.isArray(value.reads) ||
     value.reads.length > 50
   )

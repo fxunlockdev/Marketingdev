@@ -1,5 +1,7 @@
+import {PRODUCTION_SKILL} from "./production-skill-pin.js";
 // Generated from the SHA-verified owner archive; update only after re-audit.
 export const CREATIVE_SKILLS = {
+ "desvio-production": PRODUCTION_SKILL,
   "brand-engine": {"skill_sha256": "0381342dacb8390806381e9bc361d42a4cf43dae01d4b073ab24b1e80d3b72d1", "tree_sha256": "fc432a66ff2b6d1f5462ea62a7bf630f82836521ed9c492bf2b9b1045b53b3d2"},
   "ad-creative": {
     skill_sha256:

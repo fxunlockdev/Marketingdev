@@ -1,7 +1,10 @@
+import {validStoredSkillSet} from './production-skill-pin.js';
+import {PRODUCTION_SKILL} from "./production-skill-pin.js";
 import {validLearning} from './learning-context.js';
 import {CreativeError,type CreativeInput,type SkillResult} from './creative-contracts.js';
 import {CREATIVE_SKILLS} from './creative-skill-pins.js';
 export const VIDEO_SKILLS={
+ "desvio-production": PRODUCTION_SKILL,
  "brand-engine":CREATIVE_SKILLS["brand-engine"],
  video:{skill_sha256:'0a35e32dda553707996bf383c00ecf971d05127d35d5d814577457c23a3ab591',tree_sha256:'76696e47ce406b06143b50a08d75effa0a5dfd109f12beb86fd5e3d1b68900f1'},
  'ad-creative':CREATIVE_SKILLS['ad-creative'],'product-marketing':CREATIVE_SKILLS['product-marketing'],social:CREATIVE_SKILLS.social,
@@ -81,7 +84,7 @@ export function videoBriefSchema(factIds:string[],durationSeconds:number){
 }
 
 export function validateVideoPlanningResult(value:any,input:VideoPlanningInput):VideoPlanningResult {
- if(!fields(value,['type','version','brief','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-video-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!Array.isArray(value.skills)||value.skills.map((s:any)=>s?.name).sort().join(',')!==Object.keys(VIDEO_SKILLS).sort().join(',')||!Array.isArray(value.reads)||value.reads.length>50)throw new CreativeError('SKILL_OUTPUT_INVALID');
+ if(!fields(value,['type','version','brief','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-video-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!validStoredSkillSet(value.skills,Object.keys(VIDEO_SKILLS))||!Array.isArray(value.reads)||value.reads.length>50)throw new CreativeError('SKILL_OUTPUT_INVALID');
  for(const s of value.skills){const pin=VIDEO_SKILLS[s.name as keyof typeof VIDEO_SKILLS];if(!fields(s,['name','skill_sha256','tree_sha256'])||!pin||s.skill_sha256!==pin.skill_sha256||s.tree_sha256!==pin.tree_sha256||!value.reads.includes(`/skills/${s.name}/SKILL.md`))throw new CreativeError('SKILL_DIGEST_MISMATCH');}
  if(value.reads.some((p:any)=>typeof p!=='string'||p.includes('..')||!p.endsWith('.md')||(p!=='/.agents/product-marketing.md'&&!Object.keys(VIDEO_SKILLS).some(s=>p.startsWith(`/skills/${s}/`)))))throw new CreativeError('SKILL_PATH_DENIED');
  validateVideoBrief(value.brief,input);return value;

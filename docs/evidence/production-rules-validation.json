@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-11-09T11:00:51.915Z",
+  "build": "passed",
+  "contract_tests": 361,
+  "additional_private_hash_test": "passed",
+  "isolated_runtime_tests": 16,
+  "final_scope_runtime_tests": 7,
+  "python_audit_tests": 2,
+  "skill_frontmatter": "passed",
+  "private_bundle_repack": "byte-identical",
+  "legacy_saved_plans": "accepted with original provenance",
+  "fresh_runtime": "requires current production pin",
+  "private_client_files": "not mounted",
+  "remote_runtime_tasks": 5,
+  "model_responses": "MOCK",
+  "paid_calls": false,
+  "limitations": [
+    "No real provider quality evaluation in this change",
+    "Named-client/project rules require explicit scoped adoption",
+    "Private rule inputs must be restored before building a clean checkout"
+  ]
+}

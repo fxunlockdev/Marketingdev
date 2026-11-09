@@ -8,6 +8,8 @@ COPY inputs/brand-engine-gpt-2k.zip /opt/app/inputs/brand-engine-gpt-2k.zip
 COPY scripts/skill_audit.py /opt/app/scripts/skill_audit.py
 COPY inputs/marketingskills-main.zip /opt/app/inputs/marketingskills-main.zip
 COPY apps/skills/runtime.py /opt/app/apps/skills/runtime.py
+COPY scripts/production_rules_audit.py /opt/app/scripts/production_rules_audit.py
+COPY inputs/desvio-production.zip /opt/app/inputs/desvio-production.zip
 USER 65534:65534
 WORKDIR /tmp
 ENTRYPOINT ["python","/opt/app/apps/skills/runtime.py"]

@@ -1,0 +1,25 @@
+{
+  "checked_at": "2026-11-09T11:00:51.915Z",
+  "worker": "sha256:15036a646e5683e29f57e14e1e548f58289551513e202d86389698403980c149",
+  "skills": "sha256:74569029d36c1ae4c7a7cdb0a2217e85dcd4ebaf8cb48eb28ade3914af95d0a5",
+  "configuration": "9430011c9e09f44f354fe0d6d9202e3ebbf34ebcb8779d280407accf47d21cb0",
+  "backup_container": "desvio-worker-rollback-production-rules-20261109",
+  "queues": [
+    {
+      "type": 1,
+      "pollers": 1
+    },
+    {
+      "type": 2,
+      "pollers": 1
+    }
+  ],
+  "roles": [
+    "desvio_worker",
+    "desvio_dispatcher"
+  ],
+  "paid_calls": false,
+  "scope": "Dev worker update after zero active jobs; graceful stop, rollback retained, new exact skills image, workflow/activity pollers and database roles verified. Shared guidance only; client mappings not activated.",
+  "api_deployment_id": "89e51f76-a944-4cfd-b118-6a9b7c02d149",
+  "api_deployment_status": "SUCCESS"
+}

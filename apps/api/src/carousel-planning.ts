@@ -1,7 +1,10 @@
+import {validStoredSkillSet} from './production-skill-pin.js';
+import {PRODUCTION_SKILL} from "./production-skill-pin.js";
 import {CreativeError,validateBrief,type CreativeBrief,type CreativeInput,type SkillResult} from './creative-contracts.js';
 import {CREATIVE_SKILLS} from './creative-skill-pins.js';
 import {validLearning} from './learning-context.js';
 export const CAROUSEL_SKILLS={
+ "desvio-production": PRODUCTION_SKILL,
  "brand-engine":CREATIVE_SKILLS["brand-engine"],image:CREATIVE_SKILLS.image,social:CREATIVE_SKILLS.social,'product-marketing':CREATIVE_SKILLS['product-marketing'],copywriting:{skill_sha256:'13c580c2432a4499e9dfdcf5d553df7aa6589e90cf5bd869fb4fbde5caf9f567',tree_sha256:'e03f9c1f236b8e8a6ecd15afb29eb21aad2fd8ea18d044ce31c9f76d9976f626'}} as const;
 export type CarouselInput={task:'carousel';brand:CreativeInput['brand'];prompt:string;channel:'linkedin'|'instagram'|'facebook';slide_count:number};
 export type CarouselPlan={title:string;caption:string;visual_direction:string;palette:string[];warnings:string[];slides:{position:number;headline:string;body:string;cta:string;image_prompt:string;alt_text:string;fact_ids:string[]}[]};
@@ -29,7 +32,7 @@ export function validateCarouselPlan(value:any,input:CarouselInput):CarouselPlan
 }
 export function validateCarouselResult(value:any,input:CarouselInput):CarouselResult{
  const fail=():never=>{throw new CreativeError('CAROUSEL_SKILL_OUTPUT_INVALID');};
- if(!exact(value,['type','version','plan','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-carousel-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!Array.isArray(value.skills)||value.skills.map((s:any)=>s?.name).sort().join(',')!==Object.keys(CAROUSEL_SKILLS).sort().join(',')||!Array.isArray(value.reads)||value.reads.length>50)fail();
+ if(!exact(value,['type','version','plan','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-carousel-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!validStoredSkillSet(value.skills,Object.keys(CAROUSEL_SKILLS))||!Array.isArray(value.reads)||value.reads.length>50)fail();
  for(const s of value.skills){const pin=CAROUSEL_SKILLS[s.name as keyof typeof CAROUSEL_SKILLS];if(!pin||s.skill_sha256!==pin.skill_sha256||s.tree_sha256!==pin.tree_sha256||!value.reads.includes(`/skills/${s.name}/SKILL.md`))fail();}
  if(value.reads.some((p:any)=>typeof p!=='string'||p.includes('..')||(p!=='/.agents/product-marketing.md'&&!Object.keys(CAROUSEL_SKILLS).some(s=>p.startsWith(`/skills/${s}/`)))))fail();
  validateCarouselPlan(value.plan,input);return value;

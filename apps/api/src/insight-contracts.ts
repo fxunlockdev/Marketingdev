@@ -1,3 +1,4 @@
+import {validStoredSkillSet} from './production-skill-pin.js';
 import {CreativeError} from './creative-contracts.js';
 import {INSIGHT_SKILLS} from './insight-skill-pins.js';
 export type InsightInput={task:'performance_analysis';brand:{id:string;sha256:string;facts:{id:string;field:string;value:string}[]};observations:any[]};
@@ -13,7 +14,7 @@ export function validateInsights(value:any,input:InsightInput){
 }
 export function validateInsightResult(value:any,input:InsightInput){
  const fail=():never=>{throw new CreativeError('SKILL_OUTPUT_INVALID');};
- if(!exact(value,['type','version','analysis','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-insight-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!Array.isArray(value.skills)||value.skills.map((s:any)=>s?.name).sort().join(',')!==Object.keys(INSIGHT_SKILLS).sort().join(',')||!Array.isArray(value.reads)||value.reads.length>50)fail();
+ if(!exact(value,['type','version','analysis','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-insight-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!validStoredSkillSet(value.skills,Object.keys(INSIGHT_SKILLS))||!Array.isArray(value.reads)||value.reads.length>50)fail();
  for(const s of value.skills){const pin=INSIGHT_SKILLS[s.name as keyof typeof INSIGHT_SKILLS];if(!pin||s.skill_sha256!==pin.skill_sha256||s.tree_sha256!==pin.tree_sha256||!value.reads.includes(`/skills/${s.name}/SKILL.md`))fail();}
  if(value.reads.some((p:any)=>typeof p!=='string'||p.includes('..')||(p!=='/.agents/product-marketing.md'&&!Object.keys(INSIGHT_SKILLS).some(s=>p.startsWith(`/skills/${s}/`)))))fail();
  validateInsights(value.analysis,input);return value;

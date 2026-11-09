@@ -1,3 +1,5 @@
+import {validStoredSkillSet} from './production-skill-pin.js';
+import {PRODUCTION_SKILL} from "./production-skill-pin.js";
 import {normalizeCreativeSpec,type CreativeSpec} from './campaign-formats.js';
 import {normalizeContentMix,contentMixCounts,type ContentMixItem} from './generation-plan.js';
 import type {PlanningReference} from './planning-references.js';
@@ -8,6 +10,7 @@ import { CREATIVE_SKILLS } from './creative-skill-pins.js';
 import {addDays,localCandidates,localMinute} from './local-calendar.js';
 import { planTime } from './content-plan.js';
 export const PLANNING_SKILLS = {
+ "desvio-production": PRODUCTION_SKILL,
  "brand-engine":CREATIVE_SKILLS["brand-engine"],
  'marketing-plan':{skill_sha256:'2b75dfae852bdb61fd96eebe3d2b373f99f67c86ff830f796310f662ba8906e8',tree_sha256:'d3f0c84f21bf77fb851403e95bd1d0270d81ae664d61a39cd003764fe5571fd6'},
  'product-marketing':CREATIVE_SKILLS['product-marketing'], social:CREATIVE_SKILLS.social,
@@ -59,7 +62,7 @@ export function validateGeneratedPlan(value:any,input:PlanningInput):GeneratedPl
  return value;
 }
 export function validatePlanningResult(value:any,input:PlanningInput):PlanningResult {
- if(!fields(value,['type','version','plan','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-plan-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!Array.isArray(value.skills)||value.skills.map((s:any)=>s?.name).sort().join(',')!==Object.keys(PLANNING_SKILLS).sort().join(',')||!Array.isArray(value.reads)||value.reads.length>50)throw new CreativeError('SKILL_OUTPUT_INVALID');
+ if(!fields(value,['type','version','plan','skills','reads','model_calls','helpers_executed'])||value.type!=='result'||value.version!=='deepagents-0.7.29/desvio-plan-v1'||value.helpers_executed!==false||!Number.isInteger(value.model_calls)||value.model_calls<1||value.model_calls>3||!validStoredSkillSet(value.skills,Object.keys(PLANNING_SKILLS))||!Array.isArray(value.reads)||value.reads.length>50)throw new CreativeError('SKILL_OUTPUT_INVALID');
  for(const s of value.skills){
   const pin=PLANNING_SKILLS[s.name as keyof typeof PLANNING_SKILLS];
   if(!pin||s.skill_sha256!==pin.skill_sha256||s.tree_sha256!==pin.tree_sha256||!value.reads.includes(`/skills/${s.name}/SKILL.md`))throw new CreativeError('SKILL_DIGEST_MISMATCH');
