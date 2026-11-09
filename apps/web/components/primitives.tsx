@@ -1,4 +1,5 @@
 "use client";
+import {Spinner} from "@astryxdesign/core/Spinner";
 import {AppLink} from "./app-link";
 import { useId, type ReactNode } from "react";
 import { ApiError, message } from "./api";
@@ -53,9 +54,10 @@ export function Wordmark() {
 }
 export function Loading() {
   return (
-    <p role="status" className="loading">
-      Loading…
-    </p>
+    <div role="status" className="loading ds-loading">
+      <Spinner size="md" aria-hidden="true" />
+      <span>Loading…</span>
+    </div>
   );
 }
 export function Blank({

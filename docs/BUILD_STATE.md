@@ -1,3 +1,11 @@
+## Astryx design refinement | 10 November 2026
+
+Introduced pinned Astryx theme, action buttons and spinner with Desvio typography and colors. Shared field gaps, panel spacing, focus rings, disabled/loading feedback and responsive sizing now apply across campaigns, team, profile, brand actions, preferences, integrations, archive, export and video setup. Existing Base UI selectors and domain-specific canvas controls retain their interaction contracts. Creation cards retain the supplied lavender/yellow/green visual hierarchy.
+
+Production build passes. All 13 production-build browser fixture tests pass. Browser fixtures cover form payloads, save/restore, permission restrictions, selection keyboard behavior, reduced motion, history focus and responsive dialogs. The authenticated read-only screenshot audit checked 22 page/viewport combinations without document or dialog overflow. Initial integration regressions (desktop mobile-menu visibility and empty button live regions) were corrected and regression checked. Direct invocation of infrastructure-dependent canvas/connection suites lacked their disposable test environment; those invocations are not end-to-end proof. No paid generation or customer content mutation is claimed by this design pass.
+
+See `ASTRYX_DESIGN_SYSTEM.md` for adopted component boundaries. Deployment verification is recorded separately after rollout.
+
 ## Owner production rules harness | 9 November 2026
 
 Added the supplied category document as a separate, immutable `desvio-production` overlay. Task-specific shared guidance is preloaded into image/ad, carousel, video/Reel, campaign-plan and performance-analysis planning without an additional model round trip. Every result records the exact skill/tree pin and loaded references. Existing source archives remain unchanged. Existing saved manifests remain valid for retries without falsely gaining the new provenance; fresh runtime output must include the new skill.

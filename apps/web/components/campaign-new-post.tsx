@@ -1,4 +1,5 @@
 "use client";
+import {ActionButton} from "./design-system";
 import {DesvioSelect} from './desvio-select';
 import {useEffect,useRef,useState} from 'react';
 import {useRouter} from 'next/navigation';
@@ -32,11 +33,11 @@ export function CampaignNewPost({businessId,initialPlan,autoOpen=false}:{busines
   dialog.current?.close();router.push(['static','story','carousel'].includes(format)?`/b/${businessId}/campaign-review?plan=${planId}&stage=generating`:`/b/${businessId}/campaign-post?${format==='blog'?'blog':'slot'}=${result.id}`);
  }catch(e){setError(e);}finally{setBusy(false);}}
  return <>
-  <button className="primary" onClick={()=>{setOpen(true);dialog.current?.showModal();}}>＋ New Post</button>
+  <ActionButton className="primary" onClick={()=>{setOpen(true);dialog.current?.showModal();}} label="＋ New Post" />
   <dialog className="campaign-new-post" ref={dialog} aria-labelledby="new-post-heading" aria-describedby="new-post-intro" onClose={()=>setOpen(false)} onCancel={e=>{if(busy||uploading)e.preventDefault();}}>
    <header>
     <div><h2 id="new-post-heading">New Post</h2><p id="new-post-intro">Start with your topic. Make it yours with images and ideas.</p></div>
-    <button type="button" aria-label="Close new post" disabled={busy||uploading} onClick={()=>dialog.current?.close()}>×</button>
+    <ActionButton type="button" aria-label="Close new post" disabled={busy||uploading} onClick={()=>dialog.current?.close()} label="×" />
    </header>
    <Notice error={error}/>
    <div className="campaign-compose-scroll"><fieldset disabled={busy||uploading} className="campaign-compose-body">
@@ -45,7 +46,7 @@ export function CampaignNewPost({businessId,initialPlan,autoOpen=false}:{busines
     </label>
     {!plans.length&&<p><a href={`/b/${businessId}/campaign-new`}>Create your first campaign</a> to start adding posts.</p>}
     <div className="campaign-compose-fields">
-     <div className="heading-row"><label htmlFor="campaign-topic">Topic</label><button type="button" aria-expanded={contextOpen} aria-controls="campaign-creative-context" onClick={()=>setContextOpen(v=>!v)}>{contextOpen?'Hide context':'＋ Add context'}</button></div>
+     <div className="heading-row"><label htmlFor="campaign-topic">Topic</label><ActionButton type="button" aria-expanded={contextOpen} aria-controls="campaign-creative-context" onClick={()=>setContextOpen(v=>!v)} label={contextOpen?'Hide context':'＋ Add context'} /></div>
      <textarea rows={3} id="campaign-topic" placeholder="What should this post be about?" maxLength={2000} value={topic} onChange={e=>setTopic(e.target.value)}/>
      {contextOpen&&<label id="campaign-creative-context">Creative direction<textarea value={context} maxLength={1800} placeholder="Describe the scene, mood, colours or specific details…" onChange={e=>setContext(e.target.value)}/><small>Your context guides the generated creative.</small></label>}
     </div>
@@ -61,7 +62,7 @@ export function CampaignNewPost({businessId,initialPlan,autoOpen=false}:{busines
     {format==='carousel'&&<label className="campaign-compose-slides">Slides<input type="number" min={2} max={10} value={slides} onChange={e=>setSlides(Number(e.target.value))}/><small>One coordinated story across every slide.</small></label>}
     {['static','carousel','story'].includes(format)&&<details className="campaign-compose-artwork"><summary>Image text & fonts<span>{artwork.text==='none'?'No image text':artwork.typography?'Custom fonts':'Brand fonts'}</span></summary><PostArtworkChoices value={artwork} onChange={setArtwork}/></details>}
    </fieldset></div>
-   <footer><span>Your post stays a draft until you approve it.</span><button className="primary" disabled={busy||uploading||!plan||!topic.trim()||!when} onClick={()=>void save()}>{busy?'Saving…':'Create Post'}</button></footer>
+   <footer><span>Your post stays a draft until you approve it.</span><ActionButton className="primary" isLoading={busy} disabled={busy||uploading||!plan||!topic.trim()||!when} onClick={()=>void save()} label={busy?'Saving…':'Create Post'} /></footer>
   </dialog>
  </>;
 }

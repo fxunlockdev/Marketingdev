@@ -1,4 +1,5 @@
 "use client";
+import {ActionButton} from "./design-system";
 import {DesvioSelect,DesvioMultiSelect} from './desvio-select';
 import {CreateChat} from './create-chat';
 import {Strategies} from "./strategies";
@@ -155,7 +156,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         <Wordmark />
         <h1>We couldn’t open Desvio.</h1>
         <Notice error={error} />
-        <button onClick={() => location.reload()}>Try again</button>
+        <ActionButton onClick={() => location.reload()} label="Try again" />
       </main>
     );
   if (!session || !businesses)
@@ -229,9 +230,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           aria-expanded={menu}
           aria-controls="business-nav"
           onClick={() => setMenu(!menu)}
-        >
-          Menu
-        </button>
+         >Menu</button>
         <nav id="business-nav" aria-label="Main navigation">
           {sections.map(([key, title, icon]) => (
             <div key={key}>
@@ -259,7 +258,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <strong>{session.user.name}</strong>
             <AppLink href="/profile">Your account</AppLink>
           </div>
-          <button
+          <ActionButton
             className="quiet"
             onClick={async () => {
               try {
@@ -269,9 +268,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
                 setSignoutError(e);
               }
             }}
-          >
-            Sign out
-          </button>
+           label="Sign out" />
         </div>
         <Notice error={signoutError} />
       </aside>
@@ -288,7 +285,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         </header>
         <main id="main" className="v5-main" key={pathname}>
           <Notice error={error}/>
-          {resolvingBusiness ? (error ? <button onClick={()=>{loadedAt.current=0;setWorkspaceRevision(n=>n+1);}}>Try again</button> : <div role="status" aria-label="Opening business"><Loading /></div>) : section === "brands" ? (
+          {resolvingBusiness ? (error ? <ActionButton onClick={()=>{loadedAt.current=0;setWorkspaceRevision(n=>n+1);}} label="Try again" /> : <div role="status" aria-label="Opening business"><Loading /></div>) : section === "brands" ? (
             isNew ? (
               <NewBusiness entitlement={entitlement} />
             ) : (
@@ -429,7 +426,7 @@ function ManageBrand({business}:{business:Business}) {
       <label htmlFor={`delete-${business.id}`}>Type {business.name} to confirm</label>
       <input ref={confirmationInput} id={`delete-${business.id}`} value={confirmation} onChange={e=>{setConfirmation(e.target.value);setConfirmationError(false);}} aria-invalid={confirmationError} aria-describedby={`delete-help-${business.id}`} autoComplete="off" disabled={busy}/>
       <p id={`delete-help-${business.id}`} role={confirmationError?'alert':undefined}>{confirmationError?`Enter “${business.name}” in the field above to confirm deletion.`:'Enter the brand name above, then select Delete brand.'}</p>
-      <Notice error={error}/><button className="danger" type="submit" disabled={busy}>{busy?'Deleting…':'Delete brand'}</button>
+      <Notice error={error}/><ActionButton className="danger" type="submit" disabled={busy} label={busy?'Deleting…':'Delete brand'} />
     </form>}
   </details>;
 }
@@ -559,7 +556,7 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
       router.push(`/b/${created.id}/onboarding`);
     }catch(e){setError(e);}finally{setBusy(false);}
   }
-  if(created)return <div className="brand-onboarding-experience"><PageTitle eyebrow="Add your business" title="Bring your brand along."><p>Upload any logos, product photos or guidelines you have.</p></PageTitle><Steps step={1}/><BrandFiles org={{id:created.organization_id,name:created.name,role:created.role??'owner'}} brandId={created.id}/><Notice error={error}/><button className="primary" disabled={busy} onClick={()=>void prepareUploads()}>{busy?"Reading your documents…":"Continue to brand analysis"}</button></div>;
+  if(created)return <div className="brand-onboarding-experience"><PageTitle eyebrow="Add your business" title="Bring your brand along."><p>Upload any logos, product photos or guidelines you have.</p></PageTitle><Steps step={1}/><BrandFiles org={{id:created.organization_id,name:created.name,role:created.role??'owner'}} brandId={created.id}/><Notice error={error}/><ActionButton className="primary" disabled={busy} onClick={()=>void prepareUploads()} label={busy?"Reading your documents…":"Continue to brand analysis"} /></div>;
   return (
     <div className="brand-onboarding-experience business-intro">
       <PageTitle
@@ -619,9 +616,7 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
           </Field>
           <label className="checkbox-field"><input type="checkbox" checked={documents} onChange={e=>setDocuments(e.target.checked)}/>I have logos, product photos or brand documents to add</label>
           <Notice error={error} />
-          <button className="primary" disabled={busy}>
-            {busy ? "Saving your business…" : "Continue"}
-          </button>
+          <ActionButton className="primary" disabled={busy} label={busy ? "Saving your business…" : "Continue"} />
         </form><aside className="business-intro-preview" aria-label="Your business preview"><div className="intro-brand-tile" aria-hidden="true">{name.trim().slice(0,1).toUpperCase()||'d'}<span>·</span></div><p className="eyebrow">Built around your business</p><h2>{name.trim()||'Make it yours.'}</h2><p>{website||'Your identity. Your voice. Your next idea.'}</p><div className="intro-brand-pillars"><span>Brand</span><span>Ideas</span><span>Calendar</span></div></aside></div>
       )}
     </div>
@@ -893,7 +888,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
       <>
         <Notice error={error} />
         {error ? (
-          <button onClick={() => void load()}>Try again</button>
+          <ActionButton onClick={() => void load()} label="Try again" />
         ) : (
           <Loading />
         )}
@@ -949,13 +944,11 @@ export function BrandOnboarding({ business }: { business: Business }) {
           <div className="wizard-actions">
             <AppLink href="/brands">Your businesses</AppLink>
             {writable && (
-              <button
+              <ActionButton
                 className="primary"
                 disabled={busy||visualEditing||factSaving}
                 onClick={() => void confirmDetails()}
-              >
-                Confirm details & continue
-              </button>
+               label="Confirm details & continue" />
             )}
           </div>
         </>
@@ -1055,13 +1048,9 @@ export function BrandOnboarding({ business }: { business: Business }) {
           <Notice error={error} />
           {writable && (
             <div className="actions">
-              <button disabled={busy} onClick={() => void save(2)}>
-                Back to brand review
-              </button>
-              <button disabled={busy} onClick={() => void save(3)}>
-                Save goals
-              </button>
-              {["owner","admin"].includes(business.role)&&<button disabled={busy} onClick={async()=>{if(await save(3,true))setConfirmed(true);}}>Save brand without a plan</button>}
+              <ActionButton disabled={busy} onClick={() => void save(2)} label="Back to brand review" />
+              <ActionButton disabled={busy} onClick={() => void save(3)} label="Save goals" />
+              {["owner","admin"].includes(business.role)&&<ActionButton disabled={busy} onClick={async()=>{if(await save(3,true))setConfirmed(true);}} label="Save brand without a plan" />}
 
             </div>
           )}
@@ -1089,7 +1078,7 @@ function BrandKit({business}:{business:Business}) {
   <div className="brand-kit-content"><h2>{tabs.find(([id])=>id===tab)?.[1]}</h2>
   {tab==='media'?<BrandReferences businessId={business.id} writable={writable} uploadWorkspace={org} visualPicker libraryMode/>:tab==='sources'?<><BrandFiles org={org} brandId={business.id}/><BrandReview section="sources" business={business} onChange={setBrain} onVisualEditing={setVisualEditing}/></>:<>
    <BrandReview key={tab} section={tab as 'profile'|'voice'|'style'} business={business} onChange={setBrain} onVisualEditing={setVisualEditing} onSavingChange={setFactSaving}/><Notice error={error}/>
-   {['owner','admin'].includes(business.role)&&<div className="brand-kit-save"><button className="primary" disabled={!brain||busy||visualEditing||factSaving} onClick={()=>void approve()}>{busy?'Saving…':'Save approved brand'}</button>{saved===brain?.revision&&<p role="status">Your approved brand is saved.</p>}{visualEditing&&<p>Save or discard your visual edit first.</p>}</div>}
+   {['owner','admin'].includes(business.role)&&<div className="brand-kit-save"><ActionButton className="primary" disabled={!brain||busy||visualEditing||factSaving} onClick={()=>void approve()} label={busy?'Saving…':'Save approved brand'} />{saved===brain?.revision&&<p role="status">Your approved brand is saved.</p>}{visualEditing&&<p>Save or discard your visual edit first.</p>}</div>}
   </>}
   </div></div>
  </section>;
@@ -1197,7 +1186,7 @@ function BrandReview({
             <h2>{section==='style'?'Colors and typography':section==='voice'?'Your brand voice':'Your brand profile'}</h2>
             <p>Check the details and make them yours.</p>
           </div>
-          <button className="quiet" onClick={()=>void load()}>Refresh profile</button>
+          <ActionButton className="quiet" onClick={()=>void load()} label="Refresh profile" />
         </div>
         <Notice error={error} />
         {!brain ? (
@@ -1278,9 +1267,7 @@ function BrandReview({
             </div>
             {field==="fonts"&&<BrandFontChoices value={value} onChange={setValue} disabled={busy}/>}
             {field==="colors"&&<BrandStylePreview field={field} value={value}/>}
-            <button disabled={busy||!value.trim()}>
-              {busy ? "Saving…" : "Add for review"}
-            </button>
+            <ActionButton disabled={busy||!value.trim()} label={busy ? "Saving…" : "Add for review"} />
           </form>
           </details>
         )}
@@ -1302,7 +1289,7 @@ function BrandReview({
             <div className="document-row" key={a.id}>
               <span>{a.filename}</span>
               {writable && (
-                <button
+                <ActionButton
                   disabled={
                     busy ||
                     (!!job &&
@@ -1327,9 +1314,7 @@ function BrandReview({
                       setBusy(false);
                     }
                   }}
-                >
-                  Extract brand evidence
-                </button>
+                 label="Extract brand evidence" />
               )}
             </div>
           ))}
@@ -1354,7 +1339,7 @@ function MissingBrandDetail({field,suggested,path,writable,onSaved,onSaving}:{fi
  useEffect(()=>{const previous=previousSuggestion.current;setValue(current=>current===previous?(suggested??''):current);previousSuggestion.current=suggested??'';},[suggested]);
  useUnsavedChanges(value!==(suggested??''));
  async function save(){setBusy(true);onSaving?.(true);setError(undefined);try{const body={field,value:value.trim()},encoded=JSON.stringify(body);if(request.current.body!==encoded)request.current={body:encoded,key:crypto.randomUUID()};await api(path+'/brain/findings',body,'POST',request.current.key);await onSaved();}catch(e){setError(e);}finally{setBusy(false);onSaving?.(false);}}
- return <article className="missing-brand-detail"><h3>{field.replaceAll('_',' ')}</h3><p className="hint">{suggested?'Suggested from your business. Adjust it, then add it to your profile.':'We couldn’t verify this from your website. Add this detail to complete your profile.'}</p><Field label={field==='audience'?'Who are your customers?':`Your ${field.replaceAll('_',' ')}`}>{id=><textarea id={id} value={value} maxLength={4000} disabled={!writable||busy} onChange={e=>setValue(e.target.value)}/>}</Field><Notice error={error}/>{writable&&<button disabled={busy||!value.trim()} onClick={()=>void save()}>{busy?'Saving…':'Add to my profile'}</button>}</article>;
+ return <article className="missing-brand-detail"><h3>{field.replaceAll('_',' ')}</h3><p className="hint">{suggested?'Suggested from your business. Adjust it, then add it to your profile.':'We couldn’t verify this from your website. Add this detail to complete your profile.'}</p><Field label={field==='audience'?'Who are your customers?':`Your ${field.replaceAll('_',' ')}`}>{id=><textarea id={id} value={value} maxLength={4000} disabled={!writable||busy} onChange={e=>setValue(e.target.value)}/>}</Field><Notice error={error}/>{writable&&<ActionButton disabled={busy||!value.trim()} onClick={()=>void save()} label={busy?'Saving…':'Add to my profile'} />}</article>;
 }
 function preferredFinding(findings:any[]) {
   return [...findings].sort((a,b)=>{
@@ -1446,30 +1431,20 @@ function Finding({
         <div className="actions">
           {editing ? (
             <>
-              <button disabled={busy} onClick={() => void decide("edited")}>
-                Save correction
-              </button>
-              <button disabled={busy} onClick={() => setEditing(false)}>
-                Cancel
-              </button>
+              <ActionButton disabled={busy} onClick={() => void decide("edited")} label="Save correction" />
+              <ActionButton disabled={busy} onClick={() => setEditing(false)} label="Cancel" />
             </>
           ) : (
             <>
-              <button aria-pressed={f.status==="correct"||f.status==="edited"} disabled={busy} onClick={() => void decide(f.status==="edited"?"edited":"correct")}>
-                Correct
-              </button>
-              <button aria-pressed={f.status==="wrong"} disabled={busy} onClick={() => void decide("wrong")}>
-                Wrong
-              </button>
-              <button
+              <ActionButton aria-pressed={f.status==="correct"||f.status==="edited"} disabled={busy} onClick={() => void decide(f.status==="edited"?"edited":"correct")} label="Correct" />
+              <ActionButton aria-pressed={f.status==="wrong"} disabled={busy} onClick={() => void decide("wrong")} label="Wrong" />
+              <ActionButton
                 disabled={busy}
                 onClick={() => {
                   setValue(f.value);
                   setEditing(true);
                 }}
-              >
-                Edit
-              </button>
+               label="Edit" />
             </>
           )}
         </div>
@@ -1490,7 +1465,7 @@ function Memory({ business }: { business: Business }) {
     <div className="workspace-view-switch" role="group" aria-label="Learning views">
       {[['facts','Brand knowledge'],['lessons','What’s working'],['sources','Sources']].map(([key,label])=><button key={key} aria-pressed={view===key} onClick={()=>setView(key)}>{label}</button>)}
     </div>
-    <Notice error={error}/>{error!==undefined&&<button onClick={()=>setRetry(n=>n+1)}>Try again</button>}
+    <Notice error={error}/>{error!==undefined&&<ActionButton onClick={()=>setRetry(n=>n+1)} label="Try again" />}
     {view==='facts'&&<div className="learning-proposals"><PerformanceLessons key={business.id} businessId={business.id}/></div>}
     {view==='facts'&&(brain?<section className="learning-facts-panel">
       <div className="heading-row"><div><h2>Brand knowledge</h2><p className="hint">{facts.length} confirmed facts{brain.active&&` · Updated ${new Date(brain.active.approved_at).toLocaleDateString()}`}</p></div><AppLink className="button" href={`/b/${business.id}/onboarding`}>Edit brand facts</AppLink></div>

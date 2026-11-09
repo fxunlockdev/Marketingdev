@@ -1,0 +1,149 @@
+/* Desvio's visual contract, shared by Astryx and the existing domain controls.
+   Artwork and export typography deliberately keep their own brand styles. */
+:root,
+[data-astryx-theme="neutral"] {
+  --font-family-body: 'Desvio Sans', system-ui, sans-serif;
+  --font-family-heading: 'Desvio Serif', Georgia, serif;
+  --color-accent: #5545d8;
+  --color-accent-muted: #eeebff;
+  --color-on-accent: #fff;
+  --color-text-accent: #4938bd;
+  --color-icon-accent: #5545d8;
+  --color-text-primary: #17171a;
+  --color-text-secondary: #64616f;
+  --color-background-body: #eeedf3;
+  --color-background-surface: #fff;
+  --color-background-card: #fff;
+  --color-background-popover: #fff;
+  --color-background-muted: #f6f5fa;
+  --color-border: #e4e1ec;
+  --color-border-emphasized: #b7afc9;
+  --color-track: #e4e1ec;
+  --radius-element: 12px;
+  --radius-container: 24px;
+  --ds-space-1: 4px;
+  --ds-space-2: 8px;
+  --ds-space-3: 12px;
+  --ds-space-4: 16px;
+  --ds-space-5: 20px;
+  --ds-space-6: 24px;
+  --ds-space-8: 32px;
+  --ds-control-height: 44px;
+  --ds-field-radius: 12px;
+  --ds-panel-radius: 24px;
+  --ds-panel-padding: clamp(20px, 2.2vw, 32px);
+  --ds-focus: #6a5cff;
+  --ds-focus-wash: #6a5cff1a;
+  --ds-field: #faf9fc;
+  --ds-ink: #17171a;
+  --ds-muted: #64616f;
+  --ds-border: #e4e1ec;
+  --ds-surface: #fff;
+}
+
+body.desvio-redesign.desvio-polished .desvio-action {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: var(--ds-control-height); height: auto; max-width: 100%;
+  padding: 10px 18px; gap: 8px; border: 1px solid var(--ds-border);
+  border-radius: 999px; background: var(--ds-surface); color: var(--ds-ink);
+  font-family: var(--font-family-body); font-size: 14px; font-weight: 600;
+  line-height: 1.4; white-space: normal; text-align: center;
+  box-shadow: 0 1px 2px #17171a05;
+}
+body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary] {
+  color: #fff; background: #17171a; border-color: #17171a;
+}
+body.desvio-redesign.desvio-polished .desvio-action[data-variant=destructive] {
+  color: #a12039; background: #fff4f5; border-color: #edc5ce;
+}
+body.desvio-redesign.desvio-polished .desvio-action:focus-visible {
+  outline: 2px solid var(--ds-focus); outline-offset: 3px;
+}
+body.desvio-redesign.desvio-polished .desvio-action:disabled { opacity: .5; cursor: not-allowed; }
+body.desvio-redesign.desvio-polished .desvio-action[aria-busy=true] { opacity: 1; }
+body.desvio-redesign.desvio-polished .desvio-action[aria-pressed=true] { background: #eeebff; color: #4938bd; border-color: #c4baed; }
+@media (hover: hover) {
+  body.desvio-redesign.desvio-polished .desvio-action:hover:not(:disabled) { background: #f4f1ff; border-color: #c4baed; color: #4938bd; }
+  body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary]:hover:not(:disabled) { background: #4938bd; border-color: #4938bd; color: #fff; }
+}
+
+/* One field rhythm, including selectors in side panels and native dialogs. */
+body.desvio-redesign.desvio-polished .field { display: grid; gap: var(--ds-space-2); }
+body.desvio-redesign.desvio-polished .field > label { margin: 0; line-height: 1.45; }
+body.desvio-redesign.desvio-polished .field > .hint { margin: 0; }
+body.desvio-redesign.desvio-polished :is(.settings-page, .auth-card, .preference-section) :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]), textarea) {
+  background: var(--ds-field); border-color: var(--ds-border); border-radius: var(--ds-field-radius);
+  min-height: 46px; padding: 11px 14px; line-height: 1.5;
+}
+body.desvio-redesign.desvio-polished :is(.settings-page, .auth-card, .preference-section) :is(input, textarea):focus-visible {
+  outline: 2px solid var(--ds-focus); outline-offset: 2px;
+}
+body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger {
+  background: var(--ds-field); border-color: var(--ds-border); border-radius: var(--ds-field-radius);
+}
+body.desvio-redesign.desvio-polished .workspace-business .ds-select-trigger { background: transparent; border: 0; }
+body.desvio-redesign.desvio-polished .team-invite-form .ds-multi-field { grid-column: 1 / -1; margin: 0; max-width: 560px; }
+body.desvio-redesign.desvio-polished :is(.settings-page, .brand-kit-content, .content-preferences) .hint { text-wrap: pretty; }
+
+/* Headings and content share a left edge and a predictable vertical rhythm. */
+body.desvio-redesign.desvio-polished .v5-main { padding-inline: 12px; }
+body.desvio-redesign.desvio-polished .v5-page-title { padding-inline: 0; }
+body.desvio-redesign.desvio-polished .v5-page-title h1 { margin: 8px 0 12px; }
+body.desvio-redesign.desvio-polished .v5-page-title > p:last-child { margin-bottom: 0; }
+body.desvio-redesign.desvio-polished :is(.heading-row, .section-heading) { flex-wrap: wrap; align-items: center; }
+body.desvio-redesign.desvio-polished :is(.heading-row, .section-heading) > div { min-width: 0; }
+body.desvio-redesign.desvio-polished .settings-page > .v5-panel { padding: var(--ds-panel-padding); border-radius: var(--ds-panel-radius); }
+body.desvio-redesign.desvio-polished .settings-page .v5-panel > h2 { margin-bottom: 12px; }
+body.desvio-redesign.desvio-polished .settings-page .v5-panel > form { margin-top: 24px; }
+body.desvio-redesign.desvio-polished .settings-page .member-row { row-gap: 12px; }
+body.desvio-redesign.desvio-polished .settings-page .member-info > span { line-height: 1.55; }
+body.desvio-redesign.desvio-polished .settings-page .member-edit { padding: 20px; border-radius: 16px; background: #f6f5fa; }
+body.desvio-redesign.desvio-polished .settings-page .member-edit .actions { margin-top: 16px; }
+body.desvio-redesign.desvio-polished .settings-page .notice > p { margin: 0 0 16px; }
+body.desvio-redesign.desvio-polished :is(.blank, .archive-empty, .overview-content-empty) {
+  padding: clamp(28px, 4vw, 48px); border: 1px solid var(--ds-border); border-radius: var(--ds-panel-radius);
+  background: var(--ds-surface); text-align: center;
+}
+body.desvio-redesign.desvio-polished :is(.blank, .archive-empty, .overview-content-empty) > p { max-width: 54ch; margin: 12px auto 20px; color: var(--ds-muted); line-height: 1.6; }
+body.desvio-redesign.desvio-polished :is(.blank, .archive-empty, .overview-content-empty) h2 { margin: 0; font-size: 28px; }
+body.desvio-redesign.desvio-polished .content-archive > .actions { margin-bottom: 24px; }
+body.desvio-redesign.desvio-polished .campaigns-screen > .heading-row { margin-bottom: 24px; }
+body.desvio-redesign.desvio-polished .campaigns-screen > .heading-row .v5-page-title { margin-bottom: 0; }
+body.desvio-redesign.desvio-polished .overview-campaigns > h2 { margin-top: 0; }
+body.desvio-redesign.desvio-polished .overview-campaign-list h3 { line-height: 1.45; text-wrap: pretty; }
+body.desvio-redesign.desvio-polished .ds-loading { display: flex; align-items: center; justify-content: flex-start; gap: 12px; padding: 24px 0; color: var(--ds-muted); font-size: 14px; }
+
+/* Canvas metadata and action spacing. */
+body.desvio-redesign.desvio-polished .conversation-canvas-strip { line-height: 1.5; }
+body.desvio-redesign.desvio-polished .conversation-canvas-strip strong { white-space: nowrap; }
+body.desvio-redesign.desvio-polished .conversation-history li button { line-height: 1.5; }
+body.desvio-redesign.desvio-polished .create-chat-screen :is(.actions, .creative-text-actions) { gap: 12px; }
+body.desvio-redesign.desvio-polished .campaign-new-post > footer .desvio-action { flex-shrink: 0; }
+body.desvio-redesign.desvio-polished .campaign-new-post .campaign-compose-fields > .heading-row .desvio-action { min-height: 36px; padding: 7px 12px; font-size: 12px; }
+body.desvio-redesign.desvio-polished .campaign-new-post header > .desvio-action[aria-label] { width: 40px; height: 40px; min-height: 40px; padding: 0; }
+
+@media (max-width: 760px) {
+  body.desvio-redesign.desvio-polished .v5-main { padding-inline: 4px; }
+  body.desvio-redesign.desvio-polished .settings-page > .heading-row { gap: 16px; }
+  body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger,
+  body.desvio-redesign.desvio-polished :is(.settings-page, .auth-card) :is(input, textarea) { font-size: 16px; }
+  body.desvio-redesign.desvio-polished :is(.blank, .archive-empty, .overview-content-empty) { padding: 28px 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.desvio-redesign.desvio-polished .desvio-action,
+  body.desvio-redesign.desvio-polished .desvio-action * { animation: none !important; transition: none !important; }
+}
+
+/* Astryx reserves a live region for async feedback; empty regions have no announcement. */
+.desvio-action [role="status"]:empty { display: none; }
+
+/* Keep the supplied three-way creation hierarchy above generic button rules. */
+body.desvio-redesign.desvio-polished .chat-start-card {
+  border-radius: 22px; padding: 16px; min-height: 80px;
+}
+body.desvio-redesign.desvio-polished .chat-start-card.post { background: #f1efff; }
+body.desvio-redesign.desvio-polished .chat-start-card.campaign { background: #fff1b8; }
+body.desvio-redesign.desvio-polished .chat-start-card.strategy { background: #cfe6c8; }
+body.desvio-redesign.desvio-polished .chat-start-icon { background: #fff; border-radius: 16px; }
+body.desvio-redesign.desvio-polished .chat-start-card strong { line-height: 1.2; }
+body.desvio-redesign.desvio-polished .chat-start-card small { margin-top: 4px; line-height: 1.5; }

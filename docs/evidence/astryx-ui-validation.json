@@ -1,0 +1,32 @@
+{
+  "checked_at": "2026-11-09T18:54:36.363030+00:00",
+  "scope": "Astryx UI refinement",
+  "production_build": "pass",
+  "browser_fixture_tests": {
+    "passed": 13,
+    "failed": 0,
+    "provider_mode": "mocked, no paid generation"
+  },
+  "visual_audit": {
+    "pages": 11,
+    "viewports": [
+      1440,
+      390
+    ],
+    "states": 22,
+    "document_overflows": 0,
+    "dialog_overflows": 0
+  },
+  "flows": [
+    "New Post field values and six formats",
+    "roles and multi-business selection",
+    "preferences save",
+    "article save and restore",
+    "history focus and keyboard dismissal",
+    "mobile navigation",
+    "reduced motion",
+    "prompt suggestions and dismissal",
+    "image/video progress recovery",
+    "lightweight card previews"
+  ]
+}

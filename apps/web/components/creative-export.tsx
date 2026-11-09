@@ -1,4 +1,5 @@
 "use client";
+import {ActionButton} from "./design-system";
 import {useCallback,useEffect,useId,useRef,useState} from 'react';
 import {VideoRequest} from './video-canvas';
 import {api} from './api';
@@ -45,16 +46,16 @@ export function CreativeExportPanel({format='png',threadId,business,versionId,so
    {preview&&loaded&&<p><a href={preview} download={format==='png'?'desvio-final.png':'desvio-instagram.jpg'}>Download final image</a></p>}
    {approved&&!disabled?<><p role="status">Final image approved for this {context.type==='slot'?'post':'creative version'}.</p>{context.type==='slot'&&<a href={`/b/${business.id}/publishing?slot=${context.id}`}>Review publishing options →</a>}</>:<>
     {!reviewable&&<p>Send this {context.type==='slot'?'post':'version'} for review before final approval.</p>}
-    {reviewer&&reviewable&&<><label className="check-row"><input type="checkbox" checked={confirmed} disabled={busy||disabled||!loaded} onChange={e=>setConfirmed(e.target.checked)}/>I reviewed this saved image and its text.</label><button className="primary" disabled={busy||disabled||!loaded||!confirmed} onClick={()=>void act(async()=>{await api(`${root}/creative-exports/${saved.id}/approve`,{sha256:saved.sha256,source_sha256:sourceSHA,context_type:context.type,context_id:context.id,context_revision:context.revision,confirmed:true});setConfirmed(false);await onApproved();})}>Approve final image</button></>}
+    {reviewer&&reviewable&&<><label className="check-row"><input type="checkbox" checked={confirmed} disabled={busy||disabled||!loaded} onChange={e=>setConfirmed(e.target.checked)}/>I reviewed this saved image and its text.</label><ActionButton className="primary" disabled={busy||disabled||!loaded||!confirmed} onClick={()=>void act(async()=>{await api(`${root}/creative-exports/${saved.id}/approve`,{sha256:saved.sha256,source_sha256:sourceSHA,context_type:context.type,context_id:context.id,context_revision:context.revision,confirmed:true});setConfirmed(false);await onApproved();})} label="Approve final image" /></>}
    </>}
   </>}
   {approved&&!disabled&&saved&&format==='png'&&threadId&&context.type==='canvas'&&<VideoRequest business={business} threadId={threadId} reference={{export_id:saved.id,approval_id:state!.approvals.find(a=>a.export_id===saved.id&&a.context_type==='canvas'&&a.context_id===context.id&&a.context_revision===context.revision)!.id,source_sha256:sourceSHA,export_sha256:saved.sha256}}/>}
-  {job&&<div role="status"><p>{job.cancel_requested?'Canceling export…':job.status==='queued'?'Final image queued…':'Preparing final image…'}</p>{writer&&<button disabled={busy||job.cancel_requested} onClick={()=>void act(()=>api(`${root}/export-jobs/${job.id}/cancel`,{}))}>Cancel export</button>}</div>}
+  {job&&<div role="status"><p>{job.cancel_requested?'Canceling export…':job.status==='queued'?'Final image queued…':'Preparing final image…'}</p>{writer&&<ActionButton disabled={busy||job.cancel_requested} onClick={()=>void act(()=>api(`${root}/export-jobs/${job.id}/cancel`,{}))} label="Cancel export" />}</div>}
   {!saved&&!job&&state?.configured&&writer&&<>
    {latestJob&&['failed','rejected'].includes(latestJob.status)&&<p role="alert">{latestJob.error_code==='EXPORT_TEXT_OVERFLOW'?'Some text extends beyond the image. Move or resize it, save, and try again.':'The export could not finish. Your creative is still saved. You can try again.'}</p>}
    {latestJob?.status==='canceled'&&<p>Export canceled. Your creative is still saved.</p>}
-   <button disabled={busy||disabled} onClick={()=>void act(create)}>Prepare final image</button>
+   <ActionButton disabled={busy||disabled} onClick={()=>void act(create)} label="Prepare final image" />
   </>}
-  {error!==undefined&&<button disabled={busy} onClick={()=>void act(async()=>{await load();setPreviewRetry(n=>n+1);})}>Reload export status</button>}
+  {error!==undefined&&<ActionButton disabled={busy} onClick={()=>void act(async()=>{await load();setPreviewRetry(n=>n+1);})} label="Reload export status" />}
  </section>;
 }
