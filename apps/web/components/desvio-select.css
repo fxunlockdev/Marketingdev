@@ -1,27 +1,27 @@
 /* Shared selection surfaces. Kept independent of page-specific input rules. */
 .ds-select{display:inline-block;position:relative;width:100%;min-width:0;vertical-align:middle;text-align:left}
 body .ds-select select.ds-select-native{position:absolute!important;opacity:0!important;pointer-events:none!important;width:1px!important;height:1px!important;padding:0!important;margin:0!important;clip-path:inset(50%);overflow:hidden}
-body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0;min-height:46px;height:auto;margin:0;padding:11px 14px;border:1px solid #dedbea;border-radius:12px;background:#faf9fc;color:#202024;font:inherit;font-size:14px;font-weight:400;line-height:1.5;text-align:left;box-shadow:0 1px 2px #17131f04;cursor:pointer;transform:none;transition:border-color 140ms,box-shadow 140ms,background-color 140ms}
-body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger:hover:not(:disabled){border-color:#bbb3d9;background:#fff}
-body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger:is([data-popup-open],:focus-visible){outline:0;border-color:#7056f5;box-shadow:0 0 0 3px #7056f51a;background:#fff}
+body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-width:0;min-height:46px;height:auto;margin:0;padding:11px 14px;border:1px solid var(--brand-border);border-radius:12px;background:var(--brand-field);color:var(--brand-ink);font:inherit;font-size:14px;font-weight:400;line-height:1.5;text-align:left;box-shadow:0 1px 2px #17131f04;cursor:pointer;transform:none;transition:border-color 140ms,box-shadow 140ms,background-color 140ms}
+body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger:hover:not(:disabled){border-color:var(--brand-strong-border);background:#fff}
+body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger:is([data-popup-open],:focus-visible){outline:0;border-color:var(--brand-link);box-shadow:0 0 0 3px #475b161a;background:#fff}
 body.desvio-redesign.desvio-polished .ds-select .ds-select-trigger:disabled{opacity:.55;cursor:not-allowed}
 .ds-select-value{display:block;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ds-select-chevron{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:50%;background:#efebff;color:#6146d6;transition:transform 160ms}
+.ds-select-chevron{display:grid;place-items:center;flex:none;width:24px;height:24px;border-radius:50%;background:var(--brand-wash);color:var(--brand-link);transition:transform 160ms}
 .ds-select-chevron[data-popup-open]{transform:rotate(180deg)}
 .ds-select-positioner{z-index:11000;max-width:calc(100vw - 24px);outline:0}
-.ds-select-popup{box-sizing:border-box;width:var(--anchor-width);min-width:min(180px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:min(340px,var(--available-height));border:1px solid #e2dfeb;border-radius:14px;background:#fff;color:#202024;box-shadow:0 12px 36px #21173520,0 2px 6px #21173508;overflow:hidden;transform-origin:var(--transform-origin);transition:opacity 130ms,transform 130ms;outline:0}
+.ds-select-popup{box-sizing:border-box;width:var(--anchor-width);min-width:min(180px,calc(100vw - 24px));max-width:calc(100vw - 24px);max-height:min(340px,var(--available-height));border:1px solid var(--brand-border);border-radius:14px;background:#fff;color:var(--brand-ink);box-shadow:0 12px 36px #21173520,0 2px 6px #21173508;overflow:hidden;transform-origin:var(--transform-origin);transition:opacity 130ms,transform 130ms;outline:0}
 .ds-select-popup[data-starting-style],.ds-select-popup[data-ending-style]{opacity:0;transform:translateY(-4px)}
 .ds-select-list{box-sizing:border-box;max-height:inherit;overflow:auto;overscroll-behavior:contain;padding:5px;outline:0;scroll-padding:5px}
 .ds-select-option{box-sizing:border-box;display:flex;align-items:center;gap:10px;position:relative;min-height:42px;padding:10px 12px;border-radius:8px;font-family:inherit;font-size:14px;font-weight:400;line-height:1.45;cursor:pointer;outline:0;user-select:none;scroll-margin:5px}
-.ds-select-option[data-selected]{background:#f2efff;color:#4930ac}
-.ds-select-option[data-highlighted]{background:#eae4ff;color:#38218f}
+.ds-select-option[data-selected]{background:var(--brand-wash);color:var(--brand-link)}
+.ds-select-option[data-highlighted]{background:var(--brand-wash);color:var(--brand-link)}
 .ds-select-option[data-disabled]{opacity:.45;cursor:not-allowed}
 .ds-select-option-label{flex:1;min-width:0;overflow-wrap:anywhere}
-.ds-select-checkbox{display:grid;place-items:center;flex:none;box-sizing:border-box;width:19px;height:19px;border:1.5px solid #d6d1e2;border-radius:5px;background:white;color:white}
+.ds-select-checkbox{display:grid;place-items:center;flex:none;box-sizing:border-box;width:19px;height:19px;border:1.5px solid var(--brand-border);border-radius:5px;background:white;color:white}
 .ds-select-checkbox > span:not([data-selected]){visibility:hidden}
-.ds-select-option[data-selected] .ds-select-checkbox{border-color:#7056f5;background:#7056f5}
-.ds-select-tick{flex:none;color:#6146d6}
-.ds-select-empty{display:block;padding:12px;color:#706980;font-size:14px}
+.ds-select-option[data-selected] .ds-select-checkbox{border-color:var(--brand-link);background:var(--brand-link)}
+.ds-select-tick{flex:none;color:var(--brand-link)}
+.ds-select-empty{display:block;padding:12px;color:var(--brand-muted);font-size:14px}
 .ds-select-error{display:block;margin-top:6px;font-size:12px;color:#ae2945}
 .ds-multi-field{display:grid;gap:8px;min-width:0;margin-block:12px}
 .ds-multi-field>label{font-weight:600;font-size:14px}
@@ -30,6 +30,6 @@ body.desvio-redesign.desvio-polished .workspace-business .ds-select-trigger{padd
 @media(forced-colors:active){.ds-select-option[data-selected]{outline:1px solid Highlight}.ds-select-checkbox{border-color:ButtonText}.ds-select-option[data-selected] .ds-select-checkbox{background:Highlight;color:HighlightText}}
 .ds-search-popup{display:flex;flex-direction:column}
 .ds-search-popup .ds-select-list{min-height:0}
-.ds-select-search{padding:10px;border-bottom:1px solid #eeeaf5;flex:none}
-body.desvio-redesign.desvio-polished .ds-select-search input{box-sizing:border-box;width:100%;min-height:40px;padding:8px 10px;border:1px solid #e2dfeb;border-radius:8px;background:#faf9fc;font-size:14px;color:#202024;outline:none}
-body.desvio-redesign.desvio-polished .ds-select-search input:focus{border-color:#7056f5;box-shadow:0 0 0 2px #7056f51a}
+.ds-select-search{padding:10px;border-bottom:1px solid var(--brand-wash);flex:none}
+body.desvio-redesign.desvio-polished .ds-select-search input{box-sizing:border-box;width:100%;min-height:40px;padding:8px 10px;border:1px solid var(--brand-border);border-radius:8px;background:var(--brand-field);font-size:14px;color:var(--brand-ink);outline:none}
+body.desvio-redesign.desvio-polished .ds-select-search input:focus{border-color:var(--brand-link);box-shadow:0 0 0 2px #475b161a}

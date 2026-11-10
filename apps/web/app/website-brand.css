@@ -1,0 +1,76 @@
+@font-face { font-family: 'Desvio Body'; src: url('/site-brand/fonts/DMSans-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Desvio Body'; src: url('/site-brand/fonts/DMSans-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Desvio Body'; src: url('/site-brand/fonts/DMSans-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+/* Identity from DESVIO-Netlify-2026-10-20.zip. Product and artwork are separate:
+   these tokens style the interface, not customer font/color data or exports. */
+@font-face { font-family: 'Desvio Display'; src: url('/site-brand/fonts/SpaceGrotesk-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
+@font-face { font-family: 'Desvio Display'; src: url('/site-brand/fonts/SpaceGrotesk-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
+@font-face { font-family: 'Desvio Display'; src: url('/site-brand/fonts/SpaceGrotesk-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
+:root, [data-astryx-theme="neutral"], body.desvio-redesign.desvio-polished {
+  --brand-paper: #f4f0e7;
+  --brand-field: #f8f5ee;
+  --brand-ink: #161713;
+  --brand-muted: #62655b;
+  --brand-link: #475b16;
+  --brand-wash: #eef4dc;
+  --brand-border: #dedbd1;
+  --brand-strong-border: #929b7b;
+  --brand-accent: #d9ff65;
+  --brand-accent-hover: #b7dd3a;
+  --font-family-heading: 'Desvio Display', 'Helvetica Neue', Arial, sans-serif;
+  --font-family-body: 'Desvio Body', 'Helvetica Neue', Arial, sans-serif;
+  --paper: var(--brand-paper); --ink: var(--brand-ink); --muted: var(--brand-muted);
+  --line: var(--brand-border); --blue: var(--brand-link); --blue-wash: var(--brand-wash);
+  --color-accent: var(--brand-link); --color-accent-muted: var(--brand-wash);
+  --color-text-accent: var(--brand-link); --color-icon-accent: var(--brand-link);
+  --color-text-primary: var(--brand-ink); --color-text-secondary: var(--brand-muted);
+  --color-background-body: var(--brand-paper); --color-background-muted: var(--brand-field);
+  --color-border: var(--brand-border); --color-border-emphasized: var(--brand-strong-border);
+  --ds-focus: var(--brand-link); --ds-focus-wash: #475b161a;
+  --focus-ring: var(--brand-link); --surface-soft: var(--brand-field);
+  --ds-field: var(--brand-field); --ds-ink: var(--brand-ink); --ds-muted: var(--brand-muted);
+  --ds-border: var(--brand-border); --ds-panel-radius: 16px; --radius-container: 16px;
+}
+::selection { background: #d9ff65; color: #161713; }
+body.desvio-redesign.desvio-polished :is(h1,h2,h3,h4) {
+  font-family: var(--font-family-heading); font-weight: 600; letter-spacing: -.03em;
+}
+body.desvio-redesign.desvio-polished .wordmark img { display: block; width: 146px; height: auto; }
+body.desvio-redesign.desvio-polished .create-chat-wordmark img { display: block; width: 130px; height: auto; max-width: 100%; }
+body.desvio-redesign.desvio-polished .create-chat-wordmark { display: flex; align-items: center; min-width: 80px; }
+body.desvio-redesign.desvio-polished :is(.v5-sidebar,.v5-panel,.v5-business-card,.v5-add-card,.preference-section,.auth-main,.auth-story,.create-chat-panel,.create-live-canvas,.campaign-new-post,.social-network-card) { border-radius: 16px; }
+body.desvio-redesign.desvio-polished :is(.v5-panel,.preference-section,.social-network-card) { border: 1px solid var(--brand-border); }
+body.desvio-redesign.desvio-polished .v5-sidebar nav a[aria-current] { background: var(--brand-ink); color: var(--brand-paper); }
+body.desvio-redesign.desvio-polished :is(.desvio-action[data-variant=primary],button.primary,a.button.primary) {
+  background: var(--brand-ink); border-color: var(--brand-ink); color: var(--brand-paper);
+}
+body.desvio-redesign.desvio-polished :is(.desvio-action[data-variant=primary],button.primary,a.button.primary):hover:not(:disabled) {
+  background: #35372f; border-color: #35372f; color: var(--brand-paper);
+}
+/* Lime is a surface accent. Dark foregrounds retain legibility on it. */
+body.desvio-redesign.desvio-polished :is(.create-composer,.create-home-hero form) button:not(:disabled) {
+  background: var(--brand-accent); color: var(--brand-ink); border-color: var(--brand-accent);
+}
+body.desvio-redesign.desvio-polished :is(.create-composer,.create-home-hero form) button:hover:not(:disabled) { background: var(--brand-accent-hover); }
+body.desvio-redesign.desvio-polished .create-live-canvas {
+  background-color: #ebe6da; background-image: radial-gradient(#b9bcaf 1px, transparent 1px);
+}
+body.desvio-redesign.desvio-polished :is(.chat-start-card.post,.chat-start-card.campaign,.chat-start-card.strategy) { background: var(--brand-paper); border: 1px solid var(--brand-border); }
+body.desvio-redesign.desvio-polished .chat-start-card.post { background: var(--brand-wash); }
+body.desvio-redesign.desvio-polished .chat-start-card:hover { border-color: var(--brand-strong-border); }
+body.desvio-redesign.desvio-polished :is(.auth-story,.redesign-welcome)::after { background: var(--brand-accent); }
+body.desvio-redesign.desvio-polished .overview-metric { background: #e8edda; color: var(--brand-ink); }
+body.desvio-redesign.desvio-polished .overview-metric:nth-child(2) { background: #ebe6da; color: var(--brand-ink); }
+body.desvio-redesign.desvio-polished .overview-metric:nth-child(3) { background: #e0dacb; color: var(--brand-ink); }
+body.desvio-redesign.desvio-polished .overview-metric strong { font-family: var(--font-family-heading); font-weight: 500; }
+@media (max-width: 760px) {
+  body.desvio-redesign.desvio-polished .wordmark img { width: 122px; }
+  body.desvio-redesign.desvio-polished .create-chat-wordmark img { width: 106px; }
+}
+
+body.desvio-redesign.desvio-polished { font-family: var(--font-family-body); }
+body.desvio-redesign.desvio-polished .create-paper-tiles span:nth-child(2) { background: #f4f0e7; }
+body.desvio-redesign.desvio-polished .create-paper-tiles span:nth-child(3) { background: #e0dacb; }
+body.desvio-redesign.desvio-polished .create-composer button:disabled { background: #e0dacb; color: #62655b; }
+body.desvio-redesign.desvio-polished .create-composer { box-shadow: none; }
+body.desvio-redesign.desvio-polished .chat-start-card strong { font-weight: 600; }

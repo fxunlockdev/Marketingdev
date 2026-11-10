@@ -1,19 +1,19 @@
-.desvio-redesign .conversation-screen .create-composer textarea{border:0!important;box-shadow:none!important;background:transparent!important;resize:none;min-width:0;min-height:48px;max-height:140px;padding:10px 12px!important;flex:1;margin:0;color:#17171a;font:inherit;line-height:1.5}
+.desvio-redesign .conversation-screen .create-composer textarea{border:0!important;box-shadow:none!important;background:transparent!important;resize:none;min-width:0;min-height:48px;max-height:140px;padding:10px 12px!important;flex:1;margin:0;color:var(--brand-ink);font:inherit;line-height:1.5}
 .desvio-redesign .conversation-screen .create-composer textarea:focus-visible{outline:0}
-.desvio-redesign .conversation-screen .create-composer:focus-within{outline:3px solid #6a5cff;outline-offset:3px}
+.desvio-redesign .conversation-screen .create-composer:focus-within{outline:3px solid var(--brand-link);outline-offset:3px}
 .desvio-redesign .conversation-screen .create-message p{white-space:pre-wrap}
 .desvio-redesign .conversation-preview{display:flex;flex-direction:column;gap:24px;align-items:center;justify-content:center;min-width:0}
 .desvio-redesign .conversation-artwork{width:100%;max-width:900px;padding:24px;border-radius:28px;background:white;min-width:0}
 .desvio-redesign .conversation-artwork>header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:20px}
-.desvio-redesign .conversation-artwork h1{font:32px/1.2 'Desvio Serif',Georgia,serif;margin:0}
+.desvio-redesign .conversation-artwork h1{font:32px/1.2 var(--font-family-heading);margin:0}
 .desvio-redesign .conversation-artwork .creative-editor{max-width:100%;min-width:0}
 .desvio-redesign .conversation-artwork canvas{max-width:100%}
-.desvio-redesign .conversation-campaign,.desvio-redesign .conversation-progress{background:white;border-radius:24px;padding:20px 24px;width:100%;max-width:900px;color:#292244}
+.desvio-redesign .conversation-campaign,.desvio-redesign .conversation-progress{background:white;border-radius:24px;padding:20px 24px;width:100%;max-width:900px;color:var(--brand-ink)}
 .desvio-redesign .conversation-problem{background:#fff1d6;border-radius:16px;padding:14px 18px;line-height:1.5;font-size:14px;color:#553b16}
-.desvio-redesign .conversation-sources{font-size:12px;margin-left:40px}.desvio-redesign .conversation-sources button{background:#f1efff;font:inherit;padding:6px 10px;margin:4px}
-.desvio-redesign .conversation-history{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 40px);border:0;border-radius:28px;padding:28px;color:#17171a;overflow:auto}
-.desvio-redesign .conversation-history::backdrop{background:#17171a70}.desvio-redesign .conversation-history header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.desvio-redesign .conversation-history h2{margin:0;font:32px 'Desvio Serif',Georgia,serif}.desvio-redesign .conversation-history label{display:block;margin-bottom:10px;font-size:14px}
-.desvio-redesign .conversation-history ul{padding:0;list-style:none;display:grid;gap:10px}.desvio-redesign .conversation-history li button{display:flex;flex-direction:column;gap:8px;text-align:left;width:100%;padding:16px 20px;margin:0;background:#f4f3f8;border:0;border-radius:18px;color:#17171a}.desvio-redesign .conversation-history li strong{overflow-wrap:anywhere}.desvio-redesign .conversation-history li span{font-size:12px;font-weight:400;color:#656174}.desvio-redesign .conversation-history button:focus-visible{outline:3px solid #6a5cff;outline-offset:2px}
+.desvio-redesign .conversation-sources{font-size:12px;margin-left:40px}.desvio-redesign .conversation-sources button{background:var(--brand-wash);font:inherit;padding:6px 10px;margin:4px}
+.desvio-redesign .conversation-history{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 40px);border:0;border-radius:28px;padding:28px;color:var(--brand-ink);overflow:auto}
+.desvio-redesign .conversation-history::backdrop{background:#17171a70}.desvio-redesign .conversation-history header{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:24px}.desvio-redesign .conversation-history h2{margin:0;font:32px var(--font-family-heading)}.desvio-redesign .conversation-history label{display:block;margin-bottom:10px;font-size:14px}
+.desvio-redesign .conversation-history ul{padding:0;list-style:none;display:grid;gap:10px}.desvio-redesign .conversation-history li button{display:flex;flex-direction:column;gap:8px;text-align:left;width:100%;padding:16px 20px;margin:0;background:var(--brand-field);border:0;border-radius:18px;color:var(--brand-ink)}.desvio-redesign .conversation-history li strong{overflow-wrap:anywhere}.desvio-redesign .conversation-history li span{font-size:12px;font-weight:400;color:var(--brand-muted)}.desvio-redesign .conversation-history button:focus-visible{outline:3px solid var(--brand-link);outline-offset:2px}
 @media(max-width:760px){.desvio-redesign .conversation-artwork{padding:18px}.desvio-redesign .conversation-history{padding:20px}.desvio-redesign .conversation-screen .create-chat-panel>header{gap:5px}.desvio-redesign .conversation-screen .create-chat-panel>header button{padding:9px}}
 
 .desvio-redesign .conversation-artwork>.creative-editor{grid-template-columns:minmax(0,1fr)}
@@ -22,18 +22,18 @@
 .desvio-redesign .conversation-screen .conversation-choices{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));margin:18px 0 24px;padding-left:40px;gap:10px}
 .desvio-redesign .conversation-screen .conversation-choices button{grid-column:span 2;min-width:0;min-height:44px;padding:10px 8px;white-space:nowrap}
 .desvio-redesign .conversation-screen .conversation-choices button:nth-last-child(-n+2){grid-column:span 3}
-.desvio-redesign .conversation-options{padding:0 8px 12px;flex-shrink:0}.desvio-redesign .conversation-options>button{min-height:36px;margin:0;padding:6px 12px;background:#f4f3f8;font-size:13px}
+.desvio-redesign .conversation-options{padding:0 8px 12px;flex-shrink:0}.desvio-redesign .conversation-options>button{min-height:36px;margin:0;padding:6px 12px;background:var(--brand-field);font-size:13px}
 .desvio-redesign .conversation-option-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px;max-height:190px;overflow:auto;padding:4px}
 .desvio-redesign .conversation-option-fields label{display:grid;gap:6px;font-size:12px}.desvio-redesign .conversation-option-fields select{min-width:0;width:100%;font-size:13px;min-height:40px;padding:8px!important;margin:0}
 .desvio-redesign .conversation-preview .create-empty{max-width:620px;text-align:center}.desvio-redesign .conversation-preview .create-paper-tiles{margin-inline:auto}
-.desvio-redesign .conversation-image-placeholder{width:min(100%,520px);flex-shrink:0}.desvio-redesign .conversation-image-placeholder>div:first-child{aspect-ratio:1;display:flex;flex-direction:column;justify-content:flex-end;gap:14px;background:white;border:16px solid white;outline:2px dashed #dedce6;outline-offset:-24px;border-radius:32px;padding:28px}
-.desvio-redesign .conversation-placeholder-title{margin-block:auto;color:#686477;font-size:16px;text-align:center}.desvio-redesign .conversation-placeholder-lines{height:40px;border-radius:12px;background:linear-gradient(#efedf3 0 15px,transparent 15px 24px,#efedf3 24px 39px);width:80%}
-.desvio-redesign .conversation-image-placeholder strong{font-size:12px;text-transform:uppercase;color:#686477}.desvio-redesign .conversation-image-placeholder>p{font-size:14px;text-align:center;margin:16px 0 0}
+.desvio-redesign .conversation-image-placeholder{width:min(100%,520px);flex-shrink:0}.desvio-redesign .conversation-image-placeholder>div:first-child{aspect-ratio:1;display:flex;flex-direction:column;justify-content:flex-end;gap:14px;background:white;border:16px solid white;outline:2px dashed var(--brand-border);outline-offset:-24px;border-radius:32px;padding:28px}
+.desvio-redesign .conversation-placeholder-title{margin-block:auto;color:var(--brand-muted);font-size:16px;text-align:center}.desvio-redesign .conversation-placeholder-lines{height:40px;border-radius:12px;background:linear-gradient(#efedf3 0 15px,transparent 15px 24px,#efedf3 24px 39px);width:80%}
+.desvio-redesign .conversation-image-placeholder strong{font-size:12px;text-transform:uppercase;color:var(--brand-muted)}.desvio-redesign .conversation-image-placeholder>p{font-size:14px;text-align:center;margin:16px 0 0}
 .desvio-redesign .conversation-artwork.is-preview{width:min(100%,620px);background:transparent;padding:0;border-radius:0;flex-shrink:0}
 .desvio-redesign .conversation-artwork.is-preview>header{gap:12px;margin:0 0 16px}.desvio-redesign .conversation-artwork.is-preview h1{font-size:24px}.desvio-redesign .conversation-artwork.is-preview>header button{margin:0;min-height:40px;padding:8px 16px}
 .desvio-redesign .conversation-artwork.is-preview .creative-editor{margin:0;padding:16px;background:white;border-radius:28px;display:block}.desvio-redesign .conversation-artwork.is-preview .creative-artboard{padding:0}.desvio-redesign .conversation-artwork.is-preview .creative-surface{overflow:hidden;border-radius:16px}
-.desvio-redesign .conversation-canvas-strip{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 20px;background:white;border-radius:999px;padding:12px 20px;max-width:100%;font-size:13px;color:#686477;flex-shrink:0}.desvio-redesign .conversation-canvas-strip span{text-transform:capitalize}.desvio-redesign .conversation-canvas-strip strong{background:#f4f3f8;border-radius:999px;padding:6px 14px;color:#4f4869;font-weight:600}
-.desvio-redesign .conversation-workflow{width:100%;padding:16px 20px;background:#f4f3f8;border-radius:20px;font-size:13px;margin-top:16px}.desvio-redesign .conversation-workflow>div{display:flex;justify-content:space-between;gap:12px}.desvio-redesign .conversation-workflow progress{display:block;width:100%!important;height:6px;border:0;border-radius:6px;appearance:none;margin:12px 0!important}.desvio-redesign .conversation-workflow progress::-webkit-progress-bar{background:#e4e1ee;border-radius:6px}.desvio-redesign .conversation-workflow progress::-webkit-progress-value{background:#6a5cff;border-radius:6px}.desvio-redesign .conversation-workflow p{margin:0 0 6px}.desvio-redesign .conversation-workflow small{color:#686477;line-height:1.5;display:block}.desvio-redesign .conversation-workflow strong{font-size:13px;font-weight:600;text-transform:none;color:#17171a}
+.desvio-redesign .conversation-canvas-strip{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:12px 20px;background:white;border-radius:999px;padding:12px 20px;max-width:100%;font-size:13px;color:var(--brand-muted);flex-shrink:0}.desvio-redesign .conversation-canvas-strip span{text-transform:capitalize}.desvio-redesign .conversation-canvas-strip strong{background:var(--brand-field);border-radius:999px;padding:6px 14px;color:var(--brand-muted);font-weight:600}
+.desvio-redesign .conversation-workflow{width:100%;padding:16px 20px;background:var(--brand-field);border-radius:20px;font-size:13px;margin-top:16px}.desvio-redesign .conversation-workflow>div{display:flex;justify-content:space-between;gap:12px}.desvio-redesign .conversation-workflow progress{display:block;width:100%!important;height:6px;border:0;border-radius:6px;appearance:none;margin:12px 0!important}.desvio-redesign .conversation-workflow progress::-webkit-progress-bar{background:var(--brand-border);border-radius:6px}.desvio-redesign .conversation-workflow progress::-webkit-progress-value{background:var(--brand-link);border-radius:6px}.desvio-redesign .conversation-workflow p{margin:0 0 6px}.desvio-redesign .conversation-workflow small{color:var(--brand-muted);line-height:1.5;display:block}.desvio-redesign .conversation-workflow strong{font-size:13px;font-weight:600;text-transform:none;color:var(--brand-ink)}
 .desvio-redesign .conversation-artwork.is-editing{max-width:1100px}.desvio-redesign .conversation-artwork.is-editing .creative-project{padding:16px}.desvio-redesign .conversation-artwork.is-editing .creative-editor{grid-template-columns:minmax(0,1fr)}
 @media(min-width:761px){.desvio-redesign .conversation-artwork.is-preview{max-width:min(620px,calc(100dvh - 230px))}}
 @media(max-width:760px){.desvio-redesign .conversation-preview{gap:16px}.desvio-redesign .conversation-artwork.is-preview .creative-editor{padding:10px}.desvio-redesign .conversation-canvas-strip{border-radius:20px;gap:10px;font-size:12px}.desvio-redesign .conversation-artwork.is-editing{padding:12px}.desvio-redesign .conversation-artwork.is-editing .creative-project{padding:12px}}
@@ -57,41 +57,41 @@
 .desvio-redesign .chat-creative-project .conversation-canvas-strip{width:100%;max-width:680px;min-height:52px;gap:16px;margin:0}
 .desvio-redesign .chat-layer-card{width:100%;max-width:320px;background:#fff;border-radius:28px;padding:18px;min-width:0}
 .desvio-redesign .chat-layer-card>header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
-.desvio-redesign .chat-layer-card h2{font:400 24px/1.2 'Desvio Serif',Georgia,serif;margin:0}
-.desvio-redesign .chat-layer-card>header>span{font-size:13px;color:#686477;white-space:nowrap}
+.desvio-redesign .chat-layer-card h2{font:400 24px/1.2 var(--font-family-heading);margin:0}
+.desvio-redesign .chat-layer-card>header>span{font-size:13px;color:var(--brand-muted);white-space:nowrap}
 .desvio-redesign .chat-layer-card fieldset{display:flex;flex-direction:column;gap:16px;min-width:0;border:0;padding:0;margin:0}
 .desvio-redesign .chat-layer-card .field{min-width:0;margin:0;display:flex;flex-direction:column;gap:8px}
-.desvio-redesign .chat-layer-card label,.desvio-redesign .chat-field-label{font-size:12.5px;font-weight:600;line-height:1.4;color:#42404d;margin:0}
-.desvio-redesign .chat-layer-card input:not([type=checkbox]),.desvio-redesign .chat-layer-card select,.desvio-redesign .chat-layer-card textarea{width:100%;min-width:0;min-height:44px;margin:0;border:0;border-radius:14px;background:#f4f3f8;padding:12px!important;font:inherit;font-size:14px;color:#17171a}
+.desvio-redesign .chat-layer-card label,.desvio-redesign .chat-field-label{font-size:12.5px;font-weight:600;line-height:1.4;color:var(--brand-ink);margin:0}
+.desvio-redesign .chat-layer-card input:not([type=checkbox]),.desvio-redesign .chat-layer-card select,.desvio-redesign .chat-layer-card textarea{width:100%;min-width:0;min-height:44px;margin:0;border:0;border-radius:14px;background:var(--brand-field);padding:12px!important;font:inherit;font-size:14px;color:var(--brand-ink)}
 .desvio-redesign .chat-layer-card textarea{min-height:80px;resize:vertical}
 .desvio-redesign .chat-layer-tabs{display:flex;gap:8px;flex-wrap:wrap}
-.desvio-redesign .chat-layer-tabs button,.desvio-redesign .chat-remove-layer{margin:0;min-height:44px;background:#f4f3f8;border:0;padding:10px 14px;border-radius:999px;color:#17171a}
+.desvio-redesign .chat-layer-tabs button,.desvio-redesign .chat-remove-layer{margin:0;min-height:44px;background:var(--brand-field);border:0;padding:10px 14px;border-radius:999px;color:var(--brand-ink)}
 .desvio-redesign .chat-layer-tabs button{max-width:100%;overflow-wrap:anywhere}
-.desvio-redesign .chat-layer-tabs button[aria-pressed=true]{background:#17171a;color:#fff}
+.desvio-redesign .chat-layer-tabs button[aria-pressed=true]{background:var(--brand-ink);color:#fff}
 .desvio-redesign .chat-layer-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .desvio-redesign .chat-layer-position{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .desvio-redesign .chat-layer-position label{font-size:12px}
-.desvio-redesign .chat-font-stepper,.desvio-redesign .chat-layer-segments{display:flex;align-items:center;gap:4px;border-radius:14px;background:#f4f3f8;padding:4px;min-height:48px}
-.desvio-redesign .chat-font-stepper>button{width:36px;height:36px;min-height:36px;padding:0;margin:0;border:0;background:#fff;flex-shrink:0;font-size:22px;border-radius:50%;color:#17171a}
-.desvio-redesign .chat-font-stepper>button:last-child{background:#17171a;color:#fff}
+.desvio-redesign .chat-font-stepper,.desvio-redesign .chat-layer-segments{display:flex;align-items:center;gap:4px;border-radius:14px;background:var(--brand-field);padding:4px;min-height:48px}
+.desvio-redesign .chat-font-stepper>button{width:36px;height:36px;min-height:36px;padding:0;margin:0;border:0;background:#fff;flex-shrink:0;font-size:22px;border-radius:50%;color:var(--brand-ink)}
+.desvio-redesign .chat-font-stepper>button:last-child{background:var(--brand-ink);color:#fff}
 .desvio-redesign .chat-font-stepper>input{min-width:0;min-height:36px!important;padding:2px!important;text-align:center;font-weight:600;appearance:textfield}
 .desvio-redesign .chat-font-stepper>input::-webkit-inner-spin-button{appearance:none}
-.desvio-redesign .chat-layer-segments>button{flex:1;min-width:0;min-height:40px;border:0;border-radius:10px;background:transparent;color:#17171a;padding:6px;margin:0;display:grid;place-items:center;font-size:13px}
-.desvio-redesign .chat-layer-segments>button[aria-pressed=true]{background:#17171a;color:#fff}
+.desvio-redesign .chat-layer-segments>button{flex:1;min-width:0;min-height:40px;border:0;border-radius:10px;background:transparent;color:var(--brand-ink);padding:6px;margin:0;display:grid;place-items:center;font-size:13px}
+.desvio-redesign .chat-layer-segments>button[aria-pressed=true]{background:var(--brand-ink);color:#fff}
 .desvio-redesign .chat-color-swatches{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px}
 .desvio-redesign .chat-color-swatches>button{width:34px;height:34px;min-height:34px;padding:0;margin:0;border:1px solid #17171a30;border-radius:50%}
-.desvio-redesign .chat-color-swatches>button[aria-pressed=true]{outline:2px solid #6a5cff;outline-offset:3px}
+.desvio-redesign .chat-color-swatches>button[aria-pressed=true]{outline:2px solid var(--brand-link);outline-offset:3px}
 .desvio-redesign .chat-color-swatches>input[type=color]{width:38px;height:38px;min-height:38px;padding:3px!important;background:transparent;cursor:pointer}
-.desvio-redesign .chat-backing-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#f4f3f8;border-radius:14px;padding:14px}
-.desvio-redesign .chat-backing-toggle input{appearance:none;width:44px;height:28px;min-width:44px;border:0;border-radius:999px;background:#d9d5e7;margin:0;padding:3px;cursor:pointer}
+.desvio-redesign .chat-backing-toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--brand-field);border-radius:14px;padding:14px}
+.desvio-redesign .chat-backing-toggle input{appearance:none;width:44px;height:28px;min-width:44px;border:0;border-radius:999px;background:var(--brand-border);margin:0;padding:3px;cursor:pointer}
 .desvio-redesign .chat-backing-toggle input::before{content:'';display:block;width:22px;height:22px;border-radius:50%;background:#fff}
-.desvio-redesign .chat-backing-toggle input:checked{background:#6a5cff}
+.desvio-redesign .chat-backing-toggle input:checked{background:var(--brand-link)}
 .desvio-redesign .chat-backing-toggle input:checked::before{transform:translateX(16px)}
 .desvio-redesign .chat-layer-footer,.desvio-redesign .chat-export-actions{display:flex;flex-wrap:wrap;gap:10px}
 .desvio-redesign .chat-layer-footer>button,.desvio-redesign .chat-export-actions>button{flex:1;min-height:44px;margin:0;padding:10px 14px;border-radius:999px}
 .desvio-redesign .chat-export-actions{margin-top:10px}
-.desvio-redesign .chat-export-actions>button:first-child{background:#f1efff;color:#4332cc;border:0}
-.desvio-redesign .chat-layer-help,.desvio-redesign .chat-layer-empty{font-size:13px;line-height:1.6;color:#686477;margin:16px 0 0}
+.desvio-redesign .chat-export-actions>button:first-child{background:var(--brand-wash);color:var(--brand-link);border:0}
+.desvio-redesign .chat-layer-help,.desvio-redesign .chat-layer-empty{font-size:13px;line-height:1.6;color:var(--brand-muted);margin:16px 0 0}
 @media(max-width:1000px){.desvio-redesign .chat-layer-card{padding:20px}.desvio-redesign .chat-layer-position{gap:8px}}
 @media(max-width:760px){.desvio-redesign .conversation-artwork.is-inline>h1{font-size:22px}.desvio-redesign .chat-layer-card h2{font-size:26px}.desvio-redesign .chat-layer-card{padding:18px;border-radius:24px}.desvio-redesign .chat-layer-position{grid-template-columns:minmax(0,1fr)}.desvio-redesign .chat-creative-project .creative-surface{border-radius:20px}}
 
@@ -102,7 +102,7 @@
 .desvio-redesign .conversation-screen .chat-backing-toggle input{min-height:28px!important;max-height:28px;height:28px!important;width:44px!important;padding:3px!important;box-shadow:none;border:0!important}
 .desvio-redesign .conversation-screen .chat-font-stepper>input{border:0!important;box-shadow:none!important;background:transparent!important;height:36px!important;min-height:36px!important;padding:2px!important}
 .desvio-redesign .conversation-screen .chat-layer-card button{transition:none}
-.desvio-redesign .chat-layer-card input[type=range]{accent-color:#6a5cff}
+.desvio-redesign .chat-layer-card input[type=range]{accent-color:var(--brand-link)}
 .desvio-redesign .conversation-screen .create-live-canvas>header{flex-shrink:0}
 .desvio-redesign .conversation-preview{justify-content:safe center}
 .desvio-redesign .chat-layer-position{align-items:end}
@@ -111,11 +111,11 @@
 
 /* The conversational canvas contains only artwork, metadata and layer controls. */
 .desvio-redesign .chat-creative-project>.creative-editor{order:0}
-.desvio-redesign .chat-layer-footer .chat-download{display:flex;align-items:center;justify-content:center;gap:6px;background:#f1efff;color:#3a2fc2;border:0}
+.desvio-redesign .chat-layer-footer .chat-download{display:flex;align-items:center;justify-content:center;gap:6px;background:var(--brand-wash);color:var(--brand-link);border:0}
 .desvio-redesign .chat-save-actions{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:6px}
 .desvio-redesign .chat-save-actions button{margin:0;min-height:42px;border-radius:999px}
 .desvio-redesign .chat-creative-project .conversation-canvas-strip>span+span:before{content:'•';color:#c7c3d3;margin-right:16px}
-.desvio-redesign .conversation-screen .create-live-canvas>header .conversation-post-details{margin-left:auto;background:white;color:#17171a;white-space:nowrap}
+.desvio-redesign .conversation-screen .create-live-canvas>header .conversation-post-details{margin-left:auto;background:white;color:var(--brand-ink);white-space:nowrap}
 .desvio-redesign .conversation-screen .create-live-canvas>header .conversation-post-details+button{margin-left:0}
 .desvio-redesign .chat-layer-card fieldset>legend.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .desvio-redesign .chat-layer-card input:not([type=checkbox]),.desvio-redesign .chat-layer-card select,.desvio-redesign .chat-layer-card textarea{border:0!important}
@@ -127,20 +127,20 @@
  .desvio-redesign .chat-creative-project>.creative-editor{display:grid;grid-template-columns:minmax(0,1fr) 320px;grid-template-areas:"artwork controls" "metadata controls";gap:20px 24px;align-items:start;align-content:start}
  .desvio-redesign .chat-creative-project .creative-artboard{grid-area:artwork;align-self:start;max-width:min(680px,calc((100dvh - 240px) * var(--artwork-ratio,1)))}
  .desvio-redesign .chat-creative-project .conversation-canvas-strip{grid-area:metadata;align-self:start;justify-self:center}
- .desvio-redesign .chat-creative-project .chat-layer-card{grid-area:controls;align-self:start;max-height:calc(100dvh - 160px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#d9d5e7 transparent}
+ .desvio-redesign .chat-creative-project .chat-layer-card{grid-area:controls;align-self:start;max-height:calc(100dvh - 160px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--brand-border) transparent}
 }
 
 .text-curve-controls {display:grid;gap:12px;min-width:0}
 .text-curve-controls label {display:flex;justify-content:space-between;gap:12px}
-.text-curve-controls output {font-variant-numeric:tabular-nums;color:#615b79}
-.text-curve-controls input[type=range] {width:100%;min-height:32px;padding:0;accent-color:#6a5cff;background:transparent;cursor:pointer}
-.text-curve-controls .hint {margin:0;font-size:12px;line-height:1.5;color:#757184}
+.text-curve-controls output {font-variant-numeric:tabular-nums;color:var(--brand-muted)}
+.text-curve-controls input[type=range] {width:100%;min-height:32px;padding:0;accent-color:var(--brand-link);background:transparent;cursor:pointer}
+.text-curve-controls .hint {margin:0;font-size:12px;line-height:1.5;color:var(--brand-muted)}
 
 /* A saved image is a versioned attachment, separate from the editable canvas. */
-.desvio-redesign .conversation-saved-image{margin:16px 0 24px 40px;padding:14px;background:#f4f3f8;border-radius:20px;max-width:320px;min-width:0}
+.desvio-redesign .conversation-saved-image{margin:16px 0 24px 40px;padding:14px;background:var(--brand-field);border-radius:20px;max-width:320px;min-width:0}
 .desvio-redesign .conversation-saved-image figcaption{display:grid;gap:4px;margin-bottom:12px;font-size:14px;line-height:1.5}
-.desvio-redesign .conversation-saved-image figcaption span{font-size:12px;color:#686477}
-.desvio-redesign .conversation-saved-preview{width:100%;background:#e7e4ef;border-radius:12px;position:relative}
+.desvio-redesign .conversation-saved-image figcaption span{font-size:12px;color:var(--brand-muted)}
+.desvio-redesign .conversation-saved-preview{width:100%;background:var(--brand-border);border-radius:12px;position:relative}
 .desvio-redesign .conversation-saved-image .creative-editor{display:block;margin:0;padding:0;border:0;background:transparent}
 .desvio-redesign .conversation-saved-image .creative-artboard{margin:0;padding:0;width:100%;min-width:0}
 .desvio-redesign .conversation-saved-image .creative-surface{border-radius:12px;overflow:hidden}
@@ -151,29 +151,29 @@
 /* Start menu dimensions and hierarchy follow the supplied Create Chat prototype. */
 .desvio-redesign .chat-start-menu{display:flex;flex-direction:column;gap:16px;padding-left:40px;min-width:0}
 .desvio-redesign .chat-start-cards{display:grid;gap:8px}
-.desvio-redesign .chat-start-card{display:flex;align-items:center;gap:14px;width:100%;margin:0;padding:14px;border:0;border-radius:22px;background:#f1efff;color:#17171a;text-align:left;min-height:74px;box-shadow:none}
+.desvio-redesign .chat-start-card{display:flex;align-items:center;gap:14px;width:100%;margin:0;padding:14px;border:0;border-radius:22px;background:var(--brand-wash);color:var(--brand-ink);text-align:left;min-height:74px;box-shadow:none}
 .desvio-redesign .chat-start-card.campaign{background:#fff1b8}
 .desvio-redesign .chat-start-card.strategy{background:#cfe6c8}
 .desvio-redesign .chat-start-icon{display:grid;place-items:center;width:46px;height:46px;flex:none;border-radius:15px;background:white}
 .desvio-redesign .chat-start-icon svg{width:20px;height:20px}
 .desvio-redesign .chat-start-card>span:nth-child(2){flex:1;min-width:0}
-.desvio-redesign .chat-start-card strong{display:block;font:400 21px/1.1 'Desvio Serif',Georgia,serif}
+.desvio-redesign .chat-start-card strong{display:block;font:400 21px/1.1 var(--font-family-heading)}
 .desvio-redesign .chat-start-card small{display:block;font-size:13px;line-height:1.4;font-weight:400;color:#3a3a44;margin-top:2px}
 .desvio-redesign .chat-start-chevron{width:16px;height:16px;flex:none}
 .desvio-redesign .chat-start-menu section{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;border:0;background:transparent}
-.desvio-redesign .chat-start-menu h2{font:600 11.5px/1.4 'Desvio Sans',sans-serif;color:#777381;margin:0;padding-left:2px}
+.desvio-redesign .chat-start-menu h2{font:600 11.5px/1.4 'Desvio Sans',sans-serif;color:var(--brand-muted);margin:0;padding-left:2px}
 .desvio-redesign .chat-start-shortcuts{display:flex;flex-wrap:wrap;gap:6px}
-.desvio-redesign .chat-start-shortcuts button{display:flex;align-items:center;gap:7px;height:36px;min-height:36px;padding:0 13px 0 8px;border-radius:999px;border:0;background:#f4f3f8;font-size:13px;font-weight:600;color:#17171a;white-space:nowrap;margin:0}
+.desvio-redesign .chat-start-shortcuts button{display:flex;align-items:center;gap:7px;height:36px;min-height:36px;padding:0 13px 0 8px;border-radius:999px;border:0;background:var(--brand-field);font-size:13px;font-weight:600;color:var(--brand-ink);white-space:nowrap;margin:0}
 .desvio-redesign .chat-start-shortcuts button>span{display:grid;place-items:center;width:22px;height:22px;border-radius:50%;flex:none}
 .desvio-redesign .chat-start-shortcuts svg{width:12px;height:12px}
-.desvio-redesign .chat-start-shortcuts .lavender{background:#f1efff}.desvio-redesign .chat-start-shortcuts .purple{background:#dcd6ff}.desvio-redesign .chat-start-shortcuts .peach{background:#ffd9c7}.desvio-redesign .chat-start-shortcuts .yellow{background:#fff1b8}.desvio-redesign .chat-start-shortcuts .green{background:#cfe6c8}
+.desvio-redesign .chat-start-shortcuts .lavender{background:var(--brand-wash)}.desvio-redesign .chat-start-shortcuts .purple{background:var(--brand-accent)}.desvio-redesign .chat-start-shortcuts .peach{background:#ffd9c7}.desvio-redesign .chat-start-shortcuts .yellow{background:#fff1b8}.desvio-redesign .chat-start-shortcuts .green{background:#cfe6c8}
 .desvio-redesign .chat-start-menu button:hover{filter:brightness(.98)}
 .desvio-redesign .conversation-screen .create-chat-panel>header button{display:inline-flex;align-items:center;justify-content:center;gap:6px}
 .desvio-redesign .conversation-screen.is-start .create-chat-panel>header button:last-child{width:36px;height:36px;padding:0;border-radius:50%;font-size:21px;flex:none}
 .desvio-redesign .conversation-screen.is-start .create-chat-panel{padding-bottom:14px}
 .desvio-redesign .conversation-screen.is-start .create-composer{min-height:58px;padding:5px 6px 5px 14px;gap:4px}
 .desvio-redesign .conversation-screen.is-start .create-composer textarea{height:44px;min-height:44px;padding:11px 4px!important;white-space:nowrap;overflow-x:auto;font-size:15px}
-.desvio-redesign .conversation-screen.is-start .create-composer button{width:44px;height:44px;min-height:44px;background:#6a5cff;border-radius:50%;flex:none}
+.desvio-redesign .conversation-screen.is-start .create-composer button{width:44px;height:44px;min-height:44px;background:var(--brand-link);border-radius:50%;flex:none}
 .desvio-redesign .conversation-screen.is-start .create-composer button:disabled{background:#cbc9d5;opacity:1}
 .desvio-redesign .conversation-screen.is-start .create-preview-area .create-empty{width:100%;max-width:460px;display:flex;flex-direction:column;align-items:center;gap:0}
 .desvio-redesign .conversation-screen.is-start .create-empty h1{max-width:460px;margin:36px 0 10px}
@@ -195,20 +195,20 @@
 
 .desvio-redesign .chat-media{width:100%;min-width:0;max-width:1100px;background:white;border-radius:28px;padding:clamp(18px,3vw,32px);display:flex;flex-direction:column;gap:20px}
 .desvio-redesign .chat-media>header{display:flex;align-items:center;justify-content:space-between;gap:16px}
-.desvio-redesign .chat-media h2{margin:0;font:clamp(24px,3vw,36px)/1.2 'Desvio Serif',Georgia,serif}
+.desvio-redesign .chat-media h2{margin:0;font:clamp(24px,3vw,36px)/1.2 var(--font-family-heading)}
 .desvio-redesign .chat-media p{margin:0;line-height:1.5;overflow-wrap:anywhere}
 .desvio-redesign .chat-slide-tabs{display:flex;gap:8px;flex-wrap:wrap}
-.desvio-redesign .chat-slide-tabs button{display:grid;gap:4px;padding:10px 16px;background:#f4f3f8;border:1px solid transparent;border-radius:14px}
-.desvio-redesign .chat-slide-tabs button[aria-pressed=true]{background:#eeeaff;border-color:#6a5cff;color:#4432cc}
+.desvio-redesign .chat-slide-tabs button{display:grid;gap:4px;padding:10px 16px;background:var(--brand-field);border:1px solid transparent;border-radius:14px}
+.desvio-redesign .chat-slide-tabs button[aria-pressed=true]{background:var(--brand-wash);border-color:var(--brand-link);color:var(--brand-link)}
 .desvio-redesign .chat-slide-tabs small{font-size:12px;font-weight:400}
 .desvio-redesign .chat-carousel-preview{margin:0;display:grid;gap:12px;justify-items:center}
 .desvio-redesign .chat-carousel-preview img{display:block;width:auto;max-width:100%;max-height:60dvh;object-fit:contain;border-radius:20px}
-.desvio-redesign .chat-carousel-preview figcaption{color:#656174;font-size:13px}
-.desvio-redesign .chat-slide-placeholder{min-height:240px;background:#f4f3f8;border-radius:20px;display:grid;place-items:center}
-.desvio-redesign .chat-media-details{border-top:1px solid #eeedf3;padding-top:20px}
+.desvio-redesign .chat-carousel-preview figcaption{color:var(--brand-muted);font-size:13px}
+.desvio-redesign .chat-slide-placeholder{min-height:240px;background:var(--brand-field);border-radius:20px;display:grid;place-items:center}
+.desvio-redesign .chat-media-details{border-top:1px solid var(--brand-paper);padding-top:20px}
 .desvio-redesign .chat-media-details summary{padding:8px 0;cursor:pointer}
 .desvio-redesign .chat-media .publication-record-actions{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}
-.desvio-redesign .chat-video fieldset{display:grid;gap:16px;min-width:0;margin:16px 0;padding:18px;border:1px solid #e7e3f0;border-radius:18px}
+.desvio-redesign .chat-video fieldset{display:grid;gap:16px;min-width:0;margin:16px 0;padding:18px;border:1px solid var(--brand-border);border-radius:18px}
 .desvio-redesign .chat-video label{display:grid;gap:8px;min-width:0}
 .desvio-redesign .chat-video label.check-row,.desvio-redesign .chat-video label.reference-choice{display:flex;gap:10px;align-items:flex-start}
 .desvio-redesign .chat-video input:not([type=checkbox]),.desvio-redesign .chat-video textarea,.desvio-redesign .chat-video select{width:100%;min-width:0;box-sizing:border-box}
@@ -219,7 +219,7 @@
 .desvio-redesign .chat-video .creative-review{display:flex;flex-direction:column;gap:16px;padding:0;margin:0;border:0;min-width:0}
 .desvio-redesign .chat-video .creative-review>h3{font:600 16px/1.5 'Desvio Sans',sans-serif;margin:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .desvio-redesign .chat-video .creative-review>[aria-label="Video review"]{display:flex;flex-direction:column;gap:16px;min-width:0}
-.desvio-redesign .chat-video video{display:block;max-width:100%!important;max-height:52dvh!important;margin-inline:auto;border-radius:18px;background:#17171a}
+.desvio-redesign .chat-video video{display:block;max-width:100%!important;max-height:52dvh!important;margin-inline:auto;border-radius:18px;background:var(--brand-ink)}
 .desvio-redesign .chat-video .creative-review>button,.desvio-redesign .chat-video .creative-review>.generation-notification{order:2;align-self:flex-start;margin:0}
 .desvio-redesign .chat-video .creative-review .field{margin:0;display:grid;gap:8px}
 
@@ -229,20 +229,20 @@
 .desvio-redesign .chat-format-frame.vertical{aspect-ratio:9/16;width:min(100%,330px)}
 .desvio-redesign .chat-format-frame.landscape{aspect-ratio:3/2;width:min(100%,520px)}
 .desvio-redesign .chat-format-artboard{position:absolute;inset:0;background:white;border-radius:32px;box-shadow:0 24px 48px #3c328c14;overflow:hidden}
-.desvio-redesign .chat-format-outline{position:absolute;inset:12px;border:2px dashed #dedde2;border-radius:22px}
+.desvio-redesign .chat-format-outline{position:absolute;inset:12px;border:2px dashed var(--brand-border);border-radius:22px}
 .desvio-redesign .chat-format-profile{position:absolute;inset:14px 20px auto;font-size:12px;font-weight:600}
 .desvio-redesign .chat-format-profile>span{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}
-.desvio-redesign .chat-format-profile b{display:grid;place-items:center;border-radius:50%;background:#17171a;color:white;width:28px;height:28px;flex-shrink:0;font-weight:500}
-.desvio-redesign .chat-format-ticks{display:flex;gap:4px;margin-bottom:12px}.desvio-redesign .chat-format-ticks i{height:3px;background:#dedde2;flex:1;border-radius:4px}.desvio-redesign .chat-format-ticks i:first-child{background:#17171a}
+.desvio-redesign .chat-format-profile b{display:grid;place-items:center;border-radius:50%;background:var(--brand-ink);color:white;width:28px;height:28px;flex-shrink:0;font-weight:500}
+.desvio-redesign .chat-format-ticks{display:flex;gap:4px;margin-bottom:12px}.desvio-redesign .chat-format-ticks i{height:3px;background:var(--brand-border);flex:1;border-radius:4px}.desvio-redesign .chat-format-ticks i:first-child{background:var(--brand-ink)}
 .desvio-redesign .chat-format-play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:grid;place-items:center;width:64px;height:64px;border-radius:50%;background:#17171ad9;color:white}
 .desvio-redesign .chat-format-lines{position:absolute;bottom:54px;left:28px;right:28px;display:grid;gap:10px}.desvio-redesign .chat-format-lines i{height:16px;border-radius:99px;background:#eeedf0;width:78%}.desvio-redesign .chat-format-lines i+i{width:52%}
-.desvio-redesign .chat-format-brand{position:absolute;bottom:28px;left:28px;right:28px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#797783;white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
-.desvio-redesign .chat-stack-sheet{position:absolute;inset:0;border:2px solid white;background:#f3f0ff;border-radius:32px}.desvio-redesign .chat-stack-sheet.back{transform:rotate(5deg) scale(.96)}.desvio-redesign .chat-stack-sheet.front{transform:rotate(-4deg) scale(.98)}
+.desvio-redesign .chat-format-brand{position:absolute;bottom:28px;left:28px;right:28px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand-muted);white-space:nowrap;text-overflow:ellipsis;overflow:hidden}
+.desvio-redesign .chat-stack-sheet{position:absolute;inset:0;border:2px solid white;background:var(--brand-wash);border-radius:32px}.desvio-redesign .chat-stack-sheet.back{transform:rotate(5deg) scale(.96)}.desvio-redesign .chat-stack-sheet.front{transform:rotate(-4deg) scale(.98)}
 .desvio-redesign .format-carousel .chat-format-frame{width:min(94%,420px)}
-.desvio-redesign .chat-format-dots{position:absolute;bottom:29px;right:28px;display:flex;gap:5px}.desvio-redesign .chat-format-dots i{width:5px;height:5px;border-radius:50%;background:#dedde2}.desvio-redesign .chat-format-dots i:first-child{background:#6a5cff}
-.desvio-redesign .chat-format-meta{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:10px;width:100%;max-width:680px;min-width:0;background:#fff;border-radius:32px;padding:10px 16px;box-sizing:border-box;font-size:13px;color:#17171a}
-.desvio-redesign .chat-format-meta>span{white-space:nowrap}.desvio-redesign .chat-format-meta .pending-detail{color:#9693a5}.desvio-redesign .chat-format-meta>i{width:4px;height:4px;border-radius:50%;background:#cac7d7}.desvio-redesign .chat-format-meta>strong{font-weight:600;color:#615b75;background:#f4f3f8;border-radius:99px;padding:7px 14px}
-.desvio-redesign .chat-topic-suggestions{display:flex;flex-wrap:wrap;gap:8px;padding-left:40px;margin-top:8px}.desvio-redesign .chat-topic-suggestions button{margin:0;border:1.5px solid #e4e1ee;border-radius:24px;background:#fff;padding:10px 16px;font-size:13px;line-height:1.4;text-align:left;max-width:100%;overflow-wrap:anywhere}
+.desvio-redesign .chat-format-dots{position:absolute;bottom:29px;right:28px;display:flex;gap:5px}.desvio-redesign .chat-format-dots i{width:5px;height:5px;border-radius:50%;background:var(--brand-border)}.desvio-redesign .chat-format-dots i:first-child{background:var(--brand-link)}
+.desvio-redesign .chat-format-meta{display:flex;justify-content:center;align-items:center;flex-wrap:wrap;gap:10px;width:100%;max-width:680px;min-width:0;background:#fff;border-radius:32px;padding:10px 16px;box-sizing:border-box;font-size:13px;color:var(--brand-ink)}
+.desvio-redesign .chat-format-meta>span{white-space:nowrap}.desvio-redesign .chat-format-meta .pending-detail{color:#9693a5}.desvio-redesign .chat-format-meta>i{width:4px;height:4px;border-radius:50%;background:#cac7d7}.desvio-redesign .chat-format-meta>strong{font-weight:600;color:var(--brand-muted);background:var(--brand-field);border-radius:99px;padding:7px 14px}
+.desvio-redesign .chat-topic-suggestions{display:flex;flex-wrap:wrap;gap:8px;padding-left:40px;margin-top:8px}.desvio-redesign .chat-topic-suggestions button{margin:0;border:1.5px solid var(--brand-border);border-radius:24px;background:#fff;padding:10px 16px;font-size:13px;line-height:1.4;text-align:left;max-width:100%;overflow-wrap:anywhere}
 .desvio-redesign .conversation-screen .create-chat-panel>header .create-mode{padding:6px 10px;font-size:12px;white-space:nowrap}
 .desvio-redesign .conversation-screen.is-topic .create-composer textarea{min-height:40px}
 .desvio-redesign .chat-video{background:transparent;padding:0;align-items:center}.desvio-redesign .chat-video-controls{width:100%;max-width:680px;min-width:0;background:white;border-radius:28px;padding:24px;display:flex;flex-direction:column;gap:18px}.desvio-redesign .chat-video-controls>header h2{font-size:26px}
@@ -256,21 +256,21 @@
 .desvio-redesign .chat-saved-video{width:100%;max-width:520px;min-width:0}.desvio-redesign .format-reel .chat-saved-video,.desvio-redesign .format-story .chat-saved-video{max-width:330px}
 .desvio-redesign .chat-saved-video [aria-label="Video review"]{display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;font-size:13px}
 .desvio-redesign .chat-saved-video video{width:100%!important;max-height:none!important;border-radius:28px}
-.desvio-redesign .chat-saved-video [aria-label="Video review"]>p[role=status]{font-size:12px;color:#686477;text-transform:capitalize}
-.desvio-redesign .chat-saved-video a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 18px;background:white;border-radius:99px;color:#4432cc;font-weight:600;text-decoration:none}
+.desvio-redesign .chat-saved-video [aria-label="Video review"]>p[role=status]{font-size:12px;color:var(--brand-muted);text-transform:capitalize}
+.desvio-redesign .chat-saved-video a{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:10px 18px;background:white;border-radius:99px;color:var(--brand-link);font-weight:600;text-decoration:none}
 .desvio-redesign .chat-video-management summary{cursor:pointer;font-weight:600;padding-block:8px}.desvio-redesign .chat-video-management[open] summary{margin-bottom:20px}
 @media(min-width:761px){.desvio-redesign .format-reel .chat-saved-video,.desvio-redesign .format-story .chat-saved-video{max-width:min(330px,calc((100dvh - 310px)*.5625))}}
 
-.desvio-redesign .chat-video-next{background:#17171a;color:white;min-height:42px;padding:10px 20px;border-radius:99px;margin:0}.desvio-redesign .chat-format-meta>strong{text-transform:capitalize}
+.desvio-redesign .chat-video-next{background:var(--brand-ink);color:white;min-height:42px;padding:10px 20px;border-radius:99px;margin:0}.desvio-redesign .chat-format-meta>strong{text-transform:capitalize}
 
 /* Recovery belongs to the transcript, leaving the composer reachable on short screens. */
-.conversation-recovery{display:grid;gap:12px;margin:16px 0;padding:16px;border:1px solid #e4e1ed;border-radius:20px;background:#f6f5fa;min-width:0;overflow-wrap:anywhere}
+.conversation-recovery{display:grid;gap:12px;margin:16px 0;padding:16px;border:1px solid var(--brand-border);border-radius:20px;background:var(--brand-field);min-width:0;overflow-wrap:anywhere}
 .conversation-recovery .notice{margin:0;padding:0;border:0;background:transparent}
-.conversation-recovery p{margin:0;color:#565366;line-height:1.5}
+.conversation-recovery p{margin:0;color:var(--brand-muted);line-height:1.5}
 .conversation-recovery-actions{display:flex;flex-wrap:wrap;gap:10px}
 .conversation-recovery button{min-height:44px;white-space:normal;text-align:center}
 
-.chat-video .video-recovery{display:grid;gap:12px;padding:24px;background:var(--surface-soft,#f5f3fa);border:1px solid var(--border,#e5e1ef);border-radius:24px;}
+.chat-video .video-recovery{display:grid;gap:12px;padding:24px;background:var(--surface-soft,var(--brand-field));border:1px solid var(--border,var(--brand-border));border-radius:24px;}
 .chat-video .video-recovery h3,.chat-video .video-recovery p{margin:0;}
 .chat-video .video-recovery h3{text-wrap:balance;}
 .chat-video .video-recovery p{text-wrap:pretty;}
@@ -279,14 +279,14 @@
 /* Video setup belongs to the conversation; the canvas remains a preview. */
 .desvio-redesign .chat-video-conversation-mount:empty{display:none}
 .desvio-redesign .chat-video-dialogue{display:grid;gap:20px;min-width:0;margin-top:24px}
-.desvio-redesign .chat-video-answer-card,.desvio-redesign .chat-video-dialogue .creative-review{margin:0 0 0 40px;padding:20px;border:1px solid #e5e1ef;border-radius:24px;background:#fff;display:grid;gap:16px;min-width:0}
+.desvio-redesign .chat-video-answer-card,.desvio-redesign .chat-video-dialogue .creative-review{margin:0 0 0 40px;padding:20px;border:1px solid var(--brand-border);border-radius:24px;background:#fff;display:grid;gap:16px;min-width:0}
 .desvio-redesign .chat-video-answer-card p,.desvio-redesign .chat-video-dialogue h4{margin:0;text-wrap:pretty}
 .desvio-redesign .chat-video-lengths{display:flex;flex-wrap:wrap;gap:8px}
-.desvio-redesign .chat-video-lengths button{min-height:44px;padding:10px 16px;background:#f5f3fa}
-.desvio-redesign .chat-video-lengths button[aria-pressed=true]{background:#17171a;color:white}
+.desvio-redesign .chat-video-lengths button{min-height:44px;padding:10px 16px;background:var(--brand-field)}
+.desvio-redesign .chat-video-lengths button[aria-pressed=true]{background:var(--brand-ink);color:white}
 .desvio-redesign .chat-video-reference-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
-.desvio-redesign .chat-video-reference{display:grid;gap:8px;padding:8px;border:1px solid #e5e1ef;border-radius:16px;text-align:left;background:#fff;min-width:0}
-.desvio-redesign .chat-video-reference .private-visual-presentation{display:block;width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:10px;background:#f5f3fa}
+.desvio-redesign .chat-video-reference{display:grid;gap:8px;padding:8px;border:1px solid var(--brand-border);border-radius:16px;text-align:left;background:#fff;min-width:0}
+.desvio-redesign .chat-video-reference .private-visual-presentation{display:block;width:100%;aspect-ratio:4/3;overflow:hidden;border-radius:10px;background:var(--brand-field)}
 .desvio-redesign .chat-video-reference img{width:100%;height:100%;object-fit:cover}
 .desvio-redesign .chat-video-reference>span:last-child{font-size:13px;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow-wrap:anywhere}
 .desvio-redesign .chat-video-dialogue button{white-space:normal;min-height:44px}
@@ -298,12 +298,12 @@
 .desvio-redesign .chat-video-dialogue .check-row input{margin-top:4px;flex-shrink:0}
 .desvio-redesign .chat-video-dialogue .chat-video-script-summary{display:grid;gap:12px}
 .desvio-redesign .chat-video-script-summary p{display:grid;gap:4px;margin:0}
-.desvio-redesign .chat-video-script-summary span{font-size:12px;color:#666173;font-variant-numeric:tabular-nums}
+.desvio-redesign .chat-video-script-summary span{font-size:12px;color:var(--brand-muted);font-variant-numeric:tabular-nums}
 .desvio-redesign .chat-video-script-editor summary{cursor:pointer;font-weight:600;padding:12px 0}
 .desvio-redesign .chat-video-dialogue .campaign-video-reference-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .desvio-redesign .chat-video-dialogue .campaign-video-reference-grid article{min-width:0}
 .desvio-redesign .chat-video-dialogue .campaign-video-reference-grid p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.desvio-redesign .chat-video-preview-hint{color:#666173;text-align:center;margin:0}
+.desvio-redesign .chat-video-preview-hint{color:var(--brand-muted);text-align:center;margin:0}
 .desvio-redesign .chat-video-image-dialog{width:min(760px,calc(100vw - 32px));max-height:85dvh;overflow:auto}
 .desvio-redesign .chat-video-dialogue .chat-video-management{margin-left:40px}
 @media(max-width:760px){.desvio-redesign .chat-video-answer-card,.desvio-redesign .chat-video-dialogue .creative-review{margin-left:0;padding:16px}.desvio-redesign .chat-video-dialogue .chat-video-management{margin-left:0}}
@@ -314,13 +314,13 @@
 .desvio-redesign .chat-video-image-strip{display:flex;gap:10px;overflow-x:auto;max-width:100%;padding:4px}
 .desvio-redesign .chat-video-image-strip .chat-video-reference{flex:0 0 72px;width:72px;height:72px;padding:3px;border-radius:14px}
 .desvio-redesign .chat-video-image-strip .private-visual-presentation{height:64px;width:64px;aspect-ratio:1}
-.desvio-redesign .chat-video-image-strip .chat-video-reference[aria-pressed=true]{border:2px solid #6c56ff;padding:2px}
+.desvio-redesign .chat-video-image-strip .chat-video-reference[aria-pressed=true]{border:2px solid var(--brand-link);padding:2px}
 .desvio-redesign .chat-video-quick-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.desvio-redesign .chat-video-quick-actions button{padding:8px 14px;background:#f5f3fa}
-.desvio-redesign .chat-video-quick-actions span,.desvio-redesign .chat-video-options summary{font-size:13px;color:#666173}
+.desvio-redesign .chat-video-quick-actions button{padding:8px 14px;background:var(--brand-field)}
+.desvio-redesign .chat-video-quick-actions span,.desvio-redesign .chat-video-options summary{font-size:13px;color:var(--brand-muted)}
 .desvio-redesign .chat-video-options summary{cursor:pointer;padding-block:4px}
 .desvio-redesign .chat-video-options[open] summary{margin-bottom:8px}
-.desvio-redesign .chat-video-quick-create .chat-video-generate{background:#17171a;color:#fff;justify-self:start;padding:10px 24px}
+.desvio-redesign .chat-video-quick-create .chat-video-generate{background:var(--brand-ink);color:#fff;justify-self:start;padding:10px 24px}
 @media(max-width:760px){.desvio-redesign .chat-video-quick-create{margin-left:0}}
 
 @supports (field-sizing:content){
@@ -329,7 +329,7 @@
 }
 
 .desvio-redesign .conversation-screen .create-composer.text-enabled:focus-within{
- outline:2px solid #6a5cff;
+ outline:2px solid var(--brand-link);
  outline-offset:0;
  box-shadow:0 4px 14px rgb(78 61 147 / 8%);
 }

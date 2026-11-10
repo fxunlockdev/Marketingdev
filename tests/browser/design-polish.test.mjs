@@ -39,7 +39,7 @@ test('creation controls stay usable with motion, keyboard navigation and narrow 
     await page.goto(`${origin}/b/${brand}/create`);
     const post = page.locator('.chat-start-card').first();
     await expect(post).toBeVisible();
-    assert.equal(await post.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(241, 239, 255)');
+    assert.equal(await post.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(238, 244, 220)');
     const gap = await page.evaluate(() => document.querySelector('.chat-start-card').getBoundingClientRect().top - document.querySelector('.create-chat-panel>header').getBoundingClientRect().bottom);
     assert(gap >= 12, 'The first card needs clearance below the header');
     await post.hover(); await page.waitForTimeout(210);

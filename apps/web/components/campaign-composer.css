@@ -12,11 +12,11 @@
 .desvio-redesign .campaign-new-post>header {
   display: flex; flex-wrap: nowrap; align-items: flex-start; justify-content: space-between;
   flex: none; padding: 24px 28px 20px; margin: 0; gap: 24px;
-  border-bottom: 1px solid #eeedf3;
+  border-bottom: 1px solid var(--brand-paper);
 }
 .desvio-redesign .campaign-new-post>header>div { min-width: 0; }
 .desvio-redesign .campaign-new-post>header h2 { font-size: 30px; margin: 0 0 8px; white-space: normal; }
-.desvio-redesign .campaign-new-post>header p { font-size: 14px; line-height: 1.5; color: #64616f; margin: 0; }
+.desvio-redesign .campaign-new-post>header p { font-size: 14px; line-height: 1.5; color: var(--brand-muted); margin: 0; }
 .desvio-redesign .campaign-new-post>header>button { flex: none; margin: 0; }
 .desvio-redesign .campaign-new-post>.notice { margin: 12px 28px 0; }
 .desvio-redesign .campaign-new-post>.campaign-compose-scroll {
@@ -32,7 +32,7 @@
 .desvio-redesign .campaign-new-post .campaign-compose-fields { display: grid; gap: 10px; margin-top: 22px; }
 .desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row { display: flex; flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; margin: 0; }
 .desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row label { margin: 0; }
-.desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row button { min-height: 36px; padding: 7px 12px; font-size: 12px; background: #f4f3f8; }
+.desvio-redesign .campaign-new-post .campaign-compose-fields>.heading-row button { min-height: 36px; padding: 7px 12px; font-size: 12px; background: var(--brand-field); }
 .desvio-redesign .campaign-new-post .campaign-compose-fields>label { margin-top: 8px; }
 .desvio-redesign .campaign-new-post .campaign-compose-options {
   display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1.45fr);
@@ -43,38 +43,38 @@
 .desvio-redesign dialog.campaign-new-post .campaign-compose-body :is(input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]),select,textarea) {
   width: 100%; min-width: 0; max-width: 100%; min-height: 46px;
   padding: 11px 14px; font-size: 14px; font-weight: 400; line-height: 22px;
-  border: 1px solid #e5e2ed; border-radius: 12px; background-color: #f8f7fb;
+  border: 1px solid var(--brand-border); border-radius: 12px; background-color: var(--brand-field);
 }
 .desvio-redesign dialog.campaign-new-post .campaign-compose-fields textarea { height: auto; min-height: 96px; resize: vertical; }
 .desvio-redesign .campaign-new-post .campaign-compose-schedule>.desvio-date-trigger {
   width: 100%; min-height: 46px; gap: 8px; padding: 11px 14px;
-  border: 1px solid #e5e2ed; border-radius: 12px; background: #f8f7fb;
+  border: 1px solid var(--brand-border); border-radius: 12px; background: var(--brand-field);
   font-size: 14px; font-weight: 400; line-height: 22px; text-align: left;
 }
 .desvio-redesign .campaign-new-post .campaign-compose-schedule>.desvio-date-trigger svg { flex: none; width: 18px; height: 18px; }
-.desvio-redesign .campaign-new-post .campaign-compose-timezone { display: block; margin-top: 10px; font-size: 12px; color: #64616f; }
+.desvio-redesign .campaign-new-post .campaign-compose-timezone { display: block; margin-top: 10px; font-size: 12px; color: var(--brand-muted); }
 .desvio-redesign .campaign-new-post .campaign-compose-slides { margin-top: 20px; }
 .desvio-redesign .campaign-new-post .campaign-compose-slides input { max-width: 140px; }
 .desvio-redesign .campaign-new-post .campaign-post-ideas { padding: 0; margin-top: 24px; }
 .desvio-redesign .campaign-new-post .campaign-post-ideas ul { margin: 12px 0 0; gap: 12px; }
 .desvio-redesign .campaign-new-post .campaign-post-ideas li button { padding: 14px; gap: 8px; border-radius: 16px; }
 .desvio-redesign .campaign-new-post .campaign-post-ideas li small { -webkit-line-clamp: 2; }
-.desvio-redesign .campaign-new-post .campaign-reference-picker { margin: 20px 0 0; padding: 16px; border: 1px solid #e7e5ed; border-radius: 16px; background: #fcfbfe; }
+.desvio-redesign .campaign-new-post .campaign-reference-picker { margin: 20px 0 0; padding: 16px; border: 1px solid var(--brand-border); border-radius: 16px; background: #fcfbfe; }
 .desvio-redesign .campaign-new-post .campaign-reference-picker .hint { margin: 10px 0 0; }
 .desvio-redesign .campaign-new-post .campaign-reference-selected { margin-top: 14px; }
 .desvio-redesign .campaign-new-post .campaign-reference-library { margin-top: 16px; padding: 4px; }
-.desvio-redesign .campaign-new-post .campaign-compose-artwork { border-top: 1px solid #eeedf3; margin-top: 24px; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork { border-top: 1px solid var(--brand-paper); margin-top: 24px; }
 .desvio-redesign .campaign-new-post .campaign-compose-artwork>summary { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 14px 0; cursor: pointer; font-size: 14px; font-weight: 600; list-style: none; }
 .desvio-redesign .campaign-new-post .campaign-compose-artwork>summary::-webkit-details-marker { display: none; }
 .desvio-redesign .campaign-new-post .campaign-compose-artwork>summary:after { content: '+'; font-size: 20px; font-weight: 400; }
 .desvio-redesign .campaign-new-post .campaign-compose-artwork[open]>summary:after { content: '−'; }
-.desvio-redesign .campaign-new-post .campaign-compose-artwork>summary span { margin-left: auto; color: #64616f; font-size: 12px; font-weight: 400; }
+.desvio-redesign .campaign-new-post .campaign-compose-artwork>summary span { margin-left: auto; color: var(--brand-muted); font-size: 12px; font-weight: 400; }
 .desvio-redesign .campaign-new-post .post-artwork-choices { margin: 0; padding: 4px 0; border: 0; gap: 10px; }
 .desvio-redesign .campaign-new-post .post-artwork-choices>h3 { display: none; }
 .desvio-redesign .campaign-new-post .post-artwork-choices>label { margin-top: 8px; }
-.desvio-redesign .campaign-new-post>footer { flex: none; position: relative; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; margin: 0; padding: 18px 28px; border-top: 1px solid #eeedf3; background: #fff; }
-.desvio-redesign .campaign-new-post>footer>span { flex: 1; min-width: 0; font-size: 12px; color: #64616f; }
-.desvio-redesign .campaign-new-post>footer>button.primary { width: auto; flex: none; min-height: 44px; padding: 11px 24px; background: #17171a; color: #fff; }
+.desvio-redesign .campaign-new-post>footer { flex: none; position: relative; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 20px; margin: 0; padding: 18px 28px; border-top: 1px solid var(--brand-paper); background: #fff; }
+.desvio-redesign .campaign-new-post>footer>span { flex: 1; min-width: 0; font-size: 12px; color: var(--brand-muted); }
+.desvio-redesign .campaign-new-post>footer>button.primary { width: auto; flex: none; min-height: 44px; padding: 11px 24px; background: var(--brand-ink); color: #fff; }
 @media(max-width:650px) {
   .desvio-redesign dialog.campaign-new-post { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 22px; }
   .desvio-redesign .campaign-new-post>header { padding: 20px; gap: 16px; }

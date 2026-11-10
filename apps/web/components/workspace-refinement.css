@@ -18,7 +18,7 @@
 .preference-save-bar button{font-size:13px;padding:10px 14px}
 .workspace-view-switch{display:flex;gap:4px;border-bottom:1px solid #e6e7e9;margin:0 0 28px;padding-bottom:8px;overflow-x:auto}
 .workspace-view-switch button{border:0;background:transparent;color:#696e76;padding:10px 16px;border-radius:8px;white-space:nowrap;font-size:14px;box-shadow:none}
-.workspace-view-switch button[aria-pressed=true]{background:#eeeeef;color:#191919;font-weight:600}
+.workspace-view-switch button[aria-pressed=true]{background:#eeeeef;color:var(--brand-ink);font-weight:600}
 .learning-facts-panel .heading-row h2{font-size:20px;margin:0 0 6px}
 .learning-facts-panel .heading-row .hint{margin:0}
 .learning-search{display:block;margin:22px 0 12px;max-width:420px}

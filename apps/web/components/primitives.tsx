@@ -44,11 +44,7 @@ export function Field({
 export function Wordmark() {
   return (
     <AppLink href="/" className="wordmark" aria-label="Desvio home">
-      <span className="brand-mark" aria-hidden="true" />
-      desvio
-      <span className="wordmark-dot" aria-hidden="true">
-        .
-      </span>
+      <img src="/site-brand/brand/desvio-black-lime.svg" alt="Desvio" width="146" height="36" />
     </AppLink>
   );
 }

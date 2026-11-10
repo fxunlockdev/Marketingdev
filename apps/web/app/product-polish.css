@@ -3,8 +3,8 @@
   --motion-quick: 120ms;
   --motion-settle: 180ms;
   --ease-settle: cubic-bezier(.2, .8, .2, 1);
-  --surface-soft: #f6f5fa;
-  --focus-ring: #6a5cff;
+  --surface-soft: var(--brand-field);
+  --focus-ring: var(--brand-link);
   --panel-gap: 20px;
 }
 
@@ -144,7 +144,7 @@ body.desvio-redesign.desvio-polished :is(.v5-main, dialog, .create-chat-screen) 
 }
 body.desvio-redesign.desvio-polished :is(.v5-main, dialog) :is(label, fieldset) { min-width: 0; }
 body.desvio-redesign.desvio-polished :is(.v5-main, dialog) :is(input, textarea, select):focus-visible {
-  outline: 2px solid #6a5cff;
+  outline: 2px solid var(--brand-link);
   outline-offset: 2px;
 }
 @media (forced-colors: active) {
@@ -156,16 +156,16 @@ body.desvio-redesign.desvio-polished dialog header > button[aria-label^="Close"]
   display: inline-flex; align-items: center; justify-content: center;
   flex: 0 0 40px; width: 40px; min-width: 40px; height: 40px; min-height: 40px;
   padding: 0; margin: 0; border: 0; border-radius: 50%;
-  background: #f4f3f8; color: #17171a; font-size: 22px; line-height: 1;
+  background: var(--brand-field); color: var(--brand-ink); font-size: 22px; line-height: 1;
 }
 body.desvio-redesign.desvio-polished .create-new-dialog header { gap: 20px; }
 body.desvio-redesign.desvio-polished .create-new-dialog nav > a { border: 0; border-radius: 20px; }
-body.desvio-redesign.desvio-polished .create-new-dialog nav > a:nth-child(1) { background: #f0edff; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav > a:nth-child(1) { background: var(--brand-wash); }
 body.desvio-redesign.desvio-polished .create-new-dialog nav > a:nth-child(2) { background: #fff3b6; }
 body.desvio-redesign.desvio-polished .create-new-dialog nav > a:nth-child(3) { background: #d8e9d0; }
 body.desvio-redesign.desvio-polished .create-new-dialog nav > a > span:first-child { background: #fff; border-radius: 16px; }
 body.desvio-redesign.desvio-polished .create-new-dialog nav > a > div { min-width: 0; }
-body.desvio-redesign.desvio-polished .create-new-dialog nav strong { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; font-size: 24px; }
+body.desvio-redesign.desvio-polished .create-new-dialog nav strong { font-family: var(--font-family-heading); font-weight: 400; font-size: 24px; }
 /* Size the nested brand editor by its available space, not the window alone. */
 body.desvio-redesign.desvio-polished .brand-kit-content { container: brand-editor / inline-size; }
 body.desvio-redesign.desvio-polished .brand-kit-content .brand-profile-review { padding: 0; border: 0; border-radius: 0; }

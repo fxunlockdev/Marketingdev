@@ -11,9 +11,11 @@ import "./studio.css";
 import "./redesign.css";
 import "./product-polish.css";
 import "./design-system.css";
+import "./website-brand.css";
 export const metadata: Metadata = {
   title: "Desvio · Your businesses, beautifully connected",
   description: "Your businesses, brand knowledge and creative work in one place.",
+  icons: { icon: "/site-brand/favicon.svg" },
   robots: { index: false, follow: false },
 };
 export const dynamic = "force-dynamic";

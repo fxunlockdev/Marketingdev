@@ -1,63 +1,63 @@
 /* Scoped translation of the supplied Desvio reference. State and actions stay live. */
-.desvio-redesign .content-workspace.calendar-workspace,.desvio-redesign .content-workspace.approval-workspace{gap:16px;color:#17171a;min-width:0}
+.desvio-redesign .content-workspace.calendar-workspace,.desvio-redesign .content-workspace.approval-workspace{gap:16px;color:var(--brand-ink);min-width:0}
 .desvio-redesign .content-workspace .plan-main{background:#fff;border:0;border-radius:28px;padding:20px;box-shadow:none;min-width:0}
 .desvio-redesign .content-workspace .plan-toolbar{gap:10px;align-items:end;border:0;padding:0 0 18px}
-.desvio-redesign .content-workspace .plan-toolbar button,.desvio-redesign .content-workspace .calendar-filters>summary,.desvio-redesign .content-workspace .daily-post-pager button{border:0;border-radius:999px;background:#f4f3f8;color:#17171a;min-height:40px;padding:10px 15px;font-size:13px;font-weight:600;box-shadow:none}
-.desvio-redesign .content-workspace .plan-toolbar button.primary{background:#17171a;color:#fff}
-.desvio-redesign .content-workspace .plan-toolbar input,.desvio-redesign .content-workspace .plan-toolbar select{border:1px solid transparent;background:#f4f3f8;border-radius:14px;min-height:40px;font-size:13px;color:#17171a}
-.desvio-redesign .content-workspace .plan-toolbar .field{font-size:12px;color:#55556a;gap:6px}
-.desvio-redesign .content-workspace .plan-toolbar button:hover:not(:disabled),.desvio-redesign .content-workspace .daily-post-pager button:hover:not(:disabled){background:#eceaf5;color:#3a2fc2}
-.desvio-redesign .content-workspace .plan-toolbar button.primary:hover:not(:disabled){background:#6a5cff;color:#fff}
-.desvio-redesign .content-workspace .calendar-filter-fields{background:#fff;border:1px solid #eeedf3;border-radius:20px;padding:16px;box-shadow:0 8px 24px #17171a0d}
-.desvio-redesign .content-workspace .plan-channels button.active,.desvio-redesign .content-workspace .plan-channels button[aria-pressed="true"]{background:#6a5cff;color:#fff}
+.desvio-redesign .content-workspace .plan-toolbar button,.desvio-redesign .content-workspace .calendar-filters>summary,.desvio-redesign .content-workspace .daily-post-pager button{border:0;border-radius:999px;background:var(--brand-field);color:var(--brand-ink);min-height:40px;padding:10px 15px;font-size:13px;font-weight:600;box-shadow:none}
+.desvio-redesign .content-workspace .plan-toolbar button.primary{background:var(--brand-ink);color:#fff}
+.desvio-redesign .content-workspace .plan-toolbar input,.desvio-redesign .content-workspace .plan-toolbar select{border:1px solid transparent;background:var(--brand-field);border-radius:14px;min-height:40px;font-size:13px;color:var(--brand-ink)}
+.desvio-redesign .content-workspace .plan-toolbar .field{font-size:12px;color:var(--brand-muted);gap:6px}
+.desvio-redesign .content-workspace .plan-toolbar button:hover:not(:disabled),.desvio-redesign .content-workspace .daily-post-pager button:hover:not(:disabled){background:var(--brand-wash);color:var(--brand-link)}
+.desvio-redesign .content-workspace .plan-toolbar button.primary:hover:not(:disabled){background:var(--brand-link);color:#fff}
+.desvio-redesign .content-workspace .calendar-filter-fields{background:#fff;border:1px solid var(--brand-paper);border-radius:20px;padding:16px;box-shadow:0 8px 24px #17171a0d}
+.desvio-redesign .content-workspace .plan-channels button.active,.desvio-redesign .content-workspace .plan-channels button[aria-pressed="true"]{background:var(--brand-link);color:#fff}
 .desvio-redesign .content-workspace .plan-date-strip{gap:8px;padding:4px 0 16px}
-.desvio-redesign .content-workspace .plan-date-strip button{border:0;border-radius:18px;background:#f4f3f8;color:#55556a;min-height:86px}
-.desvio-redesign .content-workspace .plan-date-strip button.active,.desvio-redesign .content-workspace .plan-date-strip button[aria-pressed="true"]{background:#6a5cff;color:#fff}
-.desvio-redesign .content-workspace .plan-results,.desvio-redesign .content-workspace .calendar-board-hint{font-size:12px;color:#646470}
+.desvio-redesign .content-workspace .plan-date-strip button{border:0;border-radius:18px;background:var(--brand-field);color:var(--brand-muted);min-height:86px}
+.desvio-redesign .content-workspace .plan-date-strip button.active,.desvio-redesign .content-workspace .plan-date-strip button[aria-pressed="true"]{background:var(--brand-link);color:#fff}
+.desvio-redesign .content-workspace .plan-results,.desvio-redesign .content-workspace .calendar-board-hint{font-size:12px;color:var(--brand-muted)}
 .desvio-redesign .content-workspace .plan-grid{gap:8px}
-.desvio-redesign .content-workspace .plan-day{background:#f8f7fc;border:0;border-radius:18px;padding:10px;min-width:0}
-.desvio-redesign .content-workspace .plan-day>h2{font-size:13px;color:#55556a;font-weight:600;margin:4px 2px 14px;font-variant-numeric:tabular-nums}
-.desvio-redesign .content-workspace .plan-card{background:#fff;color:#17171a;border:0;border-radius:16px;padding:8px;box-shadow:0 1px 2px #17171a0f;text-align:left;justify-items:stretch;align-items:start;grid-template-columns:minmax(0,1fr);justify-content:stretch}
+.desvio-redesign .content-workspace .plan-day{background:var(--brand-field);border:0;border-radius:18px;padding:10px;min-width:0}
+.desvio-redesign .content-workspace .plan-day>h2{font-size:13px;color:var(--brand-muted);font-weight:600;margin:4px 2px 14px;font-variant-numeric:tabular-nums}
+.desvio-redesign .content-workspace .plan-card{background:#fff;color:var(--brand-ink);border:0;border-radius:16px;padding:8px;box-shadow:0 1px 2px #17171a0f;text-align:left;justify-items:stretch;align-items:start;grid-template-columns:minmax(0,1fr);justify-content:stretch}
 .desvio-redesign .content-workspace .plan-card:hover{background:#fff;box-shadow:0 4px 12px #17171a12}
 .desvio-redesign .content-workspace .plan-card .post-thumbnail{width:100%;border-radius:11px}
-.desvio-redesign .content-workspace .plan-card .calendar-card-heading{width:100%;font-size:12px;color:#6e6e78}
+.desvio-redesign .content-workspace .plan-card .calendar-card-heading{width:100%;font-size:12px;color:var(--brand-muted)}
 .desvio-redesign .content-workspace .plan-card>strong{font-size:14px;line-height:1.4}
-.desvio-redesign .content-workspace .plan-card .calendar-card-channel{font-size:12px;color:#6e6e78}
+.desvio-redesign .content-workspace .plan-card .calendar-card-channel{font-size:12px;color:var(--brand-muted)}
 .desvio-redesign .content-workspace .plan-state{border-radius:999px;font-size:11px;padding:4px 9px;justify-self:start}
-.desvio-redesign .content-workspace .plan-post-list>li,.desvio-redesign .content-workspace .daily-post{border:1px solid #eeedf3;border-radius:22px;box-shadow:none}
-.desvio-redesign .content-workspace .plan-list-card{background:#fff;color:#17171a;align-items:stretch}
-.desvio-redesign .content-workspace .plan-list-card:hover{background:#f8f7fc}
-.desvio-redesign .content-workspace .plan-empty{border:0;background:#f8f7fc;border-radius:22px;margin:10px 0;padding:48px 24px}
-.desvio-redesign .content-workspace .plan-empty h3,.desvio-redesign .content-workspace.approval-workspace>.section-heading h1{font-family:'Desvio Serif','DM Serif Display',Georgia,serif;font-weight:400;text-wrap:balance;color:#17171a}
+.desvio-redesign .content-workspace .plan-post-list>li,.desvio-redesign .content-workspace .daily-post{border:1px solid var(--brand-paper);border-radius:22px;box-shadow:none}
+.desvio-redesign .content-workspace .plan-list-card{background:#fff;color:var(--brand-ink);align-items:stretch}
+.desvio-redesign .content-workspace .plan-list-card:hover{background:var(--brand-field)}
+.desvio-redesign .content-workspace .plan-empty{border:0;background:var(--brand-field);border-radius:22px;margin:10px 0;padding:48px 24px}
+.desvio-redesign .content-workspace .plan-empty h3,.desvio-redesign .content-workspace.approval-workspace>.section-heading h1{font-family:var(--font-family-heading);font-weight:400;text-wrap:balance;color:var(--brand-ink)}
 .desvio-redesign .content-workspace.approval-workspace>.section-heading h1{font-size:44px;line-height:1.1}
-.desvio-redesign .content-workspace.approval-workspace>.section-heading p{font-size:15px;color:#55556a}
-.desvio-redesign .content-workspace #plan-generator{border:0;border-radius:28px;background:#dcd6ff;padding:24px}
-.desvio-redesign .content-workspace button:focus-visible,.desvio-redesign .content-workspace summary:focus-visible,.desvio-redesign .connections-redesign button:focus-visible,.desvio-redesign .connections-redesign a:focus-visible{outline:2px solid #6a5cff;outline-offset:3px}
-.desvio-redesign .postforme-social.connections-redesign{max-width:none;color:#17171a;display:grid;gap:24px}
+.desvio-redesign .content-workspace.approval-workspace>.section-heading p{font-size:15px;color:var(--brand-muted)}
+.desvio-redesign .content-workspace #plan-generator{border:0;border-radius:28px;background:var(--brand-accent);padding:24px}
+.desvio-redesign .content-workspace button:focus-visible,.desvio-redesign .content-workspace summary:focus-visible,.desvio-redesign .connections-redesign button:focus-visible,.desvio-redesign .connections-redesign a:focus-visible{outline:2px solid var(--brand-link);outline-offset:3px}
+.desvio-redesign .postforme-social.connections-redesign{max-width:none;color:var(--brand-ink);display:grid;gap:24px}
 .desvio-redesign .connections-redesign .social-heading{margin:0;align-items:end;gap:20px}
-.desvio-redesign .connections-redesign .social-heading h1{font-family:'Desvio Serif','DM Serif Display',Georgia,serif;font-size:48px;font-weight:400;line-height:1.1;text-wrap:balance}
-.desvio-redesign .connections-redesign .social-heading p{color:#55556a;font-size:15px;line-height:1.5;margin:10px 0 0}
-.desvio-redesign .connections-redesign button,.desvio-redesign .connections-redesign .button{border:0;border-radius:999px;background:#17171a;color:#fff;min-height:42px;padding:10px 18px;font-size:14px;font-weight:600;box-shadow:none}
-.desvio-redesign .connections-redesign button:hover:not(:disabled),.desvio-redesign .connections-redesign .button:hover{background:#6a5cff;color:#fff}
-.desvio-redesign .connections-redesign .social-heading>button{background:#fff;color:#17171a;flex-shrink:0}
+.desvio-redesign .connections-redesign .social-heading h1{font-family:var(--font-family-heading);font-size:48px;font-weight:400;line-height:1.1;text-wrap:balance}
+.desvio-redesign .connections-redesign .social-heading p{color:var(--brand-muted);font-size:15px;line-height:1.5;margin:10px 0 0}
+.desvio-redesign .connections-redesign button,.desvio-redesign .connections-redesign .button{border:0;border-radius:999px;background:var(--brand-ink);color:#fff;min-height:42px;padding:10px 18px;font-size:14px;font-weight:600;box-shadow:none}
+.desvio-redesign .connections-redesign button:hover:not(:disabled),.desvio-redesign .connections-redesign .button:hover{background:var(--brand-link);color:#fff}
+.desvio-redesign .connections-redesign .social-heading>button{background:#fff;color:var(--brand-ink);flex-shrink:0}
 .desvio-redesign .connections-redesign .social-section-title{margin:0 0 14px;gap:12px}
 .desvio-redesign .connections-redesign .social-section-title h2{font-size:17px;font-weight:600}
-.desvio-redesign .connections-redesign .social-section-title>span{font-size:12px;color:#6e6e78}
+.desvio-redesign .connections-redesign .social-section-title>span{font-size:12px;color:var(--brand-muted)}
 .desvio-redesign .connections-redesign .social-network-grid{gap:12px;grid-template-columns:repeat(3,minmax(0,1fr))}
 .desvio-redesign .connections-redesign .social-network-card{border:0;border-radius:28px;padding:24px;min-height:260px;background:#fff;gap:12px}
 .desvio-redesign .connections-redesign .social-network-card .social-mark{width:56px;height:56px;border-radius:18px;margin-bottom:8px}
-.desvio-redesign .connections-redesign .social-network-card h3{font-family:'Desvio Serif','DM Serif Display',Georgia,serif;font-weight:400;font-size:30px;line-height:1.15;margin:0}
-.desvio-redesign .connections-redesign .social-network-card p{font-size:14px;color:#55556a;line-height:1.5;margin:0 0 12px}
+.desvio-redesign .connections-redesign .social-network-card h3{font-family:var(--font-family-heading);font-weight:400;font-size:30px;line-height:1.15;margin:0}
+.desvio-redesign .connections-redesign .social-network-card p{font-size:14px;color:var(--brand-muted);line-height:1.5;margin:0 0 12px}
 .desvio-redesign .connections-redesign .social-network-card>button{width:auto;align-self:flex-start;margin-top:auto;gap:16px}
-.desvio-redesign .connections-redesign .social-setup,.desvio-redesign .connections-redesign .social-handoff{border:0;border-radius:24px;padding:24px;background:#dcd6ff;margin:0;min-width:0}
+.desvio-redesign .connections-redesign .social-setup,.desvio-redesign .connections-redesign .social-handoff{border:0;border-radius:24px;padding:24px;background:var(--brand-accent);margin:0;min-width:0}
 .desvio-redesign .connections-redesign .social-setup p,.desvio-redesign .connections-redesign .social-handoff p{color:#3a3a44;line-height:1.6}
 .desvio-redesign .connections-redesign .social-account-list{border:0;border-radius:28px;background:#fff;overflow:hidden}
-.desvio-redesign .connections-redesign .social-account{padding:24px;border-color:#eeedf3;gap:14px}
+.desvio-redesign .connections-redesign .social-account{padding:24px;border-color:var(--brand-paper);gap:14px}
 .desvio-redesign .connections-redesign .social-account-info{min-width:0;overflow-wrap:anywhere}
-.desvio-redesign .connections-redesign .social-account>button{background:#f4f3f8;color:#17171a}
-.desvio-redesign .connections-redesign .social-disconnect{border-radius:18px;background:#f8f7fc;padding:16px}
-.desvio-redesign .connections-redesign .social-notice{border-radius:18px;padding:16px;background:#f1efff;color:#3a2fc2;margin:0}
-.desvio-redesign .connections-redesign .social-footnote{font-size:13px;color:#6e6e78;margin:0}
+.desvio-redesign .connections-redesign .social-account>button{background:var(--brand-field);color:var(--brand-ink)}
+.desvio-redesign .connections-redesign .social-disconnect{border-radius:18px;background:var(--brand-field);padding:16px}
+.desvio-redesign .connections-redesign .social-notice{border-radius:18px;padding:16px;background:var(--brand-wash);color:var(--brand-link);margin:0}
+.desvio-redesign .connections-redesign .social-footnote{font-size:13px;color:var(--brand-muted);margin:0}
 @media(max-width:800px){.desvio-redesign .connections-redesign .social-network-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.desvio-redesign .connections-redesign .social-heading{align-items:start;flex-wrap:wrap}}
 @media(max-width:600px){
  .desvio-redesign .content-workspace .plan-main{padding:14px;border-radius:24px}
@@ -75,21 +75,21 @@
 /* Offline reference export: compact week board, list rows and review cards. */
 .desvio-redesign .calendar-page-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:4px 6px;margin:0}
 .desvio-redesign .calendar-page-heading h1{font-size:48px;line-height:1.05;margin:8px 0}
-.desvio-redesign .calendar-page-heading p{font-size:14px;color:#6e6e78;margin:0}
-.desvio-redesign .calendar-page-heading .calendar-business-name{font-size:13px;margin-bottom:8px;color:#646470}
-.desvio-redesign .content-workspace .calendar-period-title{font-family:'Desvio Serif',Georgia,serif;font-size:24px;line-height:1.2;margin:0 6px;font-weight:400;flex:1;min-width:180px}
+.desvio-redesign .calendar-page-heading p{font-size:14px;color:var(--brand-muted);margin:0}
+.desvio-redesign .calendar-page-heading .calendar-business-name{font-size:13px;margin-bottom:8px;color:var(--brand-muted)}
+.desvio-redesign .content-workspace .calendar-period-title{font-family:var(--font-family-heading);font-size:24px;line-height:1.2;margin:0 6px;font-weight:400;flex:1;min-width:180px}
 .desvio-redesign .content-workspace .plan-toolbar{align-items:center;flex-wrap:wrap;padding-bottom:12px;gap:10px}
 .desvio-redesign .content-workspace .calendar-period button{padding:8px 12px;min-height:36px}
 .desvio-redesign .calendar-more-options{margin-left:auto;position:relative}
-.desvio-redesign .calendar-more-options>summary{list-style:none;cursor:pointer;padding:9px 12px;border-radius:999px;background:#f4f3f8;font-size:12px}
-.desvio-redesign .calendar-options-content{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px;background:#f8f7fc;border-radius:18px;margin-top:12px;min-width:0}
+.desvio-redesign .calendar-more-options>summary{list-style:none;cursor:pointer;padding:9px 12px;border-radius:999px;background:var(--brand-field);font-size:12px}
+.desvio-redesign .calendar-options-content{display:flex;flex-wrap:wrap;align-items:flex-end;gap:12px;padding:16px;background:var(--brand-field);border-radius:18px;margin-top:12px;min-width:0}
 .desvio-redesign .calendar-more-options[open]{flex:1 0 100%;margin:0}
-.desvio-redesign .calendar-view-toggle{display:flex;gap:2px;background:#f4f3f8;border-radius:999px;padding:3px;width:228px;max-width:100%;margin:0 0 16px}
+.desvio-redesign .calendar-view-toggle{display:flex;gap:2px;background:var(--brand-field);border-radius:999px;padding:3px;width:228px;max-width:100%;margin:0 0 16px}
 .desvio-redesign .calendar-view-toggle button{flex:1;border:0;background:transparent;border-radius:999px;min-height:32px;padding:6px 12px;font-size:13px;font-weight:500}
-.desvio-redesign .calendar-view-toggle button[aria-pressed=true]{background:#17171a;color:#fff}
+.desvio-redesign .calendar-view-toggle button[aria-pressed=true]{background:var(--brand-ink);color:#fff}
 .desvio-redesign .calendar-workspace .plan-grid-week{grid-template-columns:repeat(7,minmax(76px,1fr));gap:6px;align-items:stretch;overflow-x:auto;padding-bottom:0;scroll-snap-type:none;border-radius:18px}
-.desvio-redesign .calendar-workspace .plan-grid-week .plan-day{background:#f8f7fc;border-radius:0;padding:8px 5px;min-height:310px}
-.desvio-redesign .calendar-workspace .plan-grid-week .plan-day>h2{font-family:inherit;text-align:left;font-size:11px;line-height:1.4;margin:0 3px 18px;font-weight:500;color:#55556a}
+.desvio-redesign .calendar-workspace .plan-grid-week .plan-day{background:var(--brand-field);border-radius:0;padding:8px 5px;min-height:310px}
+.desvio-redesign .calendar-workspace .plan-grid-week .plan-day>h2{font-family:inherit;text-align:left;font-size:11px;line-height:1.4;margin:0 3px 18px;font-weight:500;color:var(--brand-muted)}
 .desvio-redesign .calendar-workspace .plan-grid-week .plan-card{padding:5px;border:0;border-radius:14px;margin-bottom:10px;gap:5px;box-shadow:none}
 .desvio-redesign .calendar-workspace .plan-grid-week .plan-card .post-thumbnail{border-radius:12px;aspect-ratio:1!important;height:auto}
 .desvio-redesign .calendar-workspace .plan-grid-week .calendar-card-heading{padding:0;font-size:10px;flex-wrap:wrap;gap:2px}
@@ -98,13 +98,13 @@
 .desvio-redesign .calendar-workspace .plan-grid-week .plan-state{font-size:10px;margin:0;padding:3px 5px;line-height:1.2;max-width:100%;white-space:normal}
 .desvio-redesign .calendar-workspace .plan-grid-week .post-action-hint{display:none!important}
 .desvio-redesign .calendar-workspace .calendar-post-rows{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
-.desvio-redesign .calendar-post-rows>li{border:0!important;background:#f8f7fc;border-radius:18px!important;overflow:hidden}
+.desvio-redesign .calendar-post-rows>li{border:0!important;background:var(--brand-field);border-radius:18px!important;overflow:hidden}
 .desvio-redesign .calendar-post-rows .plan-list-card{display:grid;grid-template-columns:56px minmax(0,1fr) minmax(140px,.7fr) auto;gap:6px 16px;padding:10px;background:transparent;align-items:center;border:0}
 .desvio-redesign .calendar-post-rows .post-thumbnail{grid-column:1;grid-row:1/4;width:56px;height:56px;aspect-ratio:1!important;border-radius:12px}
 .desvio-redesign .calendar-post-rows strong{grid-column:2;grid-row:1;font-size:14px;line-height:1.25}
-.desvio-redesign .calendar-post-rows .list-post-caption{grid-column:2;grid-row:2;font-size:12px;color:#6e6e78;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.desvio-redesign .calendar-post-rows .list-post-format{grid-column:3;grid-row:1;font-size:12px;color:#55556a}
-.desvio-redesign .calendar-post-rows .list-post-meta{grid-column:3;grid-row:2;font-size:11px;color:#6e6e78}
+.desvio-redesign .calendar-post-rows .list-post-caption{grid-column:2;grid-row:2;font-size:12px;color:var(--brand-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.desvio-redesign .calendar-post-rows .list-post-format{grid-column:3;grid-row:1;font-size:12px;color:var(--brand-muted)}
+.desvio-redesign .calendar-post-rows .list-post-meta{grid-column:3;grid-row:2;font-size:11px;color:var(--brand-muted)}
 .desvio-redesign .calendar-post-rows .plan-state{grid-column:3;grid-row:3}
 .desvio-redesign .calendar-post-rows .post-action-hint{grid-column:4;grid-row:1/4;font-size:12px;border:0;padding:0}
 .desvio-redesign .approval-workspace .plan-main{padding:0;background:transparent}
@@ -113,20 +113,20 @@
 .desvio-redesign .approval-post-grid>li{border:0!important;background:#fff;border-radius:28px!important;padding:10px;overflow:hidden}
 .desvio-redesign .approval-post-grid .plan-list-card{display:flex;flex-direction:column;border:0;padding:0;gap:10px;background:transparent;border-radius:20px;text-align:left;min-width:0}
 .desvio-redesign .approval-post-grid .post-thumbnail{order:-2;border-radius:20px;width:100%;aspect-ratio:4/3!important;overflow:hidden}
-.desvio-redesign .approval-post-grid .list-post-format{font-size:12px;color:#55556a}
-.desvio-redesign .approval-post-grid .list-post-meta{font-size:12px;color:#6e6e78}
+.desvio-redesign .approval-post-grid .list-post-format{font-size:12px;color:var(--brand-muted)}
+.desvio-redesign .approval-post-grid .list-post-meta{font-size:12px;color:var(--brand-muted)}
 .desvio-redesign .approval-post-grid strong{font-size:15px;line-height:1.3}
 .desvio-redesign .approval-post-grid .list-post-caption{font-size:13px;line-height:1.45;font-weight:400}
-.desvio-redesign .approval-post-grid .post-action-hint{display:flex;justify-content:center;align-items:center;min-height:40px;background:#17171a;color:#fff;border:0;border-radius:999px;margin-top:4px}
+.desvio-redesign .approval-post-grid .post-action-hint{display:flex;justify-content:center;align-items:center;min-height:40px;background:var(--brand-ink);color:#fff;border:0;border-radius:999px;margin-top:4px}
 .desvio-redesign .approval-post-grid .plan-select{font-size:12px;padding:6px;margin:0 0 8px}
-.desvio-redesign .connections-redesign .social-heading .social-business-name{font-size:13px;color:#6e6e78;margin:0 0 10px}
+.desvio-redesign .connections-redesign .social-heading .social-business-name{font-size:13px;color:var(--brand-muted);margin:0 0 10px}
 .desvio-redesign .connections-redesign .social-network-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 .desvio-redesign .connections-redesign .social-network-card{padding:24px;min-height:300px;gap:12px}
 .desvio-redesign .connections-redesign .social-network-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
-.desvio-redesign .connections-redesign .social-network-top .social-mark{width:52px;height:60px;flex:none;border-radius:18px;background:#fff;color:#17171a;margin:0 0 12px}
-.desvio-redesign .connections-redesign .social-network-top .social-status{font-size:11px;line-height:1.2;border-radius:999px;padding:6px 8px;background:#f4f3f8;color:#55556a;white-space:normal}
+.desvio-redesign .connections-redesign .social-network-top .social-mark{width:52px;height:60px;flex:none;border-radius:18px;background:#fff;color:var(--brand-ink);margin:0 0 12px}
+.desvio-redesign .connections-redesign .social-network-top .social-status{font-size:11px;line-height:1.2;border-radius:999px;padding:6px 8px;background:var(--brand-field);color:var(--brand-muted);white-space:normal}
 .desvio-redesign .connections-redesign .social-network-top .social-status.is-connected{background:#fff;color:#304a29}
-.desvio-redesign .connections-redesign .network-connected{background:#dcd6ff}
+.desvio-redesign .connections-redesign .network-connected{background:var(--brand-accent)}
 .desvio-redesign .connections-redesign .network-instagram{background:#ffd9c7}
 .desvio-redesign .connections-redesign .social-network-card h3{font-size:28px}
 .desvio-redesign .connections-redesign .social-network-card p{font-size:13px}
@@ -141,7 +141,7 @@
 .desvio-redesign .calendar-workspace .calendar-board-hint,.desvio-redesign .calendar-workspace .calendar-secondary-copy,.desvio-redesign .calendar-workspace .plan-results>p{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap;padding:0;margin:0}
 .desvio-redesign .calendar-workspace .plan-results{margin:0;padding:0}
 .desvio-redesign .calendar-workspace .plan-results:has(>div){margin:8px 0}
-.desvio-redesign .calendar-workspace .plan-grid-week .plan-day.is-today{background:#f0edff}
-.desvio-redesign .calendar-workspace .plan-grid-week .plan-day.is-today>h2{color:#5c48ef;font-weight:700}
+.desvio-redesign .calendar-workspace .plan-grid-week .plan-day.is-today{background:var(--brand-wash)}
+.desvio-redesign .calendar-workspace .plan-grid-week .plan-day.is-today>h2{color:var(--brand-link);font-weight:700}
 .desvio-redesign .calendar-options-content .calendar-activity{flex-basis:100%;margin:0;padding:0}
 .desvio-redesign .calendar-options-content .calendar-activity>summary{font-size:13px}

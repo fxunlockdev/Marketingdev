@@ -3,22 +3,22 @@
 :root,
 [data-astryx-theme="neutral"] {
   --font-family-body: 'Desvio Sans', system-ui, sans-serif;
-  --font-family-heading: 'Desvio Serif', Georgia, serif;
-  --color-accent: #5545d8;
-  --color-accent-muted: #eeebff;
+  --font-family-heading: 'Desvio Display', Arial, sans-serif;
+  --color-accent: var(--brand-link);
+  --color-accent-muted: var(--brand-wash);
   --color-on-accent: #fff;
-  --color-text-accent: #4938bd;
-  --color-icon-accent: #5545d8;
-  --color-text-primary: #17171a;
-  --color-text-secondary: #64616f;
-  --color-background-body: #eeedf3;
+  --color-text-accent: var(--brand-link);
+  --color-icon-accent: var(--brand-link);
+  --color-text-primary: var(--brand-ink);
+  --color-text-secondary: var(--brand-muted);
+  --color-background-body: var(--brand-paper);
   --color-background-surface: #fff;
   --color-background-card: #fff;
   --color-background-popover: #fff;
-  --color-background-muted: #f6f5fa;
-  --color-border: #e4e1ec;
-  --color-border-emphasized: #b7afc9;
-  --color-track: #e4e1ec;
+  --color-background-muted: var(--brand-field);
+  --color-border: var(--brand-border);
+  --color-border-emphasized: var(--brand-strong-border);
+  --color-track: var(--brand-border);
   --radius-element: 12px;
   --radius-container: 24px;
   --ds-space-1: 4px;
@@ -32,12 +32,12 @@
   --ds-field-radius: 12px;
   --ds-panel-radius: 24px;
   --ds-panel-padding: clamp(20px, 2.2vw, 32px);
-  --ds-focus: #6a5cff;
-  --ds-focus-wash: #6a5cff1a;
-  --ds-field: #faf9fc;
-  --ds-ink: #17171a;
-  --ds-muted: #64616f;
-  --ds-border: #e4e1ec;
+  --ds-focus: var(--brand-link);
+  --ds-focus-wash: #475b161a;
+  --ds-field: var(--brand-field);
+  --ds-ink: var(--brand-ink);
+  --ds-muted: var(--brand-muted);
+  --ds-border: var(--brand-border);
   --ds-surface: #fff;
 }
 
@@ -51,7 +51,7 @@ body.desvio-redesign.desvio-polished .desvio-action {
   box-shadow: 0 1px 2px #17171a05;
 }
 body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary] {
-  color: #fff; background: #17171a; border-color: #17171a;
+  color: #fff; background: var(--brand-ink); border-color: var(--brand-ink);
 }
 body.desvio-redesign.desvio-polished .desvio-action[data-variant=destructive] {
   color: #a12039; background: #fff4f5; border-color: #edc5ce;
@@ -61,10 +61,10 @@ body.desvio-redesign.desvio-polished .desvio-action:focus-visible {
 }
 body.desvio-redesign.desvio-polished .desvio-action:disabled { opacity: .5; cursor: not-allowed; }
 body.desvio-redesign.desvio-polished .desvio-action[aria-busy=true] { opacity: 1; }
-body.desvio-redesign.desvio-polished .desvio-action[aria-pressed=true] { background: #eeebff; color: #4938bd; border-color: #c4baed; }
+body.desvio-redesign.desvio-polished .desvio-action[aria-pressed=true] { background: var(--brand-wash); color: var(--brand-link); border-color: var(--brand-strong-border); }
 @media (hover: hover) {
-  body.desvio-redesign.desvio-polished .desvio-action:hover:not(:disabled) { background: #f4f1ff; border-color: #c4baed; color: #4938bd; }
-  body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary]:hover:not(:disabled) { background: #4938bd; border-color: #4938bd; color: #fff; }
+  body.desvio-redesign.desvio-polished .desvio-action:hover:not(:disabled) { background: var(--brand-wash); border-color: var(--brand-strong-border); color: var(--brand-link); }
+  body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary]:hover:not(:disabled) { background: var(--brand-link); border-color: var(--brand-link); color: #fff; }
 }
 
 /* One field rhythm, including selectors in side panels and native dialogs. */
@@ -97,7 +97,7 @@ body.desvio-redesign.desvio-polished .settings-page .v5-panel > h2 { margin-bott
 body.desvio-redesign.desvio-polished .settings-page .v5-panel > form { margin-top: 24px; }
 body.desvio-redesign.desvio-polished .settings-page .member-row { row-gap: 12px; }
 body.desvio-redesign.desvio-polished .settings-page .member-info > span { line-height: 1.55; }
-body.desvio-redesign.desvio-polished .settings-page .member-edit { padding: 20px; border-radius: 16px; background: #f6f5fa; }
+body.desvio-redesign.desvio-polished .settings-page .member-edit { padding: 20px; border-radius: 16px; background: var(--brand-field); }
 body.desvio-redesign.desvio-polished .settings-page .member-edit .actions { margin-top: 16px; }
 body.desvio-redesign.desvio-polished .settings-page .notice > p { margin: 0 0 16px; }
 body.desvio-redesign.desvio-polished :is(.blank, .archive-empty, .overview-content-empty) {
@@ -141,7 +141,7 @@ body.desvio-redesign.desvio-polished .campaign-new-post header > .desvio-action[
 body.desvio-redesign.desvio-polished .chat-start-card {
   border-radius: 22px; padding: 16px; min-height: 80px;
 }
-body.desvio-redesign.desvio-polished .chat-start-card.post { background: #f1efff; }
+body.desvio-redesign.desvio-polished .chat-start-card.post { background: var(--brand-wash); }
 body.desvio-redesign.desvio-polished .chat-start-card.campaign { background: #fff1b8; }
 body.desvio-redesign.desvio-polished .chat-start-card.strategy { background: #cfe6c8; }
 body.desvio-redesign.desvio-polished .chat-start-icon { background: #fff; border-radius: 16px; }
@@ -152,8 +152,8 @@ body.desvio-redesign.desvio-polished .chat-start-card small { margin-top: 4px; l
 body.desvio-redesign.desvio-polished :is(.v5-shell, .create-chat-screen, .auth-layout) button:disabled {
   opacity: 1;
   background: #eeedf2;
-  color: #686472;
-  border-color: #ddd9e5;
+  color: var(--brand-muted);
+  border-color: var(--brand-border);
   box-shadow: none;
   cursor: not-allowed;
 }
