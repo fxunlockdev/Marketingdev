@@ -18,6 +18,6 @@ Shared controls were applied to campaign creation, post creation, business/onboa
 
 ## Validation and limits
 
-Production web build and TypeScript pass. Browser fixtures verify form payloads, role restrictions, save/restore, disabled actions, dropdown keyboard interaction, modal containment, reduced motion, mobile navigation and chat history. Screenshots cover 11 authenticated read-only pages at 1440px and 390px, with no document or dialog overflow. New Post is additionally checked at tablet, 320px and short desktop heights.
+Production web build and TypeScript pass. Browser fixtures verify form payloads, role restrictions, save/restore, disabled actions, dropdown keyboard interaction, modal containment, reduced motion, mobile navigation and chat history. Screenshots cover 16 authenticated read-only pages at 1440px and 390px, with no document or dialog overflow. New Post is additionally checked at tablet, 320px and short desktop heights.
 
 Mocked provider responses in UI tests validate interface behavior, not new paid image/video output. No customer content is generated, approved or published by the visual audit. Provider integrations and export renderers were not changed by this UI release.

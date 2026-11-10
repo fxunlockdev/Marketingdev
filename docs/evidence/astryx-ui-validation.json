@@ -8,12 +8,12 @@
     "provider_mode": "mocked, no paid generation"
   },
   "visual_audit": {
-    "pages": 11,
+    "pages": 16,
     "viewports": [
       1440,
       390
     ],
-    "states": 22,
+    "states": 32,
     "document_overflows": 0,
     "dialog_overflows": 0
   },
@@ -28,5 +28,28 @@
     "prompt suggestions and dismissal",
     "image/video progress recovery",
     "lightweight card previews"
-  ]
+  ],
+  "legacy_social_suite": {
+    "result": "failed, 10 tests",
+    "first_failure": "Legacy empty-state heading is inside the closed Previous connections and history disclosure. Suite targets the former Postiz page; current primary page uses Post for Me.",
+    "scope": "Not accepted as live connector proof. No provider changes made."
+  },
+  "deployment": {
+    "id": "119047a3-b2cf-4aa1-8d69-16071eb36d43",
+    "service": "dev web",
+    "source_commit": "4bd5dc9",
+    "status": "SUCCESS",
+    "healthcheck": "passed",
+    "hosted_browser_fixture_tests": {
+      "passed": 13,
+      "failed": 0,
+      "provider_mode": "mocked; no paid generation or actual publishing"
+    },
+    "authenticated_mobile_audit": {
+      "states": 16,
+      "width": 390,
+      "document_overflows": 0,
+      "dialog_overflows": 0
+    }
+  }
 }
