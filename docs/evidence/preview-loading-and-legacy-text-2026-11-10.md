@@ -24,4 +24,12 @@ The two upcoming static drafts had saved Arial layers with low-contrast colors, 
 - Production browser regression: passed. Confirms first-row fetch without visibility callbacks, one concurrent fetch for duplicate cards, saved overlays preserved when intentionally present, explicit empty carousel and reauthentication on page reload.
 - Live read-back confirmed both repaired slots have zero image text layers, unchanged captions and media, and preserved previous versions.
 
-Deployment and hosted verification are recorded after release.
+## Release and additional startup improvement
+
+Initial release `4663902` deployed successfully as Railway web deployment `4192ab07-a673-438e-b720-0e0a53d759eb`. Hosted preview regression passed. Live desktop and mobile checks confirmed clean image overlays, explicit empty carousel messaging, a create action and no horizontal overflow.
+
+Fresh live navigations still took 3.3–5.1 seconds to display the first image. Inspection found that Home eagerly downloaded the chat, campaign and editor screens. Those secondary screens now load on demand. Initial JavaScript dropped from approximately 521 KB transferred to 350 KB encoded, about one-third less. This is a download reduction, not a guaranteed proportional latency improvement.
+
+The follow-up production build passed. Thirteen production browser tests passed across selectors, dialogs, design polish, campaigns, preview loading, progress and suggestions. A read-only audit of 32 actual-data desktop/mobile views completed without horizontal overflow. No new paid generations or publishing were performed.
+
+Final deployment and live timing are recorded after release.
