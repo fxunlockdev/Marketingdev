@@ -11,8 +11,8 @@ Presentation literals in existing styles now reference common brand tokens. Astr
 ## Validation
 
 - Production Next build and web TypeScript check passed.
-- 18 browser regression tests passed in the first branding build, including selectors, mobile menus, dialogs, permissions feedback, prompt suggestions, creative brief saving, thumbnail behavior, and generation progress recovery. APIs in these tests are fixtures; they do not verify external generation.
-- Read-only authenticated page audit: 16 routes at 1440px and 390px, no horizontal overflow. Visual inspection covered home, chat and team/mobile. Final palette refinements receive another run before deployment.
+- 18 browser regression tests passed in both branding builds, including selectors, mobile menus, dialogs, permissions feedback, prompt suggestions, creative brief saving, thumbnail behavior, and generation progress recovery. APIs in these tests are fixtures; they do not verify external generation.
+- Read-only authenticated page audit: 16 routes at 1440px and 390px, no horizontal overflow. Visual inspection covered home, chat and team/mobile. Final read-only audit also passed all 32 views without horizontal overflow. New Post dialog was visually inspected; remaining lavender reference/idea surfaces were changed to the shared ivory field token.
 - No database migration, account changes, paid generation, or publishing is part of this change.
 
 ## Limits

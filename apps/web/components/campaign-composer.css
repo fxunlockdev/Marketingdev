@@ -59,7 +59,7 @@
 .desvio-redesign .campaign-new-post .campaign-post-ideas ul { margin: 12px 0 0; gap: 12px; }
 .desvio-redesign .campaign-new-post .campaign-post-ideas li button { padding: 14px; gap: 8px; border-radius: 16px; }
 .desvio-redesign .campaign-new-post .campaign-post-ideas li small { -webkit-line-clamp: 2; }
-.desvio-redesign .campaign-new-post .campaign-reference-picker { margin: 20px 0 0; padding: 16px; border: 1px solid var(--brand-border); border-radius: 16px; background: #fcfbfe; }
+.desvio-redesign .campaign-new-post .campaign-reference-picker { margin: 20px 0 0; padding: 16px; border: 1px solid var(--brand-border); border-radius: 16px; background: var(--brand-field); }
 .desvio-redesign .campaign-new-post .campaign-reference-picker .hint { margin: 10px 0 0; }
 .desvio-redesign .campaign-new-post .campaign-reference-selected { margin-top: 14px; }
 .desvio-redesign .campaign-new-post .campaign-reference-library { margin-top: 16px; padding: 4px; }
