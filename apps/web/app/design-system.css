@@ -147,3 +147,26 @@ body.desvio-redesign.desvio-polished .chat-start-card.strategy { background: #cf
 body.desvio-redesign.desvio-polished .chat-start-icon { background: #fff; border-radius: 16px; }
 body.desvio-redesign.desvio-polished .chat-start-card strong { line-height: 1.2; }
 body.desvio-redesign.desvio-polished .chat-start-card small { margin-top: 4px; line-height: 1.5; }
+
+/* Keep unavailable actions legible across legacy and Astryx surfaces. */
+body.desvio-redesign.desvio-polished :is(.v5-shell, .create-chat-screen, .auth-layout) button:disabled {
+  opacity: 1;
+  background: #eeedf2;
+  color: #686472;
+  border-color: #ddd9e5;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+body.desvio-redesign.desvio-polished .social-network-card .desvio-action { align-self: flex-start; }
+
+/* Astryx action hierarchy and consistent readable state feedback. */
+body.desvio-redesign.desvio-polished .connections-redesign .social-network-card {
+  gap: 16px; padding: 24px; border-radius: var(--ds-panel-radius);
+}
+body.desvio-redesign.desvio-polished .connections-redesign .social-network-top { width: 100%; align-items: center; }
+body.desvio-redesign.desvio-polished .connections-redesign .social-network-card h3 { font-size: 28px; margin: 0; }
+body.desvio-redesign.desvio-polished .connections-redesign .social-network-card p { line-height: 1.55; margin: 0; }
+body.desvio-redesign.desvio-polished .connections-redesign .social-network-card .desvio-action { margin-top: auto; width: auto; min-width: 120px; }
+body.desvio-redesign.desvio-polished .social-footnote { margin-top: 24px; line-height: 1.6; color: var(--ds-muted); }
+body.desvio-redesign.desvio-polished .social-legacy { margin-top: 24px; padding-top: 20px; }
+body.desvio-redesign.desvio-polished .social-legacy > summary { color: var(--ds-muted); padding: 8px 0; }
