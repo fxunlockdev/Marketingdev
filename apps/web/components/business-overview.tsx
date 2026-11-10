@@ -19,10 +19,10 @@ export function BusinessOverviewPanel({business,name}:{name?:string;business:{id
 
   <section className="overview-upcoming" aria-labelledby="upcoming-heading">
     <div className="section-heading"><h2 id="upcoming-heading">Upcoming posts</h2><div className="actions"><AppLink className="button" href={link('content-plan')}>View calendar</AppLink></div></div>
-    {data.upcoming_posts?.length?<ul className="upcoming-grid">{data.upcoming_posts.map(post=><li key={post.id}><AppLink className={`upcoming-post ${styles.card} ${!post.design&&!post.video_version_id&&!post.carousel_version_id?styles.pending:''}`} href={`${link('content-plan')}?start=${post.starts_on}&slot=${post.id}`}>
+    {data.upcoming_posts?.length?<ul className="upcoming-grid">{data.upcoming_posts.map((post,index)=><li key={post.id}><AppLink className={`upcoming-post ${styles.card} ${!post.design&&!post.video_version_id&&!post.carousel_version_id?styles.pending:''}`} href={`${link('content-plan')}?start=${post.starts_on}&slot=${post.id}`}>
       <div className="upcoming-meta"><span>{post.creative_spec?.placement==='reel'?'Reel':post.creative_spec?.placement==='story'?(post.format==='video'?'Video story':'Image story'):post.format==='video'?'Video':post.format==='carousel'?'Carousel':'Image'} · {post.channel==='linkedin'?'LinkedIn':post.channel==='instagram'?'Instagram':post.channel}</span><time dateTime={post.planned_at}>{new Intl.DateTimeFormat(undefined,{timeZone:post.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(post.planned_at))}</time></div>
-      <PostThumbnail businessId={business.id} post={post}/>
-      <div className="upcoming-copy"><span className="status neutral">{postProgress(post)}</span><h3>{post.hook||post.brief}</h3><p>{post.plan_title}</p><span className="upcoming-open">Open post <span aria-hidden="true">→</span></span></div>
+      <PostThumbnail businessId={business.id} post={post} priority={index<4}/>
+      <div className="upcoming-copy"><span className="status neutral">{postProgress(post)}</span><h3>{post.hook||post.brief.split(/\n\s*(?:Additional creative direction|Image direction):/i)[0]}</h3><p>{post.plan_title}</p><span className="upcoming-open">{post.state==='content_needed'&&!post.generation_status?`Create ${post.format==='carousel'?'carousel':post.format==='video'?'video':'image'}`:'Open post'} <span aria-hidden="true">→</span></span></div>
     </AppLink></li>)}</ul>:<div className="overview-content-empty"><h3>Your next posts start here</h3><p>Plan your first campaign to see your upcoming posts here.</p><AppLink className="button primary" href={link('campaign-new')}>Create a campaign</AppLink></div>}
   </section>
   {!!data.campaigns?.length&&<section className="overview-campaigns" aria-labelledby="campaigns-heading">
@@ -59,7 +59,7 @@ function postProgress(post:UpcomingPost){
  if(post.generation_status==='unknown')return 'Needs a check';
  if(['queued','running','retrying'].includes(post.generation_status??''))return post.generation_status==='queued'?'Queued':post.format==='video'?'Creating video':post.format==='carousel'?'Creating carousel':'Creating image';
  if(['failed','rejected'].includes(post.generation_status??''))return 'Needs attention';
- return ({content_needed:'Ready to create',draft_ready:'Draft ready',pending_review:'Ready for review',approved:'Approved',changes_requested:'Changes requested',rejected:'Needs changes'} as Record<string,string>)[post.state]??'Open to review';
+ return ({content_needed:'Not generated yet',draft_ready:'Draft ready',pending_review:'Ready for review',approved:'Approved',changes_requested:'Changes requested',rejected:'Needs changes'} as Record<string,string>)[post.state]??'Open to review';
 }
 
 function campaignDate(day:string){return new Intl.DateTimeFormat(undefined,{timeZone:"UTC",month:"short",day:"numeric"}).format(new Date(day+"T12:00:00Z"));}

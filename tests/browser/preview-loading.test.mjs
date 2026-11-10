@@ -10,17 +10,20 @@ test('home cards use small previews, preserve overlays and distinguish uncreated
  await page.route('**/api/**',async route=>{const path=new URL(route.request().url()).pathname;let data={};
   if(path.endsWith('/get-session'))data={user:{id:'owner',name:'Maya',emailVerified:true}};
   else if(path==='/api/v1/businesses')data={businesses:[{id:brand,organization_id:brand,name:'Studio',role:'owner',has_approved_brand:true}]};
-  else if(path.endsWith('/overview'))data={counts:{},upcoming_posts:[post,{...post,id:'two',format:'carousel',design:null,state:'content_needed'}],activity:[],recommendations:[],generation_activity:[],campaigns:[],performance:{posts:[]}};
-  else if(path.endsWith('/preview')){previewReads++;await route.fulfill({contentType:'image/webp',body:image});return;}
+  else if(path.endsWith('/overview'))data={counts:{},upcoming_posts:[post,{...post,id:'duplicate'}, {...post,id:'two',format:'carousel',design:null,state:'content_needed'}],activity:[],recommendations:[],generation_activity:[],campaigns:[],performance:{posts:[]}};
+  else if(path.endsWith('/preview')){previewReads++;await new Promise(resolve=>setTimeout(resolve,200));await route.fulfill({contentType:'image/webp',body:image});return;}
   else if(path.includes('/creative-media/'))originalReads++;
   await route.fulfill({json:data});
  });
  try{
+  // Above-the-fold images must start even before visibility callbacks arrive.
+  await page.addInitScript(()=>{window.IntersectionObserver=class {observe(){} unobserve(){} disconnect(){} takeRecords(){return [];} };});
   await page.goto(`${origin}/b/${brand}/overview`);
-  await expect(page.locator('.post-thumbnail svg image')).toHaveAttribute('href',/^blob:/);
+  await expect(page.locator('.post-thumbnail svg image').first()).toHaveAttribute('href',/^blob:/);
   await expect(page.locator('.post-thumbnail').first()).toContainText('Saved headline');
-  assert.equal(previewReads,1);assert.equal(originalReads,0);
-  await expect(page.locator('.post-thumbnail').nth(1)).toContainText('Carousel');await expect(page.locator('.upcoming-copy').nth(1)).toContainText('Ready to create');
-  await page.setViewportSize({width:390,height:844});await expect(page.locator('.post-thumbnail svg image')).toHaveAttribute('href',/^blob:/);
+  assert.equal(previewReads,1,'duplicate thumbnails share the in-flight preview');assert.equal(originalReads,0);
+  await expect(page.locator('.post-thumbnail').nth(2)).toContainText('No slides generated yet');await expect(page.locator('.upcoming-copy').nth(2)).toContainText('Not generated yet');await expect(page.locator('.upcoming-copy').nth(2)).toContainText('Create carousel');
+  await page.setViewportSize({width:390,height:844});await expect(page.locator('.post-thumbnail svg image').first()).toHaveAttribute('href',/^blob:/);
+  await page.reload();await expect(page.locator('.post-thumbnail svg image').first()).toHaveAttribute('href',/^blob:/);assert.equal(previewReads,2,'a new page authenticates its image request again');
  }finally{await browser.close();}
 });
