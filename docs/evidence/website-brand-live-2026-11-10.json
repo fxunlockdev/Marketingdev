@@ -1,0 +1,74 @@
+{
+  "passed": true,
+  "checked_at": "2026-11-10T11:05:24.337Z",
+  "scope": "Read-only authenticated hosted branding, logo load, typography and responsive overflow. No generation or publishing.",
+  "views": [
+    {
+      "route": "overview",
+      "width": 1440,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    },
+    {
+      "route": "create",
+      "width": 1440,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    },
+    {
+      "route": "team",
+      "width": 1440,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    },
+    {
+      "route": "content-preferences",
+      "width": 1440,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    },
+    {
+      "route": "overview",
+      "width": 390,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    },
+    {
+      "route": "create",
+      "width": 390,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    },
+    {
+      "route": "team",
+      "width": 390,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    },
+    {
+      "route": "content-preferences",
+      "width": 390,
+      "paper": "#f4f0e7",
+      "heading": "\"Desvio Body\", \"Helvetica Neue\", Arial, sans-serif",
+      "overflow": false,
+      "logos": true
+    }
+  ],
+  "deployment_id": "83754864-94aa-466c-99e5-b635e236a3d0",
+  "deployment_status": "SUCCESS",
+  "code_commit": "beaba85"
+}

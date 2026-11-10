@@ -18,3 +18,7 @@ Presentation literals in existing styles now reference common brand tokens. Astr
 ## Limits
 
 This adapts the website's identity to product layouts; it does not copy marketing pages or replace functional workflows. Existing generated artwork retains its original colors and typography. Historical creative text quality is a separate data/rendering concern.
+
+## Deployment
+
+Dev web deployment `83754864-94aa-466c-99e5-b635e236a3d0` reached SUCCESS. Authenticated hosted verification passed on home, chat, team and content preferences at 1440px and 390px (8 views), including logo loading, shared palette and overflow. See `website-brand-live-2026-11-10.json`.
