@@ -1,0 +1,30 @@
+import {test,before,after} from 'node:test';
+import assert from 'node:assert/strict';
+import {randomUUID} from 'node:crypto';
+import {Pool} from 'pg';
+import {TenantDatabase} from '../../dist/database.js';
+import {Workspaces} from '../../dist/workspaces.js';
+import {Businesses} from '../../dist/businesses.js';
+const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),app=new Pool({connectionString:config.appDatabaseUrl});
+const database=new TenantDatabase(app),workspaces=new Workspaces(database),businesses=new Businesses(database,workspaces),alice=randomUUID(),bob=randomUUID();
+let organization;
+before(async()=>{for(const id of [alice,bob])await admin.query('INSERT INTO auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$1::text,$2,true)',[id,`${id}@example.test`]);organization=await workspaces.create(alice,{name:'Questionnaire account'});});
+after(async()=>{await Promise.all([admin.end(),app.end()]);});
+
+test('creative questionnaire persists, supports old clients, rejects stale updates and isolates businesses',async()=>{
+ const target=await workspaces.createBrand(alice,organization.id,{name:'Questionnaire persistence'},randomUUID());
+ const initial=await businesses.onboarding(alice,target.id);
+ assert.deepEqual(initial.creative_brief,{});
+ const input={revision:0,step:3,goal:'leads',timezone:'UTC',cadence:3,channels:['instagram'],must_avoid:'No guarantees',creative_brief:{markets:'Mumbai',languages:'English',timing:'December launch',direction:'Quiet Ritual'}};
+ const saved=await businesses.onboarding(alice,target.id,input);
+ assert.deepEqual(saved.creative_brief,input.creative_brief);
+ assert.deepEqual((await businesses.onboarding(alice,target.id)).creative_brief,input.creative_brief);
+ await assert.rejects(businesses.onboarding(alice,target.id,input),/changed/);
+ await assert.rejects(businesses.onboarding(bob,target.id),/not found|access|Forbidden/i);
+ const {creative_brief,...legacy}=input;
+ const updated=await businesses.onboarding(alice,target.id,{...legacy,revision:saved.revision});
+ assert.deepEqual(updated.creative_brief,creative_brief);
+ await assert.rejects(businesses.onboarding(alice,target.id,{...input,revision:updated.revision,creative_brief:{markets:'x'.repeat(601)}}),/600/);
+ const cleared=await businesses.onboarding(alice,target.id,{...input,revision:updated.revision,creative_brief:{}});
+ assert.deepEqual(cleared.creative_brief,{});
+});

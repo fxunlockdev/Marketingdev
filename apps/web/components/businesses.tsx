@@ -1,4 +1,5 @@
 "use client";
+import {CreativeBrief} from "./creative-brief";
 import dynamic from "next/dynamic";
 import {ActionButton} from "./design-system";
 import {DesvioSelect,DesvioMultiSelect} from './desvio-select';
@@ -839,6 +840,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
         must_avoid: direction.must_avoid,
         business_stage: direction.business_stage ?? "",
         growth_expectation: direction.growth_expectation ?? "",
+        creative_brief: direction.creative_brief ?? {},
         preferences_edited: dirty || state.preferences_edited || approve,
       };
       const saved = await api(
@@ -953,7 +955,8 @@ export function BrandOnboarding({ business }: { business: Business }) {
         </>
       ) : (
         <section className="v5-panel onboarding-form">
-          <h2>Review your direction</h2>
+          <h2>Make your content feel like you</h2>
+          <p>Tell us what social media should do for your business. We will use your answers to guide new content plans.</p>
           <div className="availability-card">
             {state.recommendation ? (
               <>
@@ -1028,6 +1031,7 @@ export function BrandOnboarding({ business }: { business: Business }) {
             {(id) => <TimeZoneSelect id={id} disabled={!writable} value={state.timezone} onChange={value=>change("timezone",value)} />}
           </Field>
           <DesvioMultiSelect label="Preferred channels" value={state.channels} options={['linkedin','instagram','facebook'].map(value=>({value,label:value==='linkedin'?'LinkedIn':value==='instagram'?'Instagram':'Facebook'}))} onChange={next=>change('channels',next)} disabled={!writable}/>
+          <CreativeBrief value={state.creative_brief} onChange={next=>change("creative_brief",next)} disabled={!writable||busy}/>
           <Field label="Topics or claims to avoid">
             {(id) => (
               <textarea

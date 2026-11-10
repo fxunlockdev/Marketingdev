@@ -1,3 +1,4 @@
+import {validateCreativeBrief} from './creative-brief.js';
 import {
   BadRequestException,
   ConflictException,
@@ -134,6 +135,7 @@ export class Businesses {
             must_avoid: "",
             business_stage: "",
             growth_expectation: "",
+            creative_brief: {},
             preferences_edited: false,
           };
           const recommendation =
@@ -182,7 +184,9 @@ export class Businesses {
           "preferences_edited",
           "business_stage",
           "growth_expectation",
+          "creative_brief",
         ]);
+        const creativeBrief = validateCreativeBrief(value.creative_brief === undefined ? prior?.creative_brief ?? {} : value.creative_brief);
         const stage = value.business_stage ?? prior?.business_stage ?? "";
         const growth = value.growth_expectation ?? prior?.growth_expectation ?? "";
         if (typeof stage !== "string" || !["", "pre_launch", "launching", "growing", "established"].includes(stage) || typeof growth !== "string" || growth.length > 600 || /[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(growth))
@@ -230,7 +234,7 @@ export class Businesses {
           );
         const row = (
           await db.query(
-            `INSERT INTO app.business_onboarding(organization_id,brand_id,step,goal,timezone,cadence,channels,must_avoid,preferences_edited,business_stage,growth_expectation) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(organization_id,brand_id) DO UPDATE SET step=EXCLUDED.step,goal=EXCLUDED.goal,timezone=EXCLUDED.timezone,cadence=EXCLUDED.cadence,channels=EXCLUDED.channels,must_avoid=EXCLUDED.must_avoid,business_stage=EXCLUDED.business_stage,growth_expectation=EXCLUDED.growth_expectation,preferences_edited=business_onboarding.preferences_edited OR EXCLUDED.preferences_edited,revision=business_onboarding.revision+1,updated_at=now() RETURNING *`,
+            `INSERT INTO app.business_onboarding(organization_id,brand_id,step,goal,timezone,cadence,channels,must_avoid,preferences_edited,business_stage,growth_expectation,creative_brief) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(organization_id,brand_id) DO UPDATE SET step=EXCLUDED.step,goal=EXCLUDED.goal,timezone=EXCLUDED.timezone,cadence=EXCLUDED.cadence,channels=EXCLUDED.channels,must_avoid=EXCLUDED.must_avoid,business_stage=EXCLUDED.business_stage,growth_expectation=EXCLUDED.growth_expectation,creative_brief=EXCLUDED.creative_brief,preferences_edited=business_onboarding.preferences_edited OR EXCLUDED.preferences_edited,revision=business_onboarding.revision+1,updated_at=now() RETURNING *`,
             [
               business.organization_id,
               id,
@@ -243,6 +247,7 @@ export class Businesses {
               value.preferences_edited ?? true,
               stage,
               growth,
+              JSON.stringify(creativeBrief),
             ],
           )
         ).rows[0];

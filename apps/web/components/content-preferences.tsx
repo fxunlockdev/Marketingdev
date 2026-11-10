@@ -1,4 +1,5 @@
 "use client";
+import {CreativeBrief,type CreativeBriefValue} from "./creative-brief";
 import {ActionButton} from "./design-system";
 import {DesvioSelect,DesvioMultiSelect} from './desvio-select';
 import {useEffect,useState} from 'react';
@@ -7,7 +8,7 @@ import {Field,Loading,Notice} from './primitives';
 import './workspace-refinement.css';
 import {TimeZoneSelect} from './time-zone-select';
 import {confirmNavigation,useUnsavedChanges} from './unsaved';
-type Preferences={revision:number;step:number;goal:string;timezone:string;cadence:number;channels:string[];must_avoid:string;business_stage:string;growth_expectation:string};
+type Preferences={revision:number;step:number;goal:string;timezone:string;cadence:number;channels:string[];must_avoid:string;business_stage:string;growth_expectation:string;creative_brief?:CreativeBriefValue};
 export function ContentPreferences({business}:{business:{id:string;name:string;role:string}}){
  const [value,setValue]=useState<Preferences>(),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[saved,setSaved]=useState(false);
  const writable=['owner','admin','editor'].includes(business.role);
@@ -17,8 +18,8 @@ export function ContentPreferences({business}:{business:{id:string;name:string;r
  useEffect(()=>{void load();},[path]);
  function change<K extends keyof Preferences>(key:K,next:Preferences[K]){setValue(v=>v?{...v,[key]:next}:v);setDirty(true);setSaved(false);}
  async function save(event:React.FormEvent){event.preventDefault();if(!value||!writable||busy)return;if(!value.channels.length){setError(new Error('Choose at least one preferred channel.'));return;}setBusy(true);setError(undefined);setSaved(false);try{
-  const {revision,step,goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation}=value;
-  setValue(await api<Preferences>(path,{revision,step,goal,timezone,cadence,channels,must_avoid,business_stage:business_stage??'',growth_expectation:growth_expectation??'',preferences_edited:true},'PATCH'));setDirty(false);setSaved(true);
+  const {revision,step,goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,creative_brief}=value;
+  setValue(await api<Preferences>(path,{revision,step,goal,timezone,cadence,channels,must_avoid,business_stage:business_stage??'',growth_expectation:growth_expectation??'',creative_brief:creative_brief??{},preferences_edited:true},'PATCH'));setDirty(false);setSaved(true);
  }catch(e){setError(e);}finally{setBusy(false);}}
  return <section className="content-preferences"><div className="v5-page-title"><p className="eyebrow">{business.name}</p><h1>Content Preferences</h1><p>Your defaults. Every new plan starts here.</p></div><Notice error={error}/>{!value?busy?<Loading/>:<ActionButton onClick={()=>void load()} label="Try again" />:<form onSubmit={save}>
  <fieldset disabled={busy||!writable}><legend className="sr-only">Content preferences</legend>
@@ -29,5 +30,6 @@ export function ContentPreferences({business}:{business:{id:string;name:string;r
  <Field label="Posts per week">{id=><input id={id} type="number" required min={1} max={30} value={value.cadence} onChange={e=>change('cadence',Number(e.target.value))}/>}</Field>
  <Field label="Time zone">{id=><TimeZoneSelect id={id} disabled={busy||!writable} value={value.timezone} onChange={next=>change('timezone',next)}/>}</Field></div></section>
  <section className="preference-section"><div><span className="preference-step">03</span><h2>Keep it on brand</h2><p>Tell us what to leave out.</p></div><Field label="Topics or claims to avoid">{id=><textarea id={id} maxLength={2000} value={value.must_avoid} onChange={e=>change('must_avoid',e.target.value)} placeholder="Words, subjects, or claims you don’t want in your content."/>}</Field></section>
+ <CreativeBrief value={value.creative_brief} onChange={next=>change("creative_brief",next)} disabled={busy||!writable}/>
  </fieldset><div className="actions preference-save-bar"><span className="hint" role="status">{dirty?'Unsaved changes':saved?'All changes saved':'Your saved defaults'}</span>{writable?<><ActionButton className="primary" type="submit" disabled={busy||!dirty} label={busy?'Saving…':'Save preferences'} /><ActionButton type="button" disabled={busy||!dirty} onClick={()=>{if(confirmNavigation())void load();}} label="Discard changes" /></>:<p>You can view these preferences. Ask an editor to make changes.</p>}</div>{saved&&<p role="status">Preferences saved. New plans will use these choices.</p>}</form>}</section>;
 }
