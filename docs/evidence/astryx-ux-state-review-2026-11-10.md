@@ -16,3 +16,7 @@ Reference: installed `@astryxdesign/core` 0.7.11 Button and Spinner documentatio
 Production build passes. Sixteen existing browser regression tests passed across campaign/blog editing, denied actions, uncertain generation recovery, selectors, dialogs, prompt suggestions, preview loading, generation progress and connection callbacks. A new connection-feedback test passes with controlled API responses, covering pending action feedback, disabled styling, error recovery, single submission, view-only explanation and 390/768/1440 viewport overflow.
 
 These tests do not connect external social accounts, publish posts or prove every possible customer journey. Real-account page layout audit and deployment results are appended after completion.
+
+## Release result
+
+The read-only real-account audit completed 32 views (16 surfaces at 1440px and 390px) with no horizontal overflow. Integrations and the mobile New Post dialog were visually inspected. Release `fd2460f` deployed successfully to dev as `0ebe4e86-6b2b-42b5-9d2b-52cae05c0763`. All four connection feedback/return tests passed against the hosted build with controlled API responses. No external accounts were connected or disconnected during this audit.
