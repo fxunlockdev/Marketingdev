@@ -1,0 +1,30 @@
+{
+  "migration": {
+    "migration": "093_onboarding_creative_brief.sql",
+    "sha256": "564f2d4331991e23d0be99af80be160fae5157bf6769920c6adce4daae4c7ffa",
+    "applied": true
+  },
+  "worker": {
+    "checked_at": "2026-11-10T10:04:02.411Z",
+    "passed": true,
+    "image": "sha256:dbd19e11cb0d54efc9c374e91301680e8ca68b4798154803e886be70d01bbf0c",
+    "backup_container": "desvio-worker-rollback-20261110-onboarding093",
+    "paid_calls": false,
+    "scope": "Current worker replaced after idle check; exact images/scanner and Temporal/DB registration verified. Chat media provider acceptance recorded separately; social publishing excluded."
+  },
+  "api": {
+    "deploymentId": "c05b8b5a-fff3-4013-ba86-b01d0e53e92d",
+    "logsUrl": "https://railway.com/project/5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12/service/21260f12-2ad2-413c-9f67-2a1c4d6f8c83?id=c05b8b5a-fff3-4013-ba86-b01d0e53e92d&",
+    "verified_status": "SUCCESS"
+  },
+  "web": {
+    "deploymentId": "3f3870c6-f6ca-497f-a4ea-8390bf2cb7c4",
+    "logsUrl": "https://railway.com/project/5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12/service/a92160c2-54ef-4523-b13b-4a9a0e2dbdd2?id=3f3870c6-f6ca-497f-a4ea-8390bf2cb7c4&",
+    "verified_status": "SUCCESS"
+  },
+  "hosted_check": {
+    "passed": true,
+    "checked_at": "2026-11-10T10:06:28.069Z",
+    "scope": "Authenticated hosted preferences API and questionnaire UI, creative direction options and mobile layout. Read-only; no preferences changed and no paid generation."
+  }
+}

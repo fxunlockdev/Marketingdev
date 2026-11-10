@@ -22,3 +22,7 @@ Source: user-supplied DESVIO-Netlify-2026-10-20.zip, static enquiry form and cre
 ## Location
 
 New business onboarding, final direction step, and Content Preferences > Your creative brief. New answers affect future work, not existing creatives. No paid generation or publishing was performed for this change.
+
+## Dev release
+
+API and web deployments reached SUCCESS. Updated worker has registered workflow and activity pollers. Authenticated hosted check passed for the preferences endpoint, questionnaire, direction options and 390px/320px layouts. No live answers changed. See onboarding-dev-deployment-2026-11-10.json.
