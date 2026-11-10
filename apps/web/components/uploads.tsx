@@ -1,4 +1,5 @@
 "use client";
+import {ActionButton} from "./design-system";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api, type Asset, type Workspace, ApiError } from "./api";
 import { useUnsavedChanges } from "./unsaved";
@@ -226,7 +227,7 @@ export function BrandFiles({
       <Notice error={error} />
       <Notice error={loadError} />
       {!!loadError && (
-        <button onClick={() => void load()}>Refresh files</button>
+        <ActionButton onClick={() => void load()} label="Refresh files" />
       )}
       {!assets ? (
         <Loading />
@@ -259,24 +260,16 @@ export function BrandFiles({
               </div>
               <div className="file-actions">
                 {asset.state === "ready" && (
-                  <button onClick={() => void action(asset, "download")}>
-                    Download
-                  </button>
+                  <ActionButton onClick={() => void action(asset, "download")} label="Download" />
                 )}
                 {["owner","admin","editor"].includes(org.role) && asset.state === "awaiting_upload" && (
-                  <button onClick={() => void action(asset, "abandon")}>
-                    Dismiss upload
-                  </button>
+                  <ActionButton onClick={() => void action(asset, "abandon")} label="Dismiss upload" />
                 )}
                 {["owner","admin","editor"].includes(org.role) &&
                   asset.job_id &&
                   ["queued", "validating"].includes(asset.state) && (
-                    <button
-                      disabled={!!asset.cancel_requested}
-                      onClick={() => void action(asset, "cancel")}
-                    >
-                      Cancel checks
-                    </button>
+                    <ActionButton disabled={!!asset.cancel_requested}
+                      onClick={() => void action(asset, "cancel")} label="Cancel checks" />
                   )}
               </div>
             </li>

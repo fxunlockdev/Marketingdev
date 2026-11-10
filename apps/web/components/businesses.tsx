@@ -226,12 +226,10 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             )}
           </Field></div>}
         </div>
-        <button
-          className="v5-menu"
+        <ActionButton type="button" className="v5-menu"
           aria-expanded={menu}
           aria-controls="business-nav"
-          onClick={() => setMenu(!menu)}
-         >Menu</button>
+          onClick={() => setMenu(!menu)} label="Menu" />
         <nav id="business-nav" aria-label="Main navigation">
           {sections.map(([key, title, icon]) => (
             <div key={key}>

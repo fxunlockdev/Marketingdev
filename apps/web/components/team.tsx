@@ -1,4 +1,5 @@
 "use client";
+import {ActionButton} from "./design-system";
 import {DesvioSelect} from './desvio-select';
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import "./settings-layout.css";
@@ -133,9 +134,7 @@ export function TeamScreen({
                 </DesvioSelect>
               )}
             </Field>
-            <button className="primary" disabled={busy}>
-              {busy ? "Saving…" : "Send invitation"}
-            </button>
+            <ActionButton className="primary" disabled={busy} label={busy ? "Saving…" : "Send invitation"} />
           </form>
           <p className="hint">
             Invitations expire after 7 days. Only the invited email can accept.
@@ -150,7 +149,7 @@ export function TeamScreen({
       <section>
         <div className="section-heading">
           <h2>People with access</h2>
-          <button onClick={() => void load()}>Refresh team</button>
+          <ActionButton onClick={() => void load()} label="Refresh team" />
         </div>
         {!members ? (
           <Loading />
@@ -208,25 +207,15 @@ export function TeamScreen({
                       )}
                     </Field>
                     <div className="actions">
-                      <button
-                        className="primary"
+                      <ActionButton className="primary"
                         disabled={busy}
-                        onClick={() => void change(member, true)}
-                      >
-                        Save role
-                      </button>
-                      <button disabled={busy} onClick={() => setConfirm(true)}>
-                        Remove access
-                      </button>
-                      <button
-                        className="quiet"
+                        onClick={() => void change(member, true)} label="Save role" />
+                      <ActionButton disabled={busy} onClick={() => setConfirm(true)} label="Remove access" />
+                      <ActionButton className="quiet"
                         onClick={() => {
                           setEditing(undefined);
                           setConfirm(false);
-                        }}
-                      >
-                        Cancel
-                      </button>
+                        }} label="Cancel" />
                     </div>
                     {confirm && (
                       <div className="notice">
@@ -234,13 +223,9 @@ export function TeamScreen({
                           Remove {member.name} from {org.name}? They will lose
                           access to all this client’s brands.
                         </p>
-                        <button
-                          className="danger"
+                        <ActionButton className="danger"
                           disabled={busy}
-                          onClick={() => void change(member, false)}
-                        >
-                          Confirm removal
-                        </button>
+                          onClick={() => void change(member, false)} label="Confirm removal" />
                       </div>
                     )}
                   </div>

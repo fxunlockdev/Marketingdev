@@ -1,4 +1,5 @@
 "use client";
+import {ActionButton} from "./design-system";
 import {DesvioSelect} from './desvio-select';
 import {paintCurvedText} from '../lib/curved-text.mjs';
 import {TextCurveControls} from './text-curve-controls';
@@ -269,10 +270,10 @@ export function CreativeEditor({
         {fontError instanceof Error && fontError.message==='EXPORT_TEXT_OVERFLOW'
           ? <p className="notice error" role="alert">This text is too tall for the image. Shorten it, reduce the font size, or use fewer lines.</p>
           : <Notice error={fontError} />}
-        {!!fontError && !(fontError instanceof Error && fontError.message==='EXPORT_TEXT_OVERFLOW') && <button type="button" onClick={() => setFontRetry(n => n + 1)}>Retry fonts</button>}
+        {!!fontError && !(fontError instanceof Error && fontError.message==='EXPORT_TEXT_OVERFLOW') && <ActionButton type="button" onClick={() => setFontRetry(n => n + 1)} label="Retry fonts" />}
         <Notice error={error} />
         {!!error && (
-          <button onClick={() => setRetry((n) => n + 1)}>Reload image</button>
+          <ActionButton onClick={() => setRetry((n) => n + 1)} label="Reload image" />
         )}
         <p className="hint">
           {design.width} × {design.height} ·{" "}
@@ -284,7 +285,7 @@ export function CreativeEditor({
       {afterArtwork}
       {!previewOnly && chatControls && <ChatLayerControls design={design} layer={layer} readOnly={readOnly} update={update} change={onChange} footer={controlsFooter} select={id=>{setSelected(id);const c=canvas.current,o=c?.getObjects().find(o=>(o as any).layerId===id);if(c&&o){c.setActiveObject(o);c.requestRenderAll();}}}/>}
       {!previewOnly && !chatControls && <fieldset className="creative-layer-controls" disabled={readOnly}>
-        <legend>Text layers</legend><div className="creative-text-actions"><button type="button" disabled={!design.layers.some(l=>l.text.trim())} onClick={()=>onChange(readableDesign(design))}>Improve text contrast</button><button type="button" disabled={!design.layers.length} onClick={()=>onChange({...design,layers:[]})}>Remove all image text</button></div><p className="hint">Use a short headline or leave the image clean. Save your changes to update the post.</p>
+        <legend>Text layers</legend><div className="creative-text-actions"><ActionButton type="button" disabled={!design.layers.some(l=>l.text.trim())} onClick={()=>onChange(readableDesign(design))} label="Improve text contrast" /><ActionButton type="button" disabled={!design.layers.length} onClick={()=>onChange({...design,layers:[]})} label="Remove all image text" /></div><p className="hint">Use a short headline or leave the image clean. Save your changes to update the post.</p>
         <Field label="Selected layer">
           {(id) => (
             <DesvioSelect
@@ -390,21 +391,16 @@ export function CreativeEditor({
                 (n) => update({ width: n }),
               )}
             </div>
-            <button
-              type="button"
+            <ActionButton type="button"
               onClick={() =>
                 onChange({
                   ...design,
                   layers: design.layers.filter((l) => l.id !== layer.id),
                 })
-              }
-            >
-              Remove text layer
-            </button>
+              } label="Remove text layer" />
           </>
         )}
-        <button
-          type="button"
+        <ActionButton type="button"
           disabled={design.layers.length >= 10}
           onClick={() => {
             const id = "text-" + crypto.randomUUID().slice(0, 8);
@@ -428,10 +424,7 @@ export function CreativeEditor({
               ],
             });
             setSelected(id);
-          }}
-        >
-          Add text layer
-        </button>
+          }} label="Add text layer" />
       </fieldset>}
     </div>
   );

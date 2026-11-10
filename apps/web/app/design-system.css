@@ -170,3 +170,9 @@ body.desvio-redesign.desvio-polished .connections-redesign .social-network-card 
 body.desvio-redesign.desvio-polished .social-footnote { margin-top: 24px; line-height: 1.6; color: var(--ds-muted); }
 body.desvio-redesign.desvio-polished .social-legacy { margin-top: 24px; padding-top: 20px; }
 body.desvio-redesign.desvio-polished .social-legacy > summary { color: var(--ds-muted); padding: 8px 0; }
+
+/* Shared button display must not expose the mobile navigation toggle on desktop. */
+body.desvio-redesign.desvio-polished .desvio-action.v5-menu { display: none; }
+@media (max-width: 760px) {
+  body.desvio-redesign.desvio-polished .desvio-action.v5-menu { display: inline-flex; }
+}

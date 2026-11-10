@@ -28,7 +28,7 @@ test('creation controls stay usable with motion, keyboard navigation and narrow 
     const recent = page.getByRole('button', {name: title, exact: true});
     await expect(recent).toBeVisible();
     await expect(page.getByRole('button', {name: 'Menu', exact: true})).toBeHidden();
-    await expect(page.locator('.desvio-action [role="status"]:empty')).toBeHidden();
+    await expect(page.locator('.desvio-action [role="status"]:empty:visible')).toHaveCount(0);
     await page.setViewportSize({width: 390, height: 844});
     const menu = page.getByRole('button', {name: 'Menu', exact: true});
     await menu.click();
