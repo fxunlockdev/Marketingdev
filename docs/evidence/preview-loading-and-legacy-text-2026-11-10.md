@@ -32,4 +32,6 @@ Fresh live navigations still took 3.3–5.1 seconds to display the first image. 
 
 The follow-up production build passed. Thirteen production browser tests passed across selectors, dialogs, design polish, campaigns, preview loading, progress and suggestions. A read-only audit of 32 actual-data desktop/mobile views completed without horizontal overflow. No new paid generations or publishing were performed.
 
-Final deployment and live timing are recorded after release.
+Follow-up release `d6d7211` deployed successfully as Railway web deployment `9f5d2f92-3838-4392-a7b4-ef7d9e0e982f`. All 13 browser regressions also passed against the hosted build using controlled API fixtures.
+
+Authenticated live read-back and screenshots confirmed zero old text overlays, the explicit ungenerated carousel state and action, and no mobile overflow. The final fresh-page check showed the first image in 3,637 ms; the two actual preview transfers took 441 and 445 ms. Hosted initial JavaScript transferred 351,730 bytes, down from the previous measured 520,940 bytes. Overall first-page loading still depends on navigation, authentication and network latency; this release does not promise instant images.
