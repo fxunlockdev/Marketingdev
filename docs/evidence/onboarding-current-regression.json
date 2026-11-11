@@ -1,0 +1,36 @@
+{
+  "checked_at": "2026-11-11T12:45:21.884054+00:00",
+  "source_commit": "d5be980",
+  "api_build": "passed",
+  "guided_database_tests": {
+    "passed": 13,
+    "providers": "mocked"
+  },
+  "contract_tests": {
+    "passed": 15
+  },
+  "browser_tests": {
+    "passed": 8,
+    "api": "mocked",
+    "viewports": [
+      1440,
+      768,
+      390
+    ]
+  },
+  "deployed_read_checks": {
+    "pages": 7,
+    "browser_errors": 0,
+    "failed_api_reads": 0,
+    "moodboard_images_decoded": 4
+  },
+  "live_generation_submitted": false,
+  "social_publication_submitted": false,
+  "completion": "not_certified",
+  "remaining": [
+    "Complete current live onboarding-to-monthly-assets mutation journey",
+    "Reconcile latest research worker rollout",
+    "Per-post missing-asset request workflow from onboarding reference",
+    "Real social publication verification"
+  ]
+}
