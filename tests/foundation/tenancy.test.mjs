@@ -558,10 +558,15 @@ test('dev without email accepts an existing verified password account but denies
 
  test('owner brand removal hides scoped records, blocks active work and frees allowance without erasing audit',async()=>{
  const owner=await signup('removal-'+randomUUID());
- await request('/api/v1/accounts/current/initialize',{method:'POST',cookie:owner.cookie,body:{}});
+ const account=(await request('/api/v1/accounts/current/initialize',{method:'POST',cookie:owner.cookie,body:{}})).body.accountId;
+ // A new account can manage several businesses; the limit is per-account data.
+ const startingQuota=await request('/api/v1/accounts/current/entitlements',{cookie:owner.cookie});
+ assert.equal(startingQuota.body.max_active_businesses,10);assert.equal(startingQuota.body.can_create_business,true);
+ // Lower this account's limit to one to prove the limit holds under concurrency.
+ await admin.query('UPDATE app.account_entitlements SET max_active_businesses=1 WHERE organization_id=$1',[account]);
  const keys=Array.from({length:5},()=>randomUUID());
  const attempts=await Promise.all(keys.map((key,i)=>request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key,body:{name:'Remove brand '+i}})));
- assert.equal(attempts.filter(r=>r.status===201).length,1,'Concurrent creation permits only one business');
+ assert.equal(attempts.filter(r=>r.status===201).length,1,'Concurrent creation never exceeds the account limit');
  assert.equal(attempts.filter(r=>r.status===409).length,4);
  const winner=attempts.findIndex(r=>r.status===201),created=[attempts[winner].body];
  const replay=await request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key:keys[winner],body:{name:'Remove brand '+winner}});

@@ -680,7 +680,7 @@ test("parser rejects malformed, oversized and unconfigured inputs and forged par
   );
 });
 
-test("V5 standard account starts empty, initializes once and concurrent second-business creation is denied", async () => {
+test("V5 standard account starts empty, initializes once and concurrent creation never exceeds the account limit", async () => {
   const initial = await Promise.all(
     Array.from({ length: 3 }, () =>
       request("/api/v1/accounts/current/initialize", { method: "POST" }),
@@ -691,7 +691,10 @@ test("V5 standard account starts empty, initializes once and concurrent second-b
   const account = initial[0].body.accountId;
   let entitlement = await request("/api/v1/accounts/current/entitlements");
   assert.equal(entitlement.body.active_businesses, 0);
-  assert.equal(entitlement.body.max_active_businesses, 1);
+  assert.equal(entitlement.body.max_active_businesses, 10);
+  assert.equal(entitlement.body.can_create_business, true);
+  // Lower this account's limit to one to prove the limit holds under concurrency.
+  await admin.query("UPDATE app.account_entitlements SET max_active_businesses=1 WHERE organization_id=$1", [account]);
   const keys = Array.from({ length: 5 }, () => randomUUID()),
     results = await Promise.all(
       keys.map((key, i) =>

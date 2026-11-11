@@ -459,17 +459,17 @@ function BusinessesIndex({
   return (
     <div className="brands-page">
       <div className="heading-row">
-        <PageTitle eyebrow="Your workspace" title="Your business">
+        <PageTitle eyebrow="Your workspace" title="Your businesses">
           <p>
-            Your brand, content and social profile, together in one workspace.
+            Each business has its own brand, content, social profile and memory.
           </p>
         </PageTitle>
         {entitlement.can_create_business&&<AppLink className="button primary" href="/brands/new">
-          Set up my business
+          {entitlement.active_businesses===0?"Set up my business":"+ Add business"}
         </AppLink>}
       </div>
       <p className="quota-caption">
-        Your account includes one business.
+        {entitlement.active_businesses} of {entitlement.max_active_businesses} businesses in use.
       </p>
       <div className="v5-business-grid">
         {businesses.map((b, i) => (
@@ -586,11 +586,11 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
       <Steps step={1} />
       {!entitlement.can_create_business ? (
         <section className="v5-panel">
-          <h2>Your business is already set up.</h2>
+          <h2>Your account is at its business limit.</h2>
           <p>
-            Your account includes one business. Continue with your existing business below.
+            {entitlement.active_businesses} of {entitlement.max_active_businesses} businesses are in use. Continue with an existing business below.
           </p>
-          <AppLink href="/brands">Back to your business</AppLink>
+          <AppLink href="/brands">Back to your businesses</AppLink>
         </section>
       ) : (
         <div className="business-intro-grid"><form
