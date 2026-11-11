@@ -1,16 +1,17 @@
+import {attribution,attributionColumnsSQL,attributionJoinsSQL,type Attribution,type AttributionSource} from './learning-attribution.js';
 /** Published Post for Me posts as analysis observations. Preserve provider values; never infer zeros, daily deltas or growth. */
 export type Queryable={query(sql:string,params?:unknown[]):Promise<{rows:Record<string,unknown>[]}>};
 export type PostFormat='static'|'carousel'|'video'|'story';
 export type FeedPost={id:string;account_id:string;caption:string;posted_at:string|null;url:string|null;metrics:Record<string,number>};
 export type FeedRow={account_id:string;posts:unknown;updated_at:string|Date};
-export type PublishedRow={publication_id:string;caption:string;scheduled_at:string|Date;release_url:string|null;account_id:string;provider:string;account_name:string;slot_format?:string|null;carousel_version_id?:string|null;video_version_id?:string|null;placement?:string|null}&Record<string,unknown>;
+export type PublishedRow={publication_id:string;caption:string;scheduled_at:string|Date;release_url:string|null;account_id:string;provider:string;account_name:string;slot_format?:string|null;carousel_version_id?:string|null;video_version_id?:string|null;placement?:string|null}&AttributionSource&Record<string,unknown>;
 export type MetricSeries={label:string;points:{date:string;value:number}[]};
-export type Observation={id:string;publication_id:string;source:'postforme';caption:string;scheduled_at:string;posted_at:string|null;provider:string;account_name:string;format:PostFormat;semantics:'lifetime';metrics:Record<string,number>;series:MetricSeries[];collected_at:string;hours_since_publish:number|null};
+export type Observation={id:string;publication_id:string;source:'postforme';caption:string;scheduled_at:string;posted_at:string|null;provider:string;account_name:string;format:PostFormat;semantics:'lifetime';metrics:Record<string,number>;series:MetricSeries[];collected_at:string;hours_since_publish:number|null;attribution:Attribution};
 
 export const OBSERVATION_LIMIT=20;
 const MATCH_WINDOW_MS=6*3600000;
 /** Latest published posts with their destination account. Row-level security scopes this to the current business. */
-export const postformePublishedSQL=`SELECT p.id AS publication_id,p.caption,p.scheduled_at,p.release_url,p.account_id,a.platform AS provider,a.username AS account_name,s.format AS slot_format,s.carousel_version_id,s.video_version_id,p.proof->>'placement' AS placement FROM app.postforme_publications p JOIN app.postforme_accounts a ON a.id=p.account_id JOIN app.content_slots s ON s.id=p.slot_id WHERE p.phase='accepted' AND p.observed_state='published' ORDER BY p.scheduled_at DESC,p.id LIMIT ${OBSERVATION_LIMIT}`;
+export const postformePublishedSQL=`SELECT p.id AS publication_id,p.caption,p.scheduled_at,p.release_url,p.account_id,a.platform AS provider,a.username AS account_name,s.format AS slot_format,s.carousel_version_id,s.video_version_id,p.proof->>'placement' AS placement,${attributionColumnsSQL} FROM app.postforme_publications p JOIN app.postforme_accounts a ON a.id=p.account_id JOIN app.content_slots s ON s.id=p.slot_id ${attributionJoinsSQL} WHERE p.phase='accepted' AND p.observed_state='published' ORDER BY p.scheduled_at DESC,p.id LIMIT ${OBSERVATION_LIMIT}`;
 export const postformeFeedsSQL='SELECT account_id,posts,updated_at FROM app.postforme_analytics ORDER BY account_id';
 
 const iso=(value:unknown):string|null=>{const time=value instanceof Date?value.getTime():typeof value==='string'?Date.parse(value):NaN;return Number.isFinite(time)?new Date(time).toISOString():null;};
@@ -46,8 +47,8 @@ function hoursBetween(from:string|null,to:string):number|null{if(!from)return nu
 
 export type Measurement={metrics:Record<string,number>;collected_at:string;posted_at:string|null};
 export function observation(row:PublishedRow,measured:Measurement):Observation|null{
- const scheduled=iso(row.scheduled_at);if(!scheduled||!Object.keys(measured.metrics).length)return null;
- return {id:row.publication_id,publication_id:row.publication_id,source:'postforme',caption:row.caption,scheduled_at:scheduled,posted_at:measured.posted_at,provider:row.provider,account_name:row.account_name,format:publishedFormat(row),semantics:'lifetime',metrics:measured.metrics,series:metricSeries(measured.metrics,measured.collected_at),collected_at:measured.collected_at,hours_since_publish:hoursBetween(measured.posted_at??scheduled,measured.collected_at)};
+ const scheduled=iso(row.scheduled_at);if(!scheduled||!Object.keys(measured.metrics).length)return null;const format=publishedFormat(row);
+ return {attribution:attribution(row,format,measured.posted_at??scheduled),id:row.publication_id,publication_id:row.publication_id,source:'postforme',caption:row.caption,scheduled_at:scheduled,posted_at:measured.posted_at,provider:row.provider,account_name:row.account_name,format,semantics:'lifetime',metrics:measured.metrics,series:metricSeries(measured.metrics,measured.collected_at),collected_at:measured.collected_at,hours_since_publish:hoursBetween(measured.posted_at??scheduled,measured.collected_at)};
 }
 export function feedMeasurements(published:PublishedRow[],feeds:FeedRow[]):Map<string,Measurement>{
  const out=new Map<string,Measurement>();

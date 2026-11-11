@@ -61,3 +61,43 @@ test('insights read Post for Me and use the Postiz reader only for a business wi
  const legacy=await insightObservations(db([['post_analytics',[{id:'legacy'}]]]));
  assert.deepEqual(legacy,{source:'postiz_legacy',observations:[{id:'legacy'}]});
 });
+
+import {attribution,postedLocal,layoutArchetype,stockUsed,ATTRIBUTION_DIMENSIONS} from '../../dist/learning-attribution.js';
+import {validateInsights,validateInsightResult,INSIGHT_RESULT_V2} from '../../dist/insight-contracts.js';
+import {INSIGHT_SKILLS} from '../../dist/insight-skill-pins.js';
+
+const attributed=(over={})=>published({version_id:'44444444-4444-4444-8444-444444444444',channel:'instagram',pillar:'Education',hook:'Stop guessing your margins',cta:'Book a demo',timezone:'America/New_York',has_creative_version:true,manifest_references:[{kind:'stock_inspiration'}],imported_stock:false,brief:{art_direction:{layout_archetype:'split-hero'}},creative_spec:{placement:'feed',aspect:'square',slide_count:1},design:{},...over});
+test('each observation carries what produced it, in the business timezone',()=>{
+ const [o]=postformeObservations([attributed()],feed([feedPost({posted_at:'2026-11-01T03:30:00.000Z'})]));
+ assert.deepEqual(o.attribution,{creative_version_id:'44444444-4444-4444-8444-444444444444',format:'static',channel:'instagram',pillar:'Education',hook:'Stop guessing your margins',cta:'Book a demo',layout_archetype:'split-hero',stock_used:true,posted_weekday:'Saturday',posted_hour:23,timezone:'America/New_York'});
+ assert.deepEqual(Object.keys(o.attribution).filter(k=>!['creative_version_id','timezone'].includes(k)).sort(),[...ATTRIBUTION_DIMENSIONS].sort());
+ for(const fragment of ['app.content_plans','app.creative_versions','app.creative_requests','app.creative_media','s.pillar','s.hook','s.cta','pl.timezone'])assert.ok(postformePublishedSQL.includes(fragment),fragment);
+});
+test('unknown attribution stays null instead of being guessed',()=>{
+ const a=attribution({channel:'linkedin',pillar:'',hook:'  ',cta:null,timezone:'Not/AZone'},'carousel','2026-11-01T09:00:00Z');
+ assert.deepEqual(a,{creative_version_id:null,format:'carousel',channel:'linkedin',pillar:null,hook:null,cta:null,layout_archetype:null,stock_used:null,posted_weekday:null,posted_hour:null,timezone:null});
+ assert.equal(postedLocal('nope','UTC'),null);assert.deepEqual(postedLocal('2026-11-02T00:05:00Z','Europe/Riga'),{weekday:'Monday',hour:2});
+ assert.equal(layoutArchetype(null,'x',{art_direction:'bad'},{art_direction:{layout:'grid'}}),'grid');assert.equal(layoutArchetype({layout_archetype:7}),null);
+ assert.equal(stockUsed({has_creative_version:true,manifest_references:[{kind:'product'}]}),false);assert.equal(stockUsed({imported_stock:true}),true);assert.equal(stockUsed({manifest_references:'bad'}),null);
+});
+
+const insightInput=()=>({task:'performance_analysis',brand:{id:'b',sha256:'a'.repeat(64),facts:[]},observations:postformeObservations([attributed()],feed([feedPost()]))});
+const insight=(over={})=>({title:'Carousel hooks',summary:'One post reported likes.',hypothesis:'Unproven: education posts may earn more saves.',next_test:'Compare two pillars over the same window.',evidence_ids:['22222222-2222-4222-8222-222222222222'],limitations:['One post.'],...over});
+const analysis=i=>({insights:[i],limitations:['Small sample.']});
+test('insights that name attribution must quote values carried by the posts they cite',()=>{
+ const input=insightInput();
+ assert.ok(validateInsights(analysis(insight()),input),'the saved v1 shape stays valid');
+ assert.ok(validateInsights(analysis(insight({attribution:[{dimension:'pillar',value:'Education'},{dimension:'stock_used',value:'true'},{dimension:'posted_hour',value:'4'}]})),input,true));
+ for(const bad of [[{dimension:'pillar',value:'Sales'}],[{dimension:'mood',value:'x'}],[],[{dimension:'pillar',value:'Education'},{dimension:'pillar',value:'Education'}],[{dimension:'pillar',value:'Education',extra:1}],'pillar'])
+  assert.throws(()=>validateInsights(analysis(insight({attribution:bad})),input),e=>e.code==='INSIGHT_OUTPUT_INVALID');
+ assert.throws(()=>validateInsights(analysis(insight()),input,true),e=>e.code==='INSIGHT_OUTPUT_INVALID','v2 requires a reference when cited posts are attributed');
+ const legacy={...input,observations:[{id:'22222222-2222-4222-8222-222222222222'}]};
+ assert.ok(validateInsights(analysis(insight()),legacy,true),'legacy Postiz observations carry no attribution to reference');
+});
+test('the v2 result version turns the attribution requirement on',()=>{
+ const input=insightInput(),skills=Object.entries(INSIGHT_SKILLS).map(([name,pin])=>({name,...pin})),reads=skills.map(s=>`/skills/${s.name}/SKILL.md`);
+ const result=(version,i)=>({type:'result',version,analysis:analysis(i),skills,reads,model_calls:1,helpers_executed:false});
+ assert.ok(validateInsightResult(result('deepagents-0.7.29/desvio-insight-v1',insight()),input),'v1 results stay valid');
+ assert.throws(()=>validateInsightResult(result(INSIGHT_RESULT_V2,insight()),input),e=>e.code==='INSIGHT_OUTPUT_INVALID');
+ assert.ok(validateInsightResult(result(INSIGHT_RESULT_V2,insight({attribution:[{dimension:'format',value:'static'}]})),input));
+});
