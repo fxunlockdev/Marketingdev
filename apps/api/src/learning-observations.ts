@@ -57,12 +57,23 @@ export function feedMeasurements(published:PublishedRow[],feeds:FeedRow[]):Map<s
  }
  return out;
 }
-export function postformeObservations(published:PublishedRow[],feeds:FeedRow[]):Observation[]{
- const measured=feedMeasurements(published,feeds);
- return published.flatMap(row=>{const m=measured.get(row.publication_id),o=m?observation(row,m):null;return o?[o]:[];});
+export type SnapshotRow={publication_id:string;metrics:unknown;posted_at:string|Date|null;collected_at:string|Date};
+/** Latest scheduled snapshot per post that actually reported metrics. */
+export const postformeSnapshotsSQL="SELECT DISTINCT ON(publication_id) publication_id,metrics,posted_at,collected_at FROM app.postforme_post_metrics WHERE state='available' AND publication_id=ANY($1::uuid[]) ORDER BY publication_id,collected_at DESC";
+export function snapshotMeasurements(snapshots:SnapshotRow[]):Map<string,Measurement>{
+ const out=new Map<string,Measurement>();
+ for(const row of snapshots){const collected=iso(row.collected_at),prior=out.get(row.publication_id);if(collected&&(!prior||prior.collected_at<collected))out.set(row.publication_id,{metrics:feedMetrics(row.metrics),collected_at:collected,posted_at:iso(row.posted_at)});}
+ return out;
+}
+/** Use whichever reading is newest: the scheduled snapshot or the account feed the customer refreshed. Readings are never combined. */
+export function postformeObservations(published:PublishedRow[],feeds:FeedRow[],snapshots:SnapshotRow[]=[]):Observation[]{
+ const fromFeed=feedMeasurements(published,feeds),fromSnapshot=snapshotMeasurements(snapshots);
+ return published.flatMap(row=>{
+  const a=fromFeed.get(row.publication_id),b=fromSnapshot.get(row.publication_id),m=a&&b?(a.collected_at>=b.collected_at?a:b):a??b,o=m?observation(row,m):null;return o?[o]:[];
+ });
 }
 export async function readPostformeObservations(db:Queryable):Promise<{published:number;observations:Observation[]}>{
  const published=(await db.query(postformePublishedSQL)).rows as PublishedRow[];if(!published.length)return {published:0,observations:[]};
- const feeds=(await db.query(postformeFeedsSQL)).rows as FeedRow[];
- return {published:published.length,observations:postformeObservations(published,feeds)};
+ const feeds=(await db.query(postformeFeedsSQL)).rows as FeedRow[],snapshots=(await db.query(postformeSnapshotsSQL,[published.map(p=>p.publication_id)])).rows as SnapshotRow[];
+ return {published:published.length,observations:postformeObservations(published,feeds,snapshots)};
 }
