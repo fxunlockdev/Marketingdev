@@ -1968,3 +1968,7 @@ The first authenticated seven-page live check failed at Calendar with the generi
 Browser GET reads now retry one time after a network failure or 502/503/504, sharing the original 20-second deadline and coalesced promise. Mutations, auth/permission/rate-limit errors and expired deadlines are not replayed. This addresses the verified immediate-failure behavior, not proof of the original intermittent Calendar failure cause.
 
 Validation: five browser-request contracts passed (mock fetch); one real-browser workspace recovery test passed with MOCK API, demonstrating onboarding opens after an interrupted business-list read and that interrupted initialization POST is attempted only once. Web typecheck passed. Deployment pending.
+
+## 2026-11-11: read recovery deployed; live access check failed
+
+Web deployment 82f516a2-3d96-4ec8-ad35-375c84cdd61c for b1162d6 is SUCCESS. The authenticated live verifier failed at onboarding with Business unavailable. Independent reads confirmed login 200, businesses 200 with an empty list, and both previous QA and primary business guided-brief URLs returning 404. This does not establish deletion or its cause. Do not count the live journey as passed or bypass tenant access checks. Evidence: docs/evidence/workspace-read-recovery-deployed.json. No generation or publication submitted. Full product completion remains outstanding.

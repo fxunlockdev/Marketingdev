@@ -1,0 +1,26 @@
+{
+  "checked_at": "2026-11-11T13:23:52.648377+00:00",
+  "source": "b1162d6",
+  "web_deployment": {
+    "id": "82f516a2-3d96-4ec8-ad35-375c84cdd61c",
+    "status": "SUCCESS"
+  },
+  "local_validation": {
+    "request_contracts": 5,
+    "browser_mock_recovery_tests": 1,
+    "web_typecheck": "passed"
+  },
+  "live_validation": {
+    "status": "blocked",
+    "login_status": 200,
+    "business_list_status": 200,
+    "accessible_business_count": 0,
+    "previous_qa_brief_status": 404,
+    "previous_primary_brief_status": 404,
+    "observed_page": "Business unavailable"
+  },
+  "limitations": [
+    "No live journey pass is claimed. Current test account cannot access prior businesses; reason not established.",
+    "No generation or social publishing submitted."
+  ]
+}
