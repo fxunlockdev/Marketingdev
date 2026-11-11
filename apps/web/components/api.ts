@@ -29,23 +29,39 @@ async function request<T = any>(
   method = body === undefined ? "GET" : "POST",
   key?: string,
 ): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(path, {
-      method,
-      credentials: "same-origin",
-      cache: "no-store",
-      headers: {
-        ...(body !== undefined ? { "content-type": "application/json" } : {}),
-        ...(key ? { "idempotency-key": key } : {}),
-      },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
-    });
-  } catch {
+  const signal = AbortSignal.timeout(20000);
+  const retryRead = method === "GET" && body === undefined;
+  let response: Response | undefined;
+  // One retry for transient read failures, within the original total deadline.
+  // Never replay a save, approval, generation or other mutation automatically.
+  for (let attempt = 0; attempt < (retryRead ? 2 : 1); attempt++) {
+    try {
+      response = await fetch(path, {
+        method,
+        credentials: "same-origin",
+        cache: "no-store",
+        headers: {
+          ...(body !== undefined ? { "content-type": "application/json" } : {}),
+          ...(key ? { "idempotency-key": key } : {}),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal,
+      });
+      if (!retryRead || attempt > 0 || ![502, 503, 504].includes(response.status) || signal.aborted) break;
+      await response.body?.cancel();
+      response = undefined;
+    } catch {
+      if (!retryRead || attempt > 0 || signal.aborted) break;
+    }
+    await new Promise(resolve => setTimeout(resolve, 300));
+    if (signal.aborted) break;
+  }
+  if (!response) {
     throw new ApiError(
       0,
-      "We couldn’t confirm that request. Your entries are still here. Check your connection before trying again.",
+      retryRead
+        ? "We couldn’t load your work. Please try again."
+        : "We couldn’t confirm that request. Your entries are still here. Check your connection before trying again.",
     );
   }
   let data: any;

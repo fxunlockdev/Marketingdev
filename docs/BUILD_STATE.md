@@ -1962,3 +1962,9 @@ Activation now checkpoints the exact API deployment and phase, retaining the loc
 Current activation preflight and apply reported unchanged and verified the running worker, already on image 149839770a55837ef9e809b0ee09eff165fc800540c6c02c9591dfe6de78a8de. This supersedes the earlier statement that this worker remains inactive. No restart or API deployment was needed.
 
 The first authenticated seven-page live check failed at Calendar with the generic request confirmation error. An isolated Calendar rerun and subsequent complete seven-page rerun passed, including four decoded mood board images and one-profile policy checks. Root cause of the initial intermittent failure is NOT established; do not label it fixed. Evidence: docs/evidence/onboarding-recovery-followup.json. No paid generation or publication was submitted. Full live generation journey, per-post missing-asset requests and complete ZIP coverage remain outstanding.
+
+## 2026-11-11: bounded recovery for workspace reads
+
+Browser GET reads now retry one time after a network failure or 502/503/504, sharing the original 20-second deadline and coalesced promise. Mutations, auth/permission/rate-limit errors and expired deadlines are not replayed. This addresses the verified immediate-failure behavior, not proof of the original intermittent Calendar failure cause.
+
+Validation: five browser-request contracts passed (mock fetch); one real-browser workspace recovery test passed with MOCK API, demonstrating onboarding opens after an interrupted business-list read and that interrupted initialization POST is attempted only once. Web typecheck passed. Deployment pending.
