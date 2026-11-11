@@ -904,3 +904,39 @@ test('campaign image batch atomically prepares mixed formats without dispatching
  // End this fixture's unexecuted requests without making any provider call.
  await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=ANY($1::uuid[]) OR id IN (SELECT generation_job_id FROM app.carousel_children WHERE parent_job_id=$2) OR id IN (SELECT export_job_id FROM app.carousel_children WHERE parent_job_id=$2)",[items.flatMap(i=>i.job_id?[i.job_id]:[]),carousel.job_id]);
 });
+
+test('stock-backed creative persists selected photo and finished output without duplicate acquisition on replay',async()=>{
+ const {StockAssets}=await import('../../dist/stock-assets.js');
+ await grant();
+ await admin.query("INSERT INTO app.stock_grants(organization_id,brand_id,enabled,ai_use_authorized,max_daily_downloads,expires_at) VALUES($1,$2,true,true,2,now()+interval '1 hour')",[org.id,brand.id]);
+ const photo=await sharp({create:{width:512,height:512,channels:3,background:'#123456'}}).jpeg().toBuffer();
+ let searches=0,downloads=0,images=0;
+ const stockJobs=new AssetJobs(worker,store,{scan:async()=>{}});
+ const stock=new StockAssets(stockJobs,{configured:true,search:async()=>{searches++;return [{id:42,title:'Calm dental office',previewURL:null,aiGenerated:false}];},download:async()=>{downloads++;return {url:'https://example.test/photo.jpg',requiresAttribution:false,attributionURL:null};}},{fetch:async()=>({status:200,bytes:photo})});
+ const stockHandler=new CreativeJobs(stockJobs,skills,provider,undefined,stock);
+ transport=async(url,init)=>{
+  if(new URL(url).pathname==='/v1/responses'){
+   const body=JSON.parse(init.body),properties=body.text?.format?.schema?.properties;
+   if(properties?.query)return response({query:'calm dental office'});
+   if(properties?.resource_id)return response({resource_id:42});
+   return standard(url,init);
+  }
+  images++;assert.equal(new URL(url).pathname,'/v1/images/edits');
+  const files=init.body.getAll('image[]');assert.equal(files.length,1);const file=files[0];
+  assert.equal((await sharp(Buffer.from(await file.arrayBuffer())).metadata()).format,'png');
+  assert.match(init.body.get('prompt'),/Visual inspiration only/);
+  assert.ok(!init.body.get('prompt').includes('https://example.test'));
+  return Response.json({created:1,data:[{b64_json:png.toString('base64')}]});
+ };
+ try{
+  const job=await submit('Create a calm dental scheduling image');
+  await stockHandler.run(scope(job));
+  assert.deepEqual(await row(job),{status:'succeeded',error_code:null});
+  const saved=(await admin.query('SELECT status,resource_id,object_key FROM app.stock_acquisitions WHERE job_id=$1',[job.id])).rows[0];
+  assert.equal(saved.status,'ready');assert.equal(Number(saved.resource_id),42);assert.ok(await store.read(saved.object_key));
+  const steps=(await admin.query('SELECT step,status FROM app.creative_calls WHERE job_id=$1 ORDER BY step',[job.id])).rows;
+  for(const step of ['plan:4','plan:5','image'])assert.ok(steps.some(s=>s.step===step&&s.status==='succeeded'),JSON.stringify(steps));
+  await stockHandler.run(scope(job));
+  assert.deepEqual({searches,downloads,images},{searches:1,downloads:1,images:1});
+ }finally{transport=undefined;}
+});

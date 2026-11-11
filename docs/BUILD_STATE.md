@@ -1999,3 +1999,10 @@ Build and 24 selected contracts passed. Two disposable PostgreSQL stock tests pa
 - Added an SDK transport regression test with five distinct images: parent edit, three customer references, and stock inspiration. Confirms every image reaches the edit request in its original order with identical bytes.
 - Validation: TypeScript build passed; creative, stock acquisition, stock planning, and Vecteezy contract suites passed 25/25. Provider transport in these contracts is mocked, not live generation evidence.
 - Still open: full worker generation acceptance, stock grants/rollout, deployment and live stock-to-creative output inspection. Application-wide completion remains unproven.
+
+### Full stock worker regression (2026-11-11)
+
+- Added `--stock-creative` foundation target. The actual CreativeJobs worker runs the isolated skill harness, stock query/selection, asset normalization, image edit transport and durable result persistence using real disposable PostgreSQL and object storage.
+- Mock vendor/model responses are explicit; test confirms stock acquisition reaches ready, planner steps 4/5 and image calls succeed, then re-running the completed job performs no second search, download or generation.
+- Result: `node scripts/foundation-test.mjs --stock-creative` passed 1/1; migration replay passed. Initial fixture expected a singular multipart field, corrected to the SDK's image[] reference array.
+- Activation gap remains: configure stock grants alongside worker rollout. Credentials alone do not authorize per-business downloads. Live paid output acceptance and deployment remain outstanding.
