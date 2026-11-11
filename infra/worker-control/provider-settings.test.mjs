@@ -46,3 +46,11 @@ test('still image replacement requires an explicit switch and separate valid enc
  assert.equal(imageRuntimeSettings(input).HIGGSFIELD_IMAGES_ENABLED,'true');
  for(const change of [{HIGGSFIELD_IMAGES_ENABLED:'yes'},{HIGGSFIELD_CREDENTIALS:''},{HIGGSFIELD_IMAGE_ENCRYPTION_KEY:'short'},{VIDEO_ENCRYPTION_KEY:input.HIGGSFIELD_IMAGE_ENCRYPTION_KEY}])assert.throws(()=>imageRuntimeSettings({...input,...change}));
 });
+
+
+test('Vecteezy credentials reach only the worker settings and numeric account IDs are validated',()=>{
+ assert.deepEqual(providerSettings({VECTEEZY_API_KEY:'fixture',VECTEEZY_ACCOUNT_ID:'123',DATABASE_URL:'private'}),{VECTEEZY_API_KEY:'fixture',VECTEEZY_ACCOUNT_ID:'123'});
+ for(const value of ['0','-1','1.5',' 123','1e3','9007199254740992',123])assert.throws(()=>providerSettings({VECTEEZY_ACCOUNT_ID:value}),/INVALID_STOCK_SETTINGS/);
+ for(const value of [' secret','secret\nvalue',123])assert.throws(()=>providerSettings({VECTEEZY_API_KEY:value}),/INVALID_PROVIDER_SETTINGS/);
+ assert.equal(providerRuntimeSettings({VECTEEZY_API_KEY:'fixture',VECTEEZY_ACCOUNT_ID:'123'}).VIDEO_ENABLED,'false');
+});

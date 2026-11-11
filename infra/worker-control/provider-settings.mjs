@@ -2,7 +2,7 @@ import {validHiggsfieldCredential} from '../../dist/higgsfield-client.js';
 import {validRunwaySecret} from '../../dist/runway-client.js';
 import {VideoDownload} from '../../dist/video-download.js';
 // Railway settings are operator input, never authority to replace infrastructure credentials.
-const keys = ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'HIGGSFIELD_CREDENTIALS', 'RUNWAYML_API_SECRET', 'MAXUN_API_KEY'];
+const keys = ['OPENAI_API_KEY', 'GEMINI_API_KEY', 'HIGGSFIELD_CREDENTIALS', 'RUNWAYML_API_SECRET', 'MAXUN_API_KEY', 'VECTEEZY_API_KEY'];
 export function providerSettings(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('INVALID_PROVIDER_SETTINGS');
   const output = {};
@@ -13,6 +13,11 @@ export function providerSettings(input) {
       throw Error('INVALID_PROVIDER_SETTINGS');
     }
     output[key] = value;
+  }
+  const accountId=input.VECTEEZY_ACCOUNT_ID;
+  if(accountId!==undefined&&accountId!==''){
+    if(typeof accountId!=='string'||!/^[1-9][0-9]*$/.test(accountId)||!Number.isSafeInteger(Number(accountId)))throw Error('INVALID_STOCK_SETTINGS');
+    output.VECTEEZY_ACCOUNT_ID=accountId;
   }
   return output;
 }
