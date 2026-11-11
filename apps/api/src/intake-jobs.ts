@@ -562,6 +562,13 @@ export class IntakeJobs {
           (await db.query("SELECT analysis_job_id FROM app.intake_dependencies WHERE analysis_job_id=$1", [j.id])).rowCount) {
         return this.finish(db,j,"failed","WEBSITE_PREREQUISITE_TIMEOUT");
       }
+      // A provider call is durably reserved before submission. Preparation
+      // failures without that record are safe to retry, not ambiguous charges.
+      if (j.kind === "brand.analyze" && !(await db.query(
+        "SELECT job_id FROM app.analysis_calls WHERE job_id=$1", [j.id],
+      )).rowCount) {
+        return this.finish(db, j, "failed", "AI_PREPARATION_FAILED");
+      }
       return this.finish(
         db,
         j,

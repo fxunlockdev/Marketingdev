@@ -244,6 +244,32 @@ test("unknown provider outcomes and interrupted submissions never automatically 
     interrupted.id,
   ]);
 });
+test("exhausted preparation is retryable but a reserved submission stays uncertain", async () => {
+  const recoveryOrg = await workspaces.create(bob, { name: "Recovery isolation" });
+  const recoveryBrand = await workspaces.createBrand(bob, recoveryOrg.id,
+    { name: "Recovery fixture", website: "https://example.org/" }, randomUUID());
+  const recoverySubmit = (kind) => intake.submit(bob, recoveryBrand.id, { kind }, randomUUID());
+  const recoveryScope = (job) => ({ organizationId: recoveryOrg.id, brandId: recoveryBrand.id, jobId: job.id });
+  const capture = await recoverySubmit("website.extract");
+  await new IntakeJobs(jobs, parser, new BrandAnalyzer(), reader).run(recoveryScope(capture));
+  let calls = 0;
+  const handler = new IntakeJobs(jobs, parser, analyzer(async () => {
+    calls++;
+    throw new Error("Provider must not be called by finalization");
+  }), reader);
+  const preparation = await recoverySubmit("brand.analyze");
+  await admin.query("UPDATE app.jobs SET attempt=3 WHERE id=$1", [preparation.id]);
+  assert.equal(await handler.fail(recoveryScope(preparation)), "failed");
+  assert.equal((await row(preparation)).error_code, "AI_PREPARATION_FAILED");
+  assert.equal(await handler.fail(recoveryScope(preparation)), "failed");
+  const reserved = await recoverySubmit("brand.analyze");
+  await admin.query("INSERT INTO app.analysis_calls(job_id,organization_id,brand_id,review_revision,model,reserved_micros,input_sha256,status) VALUES($1,$2,$3,0,'MOCK-model',1,'test','submitted')", [reserved.id, recoveryOrg.id, recoveryBrand.id]);
+  assert.equal(await handler.fail(recoveryScope(reserved)), "unknown");
+  assert.equal((await row(reserved)).error_code, "AI_SUBMISSION_REQUIRES_REVIEW");
+  await assert.rejects(recoverySubmit("brand.analyze"), /uncertain outcome/);
+  assert.equal(calls, 0);
+  await admin.query("UPDATE app.jobs SET status='rejected' WHERE id=$1", [reserved.id]);
+});
 test("cancellation, evidence edits during AI calls and insufficient budget preserve existing work", async () => {
   const canceled = await submit("website.extract");
   await admin.query("UPDATE app.jobs SET cancel_requested=true WHERE id=$1", [
