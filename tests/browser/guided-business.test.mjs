@@ -14,14 +14,14 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
  let saved={revision:0,step:0,brief:{offering:'',audience:'',market:'',goal:'awareness',visual_direction:'',must_follow:''},research_job_id:null};
  await page.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;let data={};
-  if(path.endsWith('/get-session'))data={user:{id:'fixture',name:'Maya',emailVerified:true}};
+  if(path.endsWith('/get-session'))data={user:{id:'fixture',name:'Maya',email:'maya@example.com',emailVerified:true}};
   else if(path==='/api/v1/businesses')data={businesses:[business]};
   else if(path.endsWith('/assets'))data={assets:[]};
   else if(path.endsWith('/canvas/references'))data={references:[]};
   else if(path.endsWith('/generation-notifications'))data={notifications:[]};
   else if(path.endsWith('/overview'))data={counts:{awaiting_review:2,approved_posts:1,creative_projects:3,active_jobs:1,published_posts:0,scheduled_posts:0,uncertain_publications:0,publication_attention:0,failed_jobs_last_week:0},upcoming_posts:[{id,channel:'instagram',format:'carousel',hook:'Meet the people behind the courtyard',brief:'',state:'content_needed',planned_at:'2026-11-20T09:00:00Z',timezone:'Asia/Kuala_Lumpur',starts_on:'2026-11-20',plan_title:'Local stories',design:null,generation_status:null}],campaigns:[],activity:[],recommendations:[],generation_activity:[],performance:{published_count:0,available_count:0,posts:[]}};
   else if(path.endsWith('/guided-brief')){
-   if(request.method()==='PATCH'){if(failSave){await route.fulfill({status:503,json:{message:'Save unavailable'}});return;}const input=request.postDataJSON();assert.equal(input.revision,saved.revision);saved={...saved,...input,revision:saved.revision+1};}
+   if(request.method()==='PATCH'){if(failSave){await route.fulfill({status:503,json:{message:'Save unavailable'}});return;}const input=request.postDataJSON();assert.ok(!JSON.stringify(input).includes("maya@example.com"));assert.equal(input.revision,saved.revision);saved={...saved,...input,revision:saved.revision+1};}
    data=saved;
   }
   else if(path.endsWith('/guided-brief/research')){saved={...saved,research_job_id:id,status:'queued'};data={id,status:'queued'};}
@@ -30,8 +30,9 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
  try{
   const evidence=process.env.DESVIO_UI_EVIDENCE;
   if(evidence)await mkdir(evidence,{recursive:true});
-  await expect(page.getByRole('region',{name:'Starter post ideas'})).toContainText('A place to meet');
-  await expect(page.getByRole('region',{name:'Starter post ideas'})).toContainText('An everyday ritual');
+  await page.goto(`${origin}/`);
+  await expect(page).toHaveURL(`${origin}/b/${id}/guided-onboarding`);
+  await expect(page.getByText('maya@example.com',{exact:true})).toBeVisible();
   for(const width of [1440,768,390]){
    await page.setViewportSize({width,height:1000});await page.goto(`${origin}/b/${id}/overview`);
    await expect(page.getByRole('heading',{name:'Your attention'})).toBeVisible();
@@ -47,14 +48,15 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
   await page.getByLabel('What does your business do?').fill('A neighbourhood cafe serving seasonal food.');
   await page.getByRole('button',{name:'Continue',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Who are we creating for?'})).toBeVisible();
-  await page.reload();
+  await page.goto(`${origin}/`);
+  await expect(page).toHaveURL(`${origin}/b/${id}/guided-onboarding`);
   await expect(page.getByRole('heading',{name:'Who are we creating for?'})).toBeVisible();
   await page.getByLabel('Your priority audience', {exact:true}).fill('Local families');
   failSave=true;
   await page.getByRole('button',{name:'Save for later',exact:true}).click();
   await expect(page.locator('.notice.error[role="alert"]')).toContainText('We couldn’t save or load your work');
   await expect(page.getByLabel('Your priority audience', {exact:true})).toHaveValue('Local families');
-  assert.ok(page.url().endsWith('/monthly-planning'));
+  assert.ok(page.url().endsWith('/guided-onboarding'));
   failSave=false;
   await page.getByRole('button',{name:'Save for later',exact:true}).click();
   await expect(page).toHaveURL(`${origin}/b/${id}/overview`);
@@ -85,6 +87,15 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
   await expect(page.getByRole('heading',{name:'Learning about your business'})).toBeVisible();
   await expect(page.getByRole('button',{name:'Back',exact:true})).toBeDisabled();
   await page.reload();await expect(page.getByRole('heading',{name:'Learning about your business'})).toBeVisible();
+  await page.goto(`${origin}/`);
+  await expect(page).toHaveURL(`${origin}/b/${id}/overview`);
+  saved={...saved,revision:0,research_job_id:null,status:undefined};
+  business.has_approved_brand=true;
+  await page.goto(`${origin}/`);
+  await expect(page).toHaveURL(`${origin}/b/${id}/overview`);
+  business.has_approved_brand=false;business.role='viewer';
+  await page.goto(`${origin}/`);
+  await expect(page).toHaveURL(`${origin}/b/${id}/overview`);
   assert.deepEqual(errors,[]);
  }finally{await browser.close();}
 });

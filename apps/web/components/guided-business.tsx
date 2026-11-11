@@ -14,7 +14,7 @@ type Brief=GuidedBrief;
 type Direction={summary:string;rationale:string;palette:{role:string;hex:string}[];heading_font:string;body_font:string;voice:string;imagery:string;pillars:string[];essential_questions:string[]};
 type Saved={can_use_saved_answers?:boolean;answers_locked?:boolean;revision:number;step:number;brief:Brief;research_job_id:string|null;status?:string;analysis_status?:string;result?:{business_direction?:Direction};analysis_result?:{business_direction?:Direction}};
 const questions=onboardingSteps;
-export function GuidedBusinessBrief({business,planning=false}:{planning?:boolean;business:{id:string;organization_id:string;name:string;website:string|null;role?:string}}){
+export function GuidedBusinessBrief({business,planning=false,accountEmail}:{accountEmail?:string;planning?:boolean;business:{id:string;organization_id:string;name:string;website:string|null;role?:string}}){
  const router=useRouter();
  const root=`/api/v1/businesses/${business.id}/guided-brief`;
  const [saved,setSaved]=useState<Saved>(),[brief,setBrief]=useState<Brief>(),[step,setStep]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[retry,setRetry]=useState(0);
@@ -34,7 +34,7 @@ export function GuidedBusinessBrief({business,planning=false}:{planning?:boolean
  return <div className={styles.wrapper}><header><p className="eyebrow">{business.name}</p><h1>{direction?'Your creative direction':'Let’s get to know your business'}</h1><p>{direction?'From your business story to content that feels like you.':'Five short steps. We’ll use your answers to research your business and recommend a creative direction.'}</p></header><Notice error={error}/>
   <details open={!direction} className={styles.questions}><summary>Your business answers</summary><section className={styles.card} aria-labelledby="brief-question"><p className={styles.step}>Step {step+1} of 5 · {questions[step]}</p>
    <fieldset disabled={busy||pending||unknown||saved.answers_locked}><legend className="sr-only">{questions[step]}</legend>
-    <OnboardingQuestions brief={brief} step={step} onChange={setBrief} onStep={next=>void save(next)} business={business} disabled={busy||pending||unknown||!!saved.answers_locked}/>
+    <OnboardingQuestions accountEmail={accountEmail} brief={brief} step={step} onChange={setBrief} onStep={next=>void save(next)} business={business} disabled={busy||pending||unknown||!!saved.answers_locked}/>
    </fieldset>
    {step===3&&!saved.answers_locked&&<OnboardingFiles business={business}/>}
    {saved.answers_locked&&<p className="hint">These answers are saved with your mood board. Use mood board feedback to refine your creative direction.</p>}<div className={styles.actions}><button disabled={busy||pending||unknown||step===0} onClick={()=>void save(step-1)}>Back</button><button disabled={busy||pending||unknown||saved.answers_locked} onClick={()=>void save(undefined,true)}>Save for later</button>{step<4?<button className="primary" disabled={busy||pending||unknown||(step===0&&!brief.offering.trim())||(step===1&&!brief.audience.trim())} onClick={()=>void save(step+1)}>Continue</button>:<button className="primary" disabled={busy||pending||unknown||!brief.offering.trim()||!brief.audience.trim()||saved.answers_locked||(!dirty&&!!direction)} onClick={()=>void research()}>{busy?'Saving…':pending?'Researching…':'Send my brief'}</button>}</div>

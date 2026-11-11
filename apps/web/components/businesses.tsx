@@ -121,7 +121,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
     [signoutError, setSignoutError] = useState<unknown>(),
     [menu, setMenu] = useState(false);
   useEffect(() => {
-    if(Date.now()-loadedAt.current<30000&&(!requestedBusinessId||businesses?.some(b=>b.id===requestedBusinessId)))return;
+    if(pathname!=="/"&&Date.now()-loadedAt.current<30000&&(!requestedBusinessId||businesses?.some(b=>b.id===requestedBusinessId)))return;
     let active = true;
     (async () => {
       try {
@@ -136,11 +136,25 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           api("/api/v1/businesses"),
           api("/api/v1/accounts/current/entitlements"),
         ]);
+        let entryPath: string | undefined;
+        if (pathname === "/") {
+          if (list.businesses.length === 0 && plan.can_create_business) entryPath = "/brands/new";
+          if (list.businesses.length === 1) {
+            const first: Business = list.businesses[0];
+            entryPath = `/b/${first.id}/overview`;
+            if (["owner", "admin"].includes(first.role)) {
+              const setup = await api(`${scopePath(first)}/guided-brief`);
+              const unfinished = !setup.research_job_id && !setup.answers_locked &&
+                (setup.revision > 0 || !first.has_approved_brand);
+              if (unfinished) entryPath = `/b/${first.id}/guided-onboarding`;
+            }
+          }
+        }
         if (active) {
           setError(undefined);
           setSession(user);
           setBusinesses(list.businesses);
-          if(pathname==="/"&&list.businesses.length===1)router.replace(`/b/${list.businesses[0].id}/overview`);
+          if(entryPath)router.replace(entryPath);
           setVerifiedBusinessId(requestedBusinessId);
           setEntitlement(plan);
           loadedAt.current=Date.now();
@@ -318,9 +332,9 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           ) : section === "content-preferences" ? (
             <ContentPreferences key={business.id} business={business}/>
           ) : section === "monthly-planning" ? (
-            <GuidedBusinessBrief key={`${business.id}:planning`} business={business} planning/>
+            <GuidedBusinessBrief key={`${business.id}:planning`} business={business} accountEmail={session.user.email} planning/>
           ) : section === "guided-onboarding" ? (
-            <GuidedBusinessBrief key={business.id} business={business}/>
+            <GuidedBusinessBrief key={business.id} business={business} accountEmail={session.user.email}/>
           ) : section === "onboarding" ? (
             <BrandOnboarding business={business} />
           ) : ["content-plan","review"].includes(section) ? (
@@ -332,7 +346,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           ) : section === "strategies" ? (
             <Strategies key={business.id} business={business}/>
           ) : section === "campaign-new" ? (
-            <GuidedBusinessBrief key={`${business.id}:planning`} business={business} planning/>
+            <GuidedBusinessBrief key={`${business.id}:planning`} business={business} accountEmail={session.user.email} planning/>
           ) : section === "campaigns" ? (
             <ContentWorkspace key={business.id} business={business}/>
           ) : section === "archive" ? (
