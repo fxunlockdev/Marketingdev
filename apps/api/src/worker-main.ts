@@ -1,3 +1,5 @@
+import {StockAssets} from './stock-assets.js';
+import {VecteezyClient} from './vecteezy-client.js';
 import {HiggsfieldReplacementJobs} from './higgsfield-replacement-jobs.js';
 import {HiggsfieldImageClient} from './higgsfield-image-client.js';
 import {ImageReplacementVault} from './image-replacement-vault.js';
@@ -47,7 +49,7 @@ const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)));
 const imageReplacements=config.higgsfieldImages?new HiggsfieldReplacementJobs(jobs,new HiggsfieldImageClient(config.higgsfieldImages),new ImageReplacementVault(config.higgsfieldImages.encryptionKey)):undefined;
-const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
+const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY),process.env.VECTEEZY_API_KEY?new StockAssets(jobs,new VecteezyClient(process.env.VECTEEZY_API_KEY,Number(process.env.VECTEEZY_ACCOUNT_ID))):undefined);
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled,config.videoRenderImage);

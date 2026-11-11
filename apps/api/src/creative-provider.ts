@@ -179,7 +179,8 @@ export class CreativeProvider {
       quality,
       safetyIdentifier,
     );
-    if(references.length>3)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
+    // Three customer references plus one internally selected stock reference.
+    if(references.length>4)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
     const images=[...(parent?[parent]:[]),...references];
     for(const bytes of images){
       if(!Buffer.isBuffer(bytes)||bytes.length>20*1024*1024)throw new CreativeError('CREATIVE_REFERENCE_INVALID');

@@ -1,3 +1,5 @@
+import {StockAssets} from './stock-assets.js';
+import {StockError} from './vecteezy-client.js';
 import {IMAGE_PLANNING_MODEL,imagePlanningRates} from './creative-planning.js';
 import {artworkDirection} from './post-artwork.js';
 import {frameCreative} from "./creative-framing.js";
@@ -38,6 +40,7 @@ export class CreativeJobs {
     readonly runtime: SkillRuntime,
     readonly provider: CreativeProvider,
     readonly gemini:GeminiPlanner=new GeminiPlanner(),
+    readonly stock?:StockAssets,
   ) {}
   planner(provider:string){if(provider!=="openai"&&provider!=="gemini")throw new CreativeError("CREATIVE_CONFIG_CHANGED");return provider==="gemini"?this.gemini:this.provider;}
   async plannerGrant(db:any,j:any,provider:string){
@@ -48,8 +51,9 @@ export class CreativeJobs {
     const provider=this.planner(request.text_provider),model=request.selected_text_model;
     if(!model)throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
     if(!provider.configured)throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
-    const wire=provider.plannerRequest(message,model,maxOutputTokens);
-    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=model===IMAGE_PLANNING_MODEL?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(message,model,maxOutputTokens),request.text_provider);
+    const providerMessage=message.step===4||message.step===5?{...message,step:1}:message;
+    const wire=provider.plannerRequest(providerMessage,model,maxOutputTokens);
+    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=model===IMAGE_PLANNING_MODEL?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(providerMessage,model,maxOutputTokens),request.text_provider);
   }
   finish(db: any, j: any, status: string, code: string | null = null) {
     return db
@@ -132,7 +136,7 @@ export class CreativeJobs {
           let remainingImage=0;
           if(j.kind==='creative.generate'&&step!=='image'&&!(await db.query("SELECT 1 FROM app.creative_calls WHERE job_id=$1 AND step='image'",[j.id])).rowCount){
             const count=Number((await db.query('SELECT count(*)::int AS n FROM app.creative_references WHERE job_id=$1',[j.id])).rows[0].n);
-            remainingImage=Number(grant.max_image_request_micros)*(1+count);
+            remainingImage=Number(grant.max_image_request_micros)*(1+count+(this.stock?1:0));
           }
           if(!Number.isSafeInteger(spent)||!Number.isSafeInteger(remainingImage)||remainingImage<0||spent+reserved+remainingImage>Number(limit))throw new CreativeError('CREATIVE_REQUEST_BUDGET_EXHAUSTED');
         }
@@ -149,6 +153,7 @@ export class CreativeJobs {
     try {
       result = await action();
     } catch (error) {
+      if(error instanceof StockError)error=new CreativeError(error.code);
       if(monthlyBudgetExceeded(error))error=new CreativeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
       const known =
         error instanceof CreativeError ||
@@ -323,6 +328,14 @@ export class CreativeJobs {
         });
       }
       if(!carousel)plan = validateSkillResult(plan, input);
+      if(this.stock){
+        const dimensions=String(request.size).split('x').map(Number);
+        const orientation=dimensions[0]===dimensions[1]?'square':dimensions[0]>dimensions[1]?'horizontal':'vertical';
+        const photo=await this.stock.reference(scope,input,plan.brief.image_prompt,orientation,message=>this.planCall(scope,message,request));
+        const stockPng=await sharp(photo,{limitInputPixels:24_000_000}).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
+        referenceImages.push(stockPng);
+        referenceManifest.push({kind:'stock_inspiration',label:'Visual inspiration only. Not the actual business product, property or customer. Preserve approved product references over this inspiration.',input_sha256:digest(stockPng)});
+      }
       let reference: Buffer | undefined;
       if (parent) {
         reference = await this.jobs.store.read(parent.object_key);
@@ -362,6 +375,7 @@ export class CreativeJobs {
           return Number(g.max_image_request_micros)*(1+referenceImages.length);
         },
         async () => {
+          if(this.stock)await this.stock.authorize(scope);
           let output = await this.provider.image(
             grant.image_model,
             prompt,
@@ -577,11 +591,13 @@ export class CreativeJobs {
         return this.finish(db, j, "succeeded");
       });
     } catch (error) {
+      if(error instanceof StockError)error=new CreativeError(error.code);
       if(monthlyBudgetExceeded(error))error=new CreativeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
       if (!(error instanceof CreativeError)) throw error;
       return this.jobs.transaction(scope, async (db, j) => {
         if (terminal.has(j.status)) return j.status;
         const status = [
+          "STOCK_DOWNLOAD_UNKNOWN",
           "CREATIVE_SUBMISSION_UNKNOWN",
           "CREATIVE_REPLAY_MISMATCH",
         ].includes(error.code)

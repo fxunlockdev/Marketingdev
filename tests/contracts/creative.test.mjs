@@ -161,7 +161,7 @@ test('multiple image references preserve ordered multipart bytes and reject inva
  }}));
  await provider.image('gpt-image-fixture','Edit with brand references','1024x1024','low','a'.repeat(64),png,[png,png,png]);
  assert.equal(calls,1);
- await assert.rejects(provider.image('gpt-image-fixture','Invalid','1024x1024','low','a'.repeat(64),undefined,[png,png,png,png]),/REFERENCE_INVALID/);
+ await assert.rejects(provider.image('gpt-image-fixture','Invalid','1024x1024','low','a'.repeat(64),undefined,[png,png,png,png,png]),/REFERENCE_INVALID/);
  await assert.rejects(provider.image('gpt-image-fixture','Invalid','1024x1024','low','a'.repeat(64),undefined,[Buffer.from('invalid')]));
  assert.equal(calls,1);
 });

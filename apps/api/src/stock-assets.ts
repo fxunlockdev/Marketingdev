@@ -1,3 +1,5 @@
+import {stockQueryRequest,stockSelectionRequest,stockQuery,stockSelection} from './stock-planning.js';
+import type {CreativeInput,PlannerRequest,PlannerResponse} from './creative-contracts.js';
 import {AssetJobs,type JobScope} from './jobs.js';
 import {VecteezyClient,StockError} from './vecteezy-client.js';
 import {SafeWeb} from './safe-web.js';
@@ -10,6 +12,31 @@ import {digest} from './object-store.js';
  */
 export class StockAssets {
  constructor(readonly jobs:AssetJobs,readonly vendor:VecteezyClient,readonly web=new SafeWeb()){}
+ async reference(scope:JobScope,input:CreativeInput,imagePrompt:string,orientation:'horizontal'|'vertical'|'square',plan:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<Buffer>{
+  await this.authorize(scope);
+  const query=stockQuery(await plan(stockQueryRequest(input,imagePrompt,orientation)));
+  let candidates=await this.jobs.transaction(scope,async db=>(await db.query('SELECT candidates FROM app.stock_selections WHERE job_id=$1',[scope.jobId])).rows[0]?.candidates);
+  if(!candidates){
+   const results=await this.vendor.search(query,orientation);
+   if(!results.length)throw new StockError('STOCK_NO_RESULTS');
+   // Ephemeral vendor URLs stay out of persistent records and model prompts.
+   const snapshot=results.map(({id,title,aiGenerated})=>({id,title,aiGenerated,previewURL:null}));
+   candidates=await this.jobs.transaction(scope,async(db,j)=>{
+    if(!await this.jobs.permitted(db,j))throw new StockError('STOCK_ACCESS_REVOKED');
+    await db.query('INSERT INTO app.stock_selections(job_id,organization_id,brand_id,query,candidates) VALUES($1,$2,$3,$4,$5) ON CONFLICT(job_id) DO NOTHING',[scope.jobId,scope.organizationId,scope.brandId,query,JSON.stringify(snapshot)]);
+    return (await db.query('SELECT candidates FROM app.stock_selections WHERE job_id=$1',[scope.jobId])).rows[0].candidates;
+   });
+  }
+  const id=stockSelection(await plan(stockSelectionRequest(imagePrompt,candidates)),candidates);
+  return this.acquire(scope,id);
+ }
+ async authorize(scope:JobScope){
+  if(!this.vendor.configured)throw new StockError('STOCK_NOT_CONFIGURED');
+  await this.jobs.transaction(scope,async(db,j)=>{
+   if(!await this.jobs.permitted(db,j))throw new StockError('STOCK_ACCESS_REVOKED');
+   if(!(await db.query('SELECT * FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2 AND enabled AND ai_use_authorized AND expires_at>now()',[scope.organizationId,scope.brandId])).rows.length)throw new StockError('STOCK_GRANT_REQUIRED');
+  });
+ }
  async acquire(scope:JobScope,resourceId:number):Promise<Buffer>{
   if(!Number.isSafeInteger(resourceId)||resourceId<=0)throw new StockError('STOCK_RESOURCE_INVALID');
   if(!this.vendor.configured)throw new StockError('STOCK_NOT_CONFIGURED');

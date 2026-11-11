@@ -34,3 +34,20 @@ test('stock daily cap serializes racing jobs and acquisition records stay privat
  await assert.rejects(app.query('SELECT * FROM app.stock_acquisitions'),{code:'42501'});
  await assert.rejects(jobs.transaction(foreign,async db=>db.query("INSERT INTO app.stock_acquisitions(job_id,organization_id,brand_id,resource_id,status) VALUES($1,$2,$3,9,'acquiring')",[two.jobId,a.org,a.brand])),{code:'42501'});
 });
+
+test('stock selection survives resume without repeating search or purchase',async()=>{
+ const a=await fixture(),b=await fixture(),scope=await a.job(),foreign=await b.job();
+ const objects=new Map();let searches=0,downloads=0;
+ const jobs=new AssetJobs(worker,{persist:async(k,v)=>objects.set(k,v),read:async k=>objects.get(k)},{scan:async()=>{}});
+ const service=new StockAssets(jobs,{configured:true,search:async()=>{searches++;return [{id:99,title:'Courtyard',previewURL:'https://example.com/temporary',aiGenerated:false}];},download:async()=>{downloads++;return {url:'https://example.com/photo.jpg',requiresAttribution:false,attributionURL:null};}},{fetch:async()=>({status:200,bytes})});
+ const input={brand:{facts:[]}};
+ const planner=async request=>({content:JSON.stringify(request.step===4?{query:'modern courtyard'}:{resource_id:99}),tool_calls:[]});
+ assert.deepEqual(await service.reference(scope,input,'Quiet courtyard','square',planner),await service.reference(scope,input,'Quiet courtyard','square',planner));
+ assert.equal(searches,1);assert.equal(downloads,1);
+ await jobs.transaction(scope,async db=>{const row=(await db.query('SELECT candidates FROM app.stock_selections')).rows[0];assert.equal(row.candidates[0].previewURL,null);});
+ await jobs.transaction(foreign,async db=>assert.equal((await db.query('SELECT * FROM app.stock_selections')).rowCount,0));
+ await assert.rejects(app.query('SELECT * FROM app.stock_selections'),{code:'42501'});
+ await admin.query('UPDATE app.stock_grants SET enabled=false WHERE organization_id=$1',[a.org]);
+ await assert.rejects(service.reference(scope,input,'Quiet courtyard','square',planner),{code:'STOCK_GRANT_REQUIRED'});
+ assert.equal(downloads,1);
+});
