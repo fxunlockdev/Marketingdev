@@ -751,7 +751,16 @@ test("V5 standard account starts empty, initializes once and concurrent second-b
     seen.map((b) => b.id),
     [target.id],
   );
-  const hidden = brand; // Another workspace stays inaccessible to this selected-business seat.
+  const outsider = await signup("brain-private-owner");
+  const privateAccount = await request("/api/v1/accounts/current/initialize", {
+    method: "POST", cookie: outsider.cookie,
+  });
+  assert.equal(privateAccount.status, 201);
+  const privateBrand = await request("/api/v1/businesses", {
+    method: "POST", cookie: outsider.cookie, key: randomUUID(), body: { name: "Unshared business" },
+  });
+  assert.equal(privateBrand.status, 201);
+  const hidden = privateBrand.body;
   assert.equal(
     (await request(`/api/v1/businesses/${hidden.id}`, { cookie: bob.cookie }))
       .status,

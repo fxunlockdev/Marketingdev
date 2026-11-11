@@ -1,0 +1,22 @@
+{
+  "checked_at": "2026-11-11T12:03:58.760892+00:00",
+  "commit": "211c836212628819b567eba4f49c940274bfaff3",
+  "branch": "dev",
+  "deployment_id": "cfd580b4-b96f-4a83-824c-c54949e9a39e",
+  "deployment_status": "SUCCESS",
+  "migration": {
+    "checked_at": "2026-11-11T11:58:45.237Z",
+    "passed": true,
+    "migration": {
+      "name": "101_single_business_accounts.sql",
+      "sha256": "e4b4027b6ea79cda0a8547b25e82fd3f1ea610dba5e16561981fe3bc11bc9d86"
+    },
+    "checksum_replay": true
+  },
+  "live_read_checks": {
+    "pages": 6,
+    "errors": [],
+    "failed_requests": []
+  },
+  "scope": "One-business customer-account limit and navigation. Read-only live checks; not proof of full onboarding generation or social-profile enforcement."
+}
