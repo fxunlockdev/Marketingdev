@@ -1,0 +1,118 @@
+{
+  "prefill": {
+    "revision": 1,
+    "hasOffering": true,
+    "hasAudience": false
+  },
+  "checked_at": "2026-11-11T01:59:51.652Z",
+  "scope": "Authenticated deployed page reads only. No generation, approval, scheduling or publication.",
+  "pages": [
+    {
+      "section": "guided-onboarding",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/guided-onboarding",
+      "headings": [
+        "Your creative direction",
+        "Your brand, brought together.",
+        "Courtyard Studio QA",
+        "Warm, inviting, neighbourly, elegant",
+        "0 of 1 posts ready"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "monthly-planning",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/monthly-planning",
+      "headings": [
+        "Plan my content",
+        "Let\u2019s plan your content"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "overview",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/overview",
+      "headings": [
+        "Hello, Vilol",
+        "Your attention",
+        "Some creations need attention",
+        "Coming up",
+        "This week\u2019s treat: Seasonal flavours meet local warmth.",
+        "Meet up, share a coffee, and make your day brighter\u2014together.",
+        "Warmth in every morning\u2014real neighbours, fresh coffee, and simple joys shared in the heart of the community.",
+        "Performance",
+        "Research & ideas",
+        "Your content plans",
+        "Weekly campaign",
+        "Weekly content"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "content-plan",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/content-plan",
+      "headings": [
+        "Calendar",
+        "Some posts need attention",
+        "Nov 11 \u2013 Nov 17, 2026",
+        "Wed, Nov 11",
+        "Thu, Nov 12",
+        "Fri, Nov 13",
+        "Sat, Nov 14",
+        "Sun, Nov 15",
+        "Mon, Nov 16",
+        "Tue, Nov 17"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "review",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/review",
+      "headings": [
+        "Approvals",
+        "Nov 11 \u2013 Dec 10, 2026"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "create",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/create",
+      "headings": [
+        "Make content",
+        "Get things done",
+        "Your idea lands here."
+      ],
+      "alerts": [
+        ""
+      ]
+    }
+  ],
+  "errors": [],
+  "failedRequests": [],
+  "source_commit": "a09f3df9a227d29db0f1c01030f868d2881d5a28",
+  "deployments": {
+    "api": {
+      "id": "19274106-f84c-4027-ad24-f1992472eee9",
+      "observed_status": "SUCCESS"
+    },
+    "web": {
+      "id": "f9c84bb1-4b9a-4a8d-be24-b8b4f7bf3a3b",
+      "observed_status": "SUCCESS"
+    }
+  },
+  "limitations": [
+    "Authenticated navigation and existing data reads only; no new generation or publication.",
+    "Plan more content reveals planning controls without redoing onboarding; submission not performed.",
+    "Existing tsq brief remains saved at revision 1 with offering present and audience absent.",
+    "Full reference fidelity and complete mutation journey remain open."
+  ]
+}

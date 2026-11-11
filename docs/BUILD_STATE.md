@@ -1926,3 +1926,7 @@ Web typecheck and diff checks passed. Guided browser suite passed 8/8 using MOCK
 ### 2026-11-11: branch checkpoint validation
 
 Prepared the accumulated guided onboarding, mood-board, monthly calendar approval, allowance and recovery work for the feature and dev branches. API build and web typecheck passed. Full contract suite passed 375 tests with one skipped and no failures. Earlier scoped guided service and browser results are recorded above. Staged credential-pattern scan found no matching secrets. Generated next-env.d.ts route-path churn is excluded. This is a source checkpoint, not a claim of complete live product verification or a confirmed deployment of the latest recurring-planning changes.
+
+### 2026-11-11: recurring planning deployed and checked
+
+API 19274106-f84c-4027-ad24-f1992472eee9 and web f9c84bb1-4b9a-4a8d-be24-b8b4f7bf3a3b observed SUCCESS for source a09f3df. Authenticated hosted checks passed six pages with no page exceptions or failing API reads. Approved test business opens monthly-planning directly; Plan more content opens period/platform/count controls without repeating the questionnaire. Four saved mood-board images decoded. Existing tsq brief is revision 1 with offering present and audience absent; intentional saved answers were not overwritten. Evidence docs/evidence/monthly-planning-deployed.json. No paid generation, approval mutation, scheduling or publication. Full ZIP fidelity and end-to-end mutation/launch audit remain incomplete.
