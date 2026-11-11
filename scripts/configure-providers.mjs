@@ -15,6 +15,7 @@ const number=(v,max,integer=true)=>{if(typeof v!=='number'||!Number.isFinite(v)|
 const model=v=>{if(typeof v!=='string'||! /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,99}$/.test(v))deny('CONFIGURATION_INVALID_MODEL');return v;};
 const textRates=['budget_micros','input_micros_per_token','output_micros_per_token'];
 const definitions={
+ stock:{table:'stock_grants',fields:['ai_use_authorized','max_daily_downloads']},
  onboarding:{table:'analysis_grants',fields:['model',...textRates,'max_tokens_per_image']},
  creative:{table:'creative_grants',fields:['text_model','image_model','quality',...textRates,'max_image_request_micros']},
  gemini_creative:{table:'gemini_creative_grants',fields:['text_model',...textRates]},
@@ -42,7 +43,8 @@ export function configurationManifest(input,now=Date.now()){
   if(new Date(g.expires_at).toISOString()!==g.expires_at.replace(/(?<!\.\d{3})Z$/,'.000Z'))deny('CONFIGURATION_EXPIRY_REQUIRED');
   g.expires_at=new Date(g.expires_at).toISOString();
   for(const field of d.fields){
-   if(field==='max_tokens_per_image'){if(g[field]!==undefined&&(!Number.isInteger(g[field])||g[field]<0||g[field]>1000000))deny('CONFIGURATION_INVALID_IMAGE_TOKEN_CAP');}
+   if(field==='ai_use_authorized'){if(typeof g[field]!=='boolean'||g.enabled&&!g[field])deny('CONFIGURATION_STOCK_AI_AUTHORIZATION_REQUIRED');}
+   else if(field==='max_tokens_per_image'){if(g[field]!==undefined&&(!Number.isInteger(g[field])||g[field]<0||g[field]>1000000))deny('CONFIGURATION_INVALID_IMAGE_TOKEN_CAP');}
    else if(field==='provider'){if(!['openai','gemini'].includes(g[field]))deny('CONFIGURATION_INVALID_PROVIDER');}
    else if(['model','text_model','image_model'].includes(field))model(g[field]);
    else if(field==='quality'){if(!['low','medium','high'].includes(g[field]))deny('CONFIGURATION_INVALID_QUALITY');}
@@ -50,7 +52,7 @@ export function configurationManifest(input,now=Date.now()){
    else if(field==='channel_id')g.channel_id=uuid(g.channel_id);
    else if(field==='remote_account_id'){if(typeof g[field]!=='string'||! /^[a-zA-Z0-9_-]{1,256}$/.test(g[field]))deny('CONFIGURATION_EXACT_ACCOUNT_REQUIRED');}
    else if(field==='budget_micros'&&g[field]===null){} // Explicit uncapped lifetime allowance; never implied by omission.
-   else number(g[field],field==='daily_limit'?100:field==='budget_micros'?1e9:field.endsWith('_per_token')?1000:1e8,!field.endsWith('_per_token'));
+   else number(g[field],['daily_limit','max_daily_downloads'].includes(field)?100:field==='budget_micros'?1e9:field.endsWith('_per_token')?1000:1e8,!field.endsWith('_per_token'));
   }
   if((g.kind==='gemini_creative'||g.provider==='gemini')&&!/^gemini-[a-zA-Z0-9._-]{1,90}$/.test(g.text_model??g.model))deny('CONFIGURATION_INVALID_GEMINI_MODEL');
   for(const k of ['max_image_request_micros','max_create_micros','max_edit_micros'])if(g.budget_micros!==null&&g[k]>g.budget_micros)deny('CONFIGURATION_CALL_CAP_EXCEEDS_BUDGET');
@@ -113,10 +115,10 @@ export async function configureProviders(pool,input,{expectedDatabase,approval,m
    for(const field of d.fields)if(field!=='remote_account_id'&&g[field]!==undefined)data[field]=g[field];
    data.expires_at=g.kind==='publishing'&&!g.enabled?new Date(0).toISOString():g.expires_at;
    if(g.kind!=='publishing')data.enabled=g.enabled;
-   data[['publishing','video'].includes(g.kind)?'operator_reference':'approved_by']=manifest.operator_reference;
+   if(g.kind!=='stock')data[['publishing','video'].includes(g.kind)?'operator_reference':'approved_by']=manifest.operator_reference;
    const keys=['organization_id','brand_id',...(d.key?[d.key]:[])],columns=Object.keys(data);
    const updates=columns.filter(k=>!keys.includes(k)).map(k=>`${k}=EXCLUDED.${k}`);
-   if(!['publishing','video','insights'].includes(g.kind))updates.push('approved_at=now()');
+   if(!['publishing','video','insights','stock'].includes(g.kind))updates.push('approved_at=now()');
    await db.query(`INSERT INTO app.${d.table}(${columns.join(',')}) VALUES(${columns.map((_,i)=>'$'+(i+1)).join(',')}) ON CONFLICT(${keys.join(',')}) DO UPDATE SET ${updates.join(',')}`,Object.values(data));
   }
   await db.query('INSERT INTO app.operator_configuration_changes(change_id,organization_id,brand_id,manifest_sha256,preview_sha256,operator_reference,configuration) VALUES($1,$2,$3,$4,$5,$6,$7)',[manifest.change_id,manifest.organization_id,manifest.business_id,manifestHash,previewHash,manifest.operator_reference,JSON.stringify({manifest,before:snapshots})]);

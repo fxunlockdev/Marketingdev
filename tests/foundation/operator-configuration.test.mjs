@@ -238,3 +238,21 @@ test('generation plan assignment is previewed, audited, idempotent and cannot re
  const disable={...m,change_id:randomUUID(),enabled:false};const dp=await configureProviders(admin,disable,options);assert.equal(dp.provider_budget_micros,0);await configureProviders(admin,disable,{...options,approval:dp.preview_sha256});assert.equal((await admin.query('SELECT enabled FROM app.generation_plans WHERE organization_id=$1',[org])).rows[0].enabled,false);
  await assert.rejects(configureProviders(admin,{...m,change_id:randomUUID(),organization_id:randomUUID()},options),{code:'CONFIGURATION_WORKSPACE_MISMATCH'});
 });
+
+test('stock grants require explicit AI permission and inherit bounded authorization for new businesses',async()=>{
+ const stock={kind:'stock',enabled:true,ai_use_authorized:true,max_daily_downloads:10,expires_at:new Date(Date.now()+86400000).toISOString()};
+ const m={...manifest(),grants:[stock]};
+ for(const patch of [{ai_use_authorized:false},{ai_use_authorized:'true'},{max_daily_downloads:0},{max_daily_downloads:101},{max_daily_downloads:1.5}])assert.throws(()=>configurationManifest({...m,grants:[{...stock,...patch}]}));
+ const preview=await configureProviders(admin,m,options);
+ assert.equal((await admin.query('SELECT * FROM app.stock_grants WHERE brand_id=$1',[brand])).rowCount,0);
+ await configureProviders(admin,m,{...options,approval:preview.preview_sha256});
+ const saved=(await admin.query('SELECT * FROM app.stock_grants WHERE brand_id=$1',[brand])).rows[0];
+ assert.equal(saved.enabled,true);assert.equal(saved.ai_use_authorized,true);assert.equal(saved.max_daily_downloads,10);
+ assert.equal((await configureProviders(admin,m,{...options,approval:preview.preview_sha256})).status,'already_applied');
+ const workspace=randomUUID();await admin.query('INSERT INTO app.organizations(id,name,created_by) VALUES($1,$2,$3)',[workspace,'Stock defaults',user]);
+ const defaults={...m,change_id:randomUUID(),organization_id:workspace,scope:'workspace_defaults'};delete defaults.business_id;
+ const dp=await configureProviders(admin,defaults,options);await configureProviders(admin,defaults,{...options,approval:dp.preview_sha256});
+ const newBrand=randomUUID();await admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[newBrand,workspace,'Stock business']);
+ const inherited=(await admin.query('SELECT * FROM app.stock_grants WHERE brand_id=$1',[newBrand])).rows[0];
+ assert.equal(inherited.max_daily_downloads,10);assert.equal(inherited.ai_use_authorized,true);assert.equal(inherited.expires_at.toISOString(),stock.expires_at);
+});

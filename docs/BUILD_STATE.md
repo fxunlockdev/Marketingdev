@@ -2006,3 +2006,9 @@ Build and 24 selected contracts passed. Two disposable PostgreSQL stock tests pa
 - Mock vendor/model responses are explicit; test confirms stock acquisition reaches ready, planner steps 4/5 and image calls succeed, then re-running the completed job performs no second search, download or generation.
 - Result: `node scripts/foundation-test.mjs --stock-creative` passed 1/1; migration replay passed. Initial fixture expected a singular multipart field, corrected to the SDK's image[] reference array.
 - Activation gap remains: configure stock grants alongside worker rollout. Credentials alone do not authorize per-business downloads. Live paid output acceptance and deployment remain outstanding.
+
+### Stock authorization and current-code README (2026-11-11)
+
+- Added operator support for scoped stock grants and migration 104 extending future-business provider defaults. Verified there is no intervening replacement of the inheritance function after migration 057.
+- Operator foundation suite passed 15/15, including explicit AI permission, cap validation, preview/apply idempotency and future-business stock grant inheritance. External providers were not called.
+- Replaced stale M0-only README with current journey, source map, harness/provider behavior, visual principles, verification commands and explicit deployment/live acceptance limitations. No UI or live deployment change claimed.
