@@ -2,7 +2,7 @@
    editorial headings. Presentation only; application states remain authoritative. */
 @font-face{font-family:'Desvio Sans';src:url('/fonts/dm-sans.ttf') format('truetype');font-weight:100 900;font-display:swap}
 @font-face{font-family:'Desvio Serif';src:url('/fonts/dm-serif-display.ttf') format('truetype');font-weight:400;font-display:swap}
-.desvio-redesign{--paper:var(--brand-paper);--white:#fff;--ink:var(--brand-ink);--muted:var(--brand-muted);--line:var(--brand-border);--blue:var(--brand-link);--blue-wash:var(--brand-wash);--studio-orange:var(--brand-link);--radius:24px;background:var(--paper);color:var(--ink);font-family:'Desvio Sans',system-ui,sans-serif}
+.desvio-redesign{background:var(--paper);color:var(--ink);font-family:'Desvio Sans',system-ui,sans-serif}
 .desvio-redesign :is(button,input,textarea,select){font-family:inherit}
 .desvio-redesign :is(h1,h2,h3,p){overflow-wrap:break-word}
 .desvio-redesign h1{font-family:var(--font-family-heading);font-weight:400;font-size:clamp(32px,3.3vw,48px);letter-spacing:-.8px;line-height:1.08;text-wrap:balance}

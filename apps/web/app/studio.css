@@ -1,6 +1,5 @@
 /* Desvio workspace: neutral surfaces, compact navigation and visual content.
    Guidance: jakubkrehel/skills @ 4c66b1f, better-ui + better-layout. */
-:root{--paper:#ffffff;--white:#ffffff;--ink:var(--brand-ink);--muted:#62666b;--line:#e6e7e9;--blue:#955022;--blue-wash:#f4e5d6;--studio-orange:#cd7439;--studio-ease:cubic-bezier(.2,0,0,1)}
 body{font-family:Arial,Helvetica,sans-serif;background:var(--paper);-webkit-font-smoothing:antialiased}
 h1,h2,h3,.wordmark,.overview-metric strong{font-family:Arial,Helvetica,sans-serif}
 h1{font-weight:500;letter-spacing:-1.8px;font-size:clamp(30px,3.1vw,46px);line-height:1.12;text-wrap:balance}

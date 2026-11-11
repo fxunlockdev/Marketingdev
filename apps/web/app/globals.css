@@ -1,14 +1,4 @@
 :root {
-  --paper: #f7f8fa;
-  --white: #fff;
-  --ink: #202933;
-  --muted: #596574;
-  --line: #dce1e7;
-  --blue: #2355c4;
-  --blue-wash: #edf2ff;
-  --green: #256346;
-  --red: #a32b2b;
-  --radius: 12px;
   font-family: Arial, Helvetica, sans-serif;
   color: var(--ink);
   background: var(--paper);

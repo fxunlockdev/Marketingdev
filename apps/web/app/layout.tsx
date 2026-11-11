@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
 import "@astryxdesign/theme-neutral/theme.css";
+import "./tokens.css";
 import {DesignSystem} from "../components/design-system";
 import "./globals.css";
 import "./v5.css";
