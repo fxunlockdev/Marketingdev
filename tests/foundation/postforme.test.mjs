@@ -45,6 +45,25 @@ test('learning loop: scheduled collection snapshots published posts idempotently
  }finally{await admin.query("UPDATE app.postforme_accounts SET status='disconnected' WHERE id=$1",[account.id]);await dispatch.end();}
 });
 
+test('learning loop: customer signals are append-only, actor-bound and private to the business',async()=>{
+ const {recordSignal,signalSummary}=await import('../../dist/learning-signals.js');
+ const slot=(await admin.query('SELECT id FROM app.content_slots WHERE brand_id=$1 LIMIT 1',[brand.id])).rows[0].id,scope={organizationId:org.id,brandId:brand.id,actorId:alice};
+ const write=(user,input,as=user)=>database.transaction(user,org.id,true,db=>recordSignal(db,{...scope,actorId:as},input),brand.id);
+ for(const reason of ['Too many people','No faces please'])await write(alice,{kind:'rejected',slot_id:slot,reason,context:{format:'static'}});
+ await write(alice,{kind:'edited',slot_id:slot,diff:{headline:{before:'A long headline',after:'Short'}}});
+ await assert.rejects(write(viewer,{kind:'approved',slot_id:slot}));
+ await assert.rejects(database.transaction(viewer,org.id,false,db=>recordSignal(db,{...scope,actorId:viewer},{kind:'approved',slot_id:slot}),brand.id),e=>['42501','25006'].includes(e.code),'the database itself refuses a read-only member');
+ await assert.rejects(write(alice,{kind:'approved',slot_id:slot},bob),e=>e.code==='42501','a signal cannot be recorded as someone else');
+ await assert.rejects(write(alice,{kind:'approved',slot_id:randomUUID()}),e=>e.code==='23503');
+ const summary=await database.transaction(viewer,org.id,false,db=>signalSummary(db),brand.id);
+ assert.deepEqual(summary.map(s=>s.statement),['Rejection reasons mention people: 2 of 2 rejections with a reason']);
+ const foreignOrg=(await admin.query('SELECT organization_id FROM app.brands WHERE id=$1',[foreign.id])).rows[0].organization_id;
+ assert.deepEqual(await database.transaction(bob,foreignOrg,false,db=>signalSummary(db),foreign.id),[]);
+ await assert.rejects(database.transaction(bob,foreignOrg,true,db=>recordSignal(db,{organizationId:org.id,brandId:brand.id,actorId:bob},{kind:'approved',slot_id:slot}),foreign.id));
+ for(const sql of ["UPDATE app.creative_signals SET reason='rewritten'",'DELETE FROM app.creative_signals'])await assert.rejects(database.transaction(alice,org.id,true,db=>db.query(sql),brand.id),e=>e.code==='42501');
+ assert.equal((await admin.query('SELECT count(*)::int n FROM app.creative_signals WHERE brand_id=$1',[brand.id])).rows[0].n,3);
+});
+
 test('disabled platforms cannot initiate OAuth and existing records remain accessible',async()=>{
  const limited=new Postforme(service.connections,{},'mock-key',false,['instagram','tiktok']);
  let invoked=false;limited.client={call:async()=>{invoked=true;throw Error('must not call');}};
