@@ -218,7 +218,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
     <div className={`v5-shell ${menu ? "menu-open" : ""}`}>
       <aside className="v5-sidebar">
         <div className="workspace-switcher"><Wordmark />
-          {businesses.length === 0 ? <span className="workspace-context">Your workspace</span> : <div className="workspace-business"><span className="workspace-business-initial" aria-hidden="true">{(business?.name??"All").slice(0,1)}</span><Field label="Business">
+          {businesses.length === 0 ? <span className="workspace-context">Your workspace</span> : businesses.length === 1 ? <div className="workspace-business"><span className="workspace-business-initial" aria-hidden="true">{businesses[0].name.slice(0,1)}</span><div><span className="workspace-context">Your business</span><strong>{businesses[0].name}</strong></div></div> : <div className="workspace-business"><span className="workspace-business-initial" aria-hidden="true">{(business?.name??"All").slice(0,1)}</span><Field label="Business">
             {(id) => (
               <DesvioSelect
                 id={id}
@@ -459,24 +459,23 @@ function BusinessesIndex({
   return (
     <div className="brands-page">
       <div className="heading-row">
-        <PageTitle eyebrow="Manage your businesses" title="Your brands">
+        <PageTitle eyebrow="Your workspace" title="Your business">
           <p>
-            Each business has its own identity, content, channels and memory.
+            Your brand, content and social profile, together in one workspace.
           </p>
         </PageTitle>
-        <AppLink className="button primary" href="/brands/new">
-          + Add business
-        </AppLink>
+        {entitlement.can_create_business&&<AppLink className="button primary" href="/brands/new">
+          Set up my business
+        </AppLink>}
       </div>
       <p className="quota-caption">
-        {entitlement.active_businesses} of {entitlement.max_active_businesses}{" "}
-        owned businesses · {entitlement.plan} allowance
+        Your account includes one business.
       </p>
       <div className="v5-business-grid">
         {businesses.map((b, i) => (
           <BusinessCard key={b.id} business={b} index={i} />
         ))}
-        <article className="v5-add-card">
+        {entitlement.can_create_business&&<article className="v5-add-card">
           <span className="add-symbol" aria-hidden="true">
             +
           </span>
@@ -498,7 +497,7 @@ function BusinessesIndex({
               ? "Add a business"
               : "View business allowance"}
           </AppLink>
-        </article>
+        </article>}
       </div>
       <div className="v5-guidance">
         <h2>A little context. Better creative.</h2>
@@ -587,13 +586,11 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
       <Steps step={1} />
       {!entitlement.can_create_business ? (
         <section className="v5-panel">
-          <h2>Your account is at its business limit.</h2>
+          <h2>Your business is already set up.</h2>
           <p>
-            {entitlement.active_businesses} of{" "}
-            {entitlement.max_active_businesses} slots are in use. Paid upgrades
-            are not available in this build.
+            Your account includes one business. Continue with your existing business below.
           </p>
-          <AppLink href="/brands">Back to your businesses</AppLink>
+          <AppLink href="/brands">Back to your business</AppLink>
         </section>
       ) : (
         <div className="business-intro-grid"><form

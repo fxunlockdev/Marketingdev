@@ -680,7 +680,7 @@ test("parser rejects malformed, oversized and unconfigured inputs and forged par
   );
 });
 
-test("V5 standard account starts empty, initializes once and concurrent fourth-business creation is denied", async () => {
+test("V5 standard account starts empty, initializes once and concurrent second-business creation is denied", async () => {
   const initial = await Promise.all(
     Array.from({ length: 3 }, () =>
       request("/api/v1/accounts/current/initialize", { method: "POST" }),
@@ -691,7 +691,7 @@ test("V5 standard account starts empty, initializes once and concurrent fourth-b
   const account = initial[0].body.accountId;
   let entitlement = await request("/api/v1/accounts/current/entitlements");
   assert.equal(entitlement.body.active_businesses, 0);
-  assert.equal(entitlement.body.max_active_businesses, 3);
+  assert.equal(entitlement.body.max_active_businesses, 1);
   const keys = Array.from({ length: 5 }, () => randomUUID()),
     results = await Promise.all(
       keys.map((key, i) =>
@@ -702,8 +702,8 @@ test("V5 standard account starts empty, initializes once and concurrent fourth-b
         }),
       ),
     );
-  assert.equal(results.filter((r) => r.status === 201).length, 3);
-  assert.equal(results.filter((r) => r.status === 409).length, 2);
+  assert.equal(results.filter((r) => r.status === 201).length, 1);
+  assert.equal(results.filter((r) => r.status === 409).length, 4);
   assert.ok(
     results
       .filter((r) => r.status === 409)
@@ -732,7 +732,7 @@ test("V5 standard account starts empty, initializes once and concurrent fourth-b
         [account],
       )
     ).rows[0].n,
-    3,
+    1,
   );
   // A selected-business seat gets no extra slots and cannot read siblings through any existing route.
   const target = results[winner].body;
@@ -751,7 +751,7 @@ test("V5 standard account starts empty, initializes once and concurrent fourth-b
     seen.map((b) => b.id),
     [target.id],
   );
-  const hidden = results.find((r, i) => r.status === 201 && i !== winner).body;
+  const hidden = brand; // Another workspace stays inaccessible to this selected-business seat.
   assert.equal(
     (await request(`/api/v1/businesses/${hidden.id}`, { cookie: bob.cookie }))
       .status,

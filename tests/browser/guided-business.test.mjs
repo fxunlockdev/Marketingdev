@@ -34,6 +34,8 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
   await page.goto(`${origin}/`);
   await expect(page).toHaveURL(`${origin}/b/${id}/guided-onboarding`);
   await expect(page.getByText('maya@example.com',{exact:true})).toBeVisible();
+  await expect(page.getByRole('combobox',{name:'Business',exact:true})).toHaveCount(0);
+  await expect(page.getByText('Your business',{exact:true})).toBeVisible();
   for(const width of [1440,768,390]){
    await page.setViewportSize({width,height:1000});await page.goto(`${origin}/b/${id}/overview`);
    await expect(page.getByRole('heading',{name:'Your attention'})).toBeVisible();

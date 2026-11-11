@@ -559,8 +559,16 @@ test('dev without email accepts an existing verified password account but denies
  test('owner brand removal hides scoped records, blocks active work and frees allowance without erasing audit',async()=>{
  const owner=await signup('removal-'+randomUUID());
  await request('/api/v1/accounts/current/initialize',{method:'POST',cookie:owner.cookie,body:{}});
- const created=[];
- for(let i=0;i<3;i++){const r=await request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{name:'Remove brand '+i}});assert.equal(r.status,201,JSON.stringify(r.body));created.push(r.body);}
+ const keys=Array.from({length:5},()=>randomUUID());
+ const attempts=await Promise.all(keys.map((key,i)=>request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key,body:{name:'Remove brand '+i}})));
+ assert.equal(attempts.filter(r=>r.status===201).length,1,'Concurrent creation permits only one business');
+ assert.equal(attempts.filter(r=>r.status===409).length,4);
+ const winner=attempts.findIndex(r=>r.status===201),created=[attempts[winner].body];
+ const replay=await request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key:keys[winner],body:{name:'Remove brand '+winner}});
+ assert.equal(replay.body.id,created[0].id,'The accepted request remains idempotent');
+ const initialQuota=await request('/api/v1/accounts/current/entitlements',{cookie:owner.cookie});
+ assert.equal(initialQuota.body.max_active_businesses,1);assert.equal(initialQuota.body.can_create_business,false);
+
  const b=created[0],path='/api/v1/businesses/'+b.id,body={organization_id:b.organization_id,name:b.name,revision:b.revision};
  assert.equal((await request(path,{method:'DELETE',cookie:bob.cookie,body})).status,404);
  const delegate=await signup('removal-admin-'+randomUUID());await admin.query("INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,'admin')",[b.organization_id,delegate.id]);assert.equal((await request(path,{method:'DELETE',cookie:delegate.cookie,body})).status,403);
@@ -572,7 +580,7 @@ test('dev without email accepts an existing verified password account but denies
  assert.equal((await request(path,{method:'DELETE',cookie:owner.cookie,body})).status,200);
  assert.equal((await request(path,{cookie:owner.cookie})).status,404);
  const list=await request('/api/v1/businesses',{cookie:owner.cookie});assert.equal(list.body.businesses.some(x=>x.id===b.id),false);
- const quota=await request('/api/v1/accounts/current/entitlements',{cookie:owner.cookie});assert.equal(quota.body.active_businesses,2);
+ const quota=await request('/api/v1/accounts/current/entitlements',{cookie:owner.cookie});assert.equal(quota.body.active_businesses,0);
  assert.equal((await request('/api/v1/businesses',{method:'POST',cookie:owner.cookie,key:randomUUID(),body:{name:'Replacement'}})).status,201);
  await assert.rejects(admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'website.extract')",[randomUUID(),b.organization_id,b.id,owner.id]),e=>e.message==='BUSINESS_REMOVED');
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE brand_id=$1 AND action='brand.removed'",[b.id])).rows[0].n,1);
