@@ -290,3 +290,20 @@ test('explicit revision text mode removes overlays and can restore a branded hea
  assert.equal(restored.layers.filter(layer=>layer.text).length,1);
  assert.deepEqual(reviseDesign(clean,'fourth',brief).layers,[]);
 });
+
+
+test('stock inspiration follows three customer references and the parent edit without losing bytes (MOCK)',async()=>{
+ const images=await Promise.all(['#112233','#223344','#334455','#445566','#556677'].map(background=>sharp({create:{width:1024,height:1024,channels:3,background}}).png().toBuffer()));
+ let calls=0;
+ const provider=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
+  if(String(url).startsWith('data:'))return fetch(url,init);
+  calls++;
+  assert.equal(new URL(url).pathname,'/v1/images/edits');
+  const files=init.body.getAll('image[]');
+  assert.equal(files.length,5);
+  for(let i=0;i<files.length;i++)assert.deepEqual(Buffer.from(await files[i].arrayBuffer()),images[i]);
+  return Response.json({created:1,data:[{b64_json:images[0].toString('base64')}]});
+ }}));
+ const result=await provider.image('gpt-image-fixture','Preserve product references; use stock only for visual inspiration','1024x1024','low','a'.repeat(64),images[0],images.slice(1));
+ assert.equal(calls,1);assert.equal(result.width,1024);assert.equal(result.height,1024);
+});
