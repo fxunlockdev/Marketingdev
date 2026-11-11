@@ -1,5 +1,6 @@
 import {acceptsModel} from './model-policy.js';
 import {StockAssets} from './stock-assets.js';
+import {stockReferenceLabel} from './stock-planning.js';
 import {StockError} from './vecteezy-client.js';
 import {imagePlanningRates} from './creative-planning.js';
 import {artworkDirection} from './post-artwork.js';
@@ -332,10 +333,13 @@ export class CreativeJobs {
       if(this.stock){
         const dimensions=String(request.size).split('x').map(Number);
         const orientation=dimensions[0]===dimensions[1]?'square':dimensions[0]>dimensions[1]?'horizontal':'vertical';
-        const photo=await this.stock.reference(scope,input,plan.brief.image_prompt,orientation,message=>this.planCall(scope,message,request));
-        const stockPng=await sharp(photo,{limitInputPixels:24_000_000}).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
-        referenceImages.push(stockPng);
-        referenceManifest.push({kind:'stock_inspiration',label:'Visual inspiration only. Not the actual business product, property or customer. Preserve approved product references over this inspiration.',input_sha256:digest(stockPng)});
+        // Stock is optional: a skipped or failed stock step is recorded and the creative goes ahead without it.
+        const stock=await this.stock.reference(scope,input,{imagePrompt:plan.brief.image_prompt,orientation,edit:!!parent,brandReferences:references.length,layoutArchetype:(plan.brief as {art_direction?:{layout_archetype?:unknown}}).art_direction?.layout_archetype,artDirection:(plan.brief as {art_direction?:unknown}).art_direction,carouselPosition:carousel?.position??null,vision:(this.planner(request.text_provider) as {acceptsImages?:boolean}).acceptsImages===true},message=>this.planCall(scope,message,request));
+        if(stock){
+          const stockPng=await sharp(stock.photo,{limitInputPixels:24_000_000}).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
+          referenceImages.push(stockPng);
+          referenceManifest.push({kind:`stock_${stock.use}`,label:stockReferenceLabel(stock.use),input_sha256:digest(stockPng)});
+        }
       }
       let reference: Buffer | undefined;
       if (parent) {
@@ -376,7 +380,7 @@ export class CreativeJobs {
           return Number(g.max_image_request_micros)*(1+referenceImages.length);
         },
         async () => {
-          if(this.stock)await this.stock.authorize(scope);
+          if(this.stock&&referenceManifest.some(r=>String(r.kind).startsWith('stock_')))await this.stock.authorize(scope);
           let output = await this.provider.image(
             grant.image_model,
             prompt,
@@ -598,7 +602,6 @@ export class CreativeJobs {
       return this.jobs.transaction(scope, async (db, j) => {
         if (terminal.has(j.status)) return j.status;
         const status = [
-          "STOCK_DOWNLOAD_UNKNOWN",
           "CREATIVE_SUBMISSION_UNKNOWN",
           "CREATIVE_REPLAY_MISMATCH",
         ].includes(error.code)
