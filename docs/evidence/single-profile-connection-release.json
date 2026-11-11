@@ -1,0 +1,46 @@
+{
+  "checked_at": "2026-11-11T12:36:30.761Z",
+  "commit": "ed1a3a8",
+  "environment": "dev",
+  "scope": "Post for Me one-profile enforcement and connection cancellation",
+  "deployments": {
+    "api": {
+      "id": "0d95c98f-3e2b-4e43-aad8-81e54a5b8d72",
+      "status": "SUCCESS"
+    },
+    "web": {
+      "id": "55785bf8-f93d-47ca-87bc-c5f14e59e7ae",
+      "status": "SUCCESS"
+    }
+  },
+  "tests": {
+    "database_with_mock_provider": {
+      "passed": 7,
+      "failed": 0
+    },
+    "browser_with_mock_api": {
+      "passed": 2,
+      "failed": 0
+    }
+  },
+  "live_read_only_checks": {
+    "pages": [
+      "guided-onboarding",
+      "monthly-planning",
+      "overview",
+      "content-plan",
+      "review",
+      "connections",
+      "create"
+    ],
+    "browser_errors": [],
+    "failed_api_requests": [],
+    "connection_limit": 1,
+    "moodboard_images_decoded": 4
+  },
+  "limitations": [
+    "No real social authorization or publication performed.",
+    "Page-read checks do not constitute the complete new-customer generation journey.",
+    "One-profile guard covers the current Post for Me provider path."
+  ]
+}
