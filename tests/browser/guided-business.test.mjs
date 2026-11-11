@@ -169,6 +169,16 @@ test('MOCK API: mood board revision, approval and campaign setup remain usable a
   await expect(page.getByRole('button',{name:'Create my mood board'})).toHaveCount(0);
   await page.getByRole('button',{name:'Back to current plan'}).click();
   await expect(page.getByRole('heading',{name:'Your monthly content is ready to review'})).toBeVisible();
+  campaigns[0]={...campaigns[0],ready_posts:5,generation_attention:true};
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'5 of 6 posts ready'})).toBeVisible();
+  await expect(page.getByText('Some posts need attention before they can finish. Your completed posts are saved.')).toBeVisible();
+  await expect(page.getByRole('link',{name:'Review posts needing attention'})).toHaveAttribute('href',`/b/${id}/content-plan?plan=${id}`);
+  assert.equal(submissions,1,'Viewing a recovery message must not resubmit generation');
+  campaigns[0]={...campaigns[0],ready_posts:6,generation_attention:false};
+  await page.reload();
+  await expect(page.getByRole('heading',{name:'Your monthly content is ready to review'})).toBeVisible();
+  await expect(page.getByRole('link',{name:'Review posts needing attention'})).toHaveCount(0);
  }finally{await browser.close();}
 });
 
