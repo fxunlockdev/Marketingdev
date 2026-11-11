@@ -1,5 +1,6 @@
+import {acceptsModel} from './model-policy.js';
 import {suggestionMessage,readIdea} from './prompt-suggestions.js';
-import {CHAT_MODEL,CHAT_RATES,chatRequest,validateChatDecision} from './chat-contracts.js';
+import {CHAT_RATES,chatRequest,validateChatDecision} from './chat-contracts.js';
 import {planningReferences,assertPlanningReferences} from './planning-references.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
 import {approvedLearning,assertLearningCurrent} from './learning-context.js';
@@ -42,7 +43,7 @@ export class PlanningJobs {
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`planning-budget:${j.brand_id.toLowerCase()}`]);
    const grant=(await db.query('SELECT * FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,providerName])).rows[0];
    if(!grant)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
-   if((bound.input.chat?CHAT_MODEL:grant.model)!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
+   if(bound.input.chat?!acceptsModel('chat',model):grant.model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
    const cost=Math.ceil(wire.maxInputTokens*Number(bound.input.chat?CHAT_RATES.input:grant.input_micros_per_token)+wire.maxOutputTokens*Number(bound.input.chat?CHAT_RATES.output:grant.output_micros_per_token));
    if(bound.input.chat?.prompt_suggestion&&cost>50000)throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
    const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM (SELECT reserved_micros FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2 AND $3='openai') reservations",[j.organization_id,j.brand_id,providerName])).rows[0].n);
@@ -94,7 +95,7 @@ export class PlanningJobs {
     if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256||hash(canonicalJSON(input))!==request.input_sha256||input.brand.id!==brain.id||input.brand.sha256!==brain.sha256||canonicalJSON(input.brand.facts)!==canonicalJSON(brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))))throw new CreativeError('PLAN_BRAND_INTEGRITY_FAILED');
     const grant=(await db.query('SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,request.provider])).rows[0];
     if(!grant||!request.selected_model)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
-    if(((input as any).chat?CHAT_MODEL:grant.model)!==request.selected_model)throw new CreativeError('PLAN_CONFIG_CHANGED');
+    if((input as any).chat?!acceptsModel('chat',request.selected_model):grant.model!==request.selected_model)throw new CreativeError('PLAN_CONFIG_CHANGED');
     await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);
     return {request,input,model:request.selected_model};
    });

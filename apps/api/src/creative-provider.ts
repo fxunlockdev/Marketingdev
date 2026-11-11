@@ -1,3 +1,4 @@
+import {reasoningEffort} from './model-policy.js';
 import {videoBriefSchema} from './video-planning.js';
 import {chatSchema} from './chat-contracts.js';
 import {CREATIVE_PLANNER_LIMITS} from './creative-budget.js';
@@ -79,7 +80,7 @@ export class CreativeProvider {
         strict: false,
       })),
       parallel_tool_calls: false,
-      ...(model==='gpt-6-sol'?{reasoning:{effort:'low' as const}}:{}),
+      ...(reasoningEffort(model)?{reasoning:{effort:reasoningEffort(model)}}:{}),
       ...(request.prompt_suggestion?{text:{format:{type:'json_schema' as const,name:'composer_idea',strict:true,schema:{type:'object',additionalProperties:false,required:['title','direction'],properties:{title:{type:'string'},direction:{type:'string'}}}}}}:{}),
       ...(request.chat_response?{reasoning:{effort:'low' as const},text:{format:{type:'json_schema' as const,name:'desvio_chat',strict:true,schema:chatSchema}}}:{}),
       ...(request.video_plan?{text:{format:{type:'json_schema' as const,name:'desvio_video_brief',strict:true,schema:videoBriefSchema(request.video_plan.fact_ids,request.video_plan.duration_seconds)}}}:{}),

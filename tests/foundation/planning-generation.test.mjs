@@ -441,7 +441,7 @@ test('AI chat uses GPT-6, persists exact envelopes, asks focused questions and r
  assert.throws(()=>chat.saveOutbox(alice,b.id,{key:randomUUID(),body:{message:'bad\u0000text'}}),/Enter a message/);
  const submitted=await chat.submit(alice,b.id,body,key);assert.deepEqual(await chat.submit(alice,b.id,body,key),submitted);await assert.rejects(chat.discard(alice,b.id,key),/already accepted/);
  await assert.rejects(chat.submit(alice,b.id,{...body,message:'Different'},key),/different message/);
- let count=0;transport=async(url,init)=>{count++;const wire=JSON.parse(init.body);assert.equal(wire.model,'gpt-6-sol');assert.equal(wire.reasoning.effort,'low');assert.equal(wire.text.format.strict,true);assert.equal(wire.max_output_tokens,4000);return modelResponse({reply:'I’ll create a clean luxury residences image for young families.',action:'image',prompt:'Luxury residences for young families. No text.',channel:'instagram',size:'1024x1024',sources:[],starts_on:null,text_mode:'none'});};
+ let count=0;transport=async(url,init)=>{count++;const wire=JSON.parse(init.body);assert.equal(wire.model,'gpt-6.1-sol');assert.equal(wire.reasoning.effort,'low');assert.equal(wire.text.format.strict,true);assert.equal(wire.max_output_tokens,4000);return modelResponse({reply:'I’ll create a clean luxury residences image for young families.',action:'image',prompt:'Luxury residences for young families. No text.',channel:'instagram',size:'1024x1024',sources:[],starts_on:null,text_mode:'none'});};
  try{
   assert.equal(await handler.run(scope(b,submitted)),'succeeded');assert.equal(await handler.run(scope(b,submitted)),'finished');assert.equal(count,1);
   await chat.acknowledge(alice,b.id,key);assert.equal((await chat.outbox(alice,b.id)).request,null);

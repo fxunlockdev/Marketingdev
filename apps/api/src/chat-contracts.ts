@@ -1,9 +1,10 @@
 import {CreativeError,type PlannerRequest} from './creative-contracts.js';
+import {MODEL_POLICY,reservationRates} from './model-policy.js';
 // Explicit user-selected chat model; no silent fallback. Images keep their own provider.
-export const CHAT_MODEL='gpt-6-sol';
+export const CHAT_MODEL=MODEL_POLICY.chat.model;
 // Conservative short-context reservation includes 30-minute cache-write input pricing.
 // https://developers.openai.com/api/docs/pricing
-export const CHAT_RATES={input:2.5,output:10};
+export const CHAT_RATES={input:reservationRates('chat').input_micros_per_token,output:reservationRates('chat').output_micros_per_token};
 export const chatSchema={type:'object',additionalProperties:false,required:['reply','action','prompt','channel','size','sources','starts_on','text_mode','slide_count','placement','duration_seconds'],properties:{slide_count:{type:'integer',minimum:2,maximum:10},placement:{type:'string',enum:['feed','reel','story']},duration_seconds:{type:'integer',minimum:3,maximum:15},text_mode:{type:'string',enum:['none','headline']},starts_on:{type:['string','null']},reply:{type:'string'},action:{type:'string',enum:['answer','image','edit_image','carousel','video','campaign','strategy']},prompt:{type:'string'},channel:{type:'string',enum:['instagram','facebook','linkedin']},size:{type:'string',enum:['1024x1024','1536x1024','1024x1536']},sources:{type:'array',items:{type:'string'}}}};
 export type ChatDecision={reply:string;action:'answer'|'image'|'edit_image'|'carousel'|'video'|'campaign'|'strategy';prompt:string;channel:'instagram'|'facebook'|'linkedin';size:'1024x1024'|'1536x1024'|'1024x1536';sources:string[];starts_on:string|null;text_mode:'none'|'headline';slide_count?:number;placement?:'feed'|'reel'|'story';duration_seconds?:number};
 export function validateChatDecision(value:any,context:any):ChatDecision{

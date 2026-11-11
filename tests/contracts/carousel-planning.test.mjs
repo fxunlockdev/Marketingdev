@@ -30,8 +30,8 @@ test('carousel structured output binds approved facts and exact slide count befo
  assert(pattern.test('Line one\nLine two'));assert(!pattern.test('a'.repeat(501)));
  let options;
  const provider=new CreativeProvider(undefined,{responses:{create:async(body,opts)=>{options=opts;assert.equal(body.text.format.strict,true);assert.deepEqual(body.text.format.schema,schema);return {status:'completed',output:[],output_text:JSON.stringify(carouselPlan(3)),id:'fixture',usage:{}};}}});
- await provider.plan(sent,'gpt-6-sol',16000);assert.equal(options.timeout,120000);
- await provider.plan({...sent,step:1},'gpt-6-sol',16000);assert.equal(options.timeout,60000);
+ await provider.plan(sent,'gpt-6.1-sol',16000);assert.equal(options.timeout,120000);
+ await provider.plan({...sent,step:1},'gpt-6.1-sol',16000);assert.equal(options.timeout,60000);
  // Runtime validation remains authoritative for order and duplicate slides.
  const invalid=carouselPlan(3);invalid.slides[1].position=1;
  assert.throws(()=>validateCarouselPlan(invalid,input),/CAROUSEL_PLAN_INVALID/);

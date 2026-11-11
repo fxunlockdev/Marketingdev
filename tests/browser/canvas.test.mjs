@@ -198,7 +198,7 @@ before(async () => {
 
           const chatWire=JSON.parse(init.body);
           if(chatWire.text?.format?.name==='desvio_chat'){
-            chatCalls++;assert.equal(chatWire.model,'gpt-6-sol');
+            chatCalls++;assert.equal(chatWire.model,'gpt-6.1-sol');
             const context=JSON.parse(chatWire.input.find(m=>m.role==='user').content);
             if(/carousel|reel|video/i.test(context.message)){
               const carousel=/carousel/i.test(context.message),reel=/reel/i.test(context.message);
@@ -1644,7 +1644,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  const progressResponse=await page.request.get(`${base}/api/v1/businesses/${brand}/canvas/threads/${conversation}`);
  assert.equal(progressResponse.status(),200,'Customer role can read workflow progress without provider-call access');
  const progressRun=(await progressResponse.json()).runs[0];
- assert.equal(progressRun.selected_text_model,'gpt-6-sol');assert.equal(progressRun.brief_ready,true);assert.equal(progressRun.image_received,true);assert.ok(progressRun.output_version_id);
+ assert.equal(progressRun.selected_text_model,'gpt-6.1-sol');assert.equal(progressRun.brief_ready,true);assert.equal(progressRun.image_received,true);assert.ok(progressRun.output_version_id);
  await expect(page.getByRole('progressbar',{name:'Completed image workflow steps',exact:true})).toHaveAttribute('value','5',{timeout:30000});
  await expect(page.getByText('Conversation saved · Available in History',{exact:true})).toBeVisible();
  // A manual saved version has no generation-job foreign key; conversational edit must use it.

@@ -11,7 +11,7 @@ test('new images and carousel slides use GPT-6 with an active grant; absent gran
 });
 test('GPT-6 creative wire uses bounded low reasoning and tier-aware reservations',()=>{
  const wire=new CreativeProvider().plannerRequest({step:1,messages:[{role:'user',content:'Plan a carousel'}],tools:[]},IMAGE_PLANNING_MODEL,16000);
- assert.equal(wire.body.model,'gpt-6-sol');assert.equal(wire.body.reasoning.effort,'low');assert.equal(wire.body.store,false);
+ assert.equal(wire.body.model,'gpt-6.1-sol');assert.equal(wire.body.reasoning.effort,'low');assert.equal(wire.body.store,false);
  assert.deepEqual(imagePlanningRates(272000),{input_micros_per_token:2.5,output_micros_per_token:10});
  assert.deepEqual(imagePlanningRates(272001),{input_micros_per_token:5,output_micros_per_token:15});
  const rates=imagePlanningRates(limits.bodyBytes+limits.inputAllowance),grant={...rates,max_image_request_micros:1000000};

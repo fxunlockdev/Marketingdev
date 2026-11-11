@@ -1,12 +1,13 @@
 import {WebsiteText} from './website-text.js';
 import {WebsitePhotos} from './website-photos.js';
 import OpenAI from 'openai';
+import {MODEL_POLICY} from './model-policy.js';
 import {IntakeError,websiteURL} from './safe-web.js';
 import {hash,canonicalJSON,lockReview} from './brand-brain.js';
 import {exceedsAllowance} from './spending-allowance.js';
 import {AssetJobs,type JobScope} from './jobs.js';
 import type {WebsitePage,VisualCapture} from './website-evidence.js';
-export const RESEARCH_MODEL='gpt-5.4-mini-2026-03-17';
+export const RESEARCH_MODEL=MODEL_POLICY.research.model;
 export const RESEARCH_VERSION='openai-web-research-v1';
 // Conservative reservation for bounded context/output and <=3 hosted calls,
 // including repeated model turns at audited standard rates. Not an actual charge.

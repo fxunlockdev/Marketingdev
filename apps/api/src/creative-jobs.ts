@@ -1,6 +1,7 @@
+import {acceptsModel} from './model-policy.js';
 import {StockAssets} from './stock-assets.js';
 import {StockError} from './vecteezy-client.js';
-import {IMAGE_PLANNING_MODEL,imagePlanningRates} from './creative-planning.js';
+import {imagePlanningRates} from './creative-planning.js';
 import {artworkDirection} from './post-artwork.js';
 import {frameCreative} from "./creative-framing.js";
 import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
@@ -53,7 +54,7 @@ export class CreativeJobs {
     if(!provider.configured)throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const providerMessage=message.step===4||message.step===5?{...message,step:1}:message;
     const wire=provider.plannerRequest(providerMessage,model,maxOutputTokens);
-    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=model===IMAGE_PLANNING_MODEL?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(providerMessage,model,maxOutputTokens),request.text_provider);
+    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=acceptsModel('brief',model)?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(providerMessage,model,maxOutputTokens),request.text_provider);
   }
   finish(db: any, j: any, status: string, code: string | null = null) {
     return db
@@ -110,7 +111,7 @@ export class CreativeJobs {
       if((await db.query('SELECT 1 FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id WHERE c.job_id=$1 AND r.revoked_at IS NOT NULL',[j.id])).rowCount)throw new CreativeError('CREATIVE_REFERENCE_REVOKED');
       const grant=await this.plannerGrant(db,j,providerName);
       if (!grant) throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
-      if (!(step!=="image" && ["creative.generate","carousel.generate"].includes(j.kind) && model===IMAGE_PLANNING_MODEL) && model !== (step === "image" ? grant.image_model : grant.text_model))
+      if (!(step!=="image" && ["creative.generate","carousel.generate"].includes(j.kind) && acceptsModel('brief',model)) && model !== (step === "image" ? grant.image_model : grant.text_model))
         throw new CreativeError("CREATIVE_CONFIG_CHANGED");
       const reserved = Math.ceil(cost(grant)),
         used = Number(
