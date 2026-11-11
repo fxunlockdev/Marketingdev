@@ -48,3 +48,33 @@ test('Postforme publication holds protect calendar edits, review, archive and br
  await assert.rejects(admin.query("INSERT INTO app.postforme_publications(id,organization_id,brand_id,account_id,slot_id,revision,request_key,request_hash,proof,caption,scheduled_at,phase) VALUES($1,$2,$3,$4,$5,2,$6,$7,'{}','Fixture',now()+interval '1 day','preparing')",[randomUUID(),org.id,brand.id,account.id,slot.id,randomUUID(),'c'.repeat(64)]),/BUSINESS_REMOVED/);
 });
 
+
+test('one-profile plan serializes platform attempts and rejects excess provider accounts without losing saved connections',async()=>{
+ const user=randomUUID(),sid=randomUUID();await admin.query('INSERT INTO auth."user"(id,name,email,"emailVerified","createdAt","updatedAt") VALUES($1,$2,$3,true,now(),now())',[user,'Profile quota',`${user}@example.test`]);
+ const workspace=await workspaces.create(user,{name:'Profile quota'}),business=await workspaces.createBrand(user,workspace.id,{name:'One profile'},randomUUID());
+ const subject=new Postforme(service.connections,{},'mock-key');let writes=0,results=[];
+ subject.client={call:async()=>{writes++;return {url:'https://api.postforme.dev/oauth/mock'};},accounts:async()=>results};
+ const attempts=await Promise.allSettled(['instagram','facebook'].map(platform=>subject.authorize(user,sid,business.id,{platform})));
+ assert.equal(attempts.filter(x=>x.status==='fulfilled').length,1);assert.equal(writes,1);
+ let active=(await subject.read(user,business.id,sid)).attempt;
+ await assert.rejects(subject.cancelAttempt(user,randomUUID(),business.id,{attempt_id:active.id}),/not found/);
+ await subject.cancelAttempt(user,sid,business.id,{attempt_id:active.id});
+ assert.equal((await subject.read(user,business.id,sid)).attempt,null);
+ await assert.rejects(subject.finish(user,sid,business.id,{attempt_id:active.id}),/expired/);
+ await subject.authorize(user,sid,business.id,{platform:active.platform});
+ active=(await subject.read(user,business.id,sid)).attempt;
+ const record=id=>({remote_id:id,platform:active.platform,username:id,profile_photo_url:null,status:'connected'});
+ results=[record('quota-one'),record('quota-two')];
+ await assert.rejects(subject.finish(user,sid,business.id,{attempt_id:active.id}),/one social profile/);
+ assert.equal((await subject.read(user,business.id)).accounts.length,0);
+ results=[record('quota-one')];await subject.finish(user,sid,business.id,{attempt_id:active.id});
+ const saved=await subject.read(user,business.id);assert.equal(saved.social_profile_limit,1);assert.equal(saved.accounts.length,1);
+ await assert.rejects(subject.authorize(user,sid,business.id,{platform:active.platform==='instagram'?'facebook':'instagram'}),/one social profile/);assert.equal(writes,2);
+ results.push(record('quota-two'));await assert.rejects(subject.refresh(user,business.id),/one social profile/);
+ assert.deepEqual((await subject.read(user,business.id)).accounts,saved.accounts);
+ // Reauthorizing the same profile still works, and replacing it is possible after provider removal.
+ await subject.authorize(user,sid,business.id,{platform:active.platform});results=[record('quota-one')];await subject.refresh(user,business.id);
+ results=[record('quota-two')];await subject.refresh(user,business.id);
+ assert.equal((await subject.read(user,business.id)).accounts.filter(a=>a.status==='connected').length,1);
+ await assert.rejects(subject.refresh(bob,business.id));
+});

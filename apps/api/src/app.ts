@@ -199,6 +199,7 @@ class PostformeController {
  constructor(@Inject(Postforme) private readonly service:Postforme){}
  @Get('connections') read(@Req() r:AuthRequest,@Param('id') id:string){return this.service.read(r.actorId,id,r.sessionId);}
  @Post('connections/authorize') authorize(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown){return this.service.authorize(r.actorId,r.sessionId,id,b);}
+ @Post('connections/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown){return this.service.cancelAttempt(r.actorId,r.sessionId,id,b);}
  @Post('connections/finish') finish(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown){return this.service.finish(r.actorId,r.sessionId,id,b);}
  @Post('connections/refresh') refresh(@Req() r:AuthRequest,@Param('id') id:string){return this.service.refresh(r.actorId,id,r.sessionId);}
  @Post('connections/:account/disconnect') disconnect(@Req() r:AuthRequest,@Param('id') id:string,@Param('account') account:string){return this.service.disconnect(r.actorId,id,account,r.sessionId);}

@@ -19,3 +19,15 @@ test('connection actions explain permissions, show pending state and recover aft
  for(const width of [390,768,1440]){await page.setViewportSize({width,height:900});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false);}
  }finally{release?.();await browser.close();}
 });
+
+test('one-profile connection handoff can be canceled without publishing or disconnecting accounts',{skip:!origin,timeout:60000},async()=>{
+ const browser=await chromium.launch(),page=await browser.newPage();let canceled=false;const pending={id:'22222222-2222-4222-8222-222222222222',platform:'instagram',expires_at:'2099-01-01T00:00:00Z'};
+ const view=()=>({provider:'postforme',configured:true,can_manage:true,social_profile_limit:1,accounts:[],platforms:['instagram','facebook'],attempt:canceled?null:pending});
+ await page.route('**/api/**',async route=>{const path=new URL(route.request().url()).pathname;let data={};
+ if(path.endsWith('/get-session'))data={user:{id:'owner',name:'Maya',emailVerified:true}};
+ else if(path==='/api/v1/businesses')data={businesses:[{id:brand,organization_id:brand,name:'Studio',role:'owner',has_approved_brand:true}]};
+ else if(path.endsWith('/postforme/connections'))data=view();
+ else if(path.endsWith('/connections/cancel')){assert.deepEqual(route.request().postDataJSON(),{attempt_id:pending.id});canceled=true;data=view();}
+ await route.fulfill({json:data});});
+ try{await page.goto(`${origin}/b/${brand}/connections`);await expect(page.getByText(/Your plan includes one social profile/)).toBeVisible();await page.getByRole('button',{name:'Cancel connection attempt',exact:true}).click();await expect(page.getByRole('heading',{name:'Finish connecting your account',exact:true})).toHaveCount(0);await expect(page.getByText('Connection attempt canceled. You can choose another platform.',{exact:true})).toBeVisible();assert.equal(canceled,true);await page.reload();await expect(page.getByRole('heading',{name:'Finish connecting your account',exact:true})).toHaveCount(0);}finally{await browser.close();}
+});
