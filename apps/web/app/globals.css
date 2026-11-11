@@ -269,7 +269,8 @@ input:disabled {
   margin: 28px 0;
 }
 .auth-story em {
-  color: var(--blue);
+  color: var(--brand-accent);
+  font-style: normal;
   font-weight: 400;
 }
 .auth-story p {

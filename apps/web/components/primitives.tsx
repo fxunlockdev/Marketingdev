@@ -41,10 +41,11 @@ export function Field({
     </div>
   );
 }
-export function Wordmark() {
+/** `tone="paper"` is the ivory wordmark for ink surfaces; the default is for paper and white. */
+export function Wordmark({ tone = "ink" }: { tone?: "ink" | "paper" }) {
   return (
     <AppLink href="/" className="wordmark" aria-label="Desvio home">
-      <img src="/site-brand/brand/desvio-black-lime.svg" alt="Desvio" width="146" height="36" />
+      <img src={`/site-brand/brand/desvio-${tone === "paper" ? "ivory" : "black"}-lime.svg`} alt="Desvio" width="146" height="36" />
     </AppLink>
   );
 }
@@ -54,6 +55,18 @@ export function Loading() {
       <Spinner size="md" aria-hidden="true" />
       <span>Loading…</span>
     </div>
+  );
+}
+/** Full-viewport neutral state shown while the session is unknown: no navigation, no account chrome. */
+export function SessionPending() {
+  return (
+    <main id="main" className="session-pending" aria-busy="true">
+      <img src="/site-brand/brand/desvio-black-lime.svg" alt="Desvio" width="146" height="36" />
+      <div role="status" className="session-pending-status">
+        <Spinner size="md" aria-hidden="true" />
+        <span>Opening Desvio…</span>
+      </div>
+    </main>
   );
 }
 export function Blank({
