@@ -2,7 +2,8 @@ import {ONBOARDING_REFERENCES} from './onboarding-references.js';
 import {BadRequestException, ConflictException} from '@nestjs/common';
 import {object} from './workspaces.js';
 
-export type OnboardingDetails={business_name:string;website:string;business_type:'products'|'services'|'both';industry:string;cta:string;differentiator:string;timing:string;competitors:string[];priority_offers:string;folder_url:string;guidelines:string;references:string[]};
+export type OnboardingSocialProfile={platform:'instagram'|'facebook'|'linkedin'|'help';handle:string};
+export type OnboardingDetails={social_profile?:OnboardingSocialProfile;business_name:string;website:string;business_type:'products'|'services'|'both';industry:string;cta:string;differentiator:string;timing:string;competitors:string[];priority_offers:string;folder_url:string;guidelines:string;references:string[]};
 export type GuidedBrief = {
   offering:string; audience:string; market:string; goal:'awareness'|'traffic'|'leads'|'sales';
   visual_direction:string; must_follow:string; details?:OnboardingDetails;
@@ -19,13 +20,21 @@ export function guidedBrief(value:unknown,complete=false):GuidedBrief {
   return {...(v.details!==undefined?{details:onboardingDetails(v.details)}:{}),offering:text(v.offering,600,complete),audience:text(v.audience,600,complete),market:text(v.market,200),goal:v.goal as GuidedBrief['goal'],visual_direction:text(v.visual_direction,800),must_follow:text(v.must_follow,800)};
 }
 function onboardingDetails(value:unknown):OnboardingDetails {
- const v=object(value,['business_name','website','business_type','industry','cta','differentiator','timing','competitors','priority_offers','folder_url','guidelines','references']);
+ const v=object(value,['business_name','website','business_type','industry','cta','differentiator','timing','competitors','priority_offers','folder_url','guidelines','references','social_profile']);
  const url=(raw:unknown)=>{const result=text(raw,1000);if(!result)return '';try{const u=new URL(result);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)throw new Error();return u.href;}catch{throw new BadRequestException('Use a valid public website or folder link');}};
  if(!['products','services','both'].includes(String(v.business_type)))throw new BadRequestException('Choose products, services or both');
  if(!['food','retail','sport','property','local','professional','other'].includes(String(v.industry)))throw new BadRequestException('Choose your industry');
  if(!Array.isArray(v.competitors)||v.competitors.length>3)throw new BadRequestException('Add up to three competitors');
  if(!Array.isArray(v.references)||v.references.length>3||new Set(v.references).size!==v.references.length||v.references.some(id=>!ONBOARDING_REFERENCES.some(r=>r.id===id)))throw new BadRequestException('Choose up to three available visual references');
- return {business_name:text(v.business_name,140,true),website:url(v.website),business_type:v.business_type as OnboardingDetails['business_type'],industry:String(v.industry),cta:text(v.cta,300),differentiator:text(v.differentiator,600),timing:text(v.timing,300),competitors:v.competitors.map(c=>text(c,300)).filter(Boolean),priority_offers:text(v.priority_offers,600),folder_url:url(v.folder_url),guidelines:text(v.guidelines,800),references:v.references as string[]};
+ let social:OnboardingSocialProfile|undefined;
+ if(v.social_profile!==undefined){
+  const profile=object(v.social_profile,['platform','handle']);
+  if(!['instagram','facebook','linkedin','help'].includes(String(profile.platform)))throw new BadRequestException('Choose one available social platform or ask us to help');
+  const handle=text(profile.handle,200);
+  if(profile.platform==='help'&&handle)throw new BadRequestException('Choose a platform before adding its profile');
+  social={platform:profile.platform as OnboardingSocialProfile['platform'],handle};
+ }
+ return {...(social?{social_profile:social}:{}),business_name:text(v.business_name,140,true),website:url(v.website),business_type:v.business_type as OnboardingDetails['business_type'],industry:String(v.industry),cta:text(v.cta,300),differentiator:text(v.differentiator,600),timing:text(v.timing,300),competitors:v.competitors.map(c=>text(c,300)).filter(Boolean),priority_offers:text(v.priority_offers,600),folder_url:url(v.folder_url),guidelines:text(v.guidelines,800),references:v.references as string[]};
 }
 export function guidedRevision(value:unknown):number {
   if(!Number.isSafeInteger(value)||Number(value)<0||Number(value)>=2147483647)throw new BadRequestException('Include the saved revision');

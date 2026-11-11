@@ -400,3 +400,22 @@ test('monthly allowance is shared across brands, concurrency-safe, and resets by
  await canvas.submit(alice,target.brand.id,threads[index].id,body,randomUUID());
  assert.equal((await boards.read(alice,target.brand.id)).allowance.items.static.used,1);
 });
+
+test('one-profile onboarding persists across reads, rejects disabled platforms and stays tenant scoped',async()=>{
+ const org=await workspaces.create(alice,{name:'Profile onboarding'});
+ const target=await workspaces.createBrand(alice,org.id,{name:'Profile cafe'},randomUUID());
+ const service=new GuidedBusiness(businesses,new Intake(businesses),['instagram']);
+ const details={business_name:'Profile cafe',website:'',business_type:'services',industry:'food',cta:'',differentiator:'',timing:'',competitors:[],priority_offers:'',folder_url:'',guidelines:'',references:[],social_profile:{platform:'instagram',handle:'@profilecafe'}};
+ await service.save(alice,target.id,{revision:0,brief:{...brief,details},step:1});
+ const saved=await service.read(alice,target.id);
+ assert.deepEqual(saved.brief.details.social_profile,details.social_profile);
+ assert.deepEqual(saved.onboarding,{social_profile_limit:1,channels:['instagram']});
+ await assert.rejects(service.save(alice,target.id,{revision:1,brief:{...brief,details:{...details,social_profile:{platform:'facebook',handle:''}}}}),/not available/);
+ assert.equal((await service.read(alice,target.id)).revision,1);
+ await assert.rejects(service.read(bob,target.id),/not found|access|Forbidden/i);
+ const disabled=new GuidedBusiness(businesses,new Intake(businesses),[]);
+ await disabled.save(alice,target.id,{revision:1,brief:saved.brief,step:2});
+ assert.equal((await disabled.read(alice,target.id)).step,2,'A saved platform becoming unavailable does not prevent resume');
+ await disabled.save(alice,target.id,{revision:2,brief:{...brief,details:{...details,social_profile:{platform:'help',handle:''}}}});
+ assert.equal((await disabled.read(alice,target.id)).brief.details.social_profile.platform,'help');
+});

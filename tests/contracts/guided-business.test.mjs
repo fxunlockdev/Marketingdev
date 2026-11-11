@@ -66,7 +66,7 @@ test('reading saved questionnaire never replaces intentionally cleared answers',
   assert.equal(user,'user');assert.equal(org,'org');assert.equal(brand,'brand');assert.equal(write,false);
   return fn({query:async()=>{queries++;return {rows:[saved]};}});
  }}},null);
- assert.deepEqual(await service.read('user','brand'),saved);
+ assert.deepEqual(await service.read('user','brand'),{...saved,onboarding:{social_profile_limit:1,channels:[]}});
  assert.equal(queries,1,'Existing drafts do not read or merge approved defaults');
 });
 
@@ -85,4 +85,17 @@ test('starter ideas require both preview formats and bounded text; saved legacy 
  assert.doesNotMatch(starterIdeaPrompt(direction,'static'),/An everyday ritual/);
  assert.match(starterIdeaPrompt(direction,'carousel'),/An everyday ritual/);
  assert.match(starterIdeaPrompt(direction,'carousel'),/revision feedback takes precedence/);
+});
+
+test('onboarding keeps one profile choice, rejects malformed input and preserves legacy briefs',()=>{
+ const social_profile={platform:'instagram',handle:'@courtyard'};
+ assert.deepEqual(guidedBrief({...brief,details:{...details,social_profile}}).details.social_profile,social_profile);
+ assert.equal(guidedBrief({...brief,details}).details.social_profile,undefined);
+ for(const social_profile of [{platform:'unknown',handle:''},{platform:'help',handle:'@someone'},[{platform:'instagram',handle:''}],{platform:'instagram',handle:'x'.repeat(201)},{platform:'instagram',handle:'',token:'secret'}])assert.throws(()=>guidedBrief({...brief,details:{...details,social_profile}}));
+});
+
+test('monthly plan rejects multiple platforms before planning or generation',async()=>{
+ const {GuidedCampaigns}=await import('../../dist/guided-campaigns.js');
+ const service=new GuidedCampaigns(null,null,['instagram','facebook']);
+ assert.throws(()=>service.create('user','brand',{moodboard_id:'11111111-1111-4111-8111-111111111111',starts_on:'2026-12-01',duration:'month',channels:['instagram','facebook'],static_count:2,carousel_count:0,video_count:0,timezone:'UTC'},'profile-plan-test'),/Choose one available platform/);
 });

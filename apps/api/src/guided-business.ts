@@ -7,7 +7,8 @@ import {hash,canonicalJSON,lockReview,bumpReview} from './brand-brain.js';
 import {guidedBrief,requireGuidedRevision,BUSINESS_RESEARCH_AGENT_VERSION} from './guided-campaign-contracts.js';
 /** A saved brief and its research share one transaction. Worker results remain unapproved. */
 export class GuidedBusiness {
- constructor(readonly businesses:Businesses,readonly intake:Intake){}
+ constructor(readonly businesses:Businesses,readonly intake:Intake,readonly channels:readonly string[]=[]){}
+ profilePolicy(){return {social_profile_limit:1,channels:this.channels.filter(c=>['instagram','facebook','linkedin'].includes(c))};}
  async read(user:string,id:string){
   const b=await this.businesses.resolve(user,id);
   return this.businesses.database.transaction(user,b.organization_id,false,async db=>{
@@ -21,9 +22,9 @@ export class GuidedBusiness {
     WHERE g.organization_id=$1 AND g.brand_id=$2`,[b.organization_id,id])).rows[0];
    // Saved answers win, including intentional empty fields. Only a new brief
    // may borrow facts from this business's immutable approved profile.
-   if(row)return row;
+   if(row)return {...row,onboarding:this.profilePolicy()};
    const approved=(await db.query('SELECT snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY review_revision DESC LIMIT 1',[b.organization_id,id])).rows[0];
-   return {revision:0,step:0,brief:initialGuidedBrief(approved?.snapshot),research_job_id:null};
+   return {onboarding:this.profilePolicy(),revision:0,step:0,brief:initialGuidedBrief(approved?.snapshot),research_job_id:null};
   },id);
  }
  async save(user:string,id:string,body:unknown){
@@ -34,6 +35,8 @@ export class GuidedBusiness {
    const row=(await db.query('SELECT revision,step,brief,research_job_id FROM app.guided_business_briefs WHERE organization_id=$1 AND brand_id=$2 FOR UPDATE',[b.organization_id,id])).rows[0];
    requireGuidedRevision(row?.revision??0,v.revision);
    const same=!!row&&canonicalJSON(row.brief)===canonicalJSON(brief),step=v.step??row?.step??0;
+   const platform=brief.details?.social_profile?.platform;
+   if(!same&&platform&&platform!=='help'&&!this.profilePolicy().channels.includes(platform))throw new BadRequestException('That platform is not available. Choose another platform or ask us to help.');
    if(same&&step===row.step)return {revision:row.revision,step,brief};
    if(row?.research_job_id){
     const active=(await db.query(`SELECT j.status FROM app.jobs j WHERE j.id=$1 OR j.id IN (SELECT analysis_job_id FROM app.intake_dependencies WHERE capture_job_id=$1)`,[row.research_job_id])).rows;

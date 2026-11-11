@@ -11,7 +11,7 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
  const id='11111111-1111-4111-8111-111111111111';
  const business={id,organization_id:id,name:'Courtyard Studio',website:null,role:'owner',has_approved_brand:false};
  let failSave=false;
- let saved={revision:0,step:0,brief:{offering:'',audience:'',market:'',goal:'awareness',visual_direction:'',must_follow:''},research_job_id:null};
+ let saved={onboarding:{social_profile_limit:1,channels:['instagram','facebook']},revision:0,step:0,brief:{offering:'',audience:'',market:'',goal:'awareness',visual_direction:'',must_follow:''},research_job_id:null};
  await page.route('**/api/**',async route=>{
   const request=route.request(),path=new URL(request.url()).pathname;let data={};
   if(path.endsWith('/get-session'))data={user:{id:'fixture',name:'Maya',email:'maya@example.com',emailVerified:true}};
@@ -48,9 +48,17 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
   }
   await page.goto(`${origin}/b/${id}/monthly-planning`);
   await expect(page.getByRole('heading',{name:'Tell us about your business'})).toBeVisible();
+  await page.getByRole('combobox',{name:'Social platform',exact:true}).click();
+  await page.getByRole('option',{name:'Instagram',exact:true}).click();
+  await page.getByLabel('Profile handle or link (optional)').fill('@courtyard');
+  await page.getByRole('combobox',{name:'Social platform',exact:true}).click();
+  await page.getByRole('option',{name:'Facebook',exact:true}).click();
+  await expect(page.getByLabel('Profile handle or link (optional)')).toHaveValue('');
+  await page.getByLabel('Profile handle or link (optional)').fill('courtyard-cafe');
   await page.getByLabel('What does your business do?').fill('A neighbourhood cafe serving seasonal food.');
   await page.getByRole('button',{name:'Continue',exact:true}).click();
   await expect(page.getByRole('heading',{name:'Who are we creating for?'})).toBeVisible();
+  assert.deepEqual(saved.brief.details.social_profile,{platform:'facebook',handle:'courtyard-cafe'});
   await page.goto(`${origin}/`);
   await expect(page).toHaveURL(`${origin}/b/${id}/guided-onboarding`);
   await expect(page.getByRole('heading',{name:'Who are we creating for?'})).toBeVisible();
@@ -158,7 +166,8 @@ test('MOCK API: mood board revision, approval and campaign setup remain usable a
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    if(process.env.DESVIO_UI_EVIDENCE){await mkdir(process.env.DESVIO_UI_EVIDENCE,{recursive:true});await page.screenshot({path:`${process.env.DESVIO_UI_EVIDENCE}/monthly-planning-${width}.png`,fullPage:true});}
   }
-  await page.getByRole('checkbox',{name:'instagram'}).check();
+  await page.getByRole('combobox',{name:'Social platform',exact:true}).click();
+  await page.getByRole('option',{name:'Instagram',exact:true}).click();
   await page.getByRole('button',{name:'Prepare my content plan'}).click();
   await expect(page.getByRole('heading',{name:'Planning your content'})).toBeVisible();
   await page.reload();await expect(page.getByRole('heading',{name:'Planning your content'})).toBeVisible();assert.equal(submissions,1);
