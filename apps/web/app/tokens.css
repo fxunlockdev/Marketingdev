@@ -29,6 +29,9 @@
   --brand-sand: #ebe6da;
   --brand-clay: #e0dacb;
   --brand-disabled: #eeedf2;
+  --brand-ink-raised: #35372f;
+  --brand-ink-line: #3b3f32;
+  --brand-ink-muted: #c9ccbf;
 
   /* Status hues, tuned to sit on paper. Text values pass 4.5:1 on their wash. */
   --status-positive: #2f6b2c;
@@ -108,17 +111,19 @@
   --duration-medium: 180ms;
   --ease-standard: cubic-bezier(.2, .8, .2, 1);
 
-  /* 7. Type: DM Sans for text, Space Grotesk for display. */
+  /* 7. Type: DM Sans for text, Space Grotesk for display. The scale has its
+        own names: Astryx's --font-size-* tokens size its components and body
+        copy, and re-pointing them shifted existing screens. */
   --font-family-body: 'Desvio Body', 'Helvetica Neue', Arial, sans-serif;
   --font-family-heading: 'Desvio Display', 'Helvetica Neue', Arial, sans-serif;
-  --font-size-xs: .75rem;
-  --font-size-sm: .875rem;
-  --font-size-base: 1rem;
-  --font-size-lg: 1.125rem;
-  --font-size-xl: 1.375rem;
-  --font-size-2xl: 1.75rem;
-  --font-size-3xl: 2.25rem;
-  --font-size-4xl: 3rem;
+  --type-xs: .75rem;
+  --type-sm: .875rem;
+  --type-base: 1rem;
+  --type-lg: 1.125rem;
+  --type-xl: 1.375rem;
+  --type-2xl: 1.75rem;
+  --type-3xl: 2.25rem;
+  --type-4xl: 3rem;
   --leading-tight: 1.1;
   --leading-snug: 1.35;
   --leading-body: 1.55;

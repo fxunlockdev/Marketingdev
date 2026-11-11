@@ -1,30 +1,120 @@
 /* Desvio's visual contract, shared by Astryx and the existing domain controls.
    Artwork and export typography deliberately keep their own brand styles. */
+/* ── Button ────────────────────────────────────────────────────────────────
+   One control for every action: `Button` (components/ui/button.tsx) and the
+   legacy `ActionButton` both render `.desvio-action` on an Astryx Button.
+   States, in order: rest, hover, focus-visible, active, loading, disabled. */
 body.desvio-redesign.desvio-polished .desvio-action {
+  position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  min-height: var(--ds-control-height); height: auto; max-width: 100%;
-  padding: 10px 18px; gap: 8px; border: 1px solid var(--ds-border);
-  border-radius: 999px; background: var(--ds-surface); color: var(--ds-ink);
-  font-family: var(--font-family-body); font-size: 14px; font-weight: 600;
-  line-height: 1.4; white-space: normal; text-align: center;
-  box-shadow: 0 1px 2px #17171a05;
+  min-height: var(--control-height); height: auto; max-width: 100%;
+  padding: var(--spacing-2) var(--spacing-5); gap: var(--spacing-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full); background: var(--color-background-surface); color: var(--color-text-primary);
+  font-family: var(--font-family-body); font-size: var(--type-sm); font-weight: 600;
+  line-height: 1.4; white-space: normal; text-align: center; text-decoration: none;
+  box-shadow: var(--shadow-low);
+  transition: background-color var(--duration-fast) var(--ease-standard), border-color var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-medium) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
 }
 body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary] {
-  color: #fff; background: var(--brand-ink); border-color: var(--brand-ink);
+  color: var(--brand-paper); background: var(--brand-ink); border-color: var(--brand-ink);
 }
 body.desvio-redesign.desvio-polished .desvio-action[data-variant=destructive] {
-  color: #a12039; background: #fff4f5; border-color: #edc5ce;
+  color: var(--status-danger); background: var(--status-danger-wash); border-color: var(--status-danger-border);
+}
+body.desvio-redesign.desvio-polished .desvio-action[data-variant=ghost] {
+  color: var(--color-text-secondary); background: transparent; border-color: transparent; box-shadow: none;
+  padding-inline: var(--spacing-3);
+}
+body.desvio-redesign.desvio-polished .desvio-action[data-size=sm] {
+  min-height: var(--control-height-sm); padding: var(--spacing-1-5) var(--spacing-4); font-size: var(--type-xs);
+}
+/* A 36px control still answers a 44px touch. */
+body.desvio-redesign.desvio-polished .desvio-action[data-size=sm]::after {
+  content: ''; position: absolute; inset: calc((var(--control-height-sm) - var(--control-height)) / 2) 0;
+}
+body.desvio-redesign.desvio-polished .desvio-action[data-size=lg] {
+  min-height: var(--control-height-lg); padding: var(--spacing-3) var(--spacing-7); font-size: var(--type-base);
+}
+body.desvio-redesign.desvio-polished .desvio-action[data-block=true] { display: flex; width: 100%; }
+@media (hover: hover) {
+  body.desvio-redesign.desvio-polished .desvio-action:hover:not(:disabled) {
+    background: var(--brand-wash); border-color: var(--brand-strong-border); color: var(--brand-link); box-shadow: var(--shadow-med);
+  }
+  body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary]:hover:not(:disabled) {
+    background: var(--brand-link); border-color: var(--brand-link); color: var(--color-on-accent);
+  }
+  body.desvio-redesign.desvio-polished .desvio-action[data-variant=destructive]:hover:not(:disabled) {
+    background: var(--status-danger); border-color: var(--status-danger); color: var(--color-on-accent);
+  }
+  body.desvio-redesign.desvio-polished .desvio-action[data-variant=ghost]:hover:not(:disabled) {
+    background: var(--brand-field); border-color: transparent; color: var(--color-text-primary); box-shadow: none;
+  }
 }
 body.desvio-redesign.desvio-polished .desvio-action:focus-visible {
-  outline: 2px solid var(--ds-focus); outline-offset: 3px;
+  outline: 2px solid var(--color-focus); outline-offset: 3px;
 }
+body.desvio-redesign.desvio-polished .desvio-action:active:not(:disabled) {
+  transform: scale(.98); box-shadow: none;
+}
+body.desvio-redesign.desvio-polished .desvio-action[data-variant=ghost]:active:not(:disabled) { background: var(--brand-sand); }
 body.desvio-redesign.desvio-polished .desvio-action:disabled { opacity: .5; cursor: not-allowed; }
-body.desvio-redesign.desvio-polished .desvio-action[aria-busy=true] { opacity: 1; }
+body.desvio-redesign.desvio-polished .desvio-action[aria-busy=true] { opacity: 1; cursor: progress; }
 body.desvio-redesign.desvio-polished .desvio-action[aria-pressed=true] { background: var(--brand-wash); color: var(--brand-link); border-color: var(--brand-strong-border); }
-@media (hover: hover) {
-  body.desvio-redesign.desvio-polished .desvio-action:hover:not(:disabled) { background: var(--brand-wash); border-color: var(--brand-strong-border); color: var(--brand-link); }
-  body.desvio-redesign.desvio-polished .desvio-action[data-variant=primary]:hover:not(:disabled) { background: var(--brand-link); border-color: var(--brand-link); color: #fff; }
+
+/* ── StatusBadge ───────────────────────────────────────────────────────────
+   Colour plus a labelled dot, so the status never depends on colour alone. */
+body.desvio-redesign.desvio-polished .ui-badge {
+  display: inline-flex; align-items: center; gap: var(--spacing-1-5); width: fit-content; max-width: 100%;
+  min-height: 24px; height: auto; padding: var(--spacing-0-5) var(--spacing-2) var(--spacing-0-5) var(--spacing-1-5);
+  border: 1px solid var(--badge-border); border-radius: var(--radius-full);
+  background: var(--badge-wash); color: var(--badge-ink);
+  font-family: var(--font-family-body); font-size: var(--type-xs); font-weight: 600; line-height: 1.4; white-space: nowrap;
 }
+body.desvio-redesign.desvio-polished .ui-badge-dot {
+  display: block; width: 6px; height: 6px; flex: none; border-radius: var(--radius-full); background: currentColor;
+}
+.ui-badge[data-tone=neutral] { --badge-ink: var(--status-neutral); --badge-wash: var(--status-neutral-wash); --badge-border: var(--status-neutral-border); }
+.ui-badge[data-tone=info] { --badge-ink: var(--status-info); --badge-wash: var(--status-info-wash); --badge-border: var(--status-info-border); }
+.ui-badge[data-tone=positive] { --badge-ink: var(--status-positive); --badge-wash: var(--status-positive-wash); --badge-border: var(--status-positive-border); }
+.ui-badge[data-tone=caution] { --badge-ink: var(--status-caution); --badge-wash: var(--status-caution-wash); --badge-border: var(--status-caution-border); }
+.ui-badge[data-tone=danger] { --badge-ink: var(--status-danger); --badge-wash: var(--status-danger-wash); --badge-border: var(--status-danger-border); }
+/* Not started is an outline, so finished work reads as filled. */
+body.desvio-redesign.desvio-polished .ui-badge[data-status=not_started] { background: transparent; border-style: dashed; }
+body.desvio-redesign.desvio-polished .ui-badge[data-status=not_started] .ui-badge-dot { background: transparent; box-shadow: inset 0 0 0 1.5px currentColor; }
+
+/* ── Card ──────────────────────────────────────────────────────────────── */
+body.desvio-redesign.desvio-polished .ui-card {
+  min-width: 0; padding: clamp(var(--spacing-5), 2.2vw, var(--spacing-7));
+  border: 1px solid var(--color-border); border-radius: var(--radius-container);
+  background: var(--color-background-card); color: var(--color-text-primary); box-shadow: none;
+}
+body.desvio-redesign.desvio-polished .ui-card[data-tone=muted] { background: var(--color-background-muted); }
+body.desvio-redesign.desvio-polished .ui-card[data-tone=accent] { background: var(--brand-wash); border-color: var(--brand-wash); }
+body.desvio-redesign.desvio-polished .ui-card[data-tone=inverse] {
+  --color-text-primary: var(--brand-paper); --color-text-secondary: var(--brand-clay); --color-border: var(--brand-ink-line); --color-focus: var(--brand-accent);
+  background: var(--brand-ink); border-color: var(--brand-ink); color: var(--brand-paper);
+}
+body.desvio-redesign.desvio-polished .ui-card[data-elevation=low] { box-shadow: var(--shadow-low); }
+body.desvio-redesign.desvio-polished .ui-card[data-elevation=raised] { box-shadow: var(--shadow-med); }
+body.desvio-redesign.desvio-polished .ui-card[data-interactive=true] {
+  transition: border-color var(--duration-fast) var(--ease-standard), box-shadow var(--duration-medium) var(--ease-standard), transform var(--duration-medium) var(--ease-standard);
+}
+@media (hover: hover) {
+  body.desvio-redesign.desvio-polished .ui-card[data-interactive=true]:hover { border-color: var(--color-border-emphasized); box-shadow: var(--shadow-med); transform: translateY(-2px); }
+}
+body.desvio-redesign.desvio-polished .ui-card[data-interactive=true]:focus-within { border-color: var(--color-focus); box-shadow: 0 0 0 3px var(--color-focus-wash); }
+body.desvio-redesign.desvio-polished .ui-card[data-interactive=true]:active { transform: none; box-shadow: none; }
+
+/* ── EmptyState ────────────────────────────────────────────────────────── */
+body.desvio-redesign.desvio-polished .ui-empty {
+  display: grid; justify-items: start; gap: var(--spacing-2); padding: var(--spacing-8) 0; text-align: left;
+}
+body.desvio-redesign.desvio-polished .ui-empty[data-compact=true] { padding: var(--spacing-5) 0; }
+body.desvio-redesign.desvio-polished .ui-empty :is(h2,h3,h4) { margin: 0; font-size: var(--type-lg); line-height: var(--leading-snug); color: var(--color-text-primary); }
+body.desvio-redesign.desvio-polished .ui-empty p { margin: 0; max-width: 46ch; font-size: var(--type-sm); line-height: var(--leading-body); color: var(--color-text-secondary); }
 
 /* One field rhythm, including selectors in side panels and native dialogs. */
 body.desvio-redesign.desvio-polished .field { display: grid; gap: var(--ds-space-2); }
@@ -91,6 +181,9 @@ body.desvio-redesign.desvio-polished .campaign-new-post header > .desvio-action[
 @media (prefers-reduced-motion: reduce) {
   body.desvio-redesign.desvio-polished .desvio-action,
   body.desvio-redesign.desvio-polished .desvio-action * { animation: none !important; transition: none !important; }
+  body.desvio-redesign.desvio-polished .desvio-action:active:not(:disabled),
+  body.desvio-redesign.desvio-polished .ui-card[data-interactive=true],
+  body.desvio-redesign.desvio-polished .ui-card[data-interactive=true]:hover { transform: none; transition: none; }
 }
 
 /* Astryx reserves a live region for async feedback; empty regions have no announcement. */
@@ -135,3 +228,58 @@ body.desvio-redesign.desvio-polished .desvio-action.v5-menu { display: none; }
 @media (max-width: 760px) {
   body.desvio-redesign.desvio-polished .desvio-action.v5-menu { display: inline-flex; }
 }
+
+/* ── Session gate ──────────────────────────────────────────────────────────
+   Shown while the session is unknown. Deliberately carries no navigation. */
+.session-pending {
+  min-height: 100dvh; display: grid; place-content: center; justify-items: center; gap: var(--spacing-6);
+  padding: var(--spacing-6); background: var(--color-background-body); color: var(--color-text-secondary);
+}
+.session-pending img { display: block; width: 146px; height: auto; }
+.session-pending-status { display: flex; align-items: center; gap: var(--spacing-3); font-size: var(--type-sm); }
+
+/* ── Sign-in and account screens ─────────────────────────────────────────── */
+body.desvio-redesign.desvio-polished .auth-story { color: var(--brand-paper); }
+body.desvio-redesign.desvio-polished .auth-story h2 { color: var(--brand-paper); }
+body.desvio-redesign.desvio-polished .auth-story > div { max-width: 34rem; }
+body.desvio-redesign.desvio-polished .auth-story p { max-width: 40ch; line-height: var(--leading-body); }
+body.desvio-redesign.desvio-polished .auth-story .wordmark:focus-visible { outline-color: var(--brand-accent); }
+body.desvio-redesign.desvio-polished .auth-links a {
+  display: inline-flex; align-items: center; min-height: var(--control-height);
+  color: var(--color-text-primary); text-underline-offset: 3px;
+  transition: color var(--duration-fast) var(--ease-standard);
+}
+body.desvio-redesign.desvio-polished .auth-links p a { min-height: 0; display: inline; font-weight: 600; }
+body.desvio-redesign.desvio-polished .auth-links p { display: flex; flex-wrap: wrap; align-items: center; gap: var(--spacing-1-5); min-height: var(--control-height); padding-top: var(--spacing-4); }
+@media (hover: hover) { body.desvio-redesign.desvio-polished .auth-links a:hover { color: var(--brand-link); } }
+body.desvio-redesign.desvio-polished .auth-links a:active { color: var(--brand-muted); }
+body.desvio-redesign.desvio-polished .auth-card .confirmation { display: grid; justify-items: start; gap: var(--spacing-3); }
+
+/* ── Workspace shell ───────────────────────────────────────────────────────
+   The markup lives in components/businesses.tsx; these rules settle the
+   hierarchy the page relies on. */
+/* Business name: label above, full name on up to two lines, never clipped mid-word. */
+body.desvio-redesign.desvio-polished .workspace-business > div { display: grid; gap: var(--spacing-0-5); min-width: 0; }
+body.desvio-redesign.desvio-polished .workspace-business .workspace-context { font-size: var(--type-xs); font-weight: 500; line-height: 1.3; }
+body.desvio-redesign.desvio-polished .workspace-business strong {
+  font-size: var(--type-sm); line-height: 1.3; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
+/* With one business the sidebar already names it; the topbar shows the page only. */
+body.desvio-redesign.desvio-polished .v5-sidebar:has(.workspace-business strong) ~ .v5-body :is(.workspace-breadcrumb, .workspace-separator) { display: none; }
+/* Account block: name and account link read as one entry; sign out is quiet. */
+body.desvio-redesign.desvio-polished .v5-account > div { min-width: 0; flex: 1; }
+body.desvio-redesign.desvio-polished .v5-account strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.desvio-redesign.desvio-polished .v5-account .desvio-action { min-height: var(--control-height); padding-inline: var(--spacing-2); font-size: var(--type-xs); font-weight: 500; }
+
+/* ── Home: legacy panels share the card surface ──────────────────────────── */
+body.desvio-redesign.desvio-polished :is(.overview-campaigns, .overview-details) {
+  margin: 0; padding: clamp(var(--spacing-5), 2.2vw, var(--spacing-7));
+  border: 1px solid var(--color-border); border-radius: var(--radius-container); background: var(--color-background-card);
+}
+body.desvio-redesign.desvio-polished .overview-campaigns .section-heading { margin-bottom: var(--spacing-4); }
+body.desvio-redesign.desvio-polished .overview-campaigns .section-heading h2 { font-size: var(--type-xl); }
+body.desvio-redesign.desvio-polished .overview-campaign-list a { border-radius: var(--radius-element); transition: border-color var(--duration-fast) var(--ease-standard), background-color var(--duration-fast) var(--ease-standard); }
+@media (hover: hover) { body.desvio-redesign.desvio-polished .overview-campaign-list a:hover { border-color: var(--color-border-emphasized); background: var(--brand-wash); } }
+body.desvio-redesign.desvio-polished .overview-campaign-list a:active { background: var(--brand-sand); }
+body.desvio-redesign.desvio-polished .overview-details > summary { padding-block: var(--spacing-3); font-size: var(--type-base); cursor: pointer; }
