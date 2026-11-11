@@ -143,7 +143,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             const first: Business = list.businesses[0];
             entryPath = `/b/${first.id}/overview`;
             if (["owner", "admin"].includes(first.role)) {
-              const setup = await api(`${scopePath(first)}/guided-brief`);
+              const setup = await api(`/api/v1/businesses/${first.id}/guided-brief`);
               const unfinished = !setup.research_job_id && !setup.answers_locked &&
                 (setup.revision > 0 || !first.has_approved_brand);
               if (unfinished) entryPath = `/b/${first.id}/guided-onboarding`;

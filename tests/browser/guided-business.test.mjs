@@ -21,6 +21,7 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
   else if(path.endsWith('/generation-notifications'))data={notifications:[]};
   else if(path.endsWith('/overview'))data={counts:{awaiting_review:2,approved_posts:1,creative_projects:3,active_jobs:1,published_posts:0,scheduled_posts:0,uncertain_publications:0,publication_attention:0,failed_jobs_last_week:0},upcoming_posts:[{id,channel:'instagram',format:'carousel',hook:'Meet the people behind the courtyard',brief:'',state:'content_needed',planned_at:'2026-11-20T09:00:00Z',timezone:'Asia/Kuala_Lumpur',starts_on:'2026-11-20',plan_title:'Local stories',design:null,generation_status:null}],campaigns:[],activity:[],recommendations:[],generation_activity:[],performance:{published_count:0,available_count:0,posts:[]}};
   else if(path.endsWith('/guided-brief')){
+   assert.equal(path,`/api/v1/businesses/${id}/guided-brief`);
    if(request.method()==='PATCH'){if(failSave){await route.fulfill({status:503,json:{message:'Save unavailable'}});return;}const input=request.postDataJSON();assert.ok(!JSON.stringify(input).includes("maya@example.com"));assert.equal(input.revision,saved.revision);saved={...saved,...input,revision:saved.revision+1};}
    data=saved;
   }
