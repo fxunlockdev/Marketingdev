@@ -1,3 +1,4 @@
+import {requireMonthlyPlanApproval} from './monthly-plan-approval.js';
 import {imagePlanningRates} from './creative-planning.js';
 import {normalizeCreativeSpec,creativeSourceSize} from './campaign-formats.js';
 import type {CarouselGeneration} from './carousel-generation.js';
@@ -96,6 +97,7 @@ export class SlotCreatives {
         )
       ).rows[0];
       if (!s) throw new NotFoundException("Content slot not found");
+      await requireMonthlyPlanApproval(db,b.organization_id,id,s);
       if (s.format === "carousel") throw new BadRequestException("Edit carousel slides in Canvas and attach the revised carousel");
       if (s.format === "video") throw new BadRequestException("Revise videos in Canvas and approve the new prompt before generation");
       if (s.revision !== v.revision)
@@ -250,14 +252,16 @@ export class SlotCreatives {
     if(new Set(slots.map(s=>s.id)).size!==slots.length)throw new BadRequestException('Choose each post once');
     const sha=hash(canonicalJSON({...(!v.automatic?{user}:{}),planId,slots,...(v.automatic?{automatic:true}:{}),...(v.credit_cap!==undefined?{credit_cap:v.credit_cap}:{})}));
     return this.plans.scope(user,id,true,async(db,b)=>{
+      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`campaign-batch:${id}:${key}`]);
       const prior=(await db.query('SELECT request_hash FROM app.campaign_image_batches WHERE organization_id=$1 AND brand_id=$2 AND request_key=$3',[b.organization_id,id,key])).rows[0];
       if(prior){if(prior.request_hash!==sha)throw new ConflictException('That request key belongs to another campaign request');return {jobs:await this.batchJobs(db,b.organization_id,id,planId,key)};}
       if(v.automatic){const previous=await this.batchJobs(db,b.organization_id,id,planId);if(previous.some(j=>slots.some(s=>s.id===j.slot_id)))throw new ConflictException('A selected image already has a generation attempt. Check its saved progress before retrying.');}
       const saved=(await db.query('SELECT * FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND plan_id=$3 AND id=ANY($4::uuid[])',[b.organization_id,id,planId,slots.map(s=>s.id)])).rows;
       if(saved.length!==slots.length)throw new NotFoundException('Campaign posts not found');
+      for(const slot of saved)await requireMonthlyPlanApproval(db,b.organization_id,id,slot);
       for(const slot of slots){const s=saved.find(s=>s.id===slot.id);if(s.revision!==slot.revision||!['static','carousel','video'].includes(s.format)||s.state!=='content_needed'||s.creative_version_id||s.video_version_id||s.carousel_version_id)throw new ConflictException('A selected post changed or already has content. Refresh your campaign.');}
       if(saved.some(s=>s.format!=='static')&&v.credit_cap===undefined)throw new BadRequestException('Review the generation credit cap before continuing');
-      if(v.automatic&&saved.some(s=>!['static','carousel'].includes(s.format)))throw new BadRequestException('Automatic creation supports images and carousels only');
+      if(v.automatic&&saved.some(s=>s.format==='video')&&!(await db.query(`SELECT g.id FROM app.guided_campaigns g JOIN app.planning_requests r ON r.job_id=g.planning_job_id WHERE g.organization_id=$1 AND g.brand_id=$2 AND r.output_plan_id=$3 AND g.plan_approved_at IS NOT NULL`,[b.organization_id,id,planId])).rowCount)throw new BadRequestException('Approve the monthly calendar before preparing video posts');
       const quote=await this.generationQuote(db,b.organization_id,id,planId);
       const selected=slots.map(s=>quote.slots.find(q=>q.id===s.id&&q.revision===s.revision));
       if(v.credit_cap!==undefined){if(!quote.available)throw new ConflictException('Generation is not configured for this brand');if(selected.some(q=>!q))throw new ConflictException('The reviewed posts changed. Review them again.');const minimum=selected.reduce((n,q)=>n+q!.credits,0);if(Number(v.credit_cap)<minimum)throw new ConflictException(`Generation requires a capacity of at least ${minimum} credits. Refresh the quote before continuing.`);}

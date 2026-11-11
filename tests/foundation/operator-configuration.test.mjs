@@ -63,7 +63,7 @@ test('expiry-only drift invalidates a preview and exact database/business bounda
 });
 test('all six AI grant kinds persist atomically, with explicit model and cost bounds',async()=>{
  const m=manifest(),common={enabled:false,expires_at:m.grants[0].expires_at,...rates};
- m.grants.push({kind:'creative',...common,text_model:'test-model',image_model:'test-image',quality:'low',max_image_request_micros:1000},{kind:'gemini_creative',...common,text_model:'gemini-test'},{kind:'planning',...common,provider:'openai',model:'test-model'},{kind:'insights',...common,provider:'gemini',model:'gemini-test'},{kind:'video',enabled:false,expires_at:common.expires_at,budget_micros:100000,models:['kling-video/v3.0/std/image-to-video'],max_create_micros:1000,max_edit_micros:1000});
+ m.grants.push({kind:'creative',...common,text_model:'test-model',image_model:'test-image',quality:'low',max_image_request_micros:1000},{kind:'gemini_creative',...common,text_model:'gemini-test'},{kind:'planning',...common,provider:'openai',model:'test-model'},{kind:'insights',...common,provider:'gemini',model:'gemini-test'},{kind:'video',enabled:false,expires_at:common.expires_at,budget_micros:100000,models:['runway/router'],max_create_micros:1000,max_edit_micros:1000});
  const p=await configureProviders(admin,m,options);assert.equal((await configureProviders(admin,m,{...options,approval:p.preview_sha256})).grants,6);
  for(const table of ['analysis_grants','creative_grants','gemini_creative_grants','planning_grants','insight_grants','video_grants'])assert.equal((await admin.query(`SELECT enabled FROM app.${table} WHERE brand_id=$1`,[brand])).rows[0].enabled,false);
 });
@@ -208,7 +208,7 @@ test('all model default types inherit exact settings and malformed policy rolls 
   {kind:'gemini_creative',...common,text_model:'gemini-test'},
   {kind:'planning',...common,provider:'openai',model:'test-plan'},
   {kind:'insights',...common,provider:'openai',model:'test-insights'},
-  {kind:'video',enabled:true,expires_at:common.expires_at,budget_micros:null,models:['kling-video/v3.0/std/image-to-video'],max_create_micros:1000,max_edit_micros:1000}];
+  {kind:'video',enabled:true,expires_at:common.expires_at,budget_micros:null,models:['runway/router'],max_create_micros:1000,max_edit_micros:1000}];
  const p=await configureProviders(admin,m,options);await configureProviders(admin,m,{...options,approval:p.preview_sha256});
  const id=randomUUID();await admin.query('INSERT INTO app.brands(id,organization_id,name) VALUES($1,$2,$3)',[id,workspace,'All defaults']);
  for(const table of ['analysis_grants','creative_grants','gemini_creative_grants','planning_grants','insight_grants','video_grants']){

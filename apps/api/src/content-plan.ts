@@ -210,7 +210,7 @@ export class ContentPlan {
    const args=[b.organization_id,id,start,end,q.channel??null,q.state??null,plan];
    const where=`s.organization_id=$1 AND s.brand_id=$2 AND s.planned_at >= $3 AND s.planned_at < $4
     AND ($5::text IS NULL OR s.channel=$5) AND ($6::text IS NULL OR s.state=$6) AND ($7::uuid IS NULL OR s.plan_id=$7)
-    ${inbox?"AND s.state NOT IN ('content_needed','draft_ready','cancelled')":q.state===undefined?"AND s.state<>'cancelled'":''}`;
+    ${inbox?"AND s.state NOT IN ('content_needed','cancelled')":q.state===undefined?"AND s.state<>'cancelled'":''}`;
    const rows=(await db.query(`SELECT s.*,p.title AS plan_title,p.timezone,p.objective,p.starts_on::text,
     COALESCE(v.caption,vv.caption,cv.caption) AS caption,v.design,v.media_id,v.skill_manifest,COALESCE(v.project_id,vv.project_id,cv.project_id) AS project_id,COALESCE(c.thread_id,vp.thread_id) AS thread_id,
     (CASE WHEN s.format='carousel' THEN cp.latest_version_id<>cv.id WHEN s.format='video' THEN vp.latest_version_id<>vv.id ELSE v.id IS NOT NULL AND c.latest_version_id<>v.id END) AS has_newer_version
@@ -312,7 +312,7 @@ export class ContentPlan {
   });
  }
  review(user:string,id:string,slotId:string,body:unknown) {
-  const v=object(body,['revision','creative_version_id','creative_sha256','video_version_id','video_sha256','carousel_version_id','carousel_sha256','decision','feedback']);
+  const v=object(body,['revision','creative_version_id','creative_sha256','video_version_id','video_sha256','carousel_version_id','carousel_sha256','decision','feedback','carousel_confirmed','carousel_review_revision']);
   return this.scope(user,id,true,(db,b)=>this.decide(db,b,user,id,uuid(slotId),v),['approved','changes_requested','rejected','reopen'].includes(String(v.decision)));
  }
  async decide(db:PoolClient,b:Business,user:string,id:string,slotId:string,v:Record<string,unknown>) {
@@ -327,7 +327,16 @@ export class ContentPlan {
   const allowed=decision==='reopen'?['approved','rejected','changes_requested'].includes(s.state):decision==='cancelled'?s.state!=='cancelled':decision==='pending_review'?['draft_ready','changes_requested'].includes(s.state):s.state==='pending_review';
   if(!allowed)throw new ConflictException('This post is not eligible for that review action');
   if(!['cancelled','reopen'].includes(decision)){
-   if(s.format==='carousel'){const c=await this.carousel(db,b.organization_id,id,s.carousel_version_id,s.channel);if(decision==='approved'&&c.status!=='approved')throw new ConflictException('Review and approve every saved carousel slide first');}
+   if(s.format==='carousel'){
+    const c=await this.carousel(db,b.organization_id,id,s.carousel_version_id,s.channel);
+    if(v.carousel_confirmed===true){
+     if(c.review_revision!==revision(v.carousel_review_revision))throw new ConflictException('The carousel review changed. Reload every slide before deciding.');
+     const status=decision==='pending_review'?'in_review':decision;
+     const next=c.review_revision+1;
+     await db.query('UPDATE app.carousel_versions SET status=$2,review_revision=$3,reviewed_by=$4,reviewed_at=now() WHERE id=$1',[c.id,status,next,status==='in_review'?null:user]);
+     await db.query('INSERT INTO app.carousel_reviews(id,organization_id,brand_id,version_id,actor_id,decision,feedback,revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[randomUUID(),b.organization_id,id,c.id,user,status,feedback,next]);
+    }else if(decision==='approved'&&c.status!=='approved')throw new ConflictException('Review and approve every saved carousel slide first');
+   }
    else if(s.format==='video'){await this.video(db,b.organization_id,id,s.video_version_id,s.channel);}
    else await this.creative(db,b.organization_id,id,s.creative_version_id,s.format);
   }

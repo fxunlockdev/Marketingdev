@@ -11,7 +11,13 @@ export function normalizeCreativeSpec(value:unknown,format:string,channel:string
  if(v.placement==='feed'?(v.aspect==='vertical'):(v.aspect!=='vertical'||channel==='linkedin'||format==='ad'||format==='carousel'))return invalid();
  if(v.placement==='reel'&&format!=='video')return invalid();
  if(format==='carousel'?!Number.isInteger(v.slide_count)||Number(v.slide_count)<2||Number(v.slide_count)>10:v.slide_count!==null)return invalid();
- return {placement:v.placement as CreativeSpec['placement'],aspect:v.aspect as CreativeSpec['aspect'],slide_count:v.slide_count as number|null,...(v.artwork!==undefined?{artwork:v.artwork as PostArtwork}:{})};
+ const artwork=v.artwork as PostArtwork|undefined;
+ const typography=artwork?.typography;
+ return {placement:v.placement as CreativeSpec['placement'],aspect:v.aspect as CreativeSpec['aspect'],slide_count:v.slide_count as number|null,
+  ...(artwork?{artwork:{text:artwork.text,...(typography?{typography:{
+   headline:{family:typography.headline.family,weight:typography.headline.weight},
+   body:{family:typography.body.family,weight:typography.body.weight},
+  }}:{})}}:{})};
 }
 export function creativeDimensions(spec:CreativeSpec):{width:number;height:number}{
  return {square:{width:1024,height:1024},portrait:{width:1024,height:1536},landscape:{width:1536,height:1024},vertical:{width:1080,height:1920}}[spec.aspect];

@@ -1,0 +1,17 @@
+.panel { display: grid; gap: 20px; min-width: 0; }
+.panel h2 { margin: 0; text-wrap: balance; }
+.panel p { margin: 0; line-height: 1.6; text-wrap: pretty; }
+.concepts { display: grid; gap: 16px; list-style: none; margin: 4px 0; padding: 0; }
+.concept { display: flex; align-items: flex-start; gap: 16px; padding: 20px; border: 1px solid var(--brand-border); border-radius: 16px; }
+.number { display: grid; place-items: center; flex: 0 0 32px; height: 32px; border-radius: 50%; background: var(--brand-surface, #f5f4f8); font-variant-numeric: tabular-nums; font-weight: 600; }
+.content { display: grid; gap: 12px; min-width: 0; flex: 1; overflow-wrap: anywhere; }
+.content > button { justify-self: start; }
+.metadata { color: var(--brand-muted); font-size: 14px; font-variant-numeric: tabular-nums; }
+.reference { display: grid; gap: 10px; max-width: 440px; }
+.reference > p { color: var(--brand-muted); font-size: 14px; }
+.actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; border-top: 1px solid var(--brand-border); padding-top: 20px; }
+.actions p { color: var(--brand-muted); font-size: 14px; }
+@media (max-width: 600px) {
+  .concept { padding: 16px; gap: 12px; }
+  .actions > button { width: 100%; white-space: normal; }
+}

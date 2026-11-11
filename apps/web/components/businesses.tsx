@@ -1,4 +1,5 @@
 "use client";
+import {GuidedBusinessBrief} from "./guided-business";
 import {CreativeBrief} from "./creative-brief";
 import dynamic from "next/dynamic";
 import {ActionButton} from "./design-system";
@@ -45,7 +46,7 @@ type Business = {
 const sections = [
   ["overview", "Home", "home"],
   ["content-plan", "Calendar", "calendar"],
-  ["campaigns", "Campaigns", "layers"],
+  ["create", "Create", "star"],
   ["review", "Approvals", "approval"],
   ["brand-kit", "Brand Kit", "orbit"],
   ["content-preferences", "Content Preferences", "sliders"],
@@ -175,9 +176,9 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       parts[0] === "b" ? (parts[2] ?? "overview") : (parts[0] ?? "overview"),
     isNew = pathname === "/brands/new",
     label =
-      section === "create" ? "Create" : section === "campaign-post" ? "Campaign post" : section === "canvas" ? "Campaigns" : section === "strategies" ? "Strategies" : section === "campaign-review" ? "Campaign" : section === "campaign-new" ? "New campaign" : section === "manage"
+      section === "campaigns" ? "Calendar" : section === "create" ? "Create" : section === "campaign-post" ? "Post" : section === "canvas" ? "Create" : section === "strategies" ? "Strategies" : section === "campaign-review" ? "Calendar" : ["campaign-new","monthly-planning"].includes(section) ? "Plan my content" : section === "manage"
         ? "Manage brand"
-        : section === "onboarding"
+        : ["onboarding","guided-onboarding"].includes(section)
         ? "Brand onboarding"
         : sections.find((s) => s[0] === section)?.[1];
   const resolvingBusiness=parts[0]==="b"&&!business&&verifiedBusinessId!==parts[1];
@@ -238,7 +239,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
               <AppLink
                 href={href(key)}
                 aria-current={
-                  section === key || (["campaign-new","campaign-review","campaign-post"].includes(section) && key === "campaigns") ||
+                  section === key || (["campaign-review","campaign-post","campaigns"].includes(section) && key === "content-plan") ||
                   (["onboarding", "manage"].includes(section) && key === "brands")
                     ? "page"
                     : undefined
@@ -316,6 +317,10 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <BrandKit key={business.id} business={business}/>
           ) : section === "content-preferences" ? (
             <ContentPreferences key={business.id} business={business}/>
+          ) : section === "monthly-planning" ? (
+            <GuidedBusinessBrief key={`${business.id}:planning`} business={business} planning/>
+          ) : section === "guided-onboarding" ? (
+            <GuidedBusinessBrief key={business.id} business={business}/>
           ) : section === "onboarding" ? (
             <BrandOnboarding business={business} />
           ) : ["content-plan","review"].includes(section) ? (
@@ -327,9 +332,9 @@ export function BusinessApp({ pathname }: { pathname: string }) {
           ) : section === "strategies" ? (
             <Strategies key={business.id} business={business}/>
           ) : section === "campaign-new" ? (
-            <CampaignBuilder key={business.id} business={business}/>
+            <GuidedBusinessBrief key={`${business.id}:planning`} business={business} planning/>
           ) : section === "campaigns" ? (
-            <CampaignsScreen key={business.id} business={business}/>
+            <ContentWorkspace key={business.id} business={business}/>
           ) : section === "archive" ? (
             <ContentArchive key={business.id} business={business}/>
           ) : section === "campaign-post" ? (
@@ -357,9 +362,9 @@ function RetiredCanvas({businessId}:{businessId:string}) {
   useEffect(()=>{
     const source=new URLSearchParams(location.search),query=new URLSearchParams();
     for(const key of ['slot','thread','project','carousel']){const value=source.get(key);if(value)query.set(key,value);}
-    router.replace(`/b/${businessId}/${query.size?'campaign-post?'+query.toString():'campaigns'}`);
+    router.replace(`/b/${businessId}/${query.size?'campaign-post?'+query.toString():'create'}`);
   },[businessId,router]);
-  return <p role="status">Opening your campaign workspace…</p>;
+  return <p role="status">Opening your creative workspace…</p>;
 }
 function PageTitle({
   eyebrow,
@@ -406,7 +411,7 @@ function BusinessCard({
           ? "Brand facts confirmed"
           : "Brand setup in progress"}
       </span>
-      <AppLink className="button card-open" href={`/b/${business.id}/onboarding`}>
+      <AppLink className="button card-open" href={`/b/${business.id}/${business.has_approved_brand?'onboarding':'guided-onboarding'}`}>
         {business.has_approved_brand ? "Review brand" : "Continue setup"}{" "}
         <span aria-hidden="true">→</span>
       </AppLink>
@@ -532,7 +537,7 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
     try {
       const b = await api("/api/v1/businesses", body, "POST", key.current);
       window.dispatchEvent(new Event('desvio-workspace-changed'));
-      if(documents)setCreated(b);else router.push(`/b/${b.id}/onboarding`);
+      if(documents)setCreated(b);else router.push(`/b/${b.id}/guided-onboarding`);
     } catch (e) {
       setError(e);
     } finally {
@@ -553,7 +558,7 @@ function NewBusiness({ entitlement }: { entitlement: any }) {
         if(job.status!=='succeeded')throw new Error(job.error_code?`We couldn’t read ${asset.filename}: ${job.error_code}. Your upload is saved.`:`${asset.filename} is still being read. Try continuing again shortly; we’ll check the same request.`);
       }
       if(!created.website&&assets.some((a:any)=>a.state==='ready'&&['application/pdf','application/vnd.openxmlformats-officedocument.presentationml.presentation'].includes(a.content_type)))await api(`/api/v1/businesses/${created.id}/intake`,{kind:'brand.analyze'},'POST',`onboarding-documents-${created.id}`);
-      router.push(`/b/${created.id}/onboarding`);
+      router.push(`/b/${created.id}/guided-onboarding`);
     }catch(e){setError(e);}finally{setBusy(false);}
   }
   if(created)return <div className="brand-onboarding-experience"><PageTitle eyebrow="Add your business" title="Bring your brand along."><p>Upload any logos, product photos or guidelines you have.</p></PageTitle><Steps step={1}/><BrandFiles org={{id:created.organization_id,name:created.name,role:created.role??'owner'}} brandId={created.id}/><Notice error={error}/><ActionButton className="primary" disabled={busy} onClick={()=>void prepareUploads()} label={busy?"Reading your documents…":"Continue to brand analysis"} /></div>;
@@ -909,10 +914,10 @@ export function BrandOnboarding({ business }: { business: Business }) {
         title={
           confirmed
             ? "Your brand is ready."
-            : preparing ? "Your brand starts here." : state.step===2 ? "Does this feel like you?" : "Your first content plan."
+            : preparing ? "Your brand starts here." : state.step===2 ? "Does this feel like you?" : "Your content preferences."
         }
       >
-        <p>{preparing?"We’ll handle the research. You make it yours.":state.step===2?"We’ve prepared the details. Edit anything before continuing.":"Choose your channels and content mix. We’ll build your calendar."}</p>
+        <p>{preparing?"We’ll handle the research. You make it yours.":state.step===2?"We’ve prepared the details. Edit anything before continuing.":"Save your preferences, then review your creative direction."}</p>
       </PageTitle>
       <Steps step={preparing?1:state.step} />
       <Notice error={error} />
@@ -921,12 +926,12 @@ export function BrandOnboarding({ business }: { business: Business }) {
         <section className="v5-panel">
           <h2>Your approved brand profile is saved.</h2>
           <p>
-            Your brand is saved. Open your content plan to start creating.
+            Your brand is saved. Review your mood board before planning your content.
           </p>
           <div className="actions"><AppLink className="button" href={`/b/${business.id}/memory`}>
             View brand memory
           </AppLink>
-          <AppLink className="button primary" href={`/b/${business.id}/content-plan`}>Open Content Plan</AppLink></div>
+          <AppLink className="button primary" href={`/b/${business.id}/guided-onboarding`}>Continue to my mood board</AppLink></div>
         </section>
       ) : state.step === 2 ? (
         <>

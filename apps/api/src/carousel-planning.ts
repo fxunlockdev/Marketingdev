@@ -37,3 +37,20 @@ export function validateCarouselResult(value:any,input:CarouselInput):CarouselRe
  if(value.reads.some((p:any)=>typeof p!=='string'||p.includes('..')||(p!=='/.agents/product-marketing.md'&&!Object.keys(CAROUSEL_SKILLS).some(s=>p.startsWith(`/skills/${s}/`)))))fail();
  validateCarouselPlan(value.plan,input);return value;
 }
+
+// Only the trusted runtime supplies these IDs and the requested slide count.
+export function carouselPlanSchema(input:CarouselInput){
+ validateCarouselInput(input);
+ const text=(max:number,min=0)=>({type:'string',pattern:`^[\\s\\S]{${min},${max}}$`});
+ const object=(properties:Record<string,unknown>)=>({type:'object',additionalProperties:false,properties,required:Object.keys(properties)});
+ return object({
+  title:text(140,1),caption:text(3000,1),visual_direction:text(2000,1),
+  palette:{type:'array',minItems:2,maxItems:2,items:{type:'string',pattern:'^#[a-fA-F0-9]{6}$'}},
+  warnings:{type:'array',maxItems:10,items:text(500,1)},
+  slides:{type:'array',minItems:input.slide_count,maxItems:input.slide_count,items:object({
+   position:{type:'integer',minimum:1,maximum:input.slide_count},
+   headline:text(140,1),body:text(500),cta:text(80),image_prompt:text(3000,1),alt_text:text(1000,1),
+   fact_ids:{type:'array',minItems:1,maxItems:20,items:{type:'string',enum:input.brand.facts.map(f=>f.id)}},
+  })},
+ });
+}

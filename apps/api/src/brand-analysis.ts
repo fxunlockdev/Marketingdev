@@ -1,3 +1,6 @@
+import {ONBOARDING_REFERENCES} from './onboarding-references.js';
+import {BUSINESS_DIRECTION_SCHEMA,DIRECTION_INSTRUCTIONS,validateBusinessDirection,type BusinessDirection} from './business-research-direction.js';
+import {guidedBrief,BUSINESS_RESEARCH_INSTRUCTIONS,BUSINESS_RESEARCH_AGENT_VERSION,type GuidedBrief} from './guided-campaign-contracts.js';
 import OpenAI from "openai";
 import { digest } from "./object-store.js";
 import { FIELDS, canonicalJSON, hash } from "./brand-brain.js";
@@ -11,11 +14,13 @@ export type EvidenceChunk = {
   website_url: string | null;
 };
 export type AnalysisInput = {
+  guided_brief?: GuidedBrief;
   chunks: EvidenceChunk[];
   reviewed: { field: string; value: string; status: string }[];
   visuals?: VisualInput[];
 };
 export type AnalysisResult = {
+  business_direction?: BusinessDirection;
   findings: { field: string; value: string; chunk_id: string; quote: string }[];
   recommendation: null | {
     goal: string;
@@ -113,6 +118,7 @@ export function validateAnalysis(
       "recommendation",
       "missing",
       ...(input.visuals?.length ? ["visual_guidance"] : []),
+      ...(input.guided_brief ? ["business_direction"] : []),
     ]) ||
     !Array.isArray(v.findings) ||
     v.findings.length > 10 ||
@@ -188,6 +194,7 @@ export function validateAnalysis(
         throw invalid();
     }
   }
+  if(input.guided_brief)validateBusinessDirection(v.business_direction,input.chunks.map(c=>c.id));
   return v;
 }
 /** Keep independently grounded results without accepting invalid citations or overwriting
@@ -197,13 +204,15 @@ export function recoverAnalysis(value: unknown, input: AnalysisInput): AnalysisR
     if (!(error instanceof IntakeError)) throw error;
   }
   const v = value as any;
-  const keys = ["findings", "recommendation", "missing", ...(input.visuals?.length ? ["visual_guidance"] : [])];
+  const keys = ["findings", "recommendation", "missing", ...(input.visuals?.length ? ["visual_guidance"] : []),...(input.guided_brief ? ["business_direction"] : [])];
   if (!exact(v, keys) || !Array.isArray(v.findings) || !Array.isArray(v.missing) ||
       v.findings.length > 100 || v.missing.length > 100 ||
       (input.visuals?.length && (!Array.isArray(v.visual_guidance) || v.visual_guidance.length > 100)))
     throw new IntakeError("AI_OUTPUT_INVALID");
+  if(input.guided_brief)validateBusinessDirection(v.business_direction,input.chunks.map(c=>c.id));
   const clean: AnalysisResult = { findings: [], recommendation: null, missing: [],
-    ...(input.visuals?.length ? { visual_guidance: [] } : {}) };
+    ...(input.visuals?.length ? { visual_guidance: [] } : {}),
+    ...(input.guided_brief ? {business_direction:v.business_direction} : {}) };
   let dropped = false;
   for (const finding of v.findings) {
     try {
@@ -223,7 +232,7 @@ export function recoverAnalysis(value: unknown, input: AnalysisInput): AnalysisR
   if (dropped || clean.missing.length !== v.missing.length)
     clean.missing.push("Some AI suggestions could not be verified against your sources and were omitted. Review the remaining details and add any missing information.");
   // Never turn a wholly unusable answer into a successful empty profile.
-  if (!clean.findings.length && !clean.recommendation && !clean.visual_guidance?.length)
+  if (!clean.findings.length && !clean.recommendation && !clean.visual_guidance?.length && !clean.business_direction)
     throw new IntakeError("AI_OUTPUT_INVALID");
   return validateAnalysis(clean, input);
 }
@@ -243,6 +252,7 @@ export function analysisRequest(
   const evidence = {
     chunks: input.chunks,
     reviewed: input.reviewed,
+    ...(input.guided_brief ? {guided_brief:guidedBrief(input.guided_brief,true),visual_reference_preferences:(input.guided_brief.details?.references??[]).map((id,index)=>{const reference=ONBOARDING_REFERENCES.find(r=>r.id===id)!;return {rank:index+1,id:reference.id,style:reference.name,category:reference.industry};}),agent_version:BUSINESS_RESEARCH_AGENT_VERSION} : {}),
     ...(visuals.length ? { visual_manifest: visualManifest(visuals) } : {}),
   };
   if (Buffer.byteLength(canonicalJSON(evidence)) > 200000)
@@ -264,7 +274,7 @@ export function analysisRequest(
     )
   )
     throw new IntakeError("AI_VISUAL_INPUT_LIMIT");
-  const schema = visuals.length
+  const baseSchema = visuals.length
     ? obj({
         ...ANALYSIS_SCHEMA.properties,
         visual_guidance: {
@@ -278,11 +288,12 @@ export function analysisRequest(
         },
       })
     : ANALYSIS_SCHEMA;
+  const schema=input.guided_brief ? obj({...baseSchema.properties,business_direction:BUSINESS_DIRECTION_SCHEMA}) : baseSchema;
   const body = {
     model,
     store: false as const,
     max_output_tokens: 4000,
-    instructions: instructions + (visuals.length ? visualInstructions : ""),
+    instructions: instructions + (visuals.length ? visualInstructions : "") + (input.guided_brief ? BUSINESS_RESEARCH_INSTRUCTIONS+DIRECTION_INSTRUCTIONS : ""),
     input: visuals.length
       ? [
           {

@@ -1,5 +1,6 @@
+import {planningSchema} from './planning-schema.js';
 import {hasCurrentProductionRules} from './production-skill-pin.js';
-import {validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
+import {carouselPlanSchema,validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
 import {validateInsightResult,type InsightInput} from './insight-contracts.js';
 import {scheduleGeneratedPlan,validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
 import {normalizeGeneratedVideoBrief,validateVideoInput,validateVideoPlanningResult,type VideoPlanningInput,type VideoPlanningResult} from './video-planning.js';
@@ -25,14 +26,14 @@ export class SkillRuntime {
   contentPlan(input:PlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<PlanningResult> {
     // Daily placement limits belong to the application, not the isolated model input.
     const {max_posts_per_day,post_ideas,...providerInput}=input;
-    return this.run(providerInput,model,value=>validatePlanningResult({...value,plan:scheduleGeneratedPlan(value.plan,input)},input));
+    return this.run(providerInput,request=>model({...request,content_plan_schema:planningSchema(input)}),value=>validatePlanningResult({...value,plan:scheduleGeneratedPlan(value.plan,input)},input));
   }
   videoPlan(input:VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<VideoPlanningResult> {
     validateVideoInput(input);
     return this.run(input,request=>model({...request,video_plan:{fact_ids:input.brand.facts.map(f=>f.id),duration_seconds:input.duration_seconds}}),value=>validateVideoPlanningResult({...value,brief:normalizeGeneratedVideoBrief(value.brief,input)},input));
   }
   insights(input:InsightInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<any>{return this.run(input,model,value=>validateInsightResult(value,input));}
-  carouselPlan(input:CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<CarouselResult>{validateCarouselInput(input);return this.run(input,model,value=>validateCarouselResult(value,input));}
+  carouselPlan(input:CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<CarouselResult>{validateCarouselInput(input);return this.run(input,request=>model({...request,carousel_plan_schema:carouselPlanSchema(input)}),value=>validateCarouselResult(value,input));}
   private async run<T>(input:CreativeInput|PlanningInput|VideoPlanningInput|InsightInput|CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,validate:(value:any)=>T):Promise<T> {
     if (!this.configured)
       throw new CreativeError("SKILL_RUNTIME_NOT_CONFIGURED");
@@ -121,7 +122,7 @@ export class SkillRuntime {
               )
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               pending = true;
-              void model({...value,chat_response:undefined,video_plan:undefined})
+              void model({...value,chat_response:undefined,video_plan:undefined,content_plan_schema:undefined,carousel_plan_schema:undefined,creative_fact_ids:undefined})
                 .then((result) => {
                   pending = false;
                   if (!settled)

@@ -1,3 +1,4 @@
+import {requireMonthlyPlanApproval} from './monthly-plan-approval.js';
 import {campaignCreativeContext,campaignDesignDirection} from './campaign-design.js';
 import type {PoolClient} from 'pg';
 import {normalizeCreativeSpec,creativeSourceSize,type CreativeSpec} from './campaign-formats.js';
@@ -31,12 +32,13 @@ export class CarouselGeneration {
    if(slot){
     const saved=(await db.query('SELECT * FROM app.content_slots WHERE id=$1 AND organization_id=$2 AND brand_id=$3 FOR UPDATE',[slot,b.organization_id,brand])).rows[0];
     if(!saved)throw new NotFoundException('Campaign post not found');
+    await requireMonthlyPlanApproval(db,b.organization_id,brand,saved);
     if(saved.format!=='carousel'||saved.channel!==v.channel||saved.revision!==v.slot_revision||['approved','cancelled'].includes(saved.state)||saved.approved_by||campaignPlan!==saved.plan_id||canonicalJSON(saved.creative_spec??null)!==canonicalJSON(spec))throw new ConflictException('This carousel post changed. Review it again before generating');
    }
    let direction=String(v.prompt);
    if(campaignPlan){const plan=(await db.query('SELECT strategy FROM app.content_plans WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[campaignPlan,b.organization_id,brand])).rows[0];if(!plan)throw new NotFoundException('Campaign not found');const campaign=plan.strategy?.campaign;if(campaign)direction+='\nSaved campaign direction (data): '+JSON.stringify({campaign:campaignCreativeContext(campaign),visual_style:campaignDesignDirection(campaign.design)});direction=withCampaignRefinement(direction,campaign?.refinement);if(direction.length>3800)throw new BadRequestException('Shorten the carousel brief to leave room for your campaign preferences');}
    if((await db.query("SELECT id FROM app.jobs WHERE kind IN ('creative.generate','carousel.generate') AND status IN ('queued','running','retrying','unknown') AND NOT (id=ANY($1::uuid[])) AND NOT EXISTS(SELECT 1 FROM app.carousel_children c WHERE c.generation_job_id=app.jobs.id AND c.parent_job_id=ANY($1::uuid[])) LIMIT 1",[scoped?.batchJobIds??[]])).rowCount)throw new ConflictException('A creative request is active or needs reconciliation');
-   const count=Number(v.slide_count);if((await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE kind='creative.generate' AND created_at>now()-interval '1 day'")).rows[0].n+count>30)throw new ConflictException('Daily creative request limit reached');
+   const count=Number(v.slide_count);if((await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE kind='creative.generate' AND created_at>now()-interval '1 day'")).rows[0].n+count>90)throw new ConflictException('Daily creative request limit reached');
    const media=Number((await db.query('SELECT COALESCE(sum(bytes),0) AS n FROM app.creative_media')).rows[0].n);if(media+count*20971520>536870912)throw new ConflictException('Creative storage limit reached');
    const exported=Number((await db.query("SELECT COALESCE((SELECT sum(bytes) FROM app.creative_exports),0)+(SELECT count(*)*20971520 FROM app.jobs WHERE kind='creative.export' AND status IN ('queued','running','retrying')) AS n")).rows[0].n);if(exported+count*20971520>536870912)throw new ConflictException('Export storage limit reached');
    if((await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE kind='creative.export' AND created_at>now()-interval '1 day'")).rows[0].n+count>100)throw new ConflictException('Daily export limit reached');
@@ -45,6 +47,7 @@ export class CarouselGeneration {
    const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions ORDER BY approved_at DESC,id LIMIT 1')).rows[0];if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('Approve this business’s brand knowledge first');
    const memory=await approvedLearning(db),input:CarouselInput={task:'carousel',brand:{id:brain.id,sha256:brain.sha256,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value})),learning:memory},prompt:direction,channel:v.channel as CarouselInput['channel'],slide_count:count};validateCarouselInput(input);
    const model=await creativeTextModel(db,b.organization_id,brand,provider,'image'),parent=randomUUID(),project=randomUUID();
+   if(!model)throw new ConflictException('Carousel generation is not enabled for this business yet');
    const thread=scoped?.threadId?{id:uuid(scoped.threadId)}:await this.canvas.createThread(user,brand,{title:String(v.prompt).slice(0,140)},`carousel:${parent}`,{db,b});
    if(scoped?.threadId&&!(await db.query('SELECT id FROM app.canvas_threads WHERE id=$1 AND organization_id=$2 AND brand_id=$3',[thread.id,b.organization_id,brand])).rowCount)throw new NotFoundException('Canvas thread not found');
    await db.query('INSERT INTO app.carousel_projects(id,organization_id,brand_id,created_by) VALUES($1,$2,$3,$4)',[project,b.organization_id,brand,user]);

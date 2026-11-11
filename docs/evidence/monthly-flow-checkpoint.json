@@ -1,0 +1,375 @@
+{
+  "checked_at": "2026-11-10T19:16:26.759546+00:00",
+  "overall_status": "INCOMPLETE",
+  "web_deployment": "f44e3959-4332-49b5-84ff-ea8145fd4e19",
+  "api_deployment": "ed181725-e1ff-4909-89e7-d498e55c5268",
+  "worker_image": "sha256:a6560149ce61b716bc5f65d90ab6d3cffa05e74269c5b7ca4142937483223c2d",
+  "automated_checks": {
+    "guided_foundation": {
+      "passed": 10,
+      "failed": 0,
+      "provider_mode": "MOCK"
+    },
+    "guided_and_monthly_carousel_contracts": {
+      "passed": 10,
+      "failed": 0
+    },
+    "isolated_moodboard_typography": {
+      "passed": 1,
+      "failed": 0,
+      "provider_mode": "MOCK"
+    },
+    "export_review_foundation": {
+      "passed": 17,
+      "failed": 0,
+      "provider_mode": "MOCK"
+    },
+    "unified_carousel_browser": {
+      "passed": 1,
+      "failed": 0,
+      "provider_mode": "MOCK"
+    },
+    "runway_contract": {
+      "passed": 11,
+      "failed": 0,
+      "provider_mode": "MOCK"
+    }
+  },
+  "live_checks": {
+    "approval_page_browser_errors": [],
+    "static_post_edit_saved_new_version": true,
+    "static_post_edit_survived_reload": true,
+    "edited_version_remains_unapproved": true,
+    "unified_carousel_review": {
+      "at": "2026-11-10T18:22:56.508Z",
+      "slot": "47ea091a-b101-435e-a2b2-ac6c0a7e6c0f",
+      "version": "65b4fc9c-8004-4029-b063-cb1e01827371",
+      "state": "approved",
+      "slideCount": 3,
+      "download": "desvio-carousel.zip",
+      "errors": [],
+      "published": false
+    },
+    "monthly_video": {
+      "status": "rejected",
+      "jobs": [
+        "5ee4ae60-7c2d-4491-a955-9cc83cdcd078",
+        "6c9a461f-870f-4fb9-9dec-edfdf0d79c2b"
+      ],
+      "error": "RUNWAY_REQUEST_REJECTED",
+      "fresh_reference_dry_run": "passed",
+      "paid_output_verified": false,
+      "root_cause": "Insufficient Runway credits",
+      "deferred_by_user": true
+    },
+    "monthly_video_attention": {
+      "at": "2026-11-10T18:35:46.250Z",
+      "generation_attention": true,
+      "approved": true,
+      "slots": 1,
+      "readOnly": true
+    }
+  },
+  "blockers": [
+    "Live monthly video output verification deferred by user. Runway returned insufficient credits on controlled submission diagnostic.",
+    "Full production readiness audit and current release evidence remain incomplete."
+  ],
+  "scope": "Dev acceptance only. No social publication. Mock checks do not certify live generation.",
+  "latest_continuation": {
+    "checked_at": "2026-11-10T18:37:35.135125+00:00",
+    "status": "INCOMPLETE",
+    "runway_history": "Two monthly requests marked invalid_request after routing to seedance2_5. Both have null taskId. Routing reason is model selection rationale, not validation detail.",
+    "monthly_video_attention": "Deployed and live verified: generation_attention true and calendar approval preserved.",
+    "validation": "Guided foundation 10/10; Runway contracts12/12; API build and web typecheck passed.",
+    "worker_build": "sha256:724b6f7be5335e9bf31cc06ba1b7ab335977d2615bc330dbd1dd8402c06508e4; transfer in progress",
+    "next": "Finish worker rollout. Continue non-video product acceptance and release evidence; video live output remains deferred.",
+    "runway_root_cause": "Observed HTTP400: You do not have enough credits to run this task. No task ID. User requested ignoring Runway for now; no further paid video tests.",
+    "api_deployment": "263621a5-0ac0-4078-a628-852d801a013c",
+    "web_deployment": "7d503fda-3c05-443d-bc02-dccebd3bcf56"
+  },
+  "runway_deferral_deployment": {
+    "status": "activated",
+    "checked_at": "2026-11-10T18:41:39.569Z",
+    "worker_image": "sha256:724b6f7be5335e9bf31cc06ba1b7ab335977d2615bc330dbd1dd8402c06508e4",
+    "targeted_contracts": {
+      "passed": 18,
+      "failed": 0
+    },
+    "live_video": "deferred by user; not verified",
+    "production_readiness": "not established"
+  },
+  "broader_acceptance_audit": {
+    "checked_at": "2026-11-10T18:44:27.034397+00:00",
+    "contracts": {
+      "passed": 373,
+      "failed": 0,
+      "skipped": 1
+    },
+    "guided_foundation": {
+      "passed": 10,
+      "failed": 0,
+      "provider_mode": "MOCK"
+    },
+    "full_foundation": "setup failed: pinned LibreOffice deb13u8 packages unavailable",
+    "changes": [
+      "Guided tests included in default foundation suite",
+      "Recovery fixture selects static bindings instead of assuming mixed batch ordering"
+    ],
+    "complete": false
+  },
+  "current_local_acceptance": {
+    "checked_at": "2026-11-10T19:00:26.969098+00:00",
+    "document_archives": {
+      "recovered": 180,
+      "sha256_verified": 180,
+      "source": "Existing local pinned document image layers",
+      "dependency_versions_changed": false
+    },
+    "onboarding_browser": {
+      "passed": 5,
+      "failed": 0,
+      "provider_mode": "MOCK",
+      "viewports": [
+        1440,
+        768,
+        390
+      ],
+      "checked_at": "2026-11-10T19:14:27.698329+00:00",
+      "log": "/tmp/desvio-guided-final-browser.log",
+      "artifacts": "/tmp/desvio-guided-final-browser",
+      "skipped": 0
+    },
+    "preview_focus_regression": {
+      "passed": 1,
+      "failed": 0
+    },
+    "authentication_tenancy": {
+      "passed": 31,
+      "failed": 0
+    },
+    "full_foundation": {
+      "status": "completed_with_failures",
+      "authentication_passed": 31,
+      "foundation_passed": 249,
+      "foundation_failed": 5,
+      "provider_mode": "MOCK",
+      "log": "/tmp/desvio-full-foundation-recovered.log",
+      "failure_causes": [
+        "Two retired video-model fixture values",
+        "Two obsolete fixed strategy capacity fixtures",
+        "One publishing fixture expected an edit now correctly prohibited during active publication"
+      ],
+      "targeted_rechecks": "All affected suites passed. Subsequent complete combined run passed 285 tests; see combined_recheck."
+    },
+    "live_video": "deferred by user",
+    "operator_recheck": {
+      "passed": 14,
+      "failed": 0
+    },
+    "strategy_recheck": {
+      "passed": 3,
+      "failed": 0,
+      "provider_mode": "MOCK"
+    },
+    "publication_recheck": {
+      "passed": 19,
+      "failed": 0,
+      "provider_mode": "MOCK",
+      "log": "/tmp/desvio-publication-final-recheck.log"
+    },
+    "combined_recheck": {
+      "status": "passed",
+      "log": "/tmp/desvio-foundation-complete-recheck.log",
+      "authentication_passed": 31,
+      "authentication_failed": 0,
+      "provider_mode": "MOCK",
+      "build": "passed",
+      "checked_at": "2026-11-10T19:14:27.698329+00:00",
+      "foundation_passed": 254,
+      "foundation_failed": 0,
+      "total_passed": 285,
+      "skipped": 0,
+      "scope": "Local real infrastructure with mock external providers. Not live provider certification."
+    },
+    "offline_recheck": {
+      "checked_at": "2026-11-10T19:10:15.901171+00:00",
+      "passed": 12,
+      "failed": 0,
+      "skipped": 1,
+      "skip_reason": "Private client source files are not distributed with this checkout; exact shared-rule mounts and archive integrity checks passed",
+      "log": "/tmp/desvio-offline-current.log"
+    },
+    "security_guard_recheck": {
+      "passed": 6,
+      "failed": 0,
+      "scope": "Python guard tests only, not the complete security release suite",
+      "log": "/tmp/desvio-security-current.log"
+    },
+    "recovery_release_check": {
+      "checked_at": "2026-11-10T19:15:06.174686+00:00",
+      "passed": true,
+      "source_sha256": "6f5c4a5c46b63baf68ad9a84b6fa43f1f56d63531a81d234770d829a74f66699",
+      "measurements": {
+        "passed": true,
+        "scope": "Disposable local logical database restore; not hosted backup, PITR, role recovery or object storage recovery",
+        "tenants": 2,
+        "dump_and_restore_ms": 1426,
+        "migrations": 100,
+        "policies": 565
+      },
+      "scope": "Actual local pg_dump/pg_restore into a separate disposable database, migration checksum replay and restored two-tenant read/write isolation. Does not verify hosted backups, PITR, cluster roles, private objects or production RPO/RTO."
+    },
+    "load_release_check": {
+      "checked_at": "2026-11-10T19:15:32.724166+00:00",
+      "passed": true,
+      "source_sha256": "6f5c4a5c46b63baf68ad9a84b6fa43f1f56d63531a81d234770d829a74f66699",
+      "measurements": {
+        "scope": "local authenticated API, not hosted capacity or provider throughput",
+        "accounts": 8,
+        "concurrency": 24,
+        "requests": 480,
+        "passed": true,
+        "duration_ms": 366,
+        "latency_ms": {
+          "p50": 15,
+          "p95": 36,
+          "p99": 84
+        },
+        "requests_per_second": 1311.48,
+        "failed_requests": 0
+      },
+      "scope": "Disposable local PostgreSQL and real authenticated API: eight isolated accounts, 24 concurrent clients, mixed tenant reads, denied foreign reads and idempotent writes. SMTP is local. No paid providers, hosted capacity, video queue throughput or production SLA is measured."
+    },
+    "security_release_check": {
+      "status": "passed",
+      "evidence": "docs/evidence/security.json",
+      "checked_at": "2026-11-10T19:24:24.316832+00:00",
+      "source_sha256": "6f5c4a5c46b63baf68ad9a84b6fa43f1f56d63531a81d234770d829a74f66699",
+      "foundation_passed": 285,
+      "guard_tests_passed": 6,
+      "dependency_audits": "root and media production dependencies: zero known vulnerabilities",
+      "scope": "M0 guards plus real local HTTP auth, PostgreSQL RLS, brand retries/revisions, verified email/recovery/invitations, local SMTP failures, rollback and restart recovery; actual local private S3 uploads, ClamAV validation, Temporal job isolation and worker process death recovery; plus bounded actual Docling PDF/PPTX/50-page extraction, immutable approved brand evidence, account quotas and selected-business grants; plus Crawl4AI/Chromium screenshots, private visual storage, SSRF controls and AI reservation/recovery and multimodal image provenance/budget guards with MOCK model/resource transports; plus actual isolated owner-skill planning, MOCK OpenAI create/edit, creative media/version approval, cost holds, cancellation, stale edits and replay isolation; plus real HTTP/PostgreSQL 30-slot persistence, per-channel version approvals, atomic bulk reviews, date/DST boundaries and edit/history rollback; plus actual isolated marketing-plan runtime and Temporal 30-slot generation with MOCK Responses, approved-context integrity, per-business grants, unknown-result holds and atomic promotion recovery; no external model provider or deployed generation-worker proof; canonical saved PNG exports use actual network-disabled Fabric/node rendering, private storage, exact-pixel/context approval and failure recovery; no social publication; business-scoped creative reference approval and revocation, immutable image linkage, bounded transformed bytes, saved provenance, conservative per-reference reservation, replay and corrupted-source rejection before model planning",
+      "live_calls": false
+    },
+    "browser_release_check": {
+      "status": "failed",
+      "exit_code": 2,
+      "log": "/tmp/desvio-browser-release-current.log",
+      "scope": "Full local browser suite with mock external providers. Multiple failures remain; not deployment certification."
+    }
+  },
+  "dependency_recovery_check": {
+    "checked_at": "2026-11-10T19:07:44.449739+00:00",
+    "unit_tests_passed": 5,
+    "unit_tests_failed": 0,
+    "official_snapshot_download": {
+      "package": "fonts-opensymbol",
+      "version": "4:102.12+LibO25.2.3-2+deb13u8",
+      "sha256": "2a0c152fa74b1ad62e6323f668921073ddb60cfb61839a678ad4bd1f204e7011",
+      "verified": true
+    },
+    "dependency_versions_changed": false,
+    "full_clean_bundle_tested": false
+  },
+  "missing_research_details_check": {
+    "status": "passed_local",
+    "browser_passed": 6,
+    "service_passed": 10,
+    "web_typecheck": "passed",
+    "browser_log": "/tmp/desvio-guided-missing-facts-browser.log",
+    "service_log": "/tmp/desvio-guided-missing-facts-foundation.log",
+    "scope": "Mock external providers. Missing required facts saved idempotently and explicitly approved before mood board submission. Not deployed or live verified."
+  },
+  "legacy_route_check": {
+    "status": "passed_local_mock_api",
+    "test": "tests/browser/legacy-creation-routes.test.mjs",
+    "typecheck": "passed",
+    "deployed": true,
+    "scope": "Legacy Canvas opens Create; Campaigns compatibility route opens Calendar without returning its menu item",
+    "web_deployment": "2cab77ed-8ff4-4b30-88ca-4e427271ad1b",
+    "live_behavior_verification": "Only page read checks this continuation; mutation assertions remain local test evidence."
+  },
+  "runway_funding_check": {
+    "status": "existing_request_unfunded",
+    "api_credit_balance": 248,
+    "user_reported_credits": 500,
+    "dry_run_status": 200,
+    "duration_seconds": 15,
+    "estimated_credits": 1020,
+    "generation_submitted": false,
+    "log": "/tmp/desvio-runway-preflight.log",
+    "contract_tests": {
+      "passed": 12,
+      "failed": 0
+    }
+  },
+  "current_chat_browser_check": {
+    "status": "focused_recovery_passed_mock_provider",
+    "passed": 2,
+    "failed": 0,
+    "log": "/tmp/desvio-chat-history-lazy-recheck.log",
+    "scope": "Image generation/edit/save/download/history and initialization/history/transcript recovery without duplicate submissions. MOCK OpenAI; real local app/auth/database/storage/jobs.",
+    "deployed": true,
+    "web_deployment": "2cab77ed-8ff4-4b30-88ca-4e427271ad1b",
+    "live_behavior_verification": "Only page read checks this continuation; mutation assertions remain local test evidence."
+  },
+  "onboarding_save_resume": {
+    "status": "passed_mock_api_browser",
+    "log": "/tmp/desvio-save-later-browser.log",
+    "checks": [
+      "failed save preserves answers",
+      "successful save returns home",
+      "brands resumes saved questionnaire step and answers",
+      "responsive layout and accessibility"
+    ],
+    "deployed": true,
+    "web_deployment": "2cab77ed-8ff4-4b30-88ca-4e427271ad1b",
+    "live_behavior_verification": "Only page read checks this continuation; mutation assertions remain local test evidence."
+  },
+  "manual_setup_moodboard_handoff": {
+    "status": "passed_mock_api_browser",
+    "deployed": true,
+    "log": "/tmp/desvio-first-plan-handoff.log",
+    "checks": [
+      "failed preference save stays on form without approval or generation",
+      "successful save and brand approval continue to guided onboarding",
+      "new setup does not submit legacy calendar generation"
+    ],
+    "remaining": "Existing pending legacy requests retain recovery; complete customer suite still has outdated flow expectations and requires reconciliation.",
+    "web_deployment": "2cab77ed-8ff4-4b30-88ca-4e427271ad1b",
+    "live_behavior_verification": "Only page read checks this continuation; mutation assertions remain local test evidence."
+  },
+  "monthly_approval_invalidation": {
+    "status": "passed_local",
+    "deployed": true,
+    "browser_passed": 8,
+    "browser_failed": 0,
+    "foundation_passed": 10,
+    "foundation_failed": 0,
+    "typecheck": "passed",
+    "browser_log": "/tmp/desvio-guided-full-current.log",
+    "foundation_log": "/tmp/desvio-guided-service-current.log",
+    "scope": "Mock external providers. Calendar edit invalidates displayed approval; another explicit approval required. Also covers questionnaire, mood-board revision, allowances, exact-version approval, recovery, legacy route handoff.",
+    "web_deployment": "2cab77ed-8ff4-4b30-88ca-4e427271ad1b",
+    "live_behavior_verification": "Only page read checks this continuation; mutation assertions remain local test evidence."
+  },
+  "latest_web_release": {
+    "deployment_id": "2cab77ed-8ff4-4b30-88ca-4e427271ad1b",
+    "status": "SUCCESS",
+    "checked_at": "2026-11-10T20:24:46.221Z",
+    "local_compile": "passed; temporary symlink dependency tracing warning, not used as deployment artifact",
+    "railway_build": "passed using standalone Docker build",
+    "authenticated_pages": [
+      "guided-onboarding",
+      "overview",
+      "content-plan",
+      "review",
+      "create"
+    ],
+    "browser_errors": [],
+    "failed_api_requests": [],
+    "moodboard_preview_images": "All four preview elements appeared and decoded after scrolling into view",
+    "scope": "Authenticated deployed page reads only. No generation, approval, scheduling or publication.",
+    "complete": false
+  }
+}

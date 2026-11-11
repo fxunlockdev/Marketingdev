@@ -255,7 +255,7 @@ test("actual isolated Deep Agents loads pinned owner skills; file reads cannot e
     assert.ok(!denied.content.includes("root:"));
     return { content: JSON.stringify(brief("fact-a")), tool_calls: [] };
   });
-  assert.equal(result.skills.length, 5);
+  assert.equal(result.skills.length, 6); // Includes the pinned Desvio production rules.
   assert.equal(result.helpers_executed, false);
   assert.equal(calls, 2);
   await assert.rejects(
@@ -384,7 +384,7 @@ test("real Temporal workflow executes isolated owner skills, mocked OpenAI gener
   assert.equal(version.status, "draft");
   assert.equal(version.design.layers[0].fontFamily,'DM Sans');
   assert.equal(version.design.layers[1].fontFamily,'DM Sans');
-  assert.equal(version.skill_manifest.skills.length, 4);
+  assert.equal(version.skill_manifest.skills.length, 5); // Includes the pinned Desvio production rules.
   assert.ok(version.skill_manifest.reserved_cost_micros >= 100000);
   const signed = await canvas.media(alice, brand.id, version.media_id);
   assert.equal((await fetch(signed.url)).status, 200);
@@ -527,10 +527,17 @@ test("unknown paid outcomes and worker resumption do not resubmit or bypass the 
   assert.equal(await handler.run(scope(j)), "unknown");
   assert.equal(imageCalls, before + 1);
   await assert.rejects(submit(), /uncertain/);
-  // Test-only operator reconciliation unlocks the following independent cases.
-  await admin.query("UPDATE app.jobs SET status='rejected' WHERE id=$1", [
-    j.id,
-  ]);
+  const callsBefore = (await admin.query('SELECT step,status,reserved_micros FROM app.creative_calls WHERE job_id=$1 ORDER BY step',[j.id])).rows;
+  assert.throws(()=>canvas.stopWaiting(alice,brand.id,j.id,{}), /Acknowledge/);
+  await assert.rejects(canvas.stopWaiting(bob,brand.id,j.id,{acknowledge_possible_charge:true}));
+  await assert.rejects(canvas.stopWaiting(viewer,brand.id,j.id,{acknowledge_possible_charge:true}));
+  assert.equal((await canvas.stopWaiting(alice,brand.id,j.id,{acknowledge_possible_charge:true})).status,'canceled');
+  await canvas.stopWaiting(alice,brand.id,j.id,{acknowledge_possible_charge:true});
+  assert.equal((await row(j)).error_code,'CREATIVE_RESULT_ABANDONED');
+  assert.deepEqual((await admin.query('SELECT step,status,reserved_micros FROM app.creative_calls WHERE job_id=$1 ORDER BY step',[j.id])).rows,callsBefore);
+  assert.equal(Number((await admin.query("SELECT count(*) FROM app.audit_events WHERE resource_id=$1 AND action='creative.unknown_result_abandoned'",[j.id])).rows[0].count),1);
+  await handler.run(scope(j));
+  assert.equal(imageCalls,before+1);
   transport = undefined;
   await grant(1);
   const exhausted = await submit();
@@ -802,9 +809,11 @@ test('campaign image batch atomically queues reviewed posts, replays without dup
  await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{slots:[body.slots[0],{...body.slots[1],revision:999}]},key),/changed/);assert.equal(await count(),0);
  const unrelated=await plannedSlot();await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{slots:[body.slots[0],{id:unrelated.id,revision:unrelated.revision}]},key),/not found/i);assert.equal(await count(),0);
  await admin.query('UPDATE app.creative_grants SET max_image_request_micros=5000000 WHERE brand_id=$1',[brand.id]);const quoted=await slotCreatives.batchStatus(alice,brand.id,plan.id);assert.ok(quoted.quote.available);assert.ok(quoted.quote.slots.every(s=>s.credits>500));await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,body,key),/capacity of at least/);assert.equal(await count(),0);await admin.query('UPDATE app.creative_grants SET max_image_request_micros=100000 WHERE brand_id=$1',[brand.id]);
+ const freshQuote=(await slotCreatives.batchStatus(alice,brand.id,plan.id)).quote;
+ body.credit_cap=freshQuote.slots.reduce((sum,slot)=>sum+slot.credits,0);
  const [a,b]=await Promise.all([slotCreatives.generateBatch(alice,brand.id,plan.id,body,key),slotCreatives.generateBatch(alice,brand.id,plan.id,body,key)]);
  assert.deepEqual(a,b);assert.equal(a.jobs.length,2);assert.equal(await count(),2);
- const snapshot=(await admin.query('SELECT reviewed_slots,credit_cap FROM app.campaign_image_batches WHERE request_key=$1',[key])).rows[0];assert.deepEqual(snapshot.reviewed_slots,body.slots);assert.equal(snapshot.credit_cap,200);const perImage=(await admin.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=ANY($1::uuid[])',[a.jobs.map(j=>j.id)])).rows;assert.ok(perImage.every(r=>Number(r.max_cost_micros)===1000000));await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,credit_cap:201},key),/another campaign/);
+ const snapshot=(await admin.query('SELECT reviewed_slots,credit_cap FROM app.campaign_image_batches WHERE request_key=$1',[key])).rows[0];assert.deepEqual(snapshot.reviewed_slots,body.slots);assert.equal(snapshot.credit_cap,body.credit_cap);const perImage=(await admin.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=ANY($1::uuid[])',[a.jobs.map(j=>j.id)])).rows;assert.ok(perImage.every(r=>Number(r.max_cost_micros)===body.credit_cap*10000/2));await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,credit_cap:body.credit_cap+1},key),/another campaign/);
  await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{slots:[body.slots[0]]},key),/another campaign/);
  await assert.rejects(canvas.submit(alice,brand.id,thread.id,request(),randomUUID()),/running|uncertain/);
  for(const j of a.jobs){assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));}

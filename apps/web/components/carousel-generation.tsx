@@ -1,4 +1,5 @@
 "use client";
+import {CreativeRecovery} from './creative-recovery';
 import {DesvioSelect} from './desvio-select';
 import {directedPrompt,type Creativity} from './creative-direction';
 import {useCallback,useEffect,useRef,useState} from 'react';
@@ -32,6 +33,8 @@ export function CarouselGeneration({businessId,canEdit,onOpen,onSlide}:{business
  {!data?<p role="status">Loading generation history…</p>:<ul>{data.runs.map(r=><li key={r.id}><h4>{r.prompt}</h4><p>{r.status==='succeeded'?'Ready for review':r.status==='unknown'?'Result needs reconciliation':r.status==='rejected'||r.status==='failed'?'Generation could not finish':r.cancel_requested?'Cancellation requested':r.status}</p>
  <ol>{data.slides.filter(s=>s.parent_job_id===r.id).map(s=><li key={s.position}>Slide {s.position+1} · {s.export_status==='succeeded'?'Saved final image':s.generation_status}{s.output_version_id&&<button type="button" disabled={busy} onClick={()=>onSlide(r.thread_id,s.project_id)}>Open generated slide {s.position+1}</button>}</li>)}</ol>
  {r.output_version_id&&<button type="button" disabled={busy} onClick={()=>void onOpen(r.project_id).catch(setError)}>Review generated carousel</button>}
+ {canEdit&&r.status==='unknown'&&<CreativeRecovery businessId={businessId} jobId={r.id} disabled={busy} onRecovered={load}/>}
+ {r.error_code==='CREATIVE_RESULT_ABANDONED'&&<p>Stopped waiting. The provider charge remains uncertain. No replacement was generated.</p>}
  {canEdit&&active(r)&&<button type="button" disabled={busy||r.cancel_requested} onClick={()=>void cancel(r.id)}>Cancel carousel generation</button>}
  {['failed','rejected','canceled','unknown'].includes(r.status)&&<p className="hint">Completed slides remain available above. Nothing from this request has been approved for publishing.</p>}
  </li>)}</ul>}

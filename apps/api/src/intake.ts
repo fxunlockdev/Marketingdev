@@ -1,3 +1,5 @@
+import type {PoolClient} from 'pg';
+import type {GuidedBrief} from './guided-campaign-contracts.js';
 import {
   BadRequestException,
   ConflictException,
@@ -84,8 +86,8 @@ export class Intake {
       id,
     );
   }
-  async submit(user: string, id: string, input: unknown, key: unknown) {
-    const b = await this.businesses.resolve(user, id),
+  async submit(user: string, id: string, input: unknown, key: unknown, scoped?: {db:PoolClient;b:{organization_id:string;website?:string|null};researchContext:GuidedBrief}) {
+    const b = scoped?.b ?? await this.businesses.resolve(user, id),
       v = object(input, ["kind", "autoAnalyze", "recoverJobId"]);
     if (!["website.extract", "brand.analyze"].includes(String(v.kind)))
       throw new BadRequestException(
@@ -109,12 +111,8 @@ export class Intake {
         );
       }
     }
-    const requestHash = hash(canonicalJSON({ kind: v.kind, url, ...(automatic ? { autoAnalyze: true } : {}),...(recovery?{recoverJobId:recovery}:{}) }));
-    return this.businesses.database.transaction(
-      user,
-      b.organization_id,
-      true,
-      async (db) => {
+    const requestHash = hash(canonicalJSON({ kind: v.kind, url, ...(automatic ? { autoAnalyze: true } : {}),...(recovery?{recoverJobId:recovery}:{}),...(scoped?{researchContext:scoped.researchContext}:{}) }));
+    const execute = async (db:PoolClient) => {
         await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
           `intake:${id}`,
         ]);
@@ -192,8 +190,8 @@ export class Intake {
           [job, b.organization_id, id, user, v.kind],
         );
         await db.query(
-          "INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,website_url) VALUES($1,$2,$3,$4,$5,$6)",
-          [job, b.organization_id, id, key, requestHash, url],
+          "INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,website_url,research_context) VALUES($1,$2,$3,$4,$5,$6,$7)",
+          [job, b.organization_id, id, key, requestHash, url, scoped ? JSON.stringify(scoped.researchContext) : null],
         );
         if(sourceId)await db.query("INSERT INTO app.intake_recoveries(job_id,organization_id,brand_id,source_job_id) VALUES($1,$2,$3,$4)",[job,b.organization_id,id,sourceId]);
         await db.query(
@@ -208,14 +206,13 @@ export class Intake {
         if (automatic) {
           const child = randomUUID();
           await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'brand.analyze')", [child,b.organization_id,id,user]);
-          await db.query("INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash) VALUES($1,$2,$3,$4,$5)", [child,b.organization_id,id,`analyze-website-${job}`,hash(canonicalJSON({kind:'brand.analyze',url:null}))]);
+          await db.query("INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,research_context) VALUES($1,$2,$3,$4,$5,$6)", [child,b.organization_id,id,`analyze-website-${job}`,hash(canonicalJSON({kind:'brand.analyze',url:null})),scoped ? JSON.stringify(scoped.researchContext) : null]);
           await db.query("INSERT INTO app.intake_dependencies(organization_id,brand_id,analysis_job_id,capture_job_id) VALUES($1,$2,$3,$4)", [b.organization_id,id,child,job]);
           await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'brand.analyze')", [child,b.organization_id,id]);
           await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'intake.submitted',$4)", [b.organization_id,id,user,child]);
         }
         return { id: job, status: "queued" };
-      },
-      id,
-    );
+      };
+    return scoped ? execute(scoped.db) : this.businesses.database.transaction(user,b.organization_id,true,execute,id);
   }
 }

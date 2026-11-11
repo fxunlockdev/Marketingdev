@@ -97,6 +97,7 @@ test('30 real persisted slots across two channels; concurrent request replay cre
  results.forEach(r=>assert.equal(r.status,201,JSON.stringify(r.body)));assert.equal(new Set(results.map(r=>r.body.id)).size,1);
  const plan=results[0].body.id;
  const r=await api(path(`content-plan?${query({plan_id:plan})}`));assert.equal(r.status,200);assert.equal(r.body.total,30);assert.equal(r.body.slots.length,30);assert.ok(r.body.slots.every(s=>s.state==='draft_ready'));
+ const reviewDrafts=await api(path(`review-inbox?${query({plan_id:plan})}`));assert.equal(reviewDrafts.status,200);assert.equal(reviewDrafts.body.total,30);assert.ok(reviewDrafts.body.slots.every(s=>s.state==='draft_ready'));
  const li=await api(path(`content-plan?${query({plan_id:plan,channel:'linkedin'})}`));assert.equal(li.body.total,15);assert.ok(li.body.slots.every(s=>s.channel==='linkedin'));
  assert.equal((await api(path('content-plans'),{method:'POST',key,body:{...body,title:'Changed'}})).status,409);
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind<>'creative.generate'",[brand.id])).rows[0].n,0);

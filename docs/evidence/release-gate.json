@@ -1,10 +1,13 @@
 {
   "passed": false,
   "errors": [
+    "Evidence stale or future dated",
     "Failed or stale offline evidence",
     "Failed or stale contracts evidence",
     "Failed or stale security evidence",
     "Failed or stale browser evidence",
+    "Failed or stale load evidence",
+    "Failed or stale recovery evidence",
     "Product E2E, deployed provider-worker tenant isolation and trusted live evidence runner are NOT_IMPLEMENTED; local auth/storage/validation-worker tests are not launch proof",
     "Overall release state is BLOCKED"
   ]

@@ -228,9 +228,14 @@ async function createBusiness(name) {
     .getByRole("button", { name: "Continue", exact: true })
     .click();
   await expect(
-    alice.getByRole("heading", { name: "Does this feel like you?" }),
+    alice.getByRole("heading", { name: "Let’s get to know your business" }),
   ).toBeVisible();
-  return alice.url().split("/b/")[1].split("/")[0];
+  const businessId = alice.url().split("/b/")[1].split("/")[0];
+  // This suite verifies the retained manual fact-review fallback. The guided
+  // questionnaire and mood board journey have their own end-to-end suite.
+  await alice.goto(`${base}/b/${businessId}/onboarding`);
+  await expect(alice.getByRole("heading", { name: "Does this feel like you?" })).toBeVisible();
+  return businessId;
 }
 async function addFact(field, value) {
   const manual = alice.locator("details").filter({has: alice.getByText("Add a detail the website does not cover", {exact:true})});
@@ -256,11 +261,11 @@ test("V5 signup and real email verification lead to zero businesses and exact na
   await signin(alice);
   await expect(alice.getByRole('combobox',{name:'Business',exact:true})).toHaveCount(0);
   await expect(alice.locator('.workspace-context')).toHaveText('Your workspace');
-  await expect(alice.getByRole('link',{name:'Create',exact:true})).toHaveCount(0);
+  await expect(alice.locator('.header-create')).toHaveCount(0);
   await expect(
     alice.getByRole("link", { name: "Add business", exact: true }),
   ).toBeVisible();
-  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Campaigns','Approvals','Brand Kit','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);  await alice.goto(base + "/brands");
+  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Create','Approvals','Brand Kit','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);  await alice.goto(base + "/brands");
   await expect(
     alice.getByText("0 of 3 owned businesses", { exact: false }),
   ).toBeVisible();
@@ -273,7 +278,7 @@ test("V5 signup and real email verification lead to zero businesses and exact na
       .getPropertyValue("--ink")
       .trim(),
   }));
-  assert.deepEqual(colors, { paper: "#ffffff", ink: "#191919" });
+  assert.deepEqual(colors, { paper: "#f4f0e7", ink: "#161713" });
   await alice.goto(base + '/brands/new');
   await alice.getByLabel('Business name', {exact:true}).fill('URL entry check');
   const submitted=[];
@@ -1281,7 +1286,7 @@ test('onboarding holds brand review until analysis finishes and hides capture co
  }finally{await alice.unroute(`**/api/v1/businesses/${b.id}/intake`,route);}
 });
 
-test('first-plan confirmation resumes its saved request then opens the campaign (MOCK planner)',async()=>{
+test('first-plan confirmation routes new work through the mood board and resumes existing requests (MOCK planner)',async()=>{
  await alice.goto(base+'/brands/new');await expect(alice.getByRole('heading',{name:'Your content. Your brand.'})).toBeVisible();await alice.screenshot({path:'work/browser/onboarding-add-business.png',fullPage:true});
  const created=await alice.request.post(base+'/api/v1/businesses',{headers:{origin:base,'idempotency-key':randomUUID()},data:{name:'First plan fixture'}});assert.equal(created.status(),201);const b=await created.json(),root=`/api/v1/businesses/${b.id}`,brain=`/api/v1/workspaces/${b.organization_id}/brands/${b.id}/brain`;
  for(const [field,value] of [['brand_name','First plan fixture'],['offering','Appointment software'],['audience','Dental practices']]){
@@ -1296,12 +1301,22 @@ test('first-plan confirmation resumes its saved request then opens the campaign 
  await alice.route('**'+root+'/content-plan/generate',generate);await alice.route('**'+root+'/content-plan/jobs',jobs);await alice.route('**'+root+'/content-plans/'+plan,detail);
  try{
  await alice.goto(`${base}/b/${b.id}/onboarding`);
- await selectOption(alice.getByLabel('Plan duration',{exact:true}),'7');await alice.getByLabel('Video ideas',{exact:true}).fill('');await expect(alice.getByLabel('Video ideas',{exact:true})).toHaveValue('');await alice.getByLabel('Video ideas',{exact:true}).fill('1');
- await alice.getByRole('button',{name:'Confirm & create my calendar',exact:true}).click();
+ await alice.getByRole('button',{name:'Continue to my mood board',exact:true}).click();
+ await expect(alice).toHaveURL(`${base}/b/${b.id}/guided-onboarding`);
+ assert.equal(submissions.length,0,'New customers must approve a mood board before requesting a calendar');
+ const savedOnboarding=await(await alice.request.get(base+root+'/onboarding')).json();
+ assert.equal(savedOnboarding.step,3);
+ const savedBusiness=await(await alice.request.get(base+root)).json();
+ assert.equal(savedBusiness.has_approved_brand,true,'The handoff must persist the approved brand');
+ // A request submitted before the flow changed must remain recoverable with its original key.
+ const pending={key:randomUUID(),body:{provider:'openai',starts_on:'2026-11-01',duration_days:7,video_count:1}};
+ await alice.evaluate(({id,pending})=>sessionStorage.setItem(`desvio-first-plan:${id}`,JSON.stringify(pending)),{id:b.id,pending});
+ await alice.goto(`${base}/b/${b.id}/onboarding`);
+ await alice.getByRole('button',{name:'Check my saved calendar request',exact:true}).click();
  await expect(alice).toHaveURL(`${base}/b/${b.id}/onboarding`);await expect(alice.getByRole('heading',{name:'Building your calendar',exact:true})).toBeVisible();
  await alice.reload();await expect(alice).toHaveURL(`${base}/b/${b.id}/onboarding`);await expect(alice.getByRole('heading',{name:'Building your calendar',exact:true})).toBeVisible();
  completed=true;await expect(alice).toHaveURL(`${base}/b/${b.id}/campaign-review?plan=${plan}`,{timeout:15000});await expect(alice.getByText('First saved plan',{exact:true})).toBeVisible();
- assert.equal(submissions.length,1);assert.equal(submissions[0].body.provider,'openai');assert.equal(submissions[0].body.duration_days,7);assert.equal(submissions[0].body.video_count,1);assert.ok(submissions[0].key);
+ assert.equal(submissions.length,1);assert.equal(submissions[0].body.provider,'openai');assert.equal(submissions[0].body.duration_days,7);assert.equal(submissions[0].body.video_count,1);assert.equal(submissions[0].key,pending.key);
  }finally{await alice.unroute('**'+root+'/content-plan/generate',generate);await alice.unroute('**'+root+'/content-plan/jobs',jobs);await alice.unroute('**'+root+'/content-plans/'+plan,detail);}
 });
 

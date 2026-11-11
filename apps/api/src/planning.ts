@@ -74,7 +74,7 @@ export class Planning {
    let first='';
    for(let cycle=0;cycle<Number(cycles);cycle++){
    const job=randomUUID();if(!first)first=job;
-   const cycleInput={...input,...(scoped?{post_count:Math.min(14,Number(count)+Math.floor(cycle/4)*scoped.weeklyIncrease)}:{}),preferences:{...input.preferences,starts_on:addDays(input.preferences.starts_on,cycle*Number(days))}};
+   const cycleInput={...input,...(scoped&&!scoped.single?{post_count:Math.min(14,Number(count)+Math.floor(cycle/4)*scoped.weeklyIncrease)}:{}),preferences:{...input.preferences,starts_on:addDays(input.preferences.starts_on,cycle*Number(days))}};
    const due=cycle===0?new Date().toISOString():dayStart(cycleInput.preferences.starts_on,input.preferences.timezone);
    if(cycleInput.preferences.starts_on>'2100-12-01'||(cycle>0&&Date.parse(due)<=Date.now()))throw new BadRequestException('Future loop cycles must start in the future');
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);

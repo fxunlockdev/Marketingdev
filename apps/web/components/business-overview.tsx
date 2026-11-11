@@ -1,5 +1,4 @@
 "use client";
-import {HomeCreate} from './home-create';
 import styles from './business-overview.module.css';
 import {PostThumbnail} from "./post-thumbnail";
 import {AppLink} from "./app-link";
@@ -13,21 +12,36 @@ export function BusinessOverviewPanel({business,name}:{name?:string;business:{id
  const [data,setData]=useState<Snapshot>(),[error,setError]=useState<unknown>(),[retry,setRetry]=useState(0);
  useEffect(()=>{setData(undefined);setError(undefined);let active=true,timer:ReturnType<typeof setTimeout>;let failures=0;const poll=async()=>{try{if(document.hidden)return;const value=await api<Snapshot>(`/api/v1/businesses/${business.id}/overview`);if(active){failures=0;setData(value);setError(undefined);}}catch(e){failures++;if(active)setError(e);}finally{if(active)timer=setTimeout(poll,Math.min(120000,30000*2**failures));}};void poll();return()=>{active=false;clearTimeout(timer);};},[business.id,retry]);
  const link=(section:string)=>`/b/${business.id}/${section}`;
- return <><h1 className="sr-only">Your content, at a glance.</h1><Notice error={error}/>{!data?(error?<button onClick={()=>setRetry(n=>n+1)}>Try again</button>:<Loading/>):<div className="reference-home-grid">
-  <HomeCreate business={business} name={name}/>
-  <div className="overview-metrics">{[['Awaiting review',data.counts.awaiting_review,'review'],['Scheduled posts',data.counts.scheduled_posts,'publishing'],['Published posts',data.counts.published_posts,'publishing']].map(([label,value,section])=><AppLink className="v5-panel overview-metric" href={link(String(section))} key={label}><span>{label}<span className="metric-arrow" aria-hidden="true">↗</span></span><strong>{value}</strong></AppLink>)}</div>
-
-  <section className="overview-upcoming" aria-labelledby="upcoming-heading">
-    <div className="section-heading"><h2 id="upcoming-heading">Upcoming posts</h2><div className="actions"><AppLink className="button" href={link('content-plan')}>View calendar</AppLink></div></div>
-    {data.upcoming_posts?.length?<ul className="upcoming-grid">{data.upcoming_posts.map((post,index)=><li key={post.id}><AppLink className={`upcoming-post ${styles.card} ${!post.design&&!post.video_version_id&&!post.carousel_version_id?styles.pending:''}`} href={`${link('content-plan')}?start=${post.starts_on}&slot=${post.id}`}>
-      <div className="upcoming-meta"><span>{post.creative_spec?.placement==='reel'?'Reel':post.creative_spec?.placement==='story'?(post.format==='video'?'Video story':'Image story'):post.format==='video'?'Video':post.format==='carousel'?'Carousel':'Image'} · {post.channel==='linkedin'?'LinkedIn':post.channel==='instagram'?'Instagram':post.channel}</span><time dateTime={post.planned_at}>{new Intl.DateTimeFormat(undefined,{timeZone:post.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(post.planned_at))}</time></div>
-      <PostThumbnail businessId={business.id} post={post} priority={index<4}/>
-      <div className="upcoming-copy"><span className="status neutral">{postProgress(post)}</span><h3>{post.hook||post.brief.split(/\n\s*(?:Additional creative direction|Image direction):/i)[0]}</h3><p>{post.plan_title}</p><span className="upcoming-open">{post.state==='content_needed'&&!post.generation_status?`Create ${post.format==='carousel'?'carousel':post.format==='video'?'video':'image'}`:'Open post'} <span aria-hidden="true">→</span></span></div>
-    </AppLink></li>)}</ul>:<div className="overview-content-empty"><h3>Your next posts start here</h3><p>Plan your first campaign to see your upcoming posts here.</p><AppLink className="button primary" href={link('campaign-new')}>Create a campaign</AppLink></div>}
-  </section>
+ const attention=[
+  ...(!business.has_approved_brand?[{title:'Finish your brand setup',detail:'Confirm your business details before creating content.',href:link('guided-onboarding')}]:[]),
+  ...(data?.counts.awaiting_review?[{title:`${data.counts.awaiting_review} posts to review`,detail:'Approve your next posts or request changes.',href:link('review')}]:[]),
+  ...((data?.counts.uncertain_publications??0)+(data?.counts.publication_attention??0)>0?[{title:'Check your publishing activity',detail:'Some posts need a connection or status check.',href:link('publishing')}]:[]),
+  ...(data?.counts.failed_jobs_last_week?[{title:'Some creations need attention',detail:'Open Calendar to check and recover unfinished content.',href:link('content-plan')}]:[]),
+ ];
+ return <><Notice error={error}/>{!data?(error?<button onClick={()=>setRetry(n=>n+1)}>Try again</button>:<Loading/>):<div className={styles.dashboard}>
+  <header className={styles.heading}><div><p className="eyebrow">{business.name}</p><h1>{name?`Hello, ${name.split(' ')[0]}`:'Your dashboard'}</h1><p>Your content, your calendar, and what needs you next.</p></div><AppLink className="button" href={link('content-plan')}>Open calendar</AppLink></header>
+  <div className={styles.topGrid}>
+   <section className={styles.attention} aria-labelledby="attention-heading"><div className={styles.sectionHeader}><h2 id="attention-heading">Your attention</h2><span className={styles.count}>{attention.length}</span></div>
+    {attention.length?<ul>{attention.map(item=><li key={item.title}><AppLink href={item.href}><div><h3>{item.title}</h3><p>{item.detail}</p></div><span aria-hidden="true">↗</span></AppLink></li>)}</ul>:<div className={styles.caughtUp}><h3>You’re up to date</h3><p>No approvals or publishing checks are waiting for you.</p></div>}
+    <AppLink className={styles.campaignAction} href={link('monthly-planning')}>Plan my content <span aria-hidden="true">→</span></AppLink>
+    {data.counts.active_jobs>0&&<p className={styles.progress} role="status">{data.counts.active_jobs} {data.counts.active_jobs===1?'task is':'tasks are'} in progress. Your saved work will stay here.</p>}
+   </section>
+   <section className={styles.upcoming} aria-labelledby="upcoming-heading"><div className={styles.sectionHeader}><h2 id="upcoming-heading">Coming up</h2><AppLink href={link('content-plan')}>View calendar →</AppLink></div>
+    {data.upcoming_posts?.length?<ul className={styles.postList}>{data.upcoming_posts.slice(0,5).map((post,index)=><li key={post.id}><AppLink className={styles.postRow} href={`${link('content-plan')}?start=${post.starts_on}&slot=${post.id}`}>
+     <div className={styles.thumbnail}><PostThumbnail businessId={business.id} post={post} priority={index<3}/></div>
+     <div className={styles.postCopy}><h3>{post.hook||post.brief.split(/\n\s*(?:Additional creative direction|Image direction):/i)[0]}</h3><p>{post.format==='carousel'?'Carousel':post.format==='video'?'Video':'Image'} · {post.channel==='linkedin'?'LinkedIn':post.channel==='instagram'?'Instagram':post.channel}</p><span>{postProgress(post)}</span></div>
+     <time dateTime={post.planned_at}>{new Intl.DateTimeFormat(undefined,{timeZone:post.timezone,month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(post.planned_at))}</time>
+    </AppLink></li>)}</ul>:<div className={styles.empty}><h3>A little planning goes a long way</h3><p>Your upcoming posts will appear here.</p><AppLink href={link('monthly-planning')}>Plan your first month →</AppLink></div>}
+   </section>
+  </div>
+  <div className={styles.metrics}>{[['Awaiting review',data.counts.awaiting_review,'review'],['Scheduled',data.counts.scheduled_posts,'publishing'],['Published',data.counts.published_posts,'publishing']].map(([label,value,section])=><AppLink href={link(String(section))} key={label}><span>{label}</span><strong>{value}</strong><span aria-hidden="true">↗</span></AppLink>)}</div>
+  <div className={styles.insightsGrid}>
+   <section className={styles.insightCard}><h2>Performance</h2><p>{data.performance.published_count?`${data.performance.available_count} of ${data.performance.published_count} published posts have saved results.`:'Your results will appear after your first posts are published and checked.'}</p><AppLink href={link('publishing')}>View results →</AppLink></section>
+   <section className={styles.ideasCard}><h2>Research & ideas</h2>{data.recommendations[0]?<><h3>{data.recommendations[0].title}</h3><p>{data.recommendations[0].summary}</p><p className="hint">A suggestion from saved results, ready for your review.</p></>:<p>Your saved brand knowledge and content learnings help shape what comes next.</p>}<AppLink href={link('memory')}>Explore your learnings →</AppLink></section>
+  </div>
   {!!data.campaigns?.length&&<section className="overview-campaigns" aria-labelledby="campaigns-heading">
-    <div className="section-heading"><h2 id="campaigns-heading">Your campaigns</h2><AppLink className="button" href={link('campaigns')}>See all campaigns</AppLink></div>
-    <ul className="overview-campaign-list">{data.campaigns.map(campaign=><li key={campaign.id}><AppLink href={`${link('campaign-review')}?plan=${campaign.id}`}>
+    <div className="section-heading"><h2 id="campaigns-heading">Your content plans</h2><AppLink className="button" href={link('content-plan')}>Open Calendar</AppLink></div>
+    <ul className="overview-campaign-list">{data.campaigns.map(campaign=><li key={campaign.id}><AppLink href={`${link('content-plan')}?plan=${campaign.id}`}>
       <div><h3>{campaign.title}</h3><p><time dateTime={campaign.starts_on}>{campaignDate(campaign.starts_on)}</time> – <time dateTime={campaign.ends_on}>{campaignDate(campaign.ends_on)}</time></p></div>
       <span>{campaign.post_count} {campaign.post_count===1?'post':'posts'}{campaign.awaiting_review?` · ${campaign.awaiting_review} to review`:campaign.approved_count?` · ${campaign.approved_count} approved`:''}</span><span aria-hidden="true">→</span>
     </AppLink></li>)}</ul>

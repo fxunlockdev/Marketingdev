@@ -167,3 +167,23 @@ test('explicit daily feed image mix preserves daily coverage while keeping reel 
  assert.equal(new Set(result.slots.filter(slot=>slot.format==='static').map(slot=>slot.planned_at.slice(0,10))).size,7);
  assert.ok(result.slots.filter(slot=>slot.format==='video').every(slot=>slot.creative_spec.placement==='reel'&&slot.creative_spec.aspect==='vertical'));
 });
+
+test('monthly planner constrains fact identifiers and selected styles in the official API request',async()=>{
+ const {planningSchema}=await import('../../dist/planning-schema.js');
+ const context={...structuredClone(input),post_count:2,duration_days:7,content_mix:['static','carousel'].map(format=>({channel:'instagram',format,count:1,creative_spec:{placement:'feed',aspect:'square',slide_count:format==='carousel'?3:null,artwork:{text:'headline',typography:{headline:{family:'Playfair Display',weight:400},body:{family:'DM Sans',weight:400}}}}}))};
+ const schema=planningSchema(context),provider=new CreativeProvider();
+ const wire=provider.plannerRequest({...message,content_plan_schema:schema},'MOCK-plan',16000);
+ assert.equal(wire.body.text.format.strict,true);assert.equal(wire.body.text.format.name,'desvio_content_plan');
+ assert.deepEqual(schema.$defs.factId.enum,['offering']);
+ assert.equal(schema.properties.slots.minItems,2);assert.equal(schema.properties.slots.maxItems,2);
+ const variants=schema.properties.slots.items.anyOf;assert.equal(variants.length,2);
+ assert.deepEqual(variants[1].properties.creative_spec.properties.slide_count.enum,[3]);
+ assert.deepEqual(variants[0].properties.creative_spec.properties.artwork.properties.typography.properties.headline.properties.family.enum,['Playfair Display']);
+ assert.deepEqual(variants[0].properties.fact_ids.items,{$ref:'#/$defs/factId'});
+ // PostgreSQL JSONB and model responses can order equivalent nested keys differently.
+ const plan=generatedPlan(context);context.preferences.channels=['instagram'];
+ plan.slots=plan.slots.map(s=>({...s,creative_spec:{...s.creative_spec,artwork:{typography:{body:{weight:400,family:'DM Sans'},headline:{weight:400,family:'Playfair Display'}},text:'headline'}}}));
+ assert.equal(validateGeneratedPlan(plan,context).slots.length,2);
+ plan.slots[0].creative_spec.artwork.typography.headline.family='DM Sans';
+ assert.throws(()=>validateGeneratedPlan(plan,context),/PLAN_OUTPUT_INVALID/);
+});

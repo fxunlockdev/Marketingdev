@@ -1,3 +1,13 @@
+## Campaign-first onboarding implementation, 10 November 2026 (LOCAL, INCOMPLETE)
+
+User approved the campaign-first plan in `design-plans/campaign-first-onboarding.md`. Added a server-persisted five-question brief with saved step, optimistic concurrency, tenant RLS, and idempotent research handoff. The opt-in dedicated research contract reuses the durable intake worker, preserves reviewed facts, validates palette/font choices and evidence IDs, and returns a proposed creative direction. Failed analysis after website capture can reuse captured sources. This does not implicitly approve research facts or brand identity.
+
+Dashboard now prioritizes review/publishing attention, compact upcoming posts, actual counts and saved insights. Create remains in sidebar and existing routes. Guided onboarding is an isolated route, not the default new-business entry, until the complete journey passes. New migration: 094_guided_business_brief.sql. No provider configuration changes or live paid jobs.
+
+Validation: API and web builds pass; 11 focused research/intake contract tests pass; 2 new foundation tests pass with real disposable PostgreSQL 17.11, tenant roles and a MOCK OpenAI response (including durable replay and saved step); two browser tests pass with MOCK API data across 1440/768/390 widths, saved-question reload, pending edit protection, accessibility checks and existing Create interactions. Screenshot inspection caught and corrected low-contrast attention-card headings. These checks do not establish live research quality or generation acceptance.
+
+Remaining: actual static plus three-slide carousel mood board generation, one successful feedback regeneration, immutable direction locking, configurable monthly allowance enforcement (20 static / 5 carousel / 5 video, samples included separately), campaign production orchestration, provider-backed acceptance tests, rollout and deployment. User's new mood board screenshot calls for an art-directed asymmetrical tile layout. Do not present the proposed-direction text card as a completed mood board. Not production-ready or deployed.
+
 ## Astryx design refinement | 10 November 2026
 
 Introduced pinned Astryx theme, action buttons and spinner with Desvio typography and colors. Shared field gaps, panel spacing, focus rings, disabled/loading feedback and responsive sizing now apply across campaigns, team, profile, brand actions, preferences, integrations, archive, export and video setup. Existing Base UI selectors and domain-specific canvas controls retain their interaction contracts. Creation cards retain the supplied lavender/yellow/green visual hierarchy.
@@ -1702,3 +1712,217 @@ Hosted rollout: web deployment `744ec1a8-f899-40ee-a498-edd5908f55ca` from `58ed
 Deployed commit `68fbe6f` to dev API and web. Shared post cards now request authenticated WebP previews bounded to 640px instead of multi-megabyte originals, with early viewport preloading. Full-resolution editing, export and publication assets remain unchanged. Preview caching is bounded to 16 MiB/256 entries with a 15-minute lifetime, scoped authorization on every request, source hash validation, concurrent request coalescing and bounded transforms outside database transactions.
 
 API/web builds and web types passed, along with 14 offline assertions/subtests, two local browser tests and two hosted browser tests. Read-only real Home verification showed three preview transfers at 339 to 357ms, totaling 200,382 bytes versus 7,054,238 original bytes. Anonymous/cross-business checks returned 401/404. Both deployments reached SUCCESS. The screenshot carousel has no saved creative or generation job, so its Ready to create placeholder is not image latency. No paid generation, publishing, customer edits or infrastructure sizing changes occurred. Evidence: `docs/evidence/image-preview-performance/README.md`.
+
+### 2026-11-10: monthly approval flow in progress
+
+The updated journey is questionnaire, research, mood board approval, concepts/calendar approval, asset generation, then individual review and regeneration. Internal plan records remain for recovery and allowances; Create entry points now offer Custom post, Plan my content and Review posts. The latest web build and focused mocked-browser navigation checks passed. The guided backend suite passes all 10 real-PostgreSQL tests with mocked model providers, including stale calendar approval, idempotent batches, monthly allowances and selected video-reference consent/revocation. Automatic video handoff now preserves the approved brief, storyline, script and prompt.
+
+Migration deployment `f0ca957b-5e75-4c2e-bae0-cd80202f9229` is being tracked for development migrations 098 and 099. Its completion and temporary migration credential cleanup must be observed before API/web rollout. Current local UI and API changes are not yet deployed. Updated worker activation, live monthly generation and the complete customer acceptance journey remain outstanding. Do not treat these local checks as production readiness.
+
+Migration follow-up: development deployment `f0ca957b-5e75-4c2e-bae0-cd80202f9229` reached SUCCESS and logged checksum-verified completion through 099. Its temporary migration credential was removed and Railway confirmed the one-shot deployment REMOVED. API rollout is now underway; customer acceptance is still pending.
+
+### November 10: concepts-first deployment checkpoint
+
+- Exact DEV API deployment `b5630d12-eb0d-4ae4-b3a3-149cb3fca3f4` and web deployment `5b66e2a4-5784-4413-b066-ee17f208a7ae` observed SUCCESS.
+- Monthly approval contract checks: 2 passed. Isolated planner test with actual skills container and MOCK model: 1 passed, preserving approved typography. These are not live generation proof.
+- Rebuilt amd64 trusted worker `sha256:12f686fea6ff934a1198d9d11d0fa0221ae2bbb06d6f77cf4d44cbbb7568f169`; inventory updated. Worker still needs transfer/import/activation before live monthly generation acceptance.
+- User reaffirmed simplified flow: concepts plus calendar approval before assets, then individual asset revisions through Approvals.
+- Whole product completion and complete live journey remain outstanding.
+
+### November 10: worker rollout in progress
+
+- Live browser verified the approved second mood board and existing failed planning state. Screenshot: `/tmp/desvio-guided-live/view.png`. Planning remains rejected with SKILL_INPUT_INVALID; no approval or asset submission exists.
+- New credential-free worker bundle: `35484fe18a94c107dc11bb590b4aeb8a6c53eefc416801f2eb32acaad619c7b2`, 386850415 bytes.
+- Initial transfer stopped at capacity preflight before upload. Host had 1.1 GB free and 4.5 GB temporary deployment archives. Removed only old Nov 1/Nov 4 Docker transport archives bf437b61 and b01928dd (about 3 GB), retaining installed images, containers, and latest rollback archive.
+- Transfer retry is currently running as exec session 61515 (PID 58692). Poll this exact session; do not restart on an observation timeout. No import or activation yet.
+- Added operator-only `work/monthly-live-check.mjs` for compact authenticated status and calendar screenshot verification.
+
+### 2026-11-10 concepts/calendar live test checkpoint
+- Previous trusted worker rollout completed: image `sha256:12f686fea6ff934a1198d9d11d0fa0221ae2bbb06d6f77cf4d44cbbb7568f169`, activation verified; API flags restored (publishing remains disabled).
+- Real retry for QA business `2af3603a-c1f3-42ab-87b9-cdd60ff25d8c` failed safely with `PLAN_OUTPUT_INVALID`. No monthly assets were generated. Scoped, read-only inspection of saved provider response confirmed a mistyped approved fact UUID; correcting that ID in a local diagnostic alone passes all checks. No live response/data was rewritten.
+- Added trusted structured-output schema for content planning, restricting fact IDs, content formats and exact approved typography. Existing server validation remains intact. Normalized nested artwork property order so JSONB/model ordering cannot reject equivalent styles.
+- API build and 23 planning/generation/approval contract tests passed. Isolated skills regression and replacement worker rollout are in progress. New API deployment requested: `0cf70d4c-125d-4a1d-bddd-ac8679e0c9f0`, not yet confirmed here.
+- End-to-end completion remains outstanding: successful concepts/calendar approval, subsequent real asset generation and review, final allowance/live video checks, remaining ZIP onboarding fidelity. Do not claim complete.
+- Follow-up: isolated real skills container with a MOCK model passed the new schema/typography regression. API deployment `0cf70d4c-125d-4a1d-bddd-ac8679e0c9f0` observed SUCCESS. Replacement worker `sha256:92c25948ba7b3a3c44943219e02479cbf18bb1920f7da90b8909bfc99cde3799` imported and verified; private transfer `a5006b5d75c35194221c456acaaa6d994c10bdba4ff730d9df2a5b66b5586cf0` completed and temporary object removed. Activation now running under preview `a76434c0d98895cadceed3879c433c744a8392c5b801a1d31713f2bee2954d76`; reconcile the same journal before any new activation. Do not retry QA planning until activation restores API flags and verifies health.
+
+### 2026-11-10 live monthly approval follow-through
+- Worker activation finished successfully: trusted worker `92c25948ba7b3a3c44943219e02479cbf18bb1920f7da90b8909bfc99cde3799`; API flags restored, final activation API deployment `c1d330df-7563-4365-8510-c47109e1a425`.
+- Live planner succeeded after strict fact-ID schema fix: QA plan `d59a9355-f98e-4c47-be55-ecb6a668a10a`, guided request `ad844637-1b58-42ee-b5b2-4fe25db71227`. Verified zero generated assets before explicit calendar approval. Browser approved exact two-post plan and approval persisted after reload. Approval at 15:50:17Z; generation started 15:50:22Z.
+- Real static asset succeeded: version `f8bbfe7a-7597-4b27-a26b-4f39ae7ca3dd`. Carousel `2d5afe96-9aff-4bef-888f-ca95d64a70f3` is UNKNOWN, not completed: plan:1 and plan:2 read_file calls succeeded; plan:3 provider result absent. All slide jobs canceled before image generation. Do not automatically retry or claim full live success. Scoped local diagnostic in ignored work/carousel-failure-private.json. No provider secret printed.
+- Fixed finished drafts being excluded from review-inbox, while retaining exact-version approval rules. Added a persisted-draft inbox assertion; planning foundation suite 17/17 passed. Guided foundation suite 10/10 passed with MOCK providers, including allowance enforcement across all formats. Browser calendar approval/reference selection 2/2 passed with MOCK APIs. Web build and diff check passed.
+- Calendar review now uses business time zone, separated concept cards, clear approval footer. Stopped/uncertain asset generation now has an attention state instead of endless progress. API deployment `f76b3152-66d9-4a75-afb4-76c260c7b000` observed SUCCESS. Web deployment `814c5be6-88a4-4f0b-8dd9-cfa2765608df` uploaded; verify exact deployment status before reporting.
+- Outstanding: resolve uncertain carousel planner outcome safely; full live asset review/regeneration and remaining ZIP fidelity work. No social publishing attempted. Working tree not committed/pushed.
+
+### 2026-11-11 simplified journey clarification
+- Customer confirmed: approve mood board, then concepts and social calendar, then generate assets. Individual assets can be edited/recreated in Approvals; Create remains for custom posts. No separate customer-facing campaign management step. Internal grouping remains to preserve durable jobs and saved records.
+- Latest web deployment 814c5be6-88a4-4f0b-8dd9-cfa2765608df was observed SUCCESS. Live Approvals browser check showed the completed static image, one reviewable post, and no browser errors. Screenshot /tmp/desvio-guided-live/approvals.png.
+- This confirms the static approval handoff only. Carousel planning remains UNKNOWN and complete end-to-end verification remains outstanding.
+
+### 2026-11-11 monthly acceptance continuation
+- Dev API ed181725-e1ff-4909-89e7-d498e55c5268 and web f44e3959-4332-49b5-84ff-ea8145fd4e19 both SUCCESS.
+- Unified carousel review now updates the ordered carousel version and calendar post in one transaction. Exact slot and carousel revisions are required. Export/review foundation 17/17 and mocked browser 1/1 passed.
+- Live QA 3-slide carousel generated, reviewed, approved, persisted across reload and downloaded as ZIP. Unified review live check passed with no browser errors. Nothing published.
+- Monthly 15-second video rejected twice with RUNWAY_REQUEST_REJECTED. Fresh approved-reference dry-runs succeed (including identical lease URL construction), so root cause is NOT established. Do not label video or whole product complete.
+- Added bounded safe router rejection classification locally; 11 Runway contracts pass. This diagnostic change is not in deployed worker yet.
+- Evidence: docs/evidence/monthly-flow-checkpoint.json. Keep paid retries paused until actual submission rejection can be diagnosed. Retain unknown-result reservations; never blindly repeat ambiguous paid calls.
+
+### Continued monthly video verification
+Runway router request history confirms both monthly video attempts were invalid_request after routing, with no task ID. Dry-run routing is not live-generation proof. Fixed a local dashboard query omission so video failed/rejected/unknown/canceled requests produce generation_attention; guided-business foundation 10/10 passed and API build passed. This query change and the newly built diagnostic worker are not deployed. Overall end-to-end completion remains unverified.
+
+### Runway rejection resolved diagnostically, live generation deferred
+A single bounded diagnostic submission returned HTTP 400 with exactly `You do not have enough credits to run this task.` No task ID was issued. The user explicitly deferred Runway testing after being told the cause. Do not retry paid video generation until the user resumes it.
+
+The adapter now classifies this observed response as `RUNWAY_INSUFFICIENT_CREDITS` without retaining provider prose or image URLs. The video workflow explains that generation is paused and saved inputs remain. Runway contracts: 12/12; API build and web typecheck passed. API deployment `263621a5-0ac0-4078-a628-852d801a013c` and web deployment `7d503fda-3c05-443d-bc02-dccebd3bcf56` reached SUCCESS. Live scoped read verifies monthly video generation_attention=true and plan approval remains set.
+
+The full release gate was run and failed. Evidence reports are stale relative to source, and the gate still explicitly lacks a trusted full-product deployed evidence runner. Keep production readiness unproven; do not remove the gate solely to obtain a passing result.
+
+### Runway deferral rollout finished
+Worker activation completed at 2026-11-10T18:41:39.569Z using image `724b6f7be5335e9bf31cc06ba1b7ab335977d2615bc330dbd1dd8402c06508e4`. Activation process exited successfully after restoration. Targeted guided onboarding, monthly approval and Runway contracts passed 18/18. No further paid generation was run after the user asked to ignore Runway. Full production acceptance remains outstanding.
+
+### Broader acceptance audit continuation
+Full contract suite passed 373 checks, with one private archive verification skipped. Standard foundation runner now includes the guided-business suite by default. Its recovery fixture previously assumed unordered batch jobs were static; it now selects actual static bindings and asserts all 20 exist. Guided foundation rerun passed 10/10 with mock providers and real isolated database/workflow behavior. Full foundation run stopped during document environment setup: pinned LibreOffice deb13u8 packages are unavailable from configured Debian repositories. No application test failure is inferred from that setup failure, and no broad pass is claimed. Next: repair reproducible document test dependency acquisition, rerun broad security/foundation checks and finish browser/ZIP fidelity verification. Runway live output remains user-deferred.
+
+### Continued acceptance, Runway remains deferred
+Recovered 180 exact pinned document dependency archives from an existing local image and verified all SHA256 values without changing dependency versions. This unblocks this machine, not fresh-machine dependency availability. Onboarding browser checks passed 5/5 with MOCK APIs across desktop/tablet/mobile; focus restoration regression passed 1/1.
+
+Full isolated foundation run completed: authentication/tenant suite 31/31; remaining foundation suite 249 passed and 5 failed. Failures were outdated test assumptions: two legacy video model grants, two fixed strategy credit quotes, and a protected edit during active publication. Updated fixtures retain the existing safeguards. Provider configuration rerun passed 14/14 and strategy rerun passed 3/3. Publishing rerun remains underway; do not claim a broad green run yet. No paid Runway call or social publication was made. Complete production release evidence remains outstanding.
+
+Publishing rerun completed successfully: 19/19 with MOCK external providers, real isolated storage/rendering/workflows. The changed-approval test verifies both the edit API protection and worker rejection when the saved revision changes after enqueue. All five original failing cases pass in affected-suite reruns (operator14, strategies3, publication19). No full combined rerun after fixture corrections; no new product deployment this continuation. Runway live output remains deferred and the overall release gate remains incomplete.
+
+
+### Dependency recovery and combined acceptance continuation
+- Added official Debian Snapshot fallback for packages retired from the current APT mirror. Exact reviewed SHA256 pins remain mandatory; corrupt cache/downloads fail closed, temporary downloads are removed, and timeout recovery stops its owned APT container first. No package versions changed.
+- `python3 -m unittest tests.test_debian_snapshot -q`: 5 passed. One real archived fonts-opensymbol deb13u8 download matched its reviewed SHA256. A complete fresh bundle has not yet been tested.
+- API build passed. Combined foundation run is active in `/tmp/desvio-foundation-complete-recheck.log`; authentication/tenancy 31/31 passed. Remaining checks use mock providers and are not live integration certification. No new deployment or Runway calls.
+
+### Follow-up acceptance checks
+- Moved Snapshot regression tests into the default offline suite. `make verify-offline` passes: 12 passed, 1 explicitly skipped because private client rule source files are not distributed here. The exact task-specific shared-rule mount set and reviewed archive checksum remain enforced; the private-content comparison has not been verified in this checkout.
+- `uv run --frozen python -m unittest discover -s tests/security -v`: 6 passed. The initial system-Python attempt lacked dependencies; rerun used the repository frozen environment. This is not the full security release gate.
+- Full foundation process remains active with the existing log; no restart and no live provider calls.
+
+### Combined acceptance completed, Runway still deferred
+- API build passed. Complete foundation run passed 285/285 (31 authentication/tenancy plus 254 remaining foundation), zero failures/skips. Real local infrastructure with mock external providers; log `/tmp/desvio-foundation-complete-recheck.log`. This supersedes the earlier running status and fixture failures.
+- Guided browser rerun passed 5/5, zero failures/skips, at desktop/tablet/mobile widths with mock APIs. Log `/tmp/desvio-guided-final-browser.log`; screenshots `/tmp/desvio-guided-final-browser`.
+- Latest user instruction explicitly defers Runway. No additional live video calls, social publishing, or deployment in this continuation. Full production release evidence remains incomplete.
+
+### Release acceptance continued
+- `make verify-recovery` passed: 100 migrations and 565 policies restored into an isolated database; two-tenant read/write denial preserved. Local restore only, hosted backup/object recovery remains unverified.
+- `make verify-load` passed: 480 authenticated requests, eight accounts, concurrency 24, no failed requests; local p95 36 ms. This does not establish hosted capacity or model-provider throughput.
+- Full security gate is active (session 7587, `/tmp/desvio-security-release-current.log`), including dependency audits and complete foundation rerun. Full browser gate is active (session 88503, `/tmp/desvio-browser-release-current.log`). Resume these handles; do not restart healthy runs.
+- Code inspection found a potential stale business-state issue in MonthlyPlanReview: plans/saved/error and mutation completions are not scoped on business prop changes. Verify remount behavior and add a regression before fixing. No product edit made in this continuation. Runway remains user-deferred; no social publication.
+
+### Business-switch investigation
+Inspected all ContentWorkspace call sites in `apps/web/components/businesses.tsx`: both use business-ID React keys (lines 325 and 335), so MonthlyPlanReview remounts on business changes. The suspected state reuse is not reachable through these production call sites; no speculative component change made. Root and media production dependency audits in the active security run report zero vulnerabilities. Security (7587) and browser (88503) processes remain active and were polled, not restarted.
+
+### Full security gate passed
+`make verify-security` exited 0 with unchanged source: build, root/media production npm audits (zero vulnerabilities), all 285 foundation tests and six Python security guards passed. Generated evidence: `docs/evidence/security.json`. External providers were mocked; hosted isolation/live output is not certified. Full browser gate still active in session 88503 (`/tmp/desvio-browser-release-current.log`); resume that handle. Runway remains deferred and no social post was published.
+
+### Fresh-account audit correction and next regression (2026-11-11)
+The initial suspicion that onboarding has no inline business confirmation was incorrect: `GuidedMoodboard` already renders “Does this sound like your business?” and reviews findings through the existing revision-checked Brand Brain endpoints. Do not add a duplicate approval bridge or silently approve researched claims.
+
+Confirmed narrower gap: when research returns no findings, or omits brand_name/offering/audience, that panel cannot add the missing required value. It only edits existing findings and routes missing details to legacy onboarding. The dedicated research foundation test deliberately returns an empty findings array with a valid business_direction; the mood board fixture separately pre-confirms three facts. Existing tests therefore do not prove the fresh-brand handoff. Next regression should use a fresh brand, research with omitted required findings, complete the missing facts inline, explicitly confirm, and submit real mood board jobs (mock providers clearly identified). Reuse the existing idempotent brain manual endpoint for user-supplied corrections; do not bypass snapshot approval or turn AI suggestions into approved facts automatically.
+
+Browser gate 88503 is still live and has advanced from Canvas to `tests/browser/connections.test.mjs` (PID 2584 observed). No product source edits during this gate. Runway remains deferred by the user.
+
+### Prepared missing-fact correction, awaiting active browser baseline
+The browser gate remains live (88503); final publishing module observed as PID 3225. Product source has not changed during it. A concrete patch is staged in `/tmp/desvio-missing-facts-edit.py`, and a mocked browser regression is staged in `/tmp/desvio-missing-facts-browser-test.txt`. Inspect before applying. The patch adds editable required fields to the existing inline confirmation panel, defaults from saved questionnaire answers, saves through the existing idempotent manual-finding endpoint, and requires a separate explicit confirmation. The test includes a lost save response and verifies exactly three saved facts with no premature approval.
+Next: once 88503 is terminal, apply staged patch; append staged regression; update the existing alternative-facts browser fixture to include brand_name/offering (it currently mocks approval with only audience, which the real API rejects). Run web type checks and guided browser suite. Add a real-service fresh-brand regression rather than relying on preapproved readyBusiness fixtures. Staged code is not implemented or tested yet.
+
+### Missing research details implemented and locally verified (2026-11-11)
+Applied the prepared correction to GuidedMoodboard and passed the saved questionnaire brief from GuidedBusiness. Missing required facts are editable inline, defaults come from saved answers, retries reuse idempotency keys, and confirmation remains explicit. No researched claim is silently approved. Updated the alternative-facts fixture to meet actual required-field rules.
+
+Web TypeScript check passed. Focused guided browser tests: 6/6 passed, including interrupted save recovery. Guided service tests: 10/10 passed, including empty research findings followed by manual fact confirmation and mood board job submission. External providers are mocked. Logs: `/tmp/desvio-guided-missing-facts-browser.log`, `/tmp/desvio-guided-missing-facts-foundation.log`, `/tmp/desvio-onboarding-typecheck.log`. Sessions 70365 and 82515 exited 0.
+
+Full browser gate 88503 exited 2, superseding all earlier running notes. Multiple Canvas, Connections, Customer and Publishing tests fail. First Canvas failure renders Business unavailable; first Customer failure expects no Create navigation although the approved product now includes Create, and the following test expects the legacy onboarding heading. These are investigation leads, not proof that all failures are stale tests. Canvas also has a duplicate planning-grant fixture insertion. Do not weaken assertions or claim the suite passed. Log: `/tmp/desvio-browser-release-current.log`.
+
+Latest user explicitly says to ignore Runway for now. No live Runway requests, social publishing, or new deployment occurred in this continuation. End-to-end completion remains unproven.
+
+### Legacy route diagnosis and Runway funding check (2026-11-11)
+The isolated first Canvas test (44480, exit 1) proved the business remained visible through the authenticated API. Its URL had redirected from `/canvas` to `/campaigns`; the route label guard did not recognize campaigns even though a compatibility renderer remained. Fixed both paths: bare legacy Canvas opens current Create; old Campaigns links render the Calendar workspace without a Campaigns navigation item. Saved creative query links retain the existing campaign-post destination. New mocked browser regression `tests/browser/legacy-creation-routes.test.mjs` passes against local Next, including enabled chat composer and Calendar controls. Web typecheck passed. This is local evidence only, not deployment evidence.
+
+The older Canvas browser test expects a retired editor and is not a valid acceptance test for the current Create surface. Current AI chat browser coverage is running as session 6774, log `/tmp/desvio-current-chat-browser.log`; do not restart while live. Full browser gate remains red. Need modernize obsolete journey tests without dropping their behavior coverage.
+
+User reports 500 Runway credits, superseding the earlier defer instruction. Read-only organization lookup using Desvio's configured API credential returned 248 credits. Scoped no-charge dry run of the existing 15-second monthly video returned 200 with quality routing to seedance2_5 and estimated cost 1020 credits (configured request ceiling 2000). No paid submission was made. Do not retry that request against an insufficient balance or silently increase any grant. Runway contract tests passed 12/12, including explicit insufficient-credit rejection and no retry. The local error handler already recognizes that rejection; the deployed older failed request still has the generic code. No new deployment or social publication in this continuation.
+
+### Current chat results and focused recheck
+Session 6774 exited 1: 6/7 current AI chat browser tests passed. Passed reconnect/history read recovery, all format previews and reload, format change context, three-slide carousel plus playable reel/video output with mock providers, date-dialog layout/validation, and guided-carousel handoff. Remaining failure is at canvas.test.mjs:1633: custom Text weight select was read as a native input. Updated assertion to existing selectField helper, preserving expected value 600. Also made that test's planning-grant fixture upsert because the complete shared-brand suite inserts the same provider grant earlier. Focused image/edit/history and recovery recheck now running session 54199, `/tmp/desvio-chat-edit-history-recheck.log`. Poll this handle; no duplicate run. No deployed or real-provider end-to-end success claimed.
+
+## Chat history recovery follow-up, 2026-11-11
+- Previous focused browser run completed: image generation/edit/save/download/history passed with MOCK OpenAI; history recovery failed because the Reload history button disappeared during a pending background history request.
+- History now loads only while its dialog is open and clears stale errors before loading. This removes hidden background reads and the stale-error retry race. Added an assertion that closed history makes no history request.
+- Focused verification is running in session 38597; log `/tmp/desvio-chat-history-lazy-recheck.log`. Not deployed; overall product completion remains unproven.
+
+### History recovery verified
+- Session 38597 exited 0: both focused chat tests passed, zero failures, MOCK OpenAI. Log `/tmp/desvio-chat-history-lazy-recheck.log`.
+- Customer tests now expect the approved Create navigation and guided onboarding landing, then explicitly visit retained manual fact review for fallback coverage. Syntax check passes; full customer rerun started, log `/tmp/desvio-customer-updated-flow.log`.
+- Publishing/connections failures use legacy Postiz fixtures against the default Post for Me UI. They still need correct legacy-surface coverage and current-provider journey verification; not waived.
+
+## Onboarding save and resume, 2026-11-11
+- Save for later now returns Home only after a confirmed save; failed saves retain answers and keep the user in the questionnaire.
+- Brands > Continue setup now resumes guided onboarding for unapproved businesses, while approved businesses retain brand review.
+- Mock-API browser test passed at desktop/tablet/phone, including save failure, retry, exit, and resume through Brands with persisted audience and step. Log `/tmp/desvio-save-later-browser.log`; not deployed.
+- Broader customer run remains live in session 70710, log `/tmp/desvio-customer-updated-flow.log`. It has reached browser tests and still reports failures; full result pending.
+
+### Manual setup to mood-board handoff (2026-11-11)
+The completed customer browser run still fails multiple obsolete campaign/dashboard expectations. Its rendered output exposed a real remaining legacy first-plan creation path. New requests from manual brand setup now save and approve the brand, then enter guided onboarding instead of directly generating a legacy campaign. Previously submitted legacy requests retain reconciliation. The saved-brand success link also goes to guided onboarding. Focused mock-API browser check passed (1/1), including failed save retention and asserting zero legacy generation requests. Evidence: `/tmp/desvio-first-plan-handoff.log`. Not deployed; full product verification remains incomplete.
+
+### Monthly approval status recovery (2026-11-11)
+Calendar success feedback is now tied to the saved plan and its current approval state. If an edit invalidates approval before generation, polling removes the success claim and restores explicit review. Regression simulates the server invalidation and verifies no automatic reapproval. Current guided browser group passed 8/8 after updating the video fixture to persist its approval, guided real-infrastructure service group passed 10/10 with mock providers, and web type checking passed. Logs: `/tmp/desvio-guided-full-current.log`, `/tmp/desvio-guided-service-current.log`, `/tmp/desvio-monthly-ui-typecheck.log`. Not deployed; complete live product audit still outstanding.
+
+## Updated flow web rollout, 2026-11-10 20:23 UTC
+
+Web deployment `2cab77ed-8ff4-4b30-88ca-4e427271ad1b` reached Railway SUCCESS. Includes tested questionnaire save/resume, fallback setup to mood board handoff, lazy chat history fetch and stale calendar approval display fixes. Isolated local compile passed; its symlinked dependencies caused standalone tracing warnings, so that local artifact was not deployed. Railway rebuilt the standalone image successfully using installed dependencies.
+
+Authenticated live read checks passed for guided onboarding, dashboard, Calendar, Approvals and Create, with no page exceptions or failing API responses. Four saved mood board previews loaded and decoded. No generation, approval, scheduling or publication was submitted. Source: `work/verify-guided-release.mjs`, `work/guided-release-readcheck.json`; screenshots in `/tmp/desvio-guided-release`. These read checks do not certify all mutation journeys. Full customer browser suite modernization, ZIP fidelity audit and overall release gates remain incomplete. Connected Runway API balance was rechecked at 248 credits; no paid retry.
+
+## Submitted questionnaire research isolation, 2026-11-11
+
+Found that brand analysis selected every historical questionnaire source, so revised answers could be sent alongside obsolete audience/market answers. Guided research now filters questionnaire evidence to the job's immutable submitted brief before source and text limits. Ordinary business evidence remains available; archived questionnaire records are retained. Legacy analysis without a guided snapshot retains its existing evidence selection.
+
+API TypeScript build passed. Guided service tests passed 11/11 against disposable PostgreSQL with MOCK OpenAI, including the new worker-level regression: failed initial research, changed answers, new research, only matching questionnaire sent, independent plain-text evidence retained, both historical questionnaire sources preserved. Log `/tmp/desvio-research-snapshot-check.log`. `git diff --check` passed. This worker change has not been deployed. Full ZIP fidelity and customer journey/release audit remain incomplete; no paid generation or social publishing was attempted.
+
+## Website research fallback and retry recovery, 2026-11-11
+
+Added an explicit Continue with my answers action after confirmed website capture failure. The real intake workflow pre-creates an analysis child, so availability correctly waits until that child is terminal too. The service test runs the real intake worker to cancel the dependent child after capture failure, then verifies saved-answer analysis, immutable brief context, idempotent retry, and no silently approved facts. Active or uncertain capture/analysis cannot be bypassed. Unchanged brief saves now return the existing revision before the active-research edit guard, allowing submission recovery after a lost response while still rejecting actual edits.
+
+API build and git diff --check passed. Guided service suite passed 12/12 on disposable PostgreSQL with MOCK external providers; log /tmp/desvio-website-fallback-service.log. Focused browser recovery test passed 1/1 with MOCK API, including reload without resubmission; log /tmp/desvio-website-fallback-browser.log. These changes and the previous research snapshot filter remain undeployed. Full live flow, ZIP fidelity, broader customer suite and release audit remain incomplete. No paid provider generation or social publication performed.
+
+## Uncertain research reconciliation and broader flow checks, 2026-11-11
+
+Guided onboarding now prioritizes an unknown website capture over its pre-created queued analysis child. Previously that combination incorrectly displayed ordinary loading. Unknown research now continues read-only polling so a confirmed resolution appears without reloading or submitting another request. Browser regression verifies uncertainty is visible, submission stays disabled, then terminal capture/analysis reveals the saved-answers recovery action with zero business mutation requests.
+
+Current complete guided browser group passed 8/8 with MOCK API, covering responsive dashboard/questionnaire, mood board revision and approval, calendar exact-version approval, video reference choice, missing facts, website failure and uncertainty recovery. Log /tmp/desvio-guided-recovery-full.log. Web typecheck and git diff --check passed. Guided and monthly approval contracts passed 6/6. The isolated planner test initially skipped without an image, then passed 1/1 using immutable local image sha256:c8d9e33a6e960f740d8366797157223702c1e3c1c1513ac9065141afd39fc956 with MOCK model; it checks approved typography preservation and unsafe input rejection. Logs /tmp/desvio-guided-contracts-current.log and /tmp/desvio-guided-runtime-current.log. No provider generation or publication. These source changes remain undeployed; complete live product and ZIP fidelity audit remain unfinished.
+
+## Recovery release rollout, 2026-11-11
+
+API deployment fdc0d8c9-2c26-46d7-b795-462f9ea3c6f3 and web deployment 2c243a09-8fb3-4ae7-a3f5-b4399b113d71 observed SUCCESS. Authenticated deployed reads at 2026-11-11T00:56:06Z passed onboarding, Home, Calendar, Approvals and Create with no page exceptions or failing API responses; all four saved mood board images decoded. Screenshot review confirms current layout, but saved content still includes em dashes and a legacy plan title. These checks do not certify mutation flows or full ZIP fidelity.
+
+Recovery worker built successfully as sha256:4b7b20e156d413880e3ff8c2a979fc8dac4bc9073bd7efd16b554def01377beb. Bundle d1d887e5906e080161d7efe8a19dc38de039e18bec4b982580452939f99596d6 is transferring in session 14693. Preview attempted before image import failed in readiness inspection; no activation was applied. Import then rerun preview before activation. Live Runway organization GET reports 248 credits; no generation submitted.
+
+### Worker activation in progress
+Transfer and both image imports succeeded. All six immutable worker/child images confirmed present on host. Preview succeeded after transient read failure; applied reviewed plan 5efe25bf408f8c95cc22bda1414d632a62af43cf370a01e6f8844a11a0c07df9. Activation session 64329 is live; journal starting. API quiesce deployment 57527c83-b764-4335-94c1-ff1d6f299e34 observed BUILDING. Do not start another activation or deploy concurrently; resume session and reconcile journal/external state if it fails. No provider spend or publication.
+
+### Worker activation completed
+Session 64329 exited 0 with activated result at 2026-11-11T01:34:14Z. Worker registration and restored API settings verified by activation runner; journal verified. Final API deployment 2fa6ad11-8a7b-4c80-83fb-f2e068c3c93f. Previous in-progress note superseded. Research snapshot isolation is now deployed. Complete ZIP fidelity, broader journey tests, and full live completion audit remain open.
+
+### 2026-11-11: current onboarding handoff verification
+
+Updated the customer browser regression to verify new manual brand setup persists approval and enters guided mood-board onboarding without submitting a legacy calendar. The same regression checks recovery of a previously submitted legacy request using its original idempotency key, including reload and completion. ZIP branding token assertions now match the approved paper/ink identity. Browser suite passed 3/3 against actual disposable API/database/storage/scanner/worker and local SMTP, with MOCK planner transport only; log `/tmp/desvio-onboarding-current-audit.log`. Guided service suite passed 12/12 with mocked external generation, and guided/monthly contracts passed 6/6. Syntax and diff checks passed. No paid generation or publication.
+
+User questioned whether each month requires onboarding. Source inspection confirms saved business answers and research are reused, and a locked mood board exposes MonthlyPlanSetup. Home and Calendar still link to the shared guided-onboarding route. A business without a guided brief receives blank answers, even if it has older Brand Brain facts. Existing-business prefill and clearer recurring-month entry remain to improve; do not claim the screenshot's business has completed the new setup without checking its saved state. Full ZIP fidelity and live end-to-end verification remain incomplete.
+
+### 2026-11-11: approved business prefill
+
+New guided questionnaires now load offering, audience and prohibited claims from the latest tenant-scoped approved Brand Brain snapshot. Existing saved questionnaires return unchanged, including deliberately cleared fields. Ambiguous, oversized or invalid facts stay blank rather than being guessed or truncated. No research is submitted by reading defaults and no approval is bypassed. Implementation: apps/api/src/guided-business.ts.
+
+Validation: npm run build passed; guided/monthly contract tests 8/8 passed, including saved-answer preservation; guided database suite 12/12 passed against disposable PostgreSQL with MOCK external providers, including approved defaults and exclusion of newly added unapproved findings. Log /tmp/desvio-guided-prefill-check.log. git diff --check passed. Not deployed. Next: dedicated recurring monthly planning entry using the locked mood board, with incomplete onboarding resuming safely. Full ZIP fidelity and live completion audit remain outstanding.
+
+### 2026-11-11: recurring monthly planning entry
+
+Added monthly-planning route within the existing authenticated business shell. Home, Calendar and creation-menu planning actions now target it; no sidebar items changed. It resumes the saved questionnaire when research is incomplete, requires mood-board approval when no locked board exists, and otherwise shows MonthlyPlanSetup directly using the locked board. Approved direction remains available via a separate link. Pending/current calendar review and exact-version approval remain in the existing flow. Legacy campaign-new entry uses the same planning mode.
+
+Web typecheck and diff checks passed. Guided browser suite passed 8/8 using MOCK API, checking Home/Calendar destinations, incomplete setup resume, no planning before board approval, direct recurring setup without questionnaire/preview repetition, reload recovery, and exact-calendar approval. Log /tmp/desvio-monthly-ui-verified.log. Additional responsive test passed 1/1 after adding 1440/768/390 overflow checks and screenshots; desktop and phone screenshots visually inspected under /tmp/desvio-monthly-planning-ui. Log /tmp/desvio-monthly-responsive.log. These checks do not certify real provider generation. Source remains undeployed; API approved-default prefill and web recurring entry are ready for deployment checks. Full ZIP fidelity, complete live updated journey and launch audit remain open.
+
+### 2026-11-11: branch checkpoint validation
+
+Prepared the accumulated guided onboarding, mood-board, monthly calendar approval, allowance and recovery work for the feature and dev branches. API build and web typecheck passed. Full contract suite passed 375 tests with one skipped and no failures. Earlier scoped guided service and browser results are recorded above. Staged credential-pattern scan found no matching secrets. Generated next-env.d.ts route-path churn is excluded. This is a source checkpoint, not a claim of complete live product verification or a confirmed deployment of the latest recurring-planning changes.

@@ -1,4 +1,4 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Pool, type PoolClient } from 'pg';
 
 export class TenantDatabase {
@@ -34,6 +34,7 @@ export class TenantDatabase {
       return value;
     } catch (err) {
       await db.query('ROLLBACK');
+      if((err as any)?.code==='P0001'&&String((err as Error).message).startsWith('CONTENT_ALLOWANCE_EXHAUSTED:'))throw new ConflictException('Your monthly '+String((err as Error).message).split(':')[1]+' allowance is used. Existing content remains available to edit and review.');
       throw err;
     } finally { db.release(); }
   }

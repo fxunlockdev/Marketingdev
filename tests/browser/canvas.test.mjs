@@ -470,9 +470,13 @@ afterEach(async()=>{
 test("Canvas browser creates a real queued job, renders a private creative and saves editable Fabric layers (MOCK OpenAI)", async () => {
   await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER MOCK')",[org,brand]);
   const photoBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
+  const visibleBusinesses=await page.evaluate(async()=>{const response=await fetch('/api/v1/businesses');return {status:response.status,body:await response.json()};});
+  assert.equal(visibleBusinesses.status,200);
+  assert.ok(visibleBusinesses.body.businesses.some(item=>item.id===brand),'Created business must be visible to its authenticated owner before opening Canvas');
   await page.goto(`${base}/b/${brand}/canvas`);
   await expect(page.getByText('Generation allowances',{exact:true})).toHaveCount(0);
-  await expect(page.getByRole('heading',{name:'Ready when you are.',exact:true})).toBeVisible();
+  try { await expect(page.getByRole('heading',{name:'Ready when you are.',exact:true})).toBeVisible(); }
+  catch(error){console.error('Canvas route diagnostic',JSON.stringify({url:page.url(),expectedBrand:brand,businesses:await page.evaluate(async()=>{const r=await fetch('/api/v1/businesses');return {status:r.status,body:await r.json()};})}));throw error;}
   await expect(page.getByRole('button',{name:'+ New conversation',exact:true})).toBeEnabled();
   await expect(page.locator('#canvas-assets')).toBeHidden();
   assert.ok(await page.locator('.studio-composer').evaluate(el=>el.getBoundingClientRect().height<150));
@@ -1224,12 +1228,16 @@ test('Canvas generates an entire carousel, reopens it for editing and reviews sa
  const carouselDownload=page.waitForEvent('download');await panel.getByRole('button',{name:'Download carousel ZIP',exact:true}).click();const savedBundle=await carouselDownload;assert.equal(savedBundle.suggestedFilename(),'desvio-carousel.zip');const bundleEntries=await readZip(await readFile(await savedBundle.path()));assert.deepEqual(bundleEntries.map(e=>e.name),['slide-01.png','slide-02.png','caption.txt','manifest.json']);const bundleManifest=JSON.parse(bundleEntries[3].bytes.toString());assert.equal(bundleManifest.status_at_download,'approved');assert.equal(bundleManifest.slides.length,2);
  await panel.getByText('Add carousel to calendar',{exact:true}).click();await panel.getByLabel(/^Carousel calendar time/).fill('2026-11-03T10:00');await panel.getByRole('button',{name:'Add saved carousel to calendar',exact:true}).click();await panel.getByRole('link',{name:'Open carousel in calendar',exact:true}).click();
  const postDetails=page.getByRole('region',{name:'Post details',exact:true});await expect(postDetails.getByRole('region',{name:'Review carousel',exact:true}).getByRole('img')).toHaveCount(2);
- await expect(postDetails.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled();await postDetails.getByRole('button',{name:'Send for review',exact:true}).click();
+ const postCarousel=postDetails.getByRole('region',{name:'Review carousel',exact:true});
+ await expect(postDetails.getByRole('button',{name:'Send for review',exact:true})).toHaveCount(0);
+ await expect(postCarousel.getByRole('checkbox')).toBeEnabled();await postCarousel.getByRole('checkbox').check();await postCarousel.getByRole('button',{name:'Send carousel for review',exact:true}).click();
  const slotId=new URL(page.url()).searchParams.get('slot');assert.ok(slotId);
- await page.goto(`${base}/b/${brand}/review?start=2026-11-03&slot=${slotId}`);await expect(postDetails.getByRole('button',{name:'Approve post',exact:true})).toBeEnabled();
- await postDetails.getByLabel('Feedback or creative direction',{exact:true}).fill('Please revisit the carousel order.');await postDetails.getByRole('button',{name:'Request changes',exact:true}).click();
+ await page.goto(`${base}/b/${brand}/review?start=2026-11-03&slot=${slotId}`);
+ await expect(postCarousel.getByRole('checkbox')).toBeEnabled();await postCarousel.getByRole('checkbox').check();
+ await postCarousel.getByLabel('Carousel review feedback',{exact:true}).fill('Please revisit the carousel order.');await postCarousel.getByRole('button',{name:'Request carousel changes',exact:true}).click();
  await waitFor(async()=>(await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[slotId])).rows[0].state==='changes_requested');
- await postDetails.getByRole('button',{name:'Send for review',exact:true}).click();await postDetails.getByRole('button',{name:'Approve post',exact:true}).click();await waitFor(async()=>(await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[slotId])).rows[0].state==='approved');
+ await expect(postCarousel.getByRole('checkbox')).toBeEnabled();await postCarousel.getByRole('checkbox').check();await postCarousel.getByRole('button',{name:'Send carousel for review',exact:true}).click();
+ await expect(postCarousel.getByRole('checkbox')).toBeEnabled();await postCarousel.getByRole('checkbox').check();await postCarousel.getByRole('button',{name:'Approve carousel',exact:true}).click();await waitFor(async()=>(await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[slotId])).rows[0].state==='approved');
  await page.reload();await expect(postDetails.getByRole('button',{name:'Reopen review',exact:true})).toBeVisible();
  assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/carousel-calendar-review-mobile.png',fullPage:true});
  await postDetails.getByRole('button',{name:'Close post',exact:true}).click();
@@ -1559,7 +1567,7 @@ test('Generated replacement confirms credits, survives reload and preserves sche
 
 
 test('AI canvas interprets, generates inline, resumes a lost response and remembers history (MOCK OpenAI)',async()=>{
- await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY')",[org,brand]);
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=EXCLUDED.expires_at,budget_micros=EXCLUDED.budget_micros",[org,brand]);
  await page.goto(`${base}/b/${brand}/create`);
  const startMenu=page.getByRole('navigation',{name:'Create and manage your content'});
  await expect(startMenu).toBeVisible();
@@ -1622,7 +1630,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await expect(page.locator('.conversation-saved-image')).toHaveAttribute('data-version-id',savedAttachment);
  await expect(page.getByLabel('Layer text',{exact:true})).toHaveValue('A little everyday care');
  await expect(selectField(page.getByLabel('Font',{exact:true}))).toHaveValue('Lora');
- await expect(page.getByLabel('Text weight',{exact:true})).toHaveValue('600');
+ await expect(selectField(page.getByLabel('Text weight',{exact:true}))).toHaveValue('600');
  await expect(page.getByRole('switch',{name:'Contrast backing',exact:true})).toBeChecked();
  await expect(page.getByLabel('Bend',{exact:false})).toHaveValue('-65');
  await expect(page.getByRole('button',{name:'Curve',exact:true})).toHaveAttribute('aria-pressed','true');
@@ -1676,10 +1684,10 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
 test('AI canvas recovers initialization, history and transcript reads without resending creation',async()=>{
  await page.unrouteAll({behavior:'wait'});
  await page.setViewportSize({width:1280,height:720});
- let bootReads=0,posts=0,failReads=false,failHistory=true;
+ let bootReads=0,posts=0,historyReads=0,failReads=false,failHistory=true;
  await page.route('**/create-chat/outbox',async route=>{if(route.request().method()==='GET'&&++bootReads===1){await route.abort('failed');return;}await route.continue();});
  await page.route('**/create-chat/messages',async route=>{posts++;await route.continue();});
- await page.route('**/create-chat/history?*',async route=>{if(failHistory){await route.abort('failed');return;}await route.continue();});
+ await page.route('**/create-chat/history?*',async route=>{historyReads++;if(failHistory){await route.abort('failed');return;}await route.continue();});
  await page.goto(`${base}/b/${brand}/create`);
  await expect(page.getByRole('button',{name:'Reconnect chat',exact:true})).toBeVisible();
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Make something');
@@ -1688,7 +1696,7 @@ test('AI canvas recovers initialization, history and transcript reads without re
  await page.getByRole('button',{name:'Reconnect chat',exact:true}).click();
  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeEnabled();
  await expect(page.getByRole('region',{name:'Chat connection',exact:true})).toHaveCount(0);
- assert.equal(bootReads,2);assert.equal(posts,0);
+ assert.equal(bootReads,2);assert.equal(posts,0);assert.equal(historyReads,0,'History is loaded only when opened');
  await page.getByRole('button',{name:'Conversation history',exact:true}).click();
  const history=page.getByRole('dialog',{name:'Conversation history',exact:true});
  await expect(history.getByRole('button',{name:'Reload history',exact:true})).toBeVisible();

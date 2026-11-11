@@ -26,7 +26,7 @@ test('creation controls stay usable with motion, keyboard navigation and narrow 
   try {
     await page.goto(`${origin}/b/${brand}/overview`);
     const recent = page.getByRole('button', {name: title, exact: true});
-    await expect(recent).toBeVisible();
+    await expect(page.getByRole('heading', {name: 'Your attention'})).toBeVisible();
     await expect(page.getByRole('button', {name: 'Menu', exact: true})).toBeHidden();
     await expect(page.locator('.desvio-action [role="status"]:empty:visible')).toHaveCount(0);
     await page.setViewportSize({width: 390, height: 844});
@@ -35,8 +35,8 @@ test('creation controls stay usable with motion, keyboard navigation and narrow 
     await expect(page.getByRole('navigation', {name: 'Main navigation'})).toBeVisible();
     await menu.click();
     await page.setViewportSize({width: 1440, height: 1000});
-    assert.deepEqual(await recent.evaluate(el => ({align: getComputedStyle(el).textAlign, overflow: getComputedStyle(el).textOverflow})), {align: 'left', overflow: 'ellipsis'});
     await page.goto(`${origin}/b/${brand}/create`);
+
     const post = page.locator('.chat-start-card').first();
     await expect(post).toBeVisible();
     assert.equal(await post.evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(238, 244, 220)');

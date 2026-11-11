@@ -83,6 +83,8 @@ export class CreativeProvider {
       ...(request.prompt_suggestion?{text:{format:{type:'json_schema' as const,name:'composer_idea',strict:true,schema:{type:'object',additionalProperties:false,required:['title','direction'],properties:{title:{type:'string'},direction:{type:'string'}}}}}}:{}),
       ...(request.chat_response?{reasoning:{effort:'low' as const},text:{format:{type:'json_schema' as const,name:'desvio_chat',strict:true,schema:chatSchema}}}:{}),
       ...(request.video_plan?{text:{format:{type:'json_schema' as const,name:'desvio_video_brief',strict:true,schema:videoBriefSchema(request.video_plan.fact_ids,request.video_plan.duration_seconds)}}}:{}),
+      ...(request.content_plan_schema?{text:{format:{type:'json_schema' as const,name:'desvio_content_plan',strict:true,schema:request.content_plan_schema}}}:{}),
+      ...(request.carousel_plan_schema?{text:{format:{type:'json_schema' as const,name:'desvio_carousel_plan',strict:true,schema:request.carousel_plan_schema}}}:{}),
       ...(request.creative_fact_ids?{text:{format:{type:'json_schema' as const,name:'desvio_creative_brief',strict:true,schema:creativeBriefSchema(request.creative_fact_ids)}}}:{}),
     };
     const bytes = Buffer.byteLength(canonicalJSON(body));
@@ -98,7 +100,8 @@ export class CreativeProvider {
     if (!this.sdk) throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const response = await this.sdk.responses.create(
       this.plannerRequest(request, model, maxOutputTokens).body,
-      { timeout: 60000 },
+      // Reserve more time for the final multi-slide answer, without retrying a paid call.
+      { timeout: request.carousel_plan_schema && request.step===3 ? 120000 : 60000 },
     );
     if (
       response.status !== "completed" ||

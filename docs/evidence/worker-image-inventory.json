@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-09T11:00:51.915Z",
+  "checked_at": "2026-11-11T00:55:43.978Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:15036a646e5683e29f57e14e1e548f58289551513e202d86389698403980c149",
+      "image_id": "sha256:4b7b20e156d413880e3ff8c2a979fc8dac4bc9073bd7efd16b554def01377beb",
       "architecture": "amd64",
       "user": "node"
     },
@@ -15,7 +15,7 @@
     },
     {
       "role": "skills",
-      "image_id": "sha256:74569029d36c1ae4c7a7cdb0a2217e85dcd4ebaf8cb48eb28ade3914af95d0a5",
+      "image_id": "sha256:7546a525fa2834755d1bc8adfc97b8d769adf317beac2d999e043313448dda10",
       "architecture": "amd64",
       "user": "65534:65534"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Owner shared production guidance: new trusted worker and skills images verified on dev. All other runtime pins unchanged. Private client rules not mounted."
+  "scope": "Recovery worker activated and registration verified; see railway-provider-activation.json. Does not certify complete product or live provider acceptance."
 }

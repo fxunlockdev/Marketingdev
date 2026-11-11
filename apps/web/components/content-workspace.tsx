@@ -1,4 +1,6 @@
 "use client";
+import {CreativeRecovery} from './creative-recovery';
+import {MonthlyPlanReview} from './monthly-plan-review';
 import {DesvioSelect} from './desvio-select';
 import "./post-details-spacing.css";
 import {useRouter} from 'next/navigation';
@@ -57,9 +59,11 @@ const when = (s: any) =>
     timeStyle: "short",
   }).format(new Date(s.planned_at));
 function jobText(j: any) {
+  if (j.error_code === "CREATIVE_RESULT_ABANDONED")
+    return "Stopped waiting. No replacement was generated.";
   if (j.cancel_requested && running(j)) return "Cancel requested";
   if (j.status === "unknown")
-    return "Result uncertain — review required before retrying";
+    return "Result uncertain. Review required before retrying";
   if (j.status === "rejected" || j.status === "failed") {
     if (
       j.error_code?.includes("APPROVAL_REQUIRED") ||
@@ -320,7 +324,8 @@ export function ContentWorkspace({
   </div>;
   return (
     <div className={`content-workspace ${inbox ? "approval-workspace" : "calendar-workspace"}`}>
-      <header className="section-heading calendar-page-heading"><div><p className="calendar-business-name">{business.name}</p><h1 ref={calendarHeading} tabIndex={-1}>{inbox?'Approvals':'Calendar'}</h1>{inbox&&<p>{data?`${data.total} ${data.total===1?'post is':'posts are'} in your review queue.`:'Review your posts, make adjustments, and approve the versions you love.'}</p>}</div><div className="actions"><button onClick={()=>setReload(n=>n+1)}>Refresh posts</button>{!inbox&&canWrite&&<button className="primary" aria-expanded={generate} aria-controls="plan-generator" onClick={()=>setGenerate(v=>!v)}>Create content plan</button>}</div></header>
+      <header className="section-heading calendar-page-heading"><div><p className="calendar-business-name">{business.name}</p><h1 ref={calendarHeading} tabIndex={-1}>{inbox?'Approvals':'Calendar'}</h1>{inbox&&<p>{data?`${data.total} ${data.total===1?'post is':'posts are'} in your review queue.`:'Review your posts, make adjustments, and approve the versions you love.'}</p>}</div><div className="actions"><button onClick={()=>setReload(n=>n+1)}>Refresh posts</button>{!inbox&&canWrite&&<a className="button primary" href={`/b/${business.id}/monthly-planning`}>Plan my content</a>}</div></header>
+      {!inbox&&<MonthlyPlanReview timezone={prefs?.timezone} businessId={business.id} canWrite={canWrite} refresh={reload} onOpen={setSelected}/>}
       <Notice error={error} />
       {message && <p role="status">{message}</p>}
       {generate && (
@@ -363,7 +368,7 @@ export function ContentWorkspace({
               </Field>
               <Field
                 label="Anything to focus on?"
-                hint="Optional. Add a campaign, seasonal theme or priority for this plan."
+                hint="Optional. Add a seasonal theme or priority for this plan."
               >
                 {(id, hint) => (
                   <textarea
@@ -440,7 +445,7 @@ export function ContentWorkspace({
         </details>
       )}
 
-          {campaign&&<button onClick={()=>{filter(()=>setCampaign(''));const url=new URL(location.href);url.searchParams.delete('plan');history.replaceState(history.state,'',url);}}>Show all campaigns</button>}
+          {campaign&&<button onClick={()=>{filter(()=>setCampaign(''));const url=new URL(location.href);url.searchParams.delete('plan');history.replaceState(history.state,'',url);}}>Show all content</button>}
           <Field label={inbox ? "Review from" : "Calendar date"}>
             {(id) => (
               <input
@@ -510,7 +515,7 @@ export function ContentWorkspace({
                   .filter(
                     ([k]) =>
                       !inbox ||
-                      !["content_needed", "draft_ready", "cancelled"].includes(
+                      !["content_needed", "cancelled"].includes(
                         k,
                       ),
                   )
@@ -571,7 +576,7 @@ export function ContentWorkspace({
                       ? "Posts appear here after they are sent for review. Change the dates or channel to see other posts."
                       : "Create a plan from your brand, or choose another date range to find saved posts."}
                   </p>
-                  {!inbox&&<a className="button primary" href={`/b/${business.id}/campaigns`}>Open campaigns</a>}
+                  {!inbox&&<a className="button primary" href={`/b/${business.id}/monthly-planning`}>Plan my content</a>}
                   {inbox && (
                     <a href={`/b/${business.id}/content-plan`}>
                       Open Content Plan
@@ -794,8 +799,8 @@ export function SlotPanel({
     };
   }, [load]);
   const s = data?.slot,
-    active = data?.generations.some(running)||data?.videos?.some(running),
-    held = data?.generations.some((j: any) => j.status === "unknown"),
+    active = data?.generations.some(running)||data?.videos?.some(running)||data?.carousel_runs?.some(running),
+    held = data?.generations.some((j: any) => j.status === "unknown")||data?.carousel_runs?.some((j: any) => j.status === "unknown"),
     dirty =
       !!s &&
       !!draft &&
@@ -926,7 +931,7 @@ export function SlotPanel({
           </p>
           <div className="slot-columns">
             <div>
-              {s.carousel_version_id ? <CalendarCarouselReview businessId={business.id} projectId={s.project_id} versionId={s.carousel_version_id} canEdit={canWrite} canReview={canReview} disabled={busy||dirty} onReady={setReady} onChanged={async()=>{await load(true);changed.current();}}/> : s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Edit video</a></> : s.design ? (
+              {s.carousel_version_id ? <CalendarCarouselReview slot={s} businessId={business.id} projectId={s.project_id} versionId={s.carousel_version_id} canEdit={canWrite} canReview={canReview} disabled={busy||dirty} onReady={setReady} onChanged={async()=>{await load(true);changed.current();}}/> : s.video_version_id ? <><VideoReview key={s.video_version_id} business={business} id={s.video_version_id} previewOnly onReady={setReady}/><a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Edit video</a></> : s.design ? (
                 <>
                   {canWrite && !editing && s.state !== 'cancelled' && <div className="post-design-actions"><button className="primary" disabled={busy||dirty||referenceDirty||!!active||!!held||s.has_newer_version} onClick={()=>{setEditDesign(structuredClone(s.design));setEditCaption(s.caption||'');setSavedEdit(undefined);setEditing(true);}}>Edit design</button></div>}
                   <CreativeEditor
@@ -960,15 +965,16 @@ export function SlotPanel({
                     ))}
                   </details>
                   <a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>
-                    Open campaign editor
+                    Open post editor
                   </a>
                 </>
               ) : (
                 <div className="plan-empty">
                   <h3>This idea needs a creative</h3>
                   {s.format==='video'&&!dirty&&<a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Create this video</a>}
+                  {s.format==='carousel'&&!dirty&&!active&&!held&&<a href={`/b/${business.id}/campaign-post?slot=${s.id}`}>Create this carousel</a>}
                   <p>
-                    {s.format==='video'?'Review your script below, then choose an approved reference image in the campaign editor.':'Create an image from the saved brief, then review it here.'}
+                    {s.format==='video'?'Review your script below, then choose an approved reference image in the post editor.':s.format==='carousel'?'Create the slides from your saved topic, then review them together here.':'Create an image from the saved brief, then review it here.'}
                   </p>
                 </div>
               )}
@@ -1139,7 +1145,7 @@ export function SlotPanel({
                 <h3>Create & review</h3>
                 {canWrite&&s.format==='static'&&s.state!=='cancelled'&&<BrandReferences businessId={business.id} writable={false} selection={referenceIds} onSelectionChange={setReferenceIds} disabled={busy||active||held||dirty}/>}
 
-                <Field label="Feedback or creative direction">
+                {s.format!=='carousel'&&<Field label="Feedback or creative direction">
                   {(id) => (
                     <textarea
                       id={id}
@@ -1149,7 +1155,7 @@ export function SlotPanel({
                       onChange={(e) => setFeedback(e.target.value)}
                     />
                   )}
-                </Field>
+                </Field>}
                 {dirty && (
                   <p>Save your post changes before creating or reviewing.</p>
                 )}
@@ -1192,6 +1198,7 @@ export function SlotPanel({
               </div>
             </div>
           </div>
+          {canWrite && data.carousel_runs?.filter((j:any)=>j.status==='unknown').map((j:any)=><section key={j.id} className="slot-activity"><h3>Carousel needs attention</h3><p>We could not confirm the provider result. No automatic retry will be made.</p><CreativeRecovery businessId={business.id} jobId={j.id} disabled={busy||dirty} onRecovered={async()=>{await load(true);changed.current();}}/></section>)}
           {data.generations.length > 0 && (
             <div className="slot-activity">
               <h3>Creative activity</h3>
@@ -1238,6 +1245,7 @@ export function SlotPanel({
                           Attach saved draft
                         </button>
                       )}
+                    {j.status === 'unknown' && canWrite && <CreativeRecovery businessId={business.id} jobId={j.job_id} disabled={busy||dirty} onRecovered={async()=>{await load(true);changed.current();}}/>}
                     {running(j) && canWrite && (
                       <button
                         disabled={busy || j.cancel_requested}
@@ -1263,7 +1271,7 @@ export function SlotPanel({
           )}
           {s.creative_version_id&&<CreativeExportPanel format={s.channel==='instagram'?'instagram-jpeg':'png'} key={business.id+s.id+s.creative_version_id+s.channel} business={business} versionId={s.creative_version_id} sourceSHA={s.creative_sha256} context={{type:'slot',id:s.id,revision:s.revision,state:s.state}} disabled={dirty||busy||!!feedback} onApproved={async()=>{await load(true);changed.current();}}/>}
                 <div className="plan-actions post-review-actions" role="group" aria-label="Post review actions">
-                  {["draft_ready", "changes_requested"].includes(s.state) &&
+                  {s.format!=='carousel'&&["draft_ready", "changes_requested"].includes(s.state) &&
                     canWrite && (
                       <button
                         className="primary"
@@ -1279,7 +1287,7 @@ export function SlotPanel({
                         Send for review
                       </button>
                     )}
-                  {s.state === "pending_review" && canReview && (
+                  {s.format!=='carousel'&&s.state === "pending_review" && canReview && (
                     <>
                       <button
                         className="primary"

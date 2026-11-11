@@ -45,6 +45,8 @@ export type PlannerRequest = {
   video_plan?: {fact_ids:string[];duration_seconds:number}; // Trusted video runtime only.
   prompt_suggestion?: boolean; // Trusted composer refinement, no tools or creative actions.
   chat_response?: boolean; // Trusted conversation router only; not supplied by skills.
+  content_plan_schema?: Record<string,unknown>; // Trusted planner only.
+  carousel_plan_schema?: Record<string,unknown>; // Trusted runtime only.
   creative_fact_ids?: string[]; // Added only by trusted static-creative runtime, never sandbox input.
   type: "model";
   step: number;

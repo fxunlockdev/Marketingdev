@@ -52,3 +52,17 @@ test('three-second compatible profile preserves duration and legacy replay while
  assert.throws(()=>c.prepare({...v,durationSeconds:5}),/INPUT_INVALID/);
  const legacy=c.prepare({...v,routingProfile:undefined});assert.equal(JSON.parse(legacy.body).input.resolution,'1080p');assert.equal(legacy.configId,router().slug);
 });
+
+test('Runway retains only safe routing rejection categories, never echoed input or private URLs',async()=>{
+ const c=client((u,i)=>i.method==='GET'?Response.json({data:[router()],hasMore:false}):Response.json({code:'no_eligible_model',error:'private prompt and signed reference URL',pipeline:[{secret:'provider detail'}]},{status:400}));
+ const v=intent(c);await assert.rejects(c.submit(v,c.prepare(v).sha256),e=>e.code==='RUNWAY_NO_ELIGIBLE_MODEL'&&e.outcome==='rejected'&&!JSON.stringify(e).includes('private'));
+ const huge=client((u,i)=>i.method==='GET'?Response.json({data:[router()],hasMore:false}):Response.json({code:'no_eligible_model',error:'x'.repeat(17000)},{status:400}));const h=intent(huge);await assert.rejects(huge.submit(h,huge.prepare(h).sha256),e=>e.code==='RUNWAY_REQUEST_REJECTED'&&e.outcome==='rejected');
+});
+
+
+test('Runway observed insufficient-credit rejection is explicit and never retried',async()=>{
+ let submits=0;
+ const c=client((u,i)=>{if(i.method==='GET')return Response.json({data:[router()],hasMore:false});submits++;return Response.json({error:'You do not have enough credits to run this task.'},{status:400});});
+ const v=intent(c);await assert.rejects(c.submit(v,c.prepare(v).sha256),e=>e.code==='RUNWAY_INSUFFICIENT_CREDITS'&&e.outcome==='rejected');assert.equal(submits,1);
+ const other=client((u,i)=>i.method==='GET'?Response.json({data:[router()],hasMore:false}):Response.json({error:'Private prompt mentions credits and secret reference URL'},{status:400}));const o=intent(other);await assert.rejects(other.submit(o,other.prepare(o).sha256),e=>e.code==='RUNWAY_REQUEST_REJECTED'&&!e.message.includes('Private'));
+});

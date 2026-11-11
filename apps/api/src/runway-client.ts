@@ -48,7 +48,15 @@ export class RunwayClient {
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),this.#timeout),outcome=paid?'unknown':'not_sent';
   try{
    let r:Response;try{r=await this.transport(new URL(path,this.#base),{method,body:body===undefined?undefined:JSON.stringify(body),headers:{Authorization:`Bearer ${this.#secret}`,'X-Runway-Version':RUNWAY_API_VERSION,Accept:'application/json',...(body===undefined?{}:{'Content-Type':'application/json'})},signal:controller.signal,redirect:'error',cache:'no-store',credentials:'omit'});}catch{throw new RunwayError(controller.signal.aborted?'RUNWAY_TIMEOUT':'RUNWAY_NETWORK_ERROR',outcome);}
-   if(!r.ok){await r.body?.cancel().catch(()=>{});const code=r.status===401?'AUTH_REJECTED':r.status===403?'ACCESS_OR_CREDITS_REJECTED':r.status===429?'RATE_LIMITED':r.status===404?'NOT_FOUND':r.status===409?'CONFLICT':r.status>=500?'UNAVAILABLE':'REQUEST_REJECTED';throw new RunwayError(`RUNWAY_${code}`,[400,401,403,404,409,422,429].includes(r.status)?'rejected':outcome);}
+   if(!r.ok){
+    // Keep provider prose and reference URLs private. Only persist allowlisted
+    // routing categories so a rejected request can be diagnosed safely.
+    let routingCode:string|undefined;
+    if(r.status===400&&r.headers.get('content-type')?.includes('application/json')){
+     const reader=r.body?.getReader();let size=0;const chunks:Uint8Array[]=[];
+     try{if(reader){while(true){const part=await reader.read();if(part.done)break;size+=part.value.length;if(size>16384)break;chunks.push(part.value);}if(size<=16384){const detail=JSON.parse(Buffer.concat(chunks).toString('utf8'));if(detail.code==='no_eligible_model')routingCode='NO_ELIGIBLE_MODEL';else if(detail.error==='You do not have enough credits to run this task.')routingCode='INSUFFICIENT_CREDITS';}}}catch{}finally{await reader?.cancel().catch(()=>{});}
+    }
+    await r.body?.cancel().catch(()=>{});const code=routingCode??(r.status===401?'AUTH_REJECTED':r.status===403?'ACCESS_OR_CREDITS_REJECTED':r.status===429?'RATE_LIMITED':r.status===404?'NOT_FOUND':r.status===409?'CONFLICT':r.status>=500?'UNAVAILABLE':'REQUEST_REJECTED');throw new RunwayError(`RUNWAY_${code}`,[400,401,403,404,409,422,429].includes(r.status)?'rejected':outcome);}
    if(method==='DELETE'&&[200,204].includes(r.status)){await r.body?.cancel().catch(()=>{});return null;}
    try{
     if(!/^application\/json(?:\s*;|$)/i.test(r.headers.get('content-type')??''))fail();

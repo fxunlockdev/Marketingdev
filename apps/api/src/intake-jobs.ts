@@ -2,6 +2,7 @@ type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string):Promise<
  pages:WebsitePage[];captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture['snapshots'][number]}[]}>;
  visualErrors:{url:string;code:string}[];coverage:Record<string,any>;
 }>};
+import {BUSINESS_RESEARCH_AGENT_VERSION} from './guided-campaign-contracts.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
@@ -344,10 +345,12 @@ export class IntakeJobs {
         )
       ).rows[0];
       if (!grant) throw new IntakeError("AI_STAGING_APPROVAL_REQUIRED");
+      const researchContext=(await db.query("SELECT research_context FROM app.intake_requests WHERE job_id=$1",[j.id])).rows[0]?.research_context;
+      // Keep archived questionnaires for history, but ground this run only in its submitted snapshot.
       const chunks = (
         await db.query(
-          "SELECT c.id,c.source_id,c.text,c.page,s.website_url FROM app.brand_chunks c JOIN app.brand_sources s ON s.id=c.source_id WHERE c.organization_id=$1 AND c.brand_id=$2 ORDER BY s.captured_at DESC,c.page,c.anchor,c.id LIMIT 100",
-          [j.organization_id, j.brand_id],
+          "SELECT c.id,c.source_id,c.text,c.page,s.website_url FROM app.brand_chunks c JOIN app.brand_sources s ON s.id=c.source_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND CASE WHEN $3::jsonb IS NOT NULL AND s.parser_version=$4 THEN (c.text::jsonb - 'brand_name')=$3::jsonb ELSE true END ORDER BY s.captured_at DESC,c.page,c.anchor,c.id LIMIT 100",
+          [j.organization_id, j.brand_id,researchContext?JSON.stringify(researchContext):null,BUSINESS_RESEARCH_AGENT_VERSION],
         )
       ).rows;
       let length = 0;
@@ -363,6 +366,7 @@ export class IntakeJobs {
         )
       ).rows;
       const input: AnalysisInput = {
+          ...(researchContext ? {guided_brief:researchContext} : {}),
           chunks: selected,
           reviewed,
           ...(visuals.length ? { visuals } : {}),
@@ -537,6 +541,7 @@ export class IntakeJobs {
         [
           j.id,
           JSON.stringify({
+            ...(call.result.business_direction ? {business_direction:call.result.business_direction} : {}),
             findings: fresh.length,
             missing: call.result.missing,
             recommendationAvailable: !!call.result.recommendation,

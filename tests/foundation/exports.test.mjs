@@ -229,7 +229,7 @@ test('approved export to original video skills, durable provider stage, actual m
  assert.equal(plansCalled,1);assert.equal(submits,1);assert.equal(statuses,1);assert.equal(downloads,1);
  const saved=(await service.list(alice.id,brand.id)).projects[0],version=await service.version(alice.id,brand.id,saved.latest_version_id);
  const attached=(await plans.list(alice.id,brand.id,linkedRange)).slots[0];assert.equal(attached.video_version_id,version.id);assert.equal(attached.state,'draft_ready');assert.equal(attached.revision,linkedSlot.revision+1);
- assert.equal(version.status,'draft');assert.equal(version.caption,'TEST FIXTURE video caption');assert.equal(version.duration_ms,3000);assert.equal(version.manifest.reference.sha256,e.sha256);assert.equal(version.manifest.plan.skills.length,5);
+ assert.equal(version.status,'draft');assert.equal(version.caption,'TEST FIXTURE video caption');assert.equal(version.duration_ms,3000);assert.equal(version.manifest.reference.sha256,e.sha256);assert.equal(version.manifest.plan.skills.length,6);
  const row=(await admin.query('SELECT * FROM app.video_versions WHERE id=$1',[version.id])).rows[0];assert.equal(digest(await store.read(row.object_key,64*1024*1024)),row.sha256);assert.equal(digest(await store.read(row.poster_key)),row.poster_sha256);
  assert.equal((await fetch(leasedURL)).status,404);assert.equal(await pipeline.step(scope(j)),'succeeded');assert.equal(submits,1);assert.equal(downloads,1);
  const endpoint=path(`video-versions/${version.id}`);
@@ -382,6 +382,7 @@ test('carousel generation reserves ordered children once, isolates tenants and c
  const ids=(await admin.query('SELECT generation_job_id,export_job_id FROM app.carousel_children WHERE parent_job_id=$1',[j.id])).rows.flatMap(r=>[r.generation_job_id,r.export_job_id]);
  assert.equal((await admin.query('SELECT * FROM app.job_dispatch WHERE job_id=ANY($1::uuid[])',[ids])).rowCount,0);
  assert.equal((await admin.query('SELECT * FROM app.job_dispatch WHERE job_id=$1',[j.id])).rowCount,1);
+ await assert.rejects(canvas.stopWaiting(alice.id,brand.id,j.id,{acknowledge_possible_charge:true}),/uncertain finished/);
  await service.cancel(alice.id,brand.id,j.id);
  const creative=new CreativeJobs(jobs,{carouselPlan(){throw Error('Canceled requests must never call a model');}},new CreativeProvider());
  const coordinator=new CarouselJobs(jobs,creative,handler);
@@ -443,9 +444,22 @@ test('durable carousel uses one actual isolated plan, sequential MOCK images and
  assert.deepEqual(slides.map(s=>s.generation_status),['succeeded','unknown','canceled']);assert.ok(slides[0].output_version_id);assert.ok(slides[0].export_id);assert.equal(partialRead.runs.find(r=>r.id===partial.id).output_version_id,null);
  await assert.rejects(service.cancel(alice.id,brand.id,partial.id),/Active carousel generation not found/);assert.equal(await coordinator.fail(scope(partial)),'unknown');assert.equal(images,4);
  await assert.rejects(service.submit(alice.id,brand.id,{prompt:'Must not bypass the unknown hold',slide_count:2,channel:'instagram',size:'1024x1024',text_provider:'openai'},randomUUID()),/reconciliation/);
- // This test intentionally leaves an unknown paid outcome. Retire only its synthetic
- // jobs after proving the hold, so later tests sharing this fixture brand stay isolated.
- await admin.query("UPDATE app.jobs SET status='failed' WHERE status='unknown' AND (id=$1 OR id IN (SELECT generation_job_id FROM app.carousel_children WHERE parent_job_id=$1))",[partial.id]);
+ await assert.rejects(canvas.stopWaiting(alice.id,sibling.id,partial.id,{acknowledge_possible_charge:true}),/unavailable/);
+ await assert.rejects(canvas.stopWaiting(viewer.id,brand.id,partial.id,{acknowledge_possible_charge:true}));
+ await admin.query("UPDATE app.jobs SET status='running' WHERE id=$1",[second.export_job_id]);
+ await assert.rejects(canvas.stopWaiting(alice.id,brand.id,partial.id,{acknowledge_possible_charge:true}),/still active/);
+ assert.equal((await service.read(alice.id,brand.id)).runs.find(r=>r.id===partial.id).status,'unknown');
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[second.export_job_id]);
+ const unknownCalls=(await admin.query("SELECT job_id,step,status,reserved_micros FROM app.creative_calls WHERE job_id=$1 OR job_id=$2 ORDER BY job_id,step",[partial.id,second.generation_job_id])).rows;
+ await assert.rejects(canvas.stopWaiting(alice.id,brand.id,second.generation_job_id,{acknowledge_possible_charge:true}),/whole carousel/);
+ assert.equal((await canvas.stopWaiting(alice.id,brand.id,partial.id,{acknowledge_possible_charge:true})).status,'canceled');
+ await canvas.stopWaiting(alice.id,brand.id,partial.id,{acknowledge_possible_charge:true});
+ assert.deepEqual((await admin.query("SELECT job_id,step,status,reserved_micros FROM app.creative_calls WHERE job_id=$1 OR job_id=$2 ORDER BY job_id,step",[partial.id,second.generation_job_id])).rows,unknownCalls);
+ const stopped=await service.read(alice.id,brand.id);
+ assert.equal(stopped.runs.find(r=>r.id===partial.id).status,'canceled');
+ assert.equal(stopped.slides.find(s=>s.parent_job_id===partial.id&&s.position===0).output_version_id,slides[0].output_version_id);
+ assert.equal((await coordinator.plan(scope(partial))).state,'canceled');
+ assert.equal(images,4);
 
 });
 
@@ -469,6 +483,17 @@ test('carousel calendar attachment binds exact ordered versions, requires final 
  await assert.rejects(plans.review(alice.id,brand.id,s.id,decision('approved')),/every saved carousel slide/);
  let v=(await carousels.read(alice.id,brand.id,c.project_id)).versions[0];await carousels.review(alice.id,brand.id,v.id,{revision:1,sha256:v.sha256,decision:'in_review',feedback:'',confirmed:true});await carousels.review(alice.id,brand.id,v.id,{revision:2,sha256:v.sha256,decision:'approved',feedback:'',confirmed:true});
  s=await plans.review(alice.id,brand.id,s.id,decision('approved'));assert.equal(s.state,'approved');
+ s=await plans.review(alice.id,brand.id,s.id,decision('reopen'));
+ const unified={...decision('approved'),carousel_confirmed:true,carousel_review_revision:3};
+ await assert.rejects(plans.review(viewer.id,brand.id,s.id,unified));
+ await assert.rejects(plans.review(bob.id,brand.id,s.id,unified));
+ await assert.rejects(plans.review(alice.id,sibling.id,s.id,unified));
+ await assert.rejects(plans.review(alice.id,brand.id,s.id,{...unified,carousel_review_revision:2}),/carousel review changed/);
+ assert.equal((await carousels.read(alice.id,brand.id,c.project_id)).versions[0].review_revision,3);
+ s=await plans.review(alice.id,brand.id,s.id,unified);assert.equal(s.state,'approved');
+ const combined=(await carousels.read(alice.id,brand.id,c.project_id)).versions[0];assert.equal(combined.status,'approved');assert.equal(combined.review_revision,4);
+ await assert.rejects(plans.review(alice.id,brand.id,s.id,unified),/current post/);
+
  const proof=()=>plans.scope(alice.id,brand.id,false,db=>carouselPublicationProof(db,s.id,renderer.image));
  const approved=await proof();assert.equal(approved.id,c.id);assert.deepEqual(approved.files.map(f=>f.id),[ea.id,eb.id]);assert.equal(approved.caption,input.caption);
  await assert.rejects(plans.scope(alice.id,sibling.id,false,db=>carouselPublicationProof(db,s.id,renderer.image)));
@@ -563,4 +588,29 @@ test('Higgsfield replacement is durable, tenant-scoped and saves a new editable 
  const exhaustedSource=await fixture(),exhausted=await service.submit(alice.id,brand.id,exhaustedSource.project_id,{...body,parent_id:exhaustedSource.id},randomUUID());await engine.step(scope(exhausted));await engine.step(scope(exhausted));await engine.step(scope(exhausted));await admin.query('UPDATE app.higgsfield_image_operations SET download_attempts=3 WHERE job_id=$1',[exhausted.id]);assert.equal(await engine.step(scope(exhausted)),'unknown');assert.equal((await service.status(alice.id,brand.id,exhaustedSource.project_id)).run.error_code,'HIGGSFIELD_DOWNLOAD_RECONCILIATION_REQUIRED');await admin.query("UPDATE app.jobs SET status='failed' WHERE id=$1",[exhausted.id]);const priorSubmits=submits;
  const next=await fixture(),uncertain=await service.submit(alice.id,brand.id,next.project_id,{...body,parent_id:next.id},randomUUID());await engine.step(scope(uncertain));
  await admin.query("UPDATE app.higgsfield_image_operations SET phase='submitting' WHERE job_id=$1",[uncertain.id]);assert.equal(await engine.step(scope(uncertain)),'unknown');assert.equal(submits,priorSubmits,'Crash after intent dispatch cannot repeat paid submission');
+});
+
+
+test('monthly video allowance counts five items, prevents a sixth, and releases failed work',async()=>{
+ const [{VideoReferences},{VideoCanvas}]=await Promise.all([import('../../dist/video-references.js'),import('../../dist/video-canvas.js')]);
+ const v=await fixture(),e=await render(v);
+ await canvas.review(editor.id,brand.id,v.id,{decision:'in_review',feedback:'Quota fixture',revision:1});
+ const approval=await exports.approve(alice.id,brand.id,e.id,{sha256:e.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:2,confirmed:true});
+ const service=new VideoCanvas(canvas,new VideoReferences(canvas,jobs,'ab'.repeat(32),renderer.image,'test'),true);
+ const thread=(await admin.query('SELECT thread_id FROM app.creative_projects WHERE id=$1',[v.project_id])).rows[0].thread_id;
+ const body={prompt:'Monthly quota verification',channel:'instagram',duration_seconds:3,reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
+ // Isolate monthly metering from earlier video pipeline fixtures in this disposable database.
+ await admin.query("UPDATE app.jobs SET created_at=now()-interval '2 days',status='failed' WHERE brand_id=$1 AND kind='creative.video'",[brand.id]);
+ const created=[];
+ for(let i=0;i<5;i++){
+  const job=await service.submit(alice.id,brand.id,thread,body,randomUUID());created.push(job.id);
+  await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[job.id]);
+ }
+ await assert.rejects(service.submit(alice.id,brand.id,thread,body,randomUUID()),/monthly/i);
+ const quota=()=>canvas.scope(alice.id,brand.id,false,async db=>(await db.query('SELECT app.content_allowances($1) AS value',[org.id])).rows[0].value);
+ assert.equal((await quota()).items.video.used,5);
+ await admin.query("UPDATE app.jobs SET status='failed' WHERE id=$1",[created[0]]);
+ assert.equal((await quota()).items.video.remaining,1);
+ await service.submit(alice.id,brand.id,thread,body,randomUUID());
+ assert.equal((await quota()).items.video.used,5);
 });

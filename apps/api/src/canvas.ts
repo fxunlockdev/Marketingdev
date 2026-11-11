@@ -596,6 +596,21 @@ export class Canvas {
       };
     });
   }
+  stopWaiting(user: string, id: string, jobId: string, body: unknown) {
+    jobId = uuid(jobId);
+    if (object(body, ["acknowledge_possible_charge"]).acknowledge_possible_charge !== true)
+      throw new BadRequestException("Acknowledge that the provider charge may still apply");
+    return this.scope(user, id, true, async (db) => {
+      try {
+        const result = await db.query("SELECT app.stop_waiting_for_creative($1,true) AS status", [jobId]);
+        return {id: jobId, status: result.rows[0].status, automatically_retried: false};
+      } catch (error: any) {
+        if (error.code === '42501') throw new NotFoundException('Creative request unavailable');
+        if (error.code === '22023') throw new ConflictException(error.message);
+        throw error;
+      }
+    });
+  }
   cancel(user: string, id: string, jobId: string) {
     jobId = uuid(jobId);
     return this.scope(user, id, true, async (db, b) => {

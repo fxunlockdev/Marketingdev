@@ -122,7 +122,11 @@ test('lost upload or submit responses hold the slot without retrying mutations',
 });
 test('changed approval, expired grant, revoked access and disabled credentials prevent external writes',async()=>{
  for(const reason of ['approval','grant','access','account','connectionHold']){const f=await approvedPost(),j=await queuePost(f),count=uploads;
-  if(reason==='approval')await plans.edit(alice.id,brand.id,f.slot.id,{revision:f.slot.revision,brief:'Owner changed the brief',reset_approval:true});
+  if(reason==='approval'){
+   await assert.rejects(plans.edit(alice.id,brand.id,f.slot.id,{revision:f.slot.revision,brief:'Owner changed the brief',reset_approval:true}),/Resolve the existing publication/);
+   // Simulate approval drift after enqueue independently of the protected edit API.
+   await admin.query('UPDATE app.content_slots SET revision=revision+1 WHERE id=$1',[f.slot.id]);
+  }
   if(reason==='grant')await admin.query("UPDATE app.publication_grants SET expires_at=now()-interval '1 second'");
   if(reason==='access')await admin.query("UPDATE app.memberships SET role='editor' WHERE organization_id=$1 AND user_id=$2",[org.id,alice.id]);
   if(reason==='connectionHold')await admin.query('UPDATE app.social_channels SET publishing_held=true WHERE brand_id=$1',[brand.id]);

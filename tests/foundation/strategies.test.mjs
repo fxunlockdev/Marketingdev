@@ -70,21 +70,23 @@ const strategyInput={kind:'education',name:'Learn with us',starts_on:'2027-01-04
 const strategies=()=>new Strategies(planning,new SlotCreatives(plans,new Canvas(businesses,null)));
 test('manual strategy creates one durable capped planning occurrence and idempotent grouping',async()=>{
  const b=await fresh();await grant(b);const service=strategies(),key=randomUUID();
- await assert.rejects(service.create(bob,b.id,strategyInput,key));await assert.rejects(service.create(viewer,b.id,strategyInput,key));
- const made=await service.create(alice,b.id,strategyInput,key);assert.deepEqual(await service.create(alice,b.id,strategyInput,key),made);
- await assert.rejects(service.create(alice,b.id,{...strategyInput,name:'Changed'},key),/another strategy/);
+ const quote=(await service.list(alice,b.id)).quote;
+ const input={...strategyInput,image_credits:quote.image_credits,credit_cap:20+3*quote.image_credits};
+ await assert.rejects(service.create(bob,b.id,input,key));await assert.rejects(service.create(viewer,b.id,input,key));
+ const made=await service.create(alice,b.id,input,key);assert.deepEqual(await service.create(alice,b.id,input,key),made);
+ await assert.rejects(service.create(alice,b.id,{...input,name:'Changed'},key),/another strategy/);
  const saved=(await service.list(alice,b.id)).strategies[0];assert.equal(saved.id,made.id);assert.equal(saved.occurrences.length,1);assert.equal(saved.allocated_credits,20);
  const loop=(await admin.query('SELECT * FROM app.planning_loops WHERE id=$1',[saved.loop_id])).rows[0];assert.equal(loop.cycles,1);assert.equal(Number(loop.budget_micros),200000);
  const job={id:saved.occurrences[0].job_id};assert.equal(await handler.run(scope(b,job)),'succeeded');const reloaded=(await service.list(alice,b.id)).strategies[0];assert.ok(reloaded.occurrences[0].plan_id);assert.equal(reloaded.occurrences[0].status,'succeeded');
  await admin.query('UPDATE app.creative_grants SET max_image_request_micros=5000000 WHERE brand_id=$1',[b.id]);assert.ok((await service.list(alice,b.id)).quote.image_credits>2000);await assert.rejects(service.generate(alice,b.id,made.id,reloaded.occurrences[0].plan_id),/more generation capacity/);assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.strategy_image_requests WHERE strategy_id=$1',[made.id])).rows[0].n,0);await admin.query('UPDATE app.creative_grants SET max_image_request_micros=100000 WHERE brand_id=$1',[b.id]);
- const images=await service.generate(alice,b.id,made.id,reloaded.occurrences[0].plan_id);assert.equal(images.jobs.length,3);assert.deepEqual(await service.generate(alice,b.id,made.id,reloaded.occurrences[0].plan_id),images);assert.equal((await service.list(alice,b.id)).strategies[0].allocated_credits,170);
+ const images=await service.generate(alice,b.id,made.id,reloaded.occurrences[0].plan_id);assert.equal(images.jobs.length,3);assert.deepEqual(await service.generate(alice,b.id,made.id,reloaded.occurrences[0].plan_id),images);assert.equal((await service.list(alice,b.id)).strategies[0].allocated_credits,20+3*input.image_credits);
  await admin.query("UPDATE app.jobs SET status='failed',error_code='PROVIDER_RESULT_UNCERTAIN' WHERE id=$1",[images.jobs[0].id]);const failedView=(await service.list(alice,b.id)).strategies[0].occurrences[0];assert.equal(failedView.images_failed,1);assert.equal(failedView.images_requested,3);assert.equal(failedView.images_active,2);for(const status of ['rejected','unknown','canceled']){await admin.query('UPDATE app.jobs SET status=$2 WHERE id=$1',[images.jobs[0].id,status]);assert.equal((await service.list(alice,b.id)).strategies[0].occurrences[0].images_failed,1);}
- const caps=(await admin.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=ANY($1::uuid[])',[images.jobs.map(j=>j.id)])).rows;assert.ok(caps.every(c=>Number(c.max_cost_micros)===500000));
+ const caps=(await admin.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=ANY($1::uuid[])',[images.jobs.map(j=>j.id)])).rows;assert.ok(caps.every(c=>Number(c.max_cost_micros)===input.image_credits*10000));
 
  await assert.rejects(service.list(bob,b.id));assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.strategy_occurrences WHERE strategy_id=$1',[made.id])).rows[0].n,1);
 });
 test('scheduled weekly strategy requires consent, stores growth and stops future jobs',async()=>{
- const b=await fresh();await grant(b);const service=strategies(),input={...strategyInput,weeks:8,weekly_increase:2,weekly_posts:13};
+ const b=await fresh();await grant(b);const service=strategies(),quote=(await service.list(alice,b.id)).quote,input={...strategyInput,weeks:8,weekly_increase:2,weekly_posts:13,image_credits:quote.image_credits,credit_cap:20+quote.image_credits};
  assert.throws(()=>service.create(alice,b.id,input,randomUUID()),/Confirm scheduled/);
  const made=await service.create(alice,b.id,{...input,schedule_consent:true},randomUUID()),saved=(await service.list(alice,b.id)).strategies[0];assert.equal(saved.occurrences.length,8);
  const requests=(await admin.query('SELECT input,scheduled_at FROM app.planning_requests WHERE loop_id=$1 ORDER BY scheduled_at',[saved.loop_id])).rows;assert.equal(requests[0].input.post_count,13);assert.equal(requests[4].input.post_count,14);

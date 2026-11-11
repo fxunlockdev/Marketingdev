@@ -1,6 +1,7 @@
 """Acquire exact reviewed native archives through signed official Debian APT.
 
 Build tooling only. No customer inputs, application secrets or package scripts.
+Retired packages use the official Snapshot archive with the same reviewed SHA256.
 Unavailable historical versions fail; never silently update the manifest.
 """
 import hashlib
@@ -9,6 +10,9 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+import time
+import uuid
+from debian_snapshot import recover_archive
 
 root = Path(__file__).resolve().parent.parent
 kind = sys.argv[1] if len(sys.argv)>1 else "document"
@@ -38,11 +42,22 @@ Acquire::Languages "none";
 (bundle / "sources.list").write_text('''deb [signed-by=/usr/share/keyrings/debian-archive-keyring.pgp] https://deb.debian.org/debian trixie main
 deb [signed-by=/usr/share/keyrings/debian-archive-keyring.pgp] https://deb.debian.org/debian-security trixie-security main
 ''')
-subprocess.run(["docker", "run", "--platform", f"linux/{architecture}", "--rm", "--read-only", "--cap-drop=ALL", "--security-opt", "no-new-privileges",
-    "--memory", "1g", "--cpus", "1", "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
-    "--mount", f"type=bind,src={bundle},dst=/bundle", "--env", "APT_CONFIG=/bundle/apt.conf", "--workdir", "/bundle/debs",
-    "--entrypoint", "sh", json.loads((root/"infra/python-runtime-image.json").read_text())["images"][architecture],
-    "-c", 'apt-get update && exec apt-get download "$@"', "download-pinned-documents", *packages], check=True, timeout=300)
+deadline = time.monotonic() + 290
+container_name = "desvio-native-fetch-" + uuid.uuid4().hex
+try:
+    result = subprocess.run(["docker", "run", "--name", container_name, "--platform", f"linux/{architecture}", "--rm", "--read-only", "--cap-drop=ALL", "--security-opt", "no-new-privileges",
+        "--memory", "1g", "--cpus", "1", "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+        "--mount", f"type=bind,src={bundle},dst=/bundle", "--env", "APT_CONFIG=/bundle/apt.conf", "--workdir", "/bundle/debs",
+        "--entrypoint", "sh", json.loads((root/"infra/python-runtime-image.json").read_text())["images"][architecture],
+        "-c", 'apt-get update && exec apt-get download "$@"', "download-pinned-documents", *packages], check=False, timeout=180)
+    needs_recovery = result.returncode != 0
+except subprocess.TimeoutExpired:
+    # Stop the exact owned container before Snapshot can write into its bundle.
+    subprocess.run(["docker", "rm", "-f", container_name], check=True, timeout=10, stdout=subprocess.DEVNULL)
+    needs_recovery = True
+if needs_recovery:
+    for pin in pins:
+        recover_archive(pin, bundle / "debs", deadline=deadline)
 for pin in pins:
     if hashlib.sha256((bundle / "debs" / pin["filename"]).read_bytes()).hexdigest() != pin["sha256"]:
         raise ValueError("Document archive digest mismatch: " + pin["Package"])
