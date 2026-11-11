@@ -1930,3 +1930,11 @@ Prepared the accumulated guided onboarding, mood-board, monthly calendar approva
 ### 2026-11-11: recurring planning deployed and checked
 
 API 19274106-f84c-4027-ad24-f1992472eee9 and web f9c84bb1-4b9a-4a8d-be24-b8b4f7bf3a3b observed SUCCESS for source a09f3df. Authenticated hosted checks passed six pages with no page exceptions or failing API reads. Approved test business opens monthly-planning directly; Plan more content opens period/platform/count controls without repeating the questionnaire. Four saved mood-board images decoded. Existing tsq brief is revision 1 with offering present and audience absent; intentional saved answers were not overwritten. Evidence docs/evidence/monthly-planning-deployed.json. No paid generation, approval mutation, scheduling or publication. Full ZIP fidelity and end-to-end mutation/launch audit remain incomplete.
+
+## 2026-11-11: starter concepts connected to onboarding previews
+
+New dedicated research results require two bounded starter concepts, one static and one carousel. Each mood board generation receives its matching concept as untrusted creative data; customer revision feedback takes precedence and approved facts remain authoritative. The board shows both starting concepts. Existing saved directions without concepts remain editable and are not populated with invented ideas. No schema migration or new provider call is added.
+
+Validation: API build and web typecheck passed; contracts 376 passed / 1 skipped; disposable PostgreSQL guided foundation 12 passed (MOCK OpenAI); focused browser mood board revision/approval test passed at 1440, 768 and 390 widths with accessibility checks (MOCK API). Database assertions verify each saved generation request contains only its matching starter concept. This change is not yet deployed or live-provider verified. Remaining ZIP coverage, full live journey and worker rollout remain outstanding.
+
+Owner now requests a single delivery branch: push/deploy future completed work to dev only; leave feat/astryx-refinement unchanged.

@@ -4,7 +4,7 @@ import {guidedBrief,nextDirectionVersion,requireGuidedRevision} from '../../dist
 import {analysisRequest,validateAnalysis,recoverAnalysis} from '../../dist/brand-analysis.js';
 const brief={offering:'Cafe',audience:'Local families',market:'Mumbai',goal:'awareness',visual_direction:'Recommend a direction',must_follow:'No invented prices'};
 const input={guided_brief:brief,chunks:[{id:'source1',source_id:'source1',text:'A family cafe in Mumbai',page:1,website_url:null}],reviewed:[]};
-const direction={summary:'A family cafe in Mumbai',rationale:'Proposed warm, welcoming photography',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Warm and welcoming',imagery:'Natural daylight and real food',pillars:['Meet the cafe','Everyday rituals'],essential_questions:[],evidence_ids:['source1']};
+const direction={summary:'A family cafe in Mumbai',rationale:'Proposed warm, welcoming photography',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Warm and welcoming',imagery:'Natural daylight and real food',pillars:['Meet the cafe','Everyday rituals'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Three scenes: arrival, a coffee close-up, and a shared table.'}],essential_questions:[],evidence_ids:['source1']};
 const result={findings:[],recommendation:null,missing:[],business_direction:direction};
 test('guided brief validates required answers and stale revisions',()=>{
  assert.deepEqual(guidedBrief(brief,true),brief);
@@ -68,4 +68,21 @@ test('reading saved questionnaire never replaces intentionally cleared answers',
  }}},null);
  assert.deepEqual(await service.read('user','brand'),saved);
  assert.equal(queries,1,'Existing drafts do not read or merge approved defaults');
+});
+
+
+test('starter ideas require both preview formats and bounded text; saved legacy boards stay editable',async()=>{
+ const {validateBusinessDirection,starterIdeaPrompt}=await import('../../dist/business-research-direction.js');
+ const legacy={...direction};delete legacy.starter_ideas;
+ assert.throws(()=>validateBusinessDirection(legacy,['source1']));
+ assert.deepEqual(validateBusinessDirection(legacy,['source1'],true),legacy);
+ assert.equal(starterIdeaPrompt(legacy,'static'),'');
+ for(const starter_ideas of [[],[direction.starter_ideas[0]],Array(2).fill(direction.starter_ideas[0]),[{...direction.starter_ideas[0],title:'x'.repeat(101)},direction.starter_ideas[1]],[{...direction.starter_ideas[0],concept:'bad\ntext'},direction.starter_ideas[1]],[{...direction.starter_ideas[0],extra:'injected'},direction.starter_ideas[1]]]){
+  assert.throws(()=>validateBusinessDirection({...direction,starter_ideas},['source1']));
+  assert.throws(()=>validateBusinessDirection({...direction,starter_ideas},['source1'],true));
+ }
+ assert.match(starterIdeaPrompt(direction,'static'),/A place to meet/);
+ assert.doesNotMatch(starterIdeaPrompt(direction,'static'),/An everyday ritual/);
+ assert.match(starterIdeaPrompt(direction,'carousel'),/An everyday ritual/);
+ assert.match(starterIdeaPrompt(direction,'carousel'),/revision feedback takes precedence/);
 });

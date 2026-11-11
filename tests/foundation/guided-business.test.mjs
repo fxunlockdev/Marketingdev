@@ -91,7 +91,7 @@ test('revised research excludes archived questionnaire answers while preserving 
  let received;
  const analyzer=new BrandAnalyzer(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
   received=JSON.parse(JSON.parse(init.body).input);
-  const direction={summary:'A family cafe',rationale:'Proposed warm creative direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food',pillars:['Local stories','Everyday rituals'],essential_questions:[],evidence_ids:[received.chunks[0].id]};
+  const direction={summary:'A family cafe',rationale:'Proposed warm creative direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food',pillars:['Local stories','Everyday rituals'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Three scenes: arrival, a coffee close-up, and a shared table.'}],essential_questions:[],evidence_ids:[received.chunks[0].id]};
   return Response.json({object:'response',id:'resp_mock',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({findings:[],recommendation:null,missing:[],business_direction:direction}),annotations:[]}]}],usage:{input_tokens:100,output_tokens:100,total_tokens:200}});
  }}));
  await new IntakeJobs(new AssetJobs(worker,null,null),analyzer).run({organizationId:organization.id,brandId:target.id,jobId:job.id});
@@ -114,7 +114,7 @@ test('dedicated research completes through the real durable worker and saves a p
  let calls=0;
  const analyzer=new BrandAnalyzer(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
   calls++;const body=JSON.parse(init.body),context=JSON.parse(body.input);assert.deepEqual(context.guided_brief,brief);
-  const direction={summary:'A family cafe in Mumbai',rationale:'Proposed friendly creative direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food in natural light',pillars:['Local stories','Everyday rituals'],essential_questions:[],evidence_ids:[context.chunks[0].id]};
+  const direction={summary:'A family cafe in Mumbai',rationale:'Proposed friendly creative direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food in natural light',pillars:['Local stories','Everyday rituals'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Three scenes: arrival, a coffee close-up, and a shared table.'}],essential_questions:[],evidence_ids:[context.chunks[0].id]};
   return Response.json({object:'response',id:'resp_mock',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({findings:[],recommendation:null,missing:[],business_direction:direction}),annotations:[]}]}],usage:{input_tokens:100,output_tokens:100,total_tokens:200}});
  }}));
  const runner=new IntakeJobs(new AssetJobs(worker,null,null),analyzer);
@@ -161,7 +161,7 @@ async function readyBusiness(existingOrg){
  await guided.save(alice,brand.id,{revision:0,brief});
  const research=await guided.research(alice,brand.id,{revision:1},randomUUID());
  // Research output fixture only. Preview requests below go through real services and constraints.
- const direction={summary:'Family cafe',rationale:'Friendly',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#eeeeee'},{role:'accent',hex:'#cc6633'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Fresh coffee',pillars:['Community','Coffee'],essential_questions:[],evidence_ids:['fixture-evidence']};
+ const direction={summary:'Family cafe',rationale:'Friendly',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#eeeeee'},{role:'accent',hex:'#cc6633'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Fresh coffee',pillars:['Community','Coffee'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Three scenes: arrival, a coffee close-up, and a shared table.'}],essential_questions:[],evidence_ids:['fixture-evidence']};
  await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[research.id]);
  await admin.query('UPDATE app.intake_requests SET result=$2 WHERE job_id=$1',[research.id,{business_direction:direction}]);
  await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST ONLY',true)",[org.id,brand.id]);
@@ -173,6 +173,10 @@ test('real mood board submission is atomic, idempotent and exempt from monthly c
  assert.deepEqual(await boards.create(alice,brand.id,{revision:1},key),first);
  const state=await boards.read(alice,brand.id);
  const specs=(await admin.query('SELECT creative_spec FROM app.creative_requests WHERE brand_id=$1',[brand.id])).rows;assert.equal(specs.length,4);for(const r of specs){assert.equal(r.creative_spec.artwork.typography.headline.family,'Lora');assert.equal(r.creative_spec.artwork.typography.body.family,'DM Sans');}
+ const imageRequest=(await admin.query('SELECT prompt FROM app.creative_requests WHERE job_id=$1',[state.boards[0].image_job_id])).rows[0];
+ const carouselRequest=(await admin.query("SELECT input->>'prompt' AS prompt FROM app.carousel_requests WHERE job_id=$1",[state.boards[0].carousel_job_id])).rows[0];
+ assert.match(imageRequest.prompt,/A place to meet/);assert.doesNotMatch(imageRequest.prompt,/An everyday ritual/);
+ assert.match(carouselRequest.prompt,/An everyday ritual/);assert.doesNotMatch(carouselRequest.prompt,/A place to meet/);
  assert.equal(state.boards.length,1);assert.equal(state.boards[0].status,'running');
  assert.equal(state.allowance.items.static.used,0);assert.equal(state.allowance.items.carousel.used,0);
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.carousel_children WHERE parent_job_id=$1',[state.boards[0].carousel_job_id])).rows[0].n,3);

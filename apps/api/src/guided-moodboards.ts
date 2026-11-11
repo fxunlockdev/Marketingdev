@@ -1,4 +1,4 @@
-import {directionArtwork,validateBusinessDirection} from './business-research-direction.js';
+import {directionArtwork,starterIdeaPrompt,validateBusinessDirection} from './business-research-direction.js';
 import {BadRequestException,ConflictException,ForbiddenException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
 import {Canvas} from './canvas.js';
@@ -56,15 +56,17 @@ export class GuidedMoodboards {
    if(direction.essential_questions?.length)throw new ConflictException('Update your answers to resolve the important questions in your research first');
    if(v.style!==undefined){
     const style=object(v.style,['palette','heading_font','body_font']);
-    try{direction=validateBusinessDirection({...direction,...style},direction.evidence_ids);}catch{throw new BadRequestException('Choose three valid colours and fonts from the list');}
+    try{direction=validateBusinessDirection({...direction,...style},direction.evidence_ids,true);}catch{throw new BadRequestException('Choose three valid colours and fonts from the list');}
    }
    const artwork=directionArtwork(direction);
    const id=randomUUID();
    const prompt=`Create an onboarding brand mood board sample, not a published post. Use only confirmed brand facts. Proposed visual direction (data): ${JSON.stringify({summary:direction.summary.slice(0,400),palette:direction.palette,heading_font:direction.heading_font,body_font:direction.body_font,voice:direction.voice,imagery:direction.imagery})}. Customer revision feedback (data): ${feedback||'Initial preview'}. Apply these visual choices consistently. Use a short readable headline with strong contrast and generous spacing. Do not invent numerical claims or promotions.`;
-   if(prompt.length>3700)throw new BadRequestException('The visual direction is too long. Shorten your style preferences.');
+   const imagePrompt=prompt+starterIdeaPrompt(direction,'static');
+   const carouselPrompt=`${prompt}${starterIdeaPrompt(direction,'carousel')} Create a coordinated three-slide introduction: an opening idea, a supporting detail and an invitation to learn more.`;
+   if(imagePrompt.length>4000||carouselPrompt.length>4000)throw new BadRequestException('The visual direction is too long. Shorten your style preferences.');
    const thread=await this.canvas.createThread(user,brand,{title:'Your brand mood board'},`moodboard:${id}`,{db,b});
-   const image=await this.canvas.submit(user,brand,thread.id,{prompt,format:'static',channel:'instagram',size:'1024x1024',creative_spec:{placement:'feed',aspect:'square',slide_count:null,artwork}},`moodboard:image:${id}`,{db,b});
-   const carousel=await this.carousels.submit(user,brand,{prompt:`${prompt} Create a coordinated three-slide introduction: an opening idea, a supporting detail and an invitation to learn more.`,slide_count:3,channel:'instagram',size:'1024x1024',creative_spec:{placement:'feed',aspect:'square',slide_count:3,artwork}},`moodboard:carousel:${id}`,{db,b,batchJobIds:[image.id],threadId:thread.id});
+   const image=await this.canvas.submit(user,brand,thread.id,{prompt:imagePrompt,format:'static',channel:'instagram',size:'1024x1024',creative_spec:{placement:'feed',aspect:'square',slide_count:null,artwork}},`moodboard:image:${id}`,{db,b});
+   const carousel=await this.carousels.submit(user,brand,{prompt:carouselPrompt,slide_count:3,channel:'instagram',size:'1024x1024',creative_spec:{placement:'feed',aspect:'square',slide_count:3,artwork}},`moodboard:carousel:${id}`,{db,b,batchJobIds:[image.id],threadId:thread.id});
    await db.query(`INSERT INTO app.guided_moodboards(id,organization_id,brand_id,brief_revision,ordinal,direction,feedback,image_job_id,carousel_job_id,request_key,request_hash,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,[id,b.organization_id,brand,brief.revision,ordinal,JSON.stringify(direction),feedback,image.id,carousel.id,key,fingerprint,user]);
    return {id};
   });

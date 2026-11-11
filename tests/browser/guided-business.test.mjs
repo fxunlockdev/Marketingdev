@@ -30,6 +30,8 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
  try{
   const evidence=process.env.DESVIO_UI_EVIDENCE;
   if(evidence)await mkdir(evidence,{recursive:true});
+  await expect(page.getByRole('region',{name:'Starter post ideas'})).toContainText('A place to meet');
+  await expect(page.getByRole('region',{name:'Starter post ideas'})).toContainText('An everyday ritual');
   for(const width of [1440,768,390]){
    await page.setViewportSize({width,height:1000});await page.goto(`${origin}/b/${id}/overview`);
    await expect(page.getByRole('heading',{name:'Your attention'})).toBeVisible();
@@ -89,7 +91,7 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
 
 test('MOCK API: mood board revision, approval and campaign setup remain usable across screen sizes',{skip:!origin,timeout:90000},async()=>{
  const browser=await chromium.launch(),context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),id='11111111-1111-4111-8111-111111111111';
- const direction={summary:'A welcoming neighbourhood cafe',rationale:'Natural light and honest food.',palette:[{role:'primary',hex:'#244536'},{role:'secondary',hex:'#FAF7EF'},{role:'accent',hex:'#B96135'}],heading_font:'Lora',body_font:'DM Sans',voice:'Warm and welcoming',imagery:'Everyday cafe moments in natural light',pillars:['Community','Seasonal food'],essential_questions:[]};
+ const direction={summary:'A welcoming neighbourhood cafe',rationale:'Natural light and honest food.',palette:[{role:'primary',hex:'#244536'},{role:'secondary',hex:'#FAF7EF'},{role:'accent',hex:'#B96135'}],heading_font:'Lora',body_font:'DM Sans',voice:'Warm and welcoming',imagery:'Everyday cafe moments in natural light',pillars:['Community','Seasonal food'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Arrival, coffee, and a shared table.'}],essential_questions:[]};
  const business={id,organization_id:id,name:'Courtyard Studio',website:null,role:'owner',has_approved_brand:true};
  let boards=[],campaigns=[],submissions=0;
  const preview={width:1024,height:1024,background_media_id:id,layers:[]};
