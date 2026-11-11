@@ -1,0 +1,133 @@
+{
+  "scope": "Recovery contract tests and authenticated deployed read checks only. No generation or publishing.",
+  "recovery_tests": {
+    "passed": 25,
+    "external_adapters": "mock"
+  },
+  "worker_check": {
+    "checked_at": "2026-11-11T12:52:30.407Z",
+    "status": "unchanged",
+    "preview_sha256": "50a43509d453cd6e702c75082224bfcdc072e228ad42e1162ca5d51fb3da9e8c",
+    "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
+  },
+  "live_reads": {
+    "prefill": {
+      "revision": 1,
+      "hasOffering": true,
+      "hasAudience": false
+    },
+    "checked_at": "2026-11-11T13:09:43.335Z",
+    "scope": "Authenticated deployed page reads only. No generation, approval, scheduling or publication.",
+    "pages": [
+      {
+        "section": "guided-onboarding",
+        "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/guided-onboarding",
+        "headings": [
+          "Your creative direction",
+          "Your brand, brought together.",
+          "Courtyard Studio QA",
+          "Warm, inviting, neighbourly, elegant",
+          "0 of 1 posts ready"
+        ],
+        "alerts": [
+          ""
+        ]
+      },
+      {
+        "section": "monthly-planning",
+        "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/monthly-planning",
+        "headings": [
+          "Plan my content",
+          "Let\u2019s plan your content"
+        ],
+        "alerts": [
+          ""
+        ]
+      },
+      {
+        "section": "overview",
+        "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/overview",
+        "headings": [
+          "Hello, Vilol",
+          "Your attention",
+          "Some creations need attention",
+          "Coming up",
+          "This week\u2019s treat: Seasonal flavours meet local warmth.",
+          "Meet up, share a coffee, and make your day brighter\u2014together.",
+          "Warmth in every morning\u2014real neighbours, fresh coffee, and simple joys shared in the heart of the community.",
+          "Performance",
+          "Research & ideas",
+          "Your content plans",
+          "Weekly campaign",
+          "Weekly content"
+        ],
+        "alerts": [
+          ""
+        ]
+      },
+      {
+        "section": "content-plan",
+        "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/content-plan",
+        "headings": [
+          "Calendar",
+          "Some posts need attention",
+          "Nov 11 \u2013 Nov 17, 2026",
+          "Wed, Nov 11",
+          "Thu, Nov 12",
+          "Fri, Nov 13",
+          "Sat, Nov 14",
+          "Sun, Nov 15",
+          "Mon, Nov 16",
+          "Tue, Nov 17"
+        ],
+        "alerts": [
+          ""
+        ]
+      },
+      {
+        "section": "review",
+        "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/review",
+        "headings": [
+          "Approvals",
+          "Nov 11 \u2013 Dec 10, 2026"
+        ],
+        "alerts": [
+          ""
+        ]
+      },
+      {
+        "section": "connections",
+        "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/connections",
+        "headings": [
+          "Connections",
+          "Social accounts",
+          "Instagram",
+          "Facebook",
+          "LinkedIn",
+          "TikTok"
+        ],
+        "alerts": [
+          ""
+        ]
+      },
+      {
+        "section": "create",
+        "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/create",
+        "headings": [
+          "Make content",
+          "Get things done",
+          "Your idea lands here."
+        ],
+        "alerts": [
+          ""
+        ]
+      }
+    ],
+    "errors": [],
+    "failedRequests": []
+  },
+  "unresolved": [
+    "Initial live Calendar check failed with request confirmation error. Isolated and full reruns passed; root cause not established.",
+    "Complete live generation journey and missing-asset workflow remain outstanding."
+  ]
+}

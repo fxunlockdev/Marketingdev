@@ -60,10 +60,24 @@ test('image replacement activation remains disabled by default and validates exp
  s.spec.values.HIGGSFIELD_IMAGES_ENABLED='yes';assert.throws(()=>activationPlan(s),/ACTIVATION_IMAGE_FLAG_INVALID/);
 });
 
-test('pause deployment timeout never swaps worker and restores API before unlock',async()=>{
- const s=snapshot(),p=activationPlan(s),a=adapter(s);let first=true;
- a.io.setAPI=async v=>{a.calls.push('api:'+v.VIDEO_ENABLED);if(first){first=false;throw Error('ACTIVATION_API_DEPLOYMENT_UNCONFIRMED');}};
+test('unconfirmed API deployment retains lock and original ID without rollback or another deployment',async()=>{
+ for(const failure of ['ACTIVATION_API_DEPLOYMENT_UNCONFIRMED','ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED','ACTIVATION_API_DEPLOYMENT_CHANGED']){
+  const s=snapshot(),p=activationPlan(s),a=adapter(s),journals=[];
+  a.io.journal=async value=>{journals.push(value);a.calls.push(value.stage);};
+  a.io.setAPI=async(v,options)=>{a.calls.push('api:'+v.VIDEO_ENABLED);if(failure!=='ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED')await options.onDeployment({deployment_id:'submitted',previous_deployment_id:'old-api'});throw Error(failure);};
+  await assert.rejects(activate(p,p.preview_sha256,a.io),e=>e.message===failure);
+  assert.ok(!a.calls.includes('swap'));assert.ok(!a.calls.includes('restore'));assert.ok(!a.calls.includes('unlock'));
+  assert.equal(a.calls.filter(c=>c.startsWith('api:')).length,1);
+  assert.equal(journals.at(-1).stage,'reconcile_required');
+  assert.equal(journals.at(-1).reason,failure);
+  assert.equal(journals.at(-1).pending_deployment?.deployment_id,failure==='ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED'?undefined:'submitted');
+ }
+});
+test('unconfirmed final deployment preserves the running replacement for reconciliation',async()=>{
+ const s=snapshot(),p=activationPlan(s),a=adapter(s),journals=[];let count=0;
+ a.io.journal=async value=>journals.push(value);
+ a.io.setAPI=async(v,options)=>{count++;await options.onDeployment({deployment_id:count===1?'pause':'enable',previous_deployment_id:count===1?'old-api':'pause'});if(count===2)throw Error('ACTIVATION_API_DEPLOYMENT_UNCONFIRMED');};
  await assert.rejects(activate(p,p.preview_sha256,a.io),/DEPLOYMENT_UNCONFIRMED/);
- assert.ok(!a.calls.includes('swap'));assert.ok(!a.calls.includes('restore'));
- assert.deepEqual(a.calls.slice(-4),['api:true','verify-api','rolled_back','unlock']);
+ assert.equal(count,2);assert.ok(a.calls.includes('verify-new'));assert.ok(!a.calls.includes('restore'));assert.ok(!a.calls.includes('unlock'));
+ assert.equal(journals.at(-1).pending_deployment.deployment_id,'enable');assert.equal(journals.at(-1).workerTouched,true);
 });

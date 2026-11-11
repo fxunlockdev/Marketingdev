@@ -8,3 +8,17 @@ test('restore timeout retains exact deployment and lock; later resume does not r
 test('idle preflight drift stops before journaling or swap',async()=>{const j=checkpoint(),h=harness(j);const make=opts=>{const io=h.make(opts),read=io.snapshot;let count=0;io.snapshot=async()=>{const s=await read();if(++count===2)s.api.deploymentId='different';return s;};return io;};await assert.rejects(resumeCheckpoint(j,make),/PREFLIGHT_DRIFT/);assert.ok(!h.calls.includes('swap'));assert.ok(!h.saved);});
 test('wrong retained token stops before mutation',async()=>{const j=checkpoint(),h=harness(j);const make=opts=>({...h.make(opts),assertLock:async()=>{throw Error('LOCK_MISMATCH');}});await assert.rejects(resumeCheckpoint(j,make),/LOCK_MISMATCH/);assert.ok(!h.calls.includes('swap'));assert.ok(!h.saved);});
 test('known platform rejection restores saved flags with one forced deploy, no worker swap',async()=>{const j=checkpoint();j.stage='restore_deployment_blocked';j.restore_attempt={variables_restored:true,running_api_deployment:'pause'};const h=harness(j,{worker:{image:'newimage',configuration:'newconfig',running:true}});let forced=false;const make=opts=>{const io=h.make(opts),set=io.setAPI;io.setAPI=async(v,o)=>{forced=o?.forceRedeploy===true;return set(v);};return io;};await resumeCheckpoint(j,make);assert.equal(forced,true);assert.ok(!h.calls.includes('swap'));assert.equal(h.calls.filter(c=>c==='restore-api').length,1);});
+
+test('activation observation checkpoint resumes the same pause deployment',async()=>{
+ const j=checkpoint();j.stage='reconcile_required';j.reason='ACTIVATION_API_DEPLOYMENT_UNCONFIRMED';j.workerTouched=false;j.pending_deployment={deployment_id:'pause',previous_deployment_id:'old-api',phase:'pause'};delete j.pause_deployment_id;
+ const h=harness({...j,pause_deployment_id:'pause'});await resumeCheckpoint(j,h.make);
+ assert.equal(h.calls.filter(c=>c==='swap').length,1);assert.equal(h.calls.filter(c=>c==='restore-api').length,1);
+});
+test('activation final observation checkpoint verifies without another deployment',async()=>{
+ const j=checkpoint();j.stage='reconcile_required';j.reason='ACTIVATION_API_DEPLOYMENT_UNCONFIRMED';j.workerTouched=true;j.pending_deployment={deployment_id:'restore',previous_deployment_id:'pause',phase:'enable'};
+ const h=harness({...j,restore_deployment_id:'restore'},{worker:{image:'newimage',configuration:'newconfig',running:true}});await resumeCheckpoint(j,h.make);
+ assert.ok(!h.calls.includes('swap'));assert.ok(!h.calls.includes('restore-api'));assert.equal(h.calls.at(-1),'unlock');
+});
+test('unknown creation receipt and deployment drift cannot resume automatically',async()=>{
+ for(const reason of ['ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED','ACTIVATION_API_DEPLOYMENT_CHANGED']){const j=checkpoint();j.stage='reconcile_required';j.reason=reason;const h=harness(j);await assert.rejects(resumeCheckpoint(j,h.make),/STAGE_INVALID/);assert.deepEqual(h.calls,[]);}
+});

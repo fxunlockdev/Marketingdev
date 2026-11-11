@@ -24,7 +24,14 @@ export function activationPlan({spec,observed,api}){
 export async function activate(plan,approval,io){
  if(approval!==plan.preview_sha256)fail('ACTIVATION_APPROVAL_MISMATCH');
  const token=randomUUID(),backup='desvio-worker-rollback-'+token;
- let locked=false,workerTouched=false,apiTouched=false;
+ let locked=false,workerTouched=false,apiTouched=false,pendingDeployment;
+ const setAPI=async (values,phase)=>{
+  await io.setAPI(values,{onDeployment:async deployment=>{
+   pendingDeployment={...deployment,phase};
+   await io.journal({stage:'api_deployment_pending',token,backup,plan,workerTouched,apiTouched,pending_deployment:pendingDeployment});
+  }});
+  pendingDeployment=undefined;
+ };
  try{
   await io.lock(token);locked=true;
   const current=activationPlan(await io.snapshot());
@@ -35,25 +42,32 @@ export async function activate(plan,approval,io){
   if(activationPlan(await io.snapshot()).preview_sha256!==approval)fail('ACTIVATION_PREVIEW_STALE');
   await io.journal({stage:'starting',token,backup,plan});
   if(API_ACTIVATION_FLAGS.some(k=>plan.api.before[k]==='true')){
-   apiTouched=true;await io.setAPI(disabled(plan.api.before));
+   apiTouched=true;await setAPI(disabled(plan.api.before),'pause');
   }
   if(plan.worker.replace){
    workerTouched=true;await io.swapWorker(plan.worker,backup,token);
    await io.startWorker();await io.verifyWorker();
   }else await io.verifyWorker();
-  apiTouched=true;await io.setAPI(plan.api.after);
+  apiTouched=true;await setAPI(plan.api.after,'enable');
   await io.verifyAPI(plan.api.after);
   await io.journal({stage:'verified',token,backup:workerTouched?backup:null,plan});
   return {status:'activated',preview_sha256:approval,backup_container:workerTouched?backup:null,scope:'Worker registration and API deployment/configuration only; provider calls and business allowances are not verified.'};
  }catch(error){
+  if(apiTouched&&['ACTIVATION_API_DEPLOYMENT_UNCONFIRMED','ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED','ACTIVATION_API_DEPLOYMENT_CHANGED'].includes(error.message)){
+   // Observation failure or competing rollout is not a failed deployment.
+   // Retain the operator lock and exact submitted ID for read-only reconciliation.
+   locked=false;
+   await io.journal({stage:'reconcile_required',token,backup,plan,workerTouched,apiTouched,...(pendingDeployment?{pending_deployment:pendingDeployment}:{}),reason:error.message});
+   throw error;
+  }
   if(workerTouched||apiTouched){
    try{
-    if(apiTouched)await io.setAPI(disabled(plan.api.before));
+    if(apiTouched)await setAPI(disabled(plan.api.before),'pause');
     if(workerTouched){await io.restoreWorker(plan.worker,backup,token);await io.verifyWorker(true);}
-    if(apiTouched){await io.setAPI(plan.api.before);await io.verifyAPI(plan.api.before);}
+    if(apiTouched){await setAPI(plan.api.before,'rollback');await io.verifyAPI(plan.api.before);}
     await io.journal({stage:'rolled_back',token,backup,plan});
    }catch{
-    await io.journal({stage:'reconcile_required',token,backup,plan}).catch(()=>{});
+    await io.journal({stage:'reconcile_required',token,backup,plan,workerTouched,apiTouched,...(pendingDeployment?{pending_deployment:pendingDeployment}:{})}).catch(()=>{});
     locked=false; // Retain the lock: an uncertain recovery must not permit another activation.
     fail('ACTIVATION_ROLLBACK_REQUIRES_RECONCILIATION');
    }

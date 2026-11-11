@@ -53,17 +53,18 @@ export function activationIO({onDeployment=async()=>{}}={}){
    }
    if(!passed)throw Error('ACTIVATION_WORKER_VERIFICATION_FAILED');
   },
-  async setAPI(values,{forceRedeploy=false}={}){
+  async setAPI(values,{forceRedeploy=false,onDeployment:recordDeployment=async()=>{}}={}){
    guardDeployment();
    const prior=variables();
    const keys=API_ACTIVATION_KEYS;
    if(keys.some(k=>!Object.hasOwn(values,k)))throw Error('ACTIVATION_API_CONFIGURATION_INVALID');
    if(!forceRedeploy&&keys.every(k=>(prior[k]??apiSettingDefault(k))===values[k]))return;
    call(['variable','set',...keys.map(k=>k+'='+values[k]),...scope(),'--skip-deploys','--json']);
-   const result=JSON.parse(call(['redeploy',...scope(),'--yes','--json']));
+   let result;try{result=JSON.parse(call(['redeploy',...scope(),'--yes','--json']));}catch{throw Error('ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED');}
    const id=result.deploymentId??result.id;
    if(typeof id!=='string'||! /^[a-f0-9-]{36}$/.test(id))throw Error('ACTIVATION_DEPLOYMENT_ID_UNCONFIRMED');
    const previous=trackedDeployment;trackedDeployment=id;
+   await recordDeployment({deployment_id:id,previous_deployment_id:previous});
    await onDeployment({deployment_id:id,previous_deployment_id:previous});
    await waitForDeployment({id,previous,status,progress:value=>console.error(JSON.stringify(value))});
   },

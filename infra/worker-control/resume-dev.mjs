@@ -8,6 +8,15 @@ import {fileURLToPath} from 'node:url';
 // deployment and no duplicate worker swap are allowed.
 export async function resumeCheckpoint(initial,makeIO=activationIO){
 let j=structuredClone(initial);
+// A bounded observation timeout retains the exact deployment, not a new rollout.
+if(['api_deployment_pending','reconcile_required'].includes(j.stage)&&j.pending_deployment&&
+ (j.stage==='api_deployment_pending'||j.reason==='ACTIVATION_API_DEPLOYMENT_UNCONFIRMED')){
+ const d=j.pending_deployment;
+ if(typeof d.deployment_id!=='string'||!d.deployment_id||typeof d.previous_deployment_id!=='string')throw Error('RESUME_DEPLOYMENT_CHECKPOINT_INVALID');
+ if(d.phase==='pause'&&!j.workerTouched)j={...j,stage:'awaiting_pause_deployment',pause_deployment_id:d.deployment_id};
+ else if(d.phase==='enable')j={...j,stage:'restore_pending',restore_deployment_id:d.deployment_id};
+}
+
 if(!['awaiting_pause_deployment','worker_swap_requested','worker_verified','restore_pending','restore_deployment_blocked','verified'].includes(j.stage))throw Error('RESUME_STAGE_INVALID');
 const io=makeIO({onDeployment:async d=>{
  j={...j,stage:'restore_pending',restore_deployment_id:d.deployment_id};

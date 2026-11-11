@@ -1954,3 +1954,11 @@ Scoped reconciliation forced one API restoration deployment d8d392f3-c0db-48da-b
 ## 2026-11-11: current onboarding regression verification
 
 Verified d5be980: API build passed, 13 guided database tests passed with mocked external providers, 15 focused contracts passed, and all 8 guided browser tests passed with mocked API at desktop/tablet/phone sizes. Authenticated deployed reads passed 7 pages without browser errors or failed API reads; four saved mood board images decoded. No paid generation, approval mutation, scheduling or publication submitted. Evidence: docs/evidence/onboarding-current-regression.json. These checks do not certify complete product readiness. Current live generation journey, research worker rollout reconciliation, per-post missing-asset requests and real publication verification remain outstanding.
+
+## 2026-11-11: durable deployment observation and follow-up checks
+
+Activation now checkpoints the exact API deployment and phase, retaining the lock on unknown receipts, observation timeouts or deployment drift instead of issuing an automatic rollback rollout. Resume reconciles known pause/enable deployment IDs without duplicate submissions. All 25 activation/deployment observation/resume contract tests passed with mocked adapters; diff whitespace check passed.
+
+Current activation preflight and apply reported unchanged and verified the running worker, already on image 149839770a55837ef9e809b0ee09eff165fc800540c6c02c9591dfe6de78a8de. This supersedes the earlier statement that this worker remains inactive. No restart or API deployment was needed.
+
+The first authenticated seven-page live check failed at Calendar with the generic request confirmation error. An isolated Calendar rerun and subsequent complete seven-page rerun passed, including four decoded mood board images and one-profile policy checks. Root cause of the initial intermittent failure is NOT established; do not label it fixed. Evidence: docs/evidence/onboarding-recovery-followup.json. No paid generation or publication was submitted. Full live generation journey, per-post missing-asset requests and complete ZIP coverage remain outstanding.
