@@ -1,0 +1,40 @@
+{
+  "commit": "b03144e2cc20e405a86ef19c9c5a7ef8348e4c10",
+  "checked_at": "2026-11-11T12:23:14.956Z",
+  "api": {
+    "deployment_id": "e057a0d5-d080-43e9-8c05-2acf97952fb6",
+    "status": "SUCCESS"
+  },
+  "web": {
+    "deployment_id": "cb06d0f1-8778-429d-b16c-9f67d02ad95f",
+    "status": "SUCCESS"
+  },
+  "local_tests": {
+    "database": 13,
+    "contracts": 9,
+    "browser_mock_api": 8,
+    "build": "passed",
+    "web_typecheck": "passed"
+  },
+  "live_checks": {
+    "pages": [
+      "guided-onboarding",
+      "monthly-planning",
+      "overview",
+      "content-plan",
+      "review",
+      "create"
+    ],
+    "browser_errors": [],
+    "failed_api_requests": [],
+    "single_profile_policy": true,
+    "single_platform_selector": true,
+    "monthly_planning_reuses_saved_setup": true
+  },
+  "scope": "Read-only authenticated dev checks. No paid generation, approval, scheduling or publishing performed.",
+  "remaining": [
+    "Actual social connection quota enforcement",
+    "Full new-customer onboarding and generation acceptance run",
+    "Post-specific asset requests from reference handoff"
+  ]
+}
