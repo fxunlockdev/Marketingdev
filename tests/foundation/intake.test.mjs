@@ -605,6 +605,33 @@ test('exhausted analysis is retryable unless a paid call is uncertain',async()=>
  await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[uncertain.child.id]);
 });
 
+test('a customer can stop waiting on uncertain research and then start again',async()=>{
+ const {UncertainRequests}=await import('../../dist/uncertain-requests.js');
+ const business=(await admin.query("SELECT id FROM app.brands WHERE organization_id=$1 AND name='Maxun fixture'",[org.id])).rows[0];
+ const release=new UncertainRequests(businesses);
+ const parent=await intake.submit(alice,business.id,{kind:'website.extract',autoAnalyze:true},randomUUID());
+ const child=(await intake.read(alice,business.id)).jobs.find(j=>j.kind==='brand.analyze'&&j.status==='queued');
+ await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[parent.id]);
+ await admin.query("UPDATE app.jobs SET status='unknown',error_code='AI_SUBMISSION_REQUIRES_REVIEW' WHERE id=$1",[child.id]);
+ // The uncertain result blocks new research, as before.
+ await assert.rejects(intake.submit(alice,business.id,{kind:'website.extract',autoAnalyze:true},randomUUID()),/uncertain outcome/);
+ // The charge must be acknowledged, and only people who can change this business may release it.
+ await assert.rejects(release.stopWaiting(alice,business.id,child.id,{}),/Acknowledge/);
+ await assert.rejects(release.stopWaiting(bob,business.id,child.id,{acknowledge_possible_charge:true}));
+ // A request that is not uncertain cannot be abandoned this way.
+ await assert.rejects(release.stopWaiting(alice,business.id,parent.id,{acknowledge_possible_charge:true}),/uncertain result/);
+ const result=await release.stopWaiting(alice,business.id,child.id,{acknowledge_possible_charge:true});
+ assert.deepEqual(result,{id:child.id,status:'canceled',automatically_retried:false});
+ assert.equal((await row(child)).error_code,'RESULT_ABANDONED');
+ // Repeating the release is harmless, and it is audited once per call that changed state.
+ assert.equal((await release.stopWaiting(alice,business.id,child.id,{acknowledge_possible_charge:true})).status,'canceled');
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE action='request.unknown_result_abandoned' AND resource_id=$1",[child.id])).rows[0].n,1);
+ // Research can start again.
+ const again=await intake.submit(alice,business.id,{kind:'website.extract',autoAnalyze:true},randomUUID());
+ assert.ok(again.id);
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE brand_id=$1 AND status IN ('queued','running','retrying')",[business.id]);
+});
+
 test('Temporal resumes the capture-to-analysis wait after worker restart without a browser', {skip:!config.storage}, async()=>{
  const {Worker,NativeConnection}=await import('@temporalio/worker');
  const {Client,Connection}=await import('@temporalio/client');

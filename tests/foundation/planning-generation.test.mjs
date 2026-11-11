@@ -111,6 +111,25 @@ test('unknown paid outcome is held and cannot be retried or cleared by cancellat
   const call=(await admin.query('SELECT status,reserved_micros FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0];assert.equal(call.status,'unknown');assert.ok(Number(call.reserved_micros)>0);
  }finally{transport=undefined;}
 });
+test('a customer can stop waiting on an uncertain plan; the reservation stays and nothing is retried',async()=>{
+ const {UncertainRequests}=await import('../../dist/uncertain-requests.js');
+ const release=new UncertainRequests(businesses);
+ const b=await fresh();await grant(b);const j=await submit(b),before=calls;
+ transport=async()=>{calls++;throw new TypeError('MOCK lost paid response');};
+ try{
+  assert.equal(await handler.run(scope(b,j)),'unknown');
+  await assert.rejects(submit(b),/uncertain/);
+  await assert.rejects(release.stopWaiting(alice,b.id,j.id,{acknowledge_possible_charge:false}),/Acknowledge/);
+  assert.deepEqual(await release.stopWaiting(alice,b.id,j.id,{acknowledge_possible_charge:true}),{id:j.id,status:'canceled',automatically_retried:false});
+  // The uncertain call keeps its reservation and is never sent again.
+  const call=(await admin.query('SELECT status,reserved_micros FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0];
+  assert.equal(call.status,'unknown');assert.ok(Number(call.reserved_micros)>0);
+  assert.equal(await handler.run(scope(b,j)),'finished');assert.equal(calls,before+1);assert.equal(await countPlans(b),0);
+ }finally{transport=undefined;}
+ // Planning is available again.
+ const next=await submit(b);assert.ok(next.id);
+});
+
 test('persisted model output recovers after a database failure without another paid call or partial calendar',async()=>{
  const b=await fresh();await grant(b);const j=await submit(b),before=calls;
  await admin.query("CREATE FUNCTION app.test_plan_promote_failure() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.strategy_slot_index=15 THEN RAISE EXCEPTION 'MOCK database promotion failure'; END IF; RETURN NEW; END $$; CREATE TRIGGER test_plan_promote_failure BEFORE INSERT ON app.content_slots FOR EACH ROW EXECUTE FUNCTION app.test_plan_promote_failure();");

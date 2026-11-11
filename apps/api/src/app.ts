@@ -10,6 +10,7 @@ import {CampaignIdeas} from './campaign-ideas.js';
 import {CampaignBlogs} from './campaign-blogs.js';
 import {CreativeProvider} from './creative-provider.js';
 import {Postforme} from './postforme.js';
+import {UncertainRequests} from './uncertain-requests.js';
 import {HiggsfieldReplacements} from './higgsfield-replacements.js';
 import {Strategies} from './strategies.js';
 import {StockMedia} from './stock-media.js';
@@ -117,6 +118,13 @@ class HiggsfieldReplacementsController {
  @Get('quote') quote(@Req() r:AuthRequest,@Param('id') id:string){return this.service.quote(r.actorId,id);}
  @Get('projects/:project') status(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string){return this.service.status(r.actorId,id,project);}
  @Post('projects/:project') submit(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,project,body,key);}
+}
+
+@Controller('api/v1/businesses/:id/requests')
+@UseGuards(SessionGuard)
+class UncertainRequestsController {
+ constructor(@Inject(UncertainRequests) readonly service:UncertainRequests){}
+ @Post(':jobId/stop-waiting') stopWaiting(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') job:string,@Body() body:unknown){return this.service.stopWaiting(r.actorId,id,job,body);}
 }
 
 @Controller('api/v1/businesses/:id/stock')
@@ -495,11 +503,12 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
  {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning,carousels:CarouselGeneration)=>new ChatConversations(canvas,planning,carousels),inject:[Canvas,Planning,CarouselGeneration]},
  {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},
  {provide:Strategies,useValue:new Strategies(new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage)),new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)))},
  {provide:HiggsfieldReplacements,useFactory:(canvas:Canvas)=>new HiggsfieldReplacements(canvas,config.higgsfieldImagesEnabled),inject:[Canvas]},
+ {provide:UncertainRequests,useValue:new UncertainRequests(new Businesses(database,workspaces))},
  {provide:StockMedia,useValue:new StockMedia(new Businesses(database,workspaces),new Assets(database,store),new StockProvider(config.pexelsApiKey))},
  {provide:GenerationNotifications,useValue:new GenerationNotifications(new ContentPlan(new Businesses(database,workspaces),config.renderImage),mail)},
  {provide:ProjectArchive,useValue:new ProjectArchive(new Canvas(new Businesses(database,workspaces),store))},

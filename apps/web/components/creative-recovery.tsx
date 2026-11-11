@@ -3,12 +3,13 @@ import {useId,useState} from 'react';
 import {api} from './api';
 import {Notice} from './primitives';
 
-export function CreativeRecovery({businessId,jobId,onRecovered,disabled=false}:{businessId:string;jobId:string;onRecovered:()=>Promise<void>;disabled?:boolean}){
+/** `kind` selects the release endpoint: generated creatives, or research and planning requests. */
+export function CreativeRecovery({businessId,jobId,onRecovered,disabled=false,kind='creative'}:{businessId:string;jobId:string;onRecovered:()=>Promise<void>;disabled?:boolean;kind?:'creative'|'request'}){
  const [confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),description=useId();
  async function stop(){
   if(busy)return;
   setBusy(true);setError(undefined);
-  try{await api(`/api/v1/businesses/${businessId}/creative-jobs/${jobId}/stop-waiting`,{acknowledge_possible_charge:true});await onRecovered();}
+  try{await api(`/api/v1/businesses/${businessId}/${kind==='request'?'requests':'creative-jobs'}/${jobId}/stop-waiting`,{acknowledge_possible_charge:true});await onRecovered();}
   catch(e){setError(e);}finally{setBusy(false);}
  }
  return <div className="creative-recovery">
