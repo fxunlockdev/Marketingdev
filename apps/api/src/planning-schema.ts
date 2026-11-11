@@ -1,4 +1,6 @@
 import type {PlanningInput} from './planning-contracts.js';
+import {campaignMonthDays} from './generation-plan.js';
+import {addDays,dayStart} from './local-calendar.js';
 const object=(properties:Record<string,unknown>)=>({type:'object',additionalProperties:false,required:Object.keys(properties),properties});
 const text=(maxLength:number)=>({type:'string',minLength:1,maxLength});
 const array=(items:unknown,minItems:number,maxItems:number)=>({type:'array',items,minItems,maxItems});
@@ -20,4 +22,19 @@ export function planningSchema(input:PlanningInput):Record<string,unknown>{
  return {...object({title:text(140),strategy:text(4000),warnings:array(text(500),0,10),slots:array({anyOf:slots},input.planning_mode==='natural'?1:input.post_count,input.planning_mode==='natural'?90:input.post_count),
  ...(input.planning_mode==='natural'?{settings:object({duration_days:{type:'integer',minimum:1,maximum:90},post_count:{type:'integer',minimum:1,maximum:90},video_count:{type:'integer',minimum:0,maximum:30}})}:{})}),
  $defs:{factId:{type:'string',enum:input.brand.facts.map(f=>f.id)}}};
+}
+
+export type PlanDuration='week'|'month'|number;
+export type PlanHorizon={starts_on:string;ends_on:string;duration_days:number;start:string;end:string};
+/** A week, a rolling calendar month or a custom day count as one exact local-date range.
+ * `ends_on` is the last local day; `start`/`end` are the instants of that range in the
+ * business's time zone, `end` exclusive, so daylight-saving days keep their real length. */
+export function planHorizon(duration:PlanDuration,startsOn:string,timezone:string):PlanHorizon{
+ const fail=():never=>{throw new Error('PLAN_HORIZON_INVALID');};
+ try{
+  if(typeof startsOn!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(startsOn)||addDays(startsOn,0)!==startsOn)return fail();
+  const days=duration==='week'?7:duration==='month'?campaignMonthDays(startsOn):duration;
+  if(typeof days!=='number'||!Number.isInteger(days)||days<1||days>90)return fail();
+  return {starts_on:startsOn,ends_on:addDays(startsOn,days-1),duration_days:days,start:dayStart(startsOn,timezone),end:dayStart(addDays(startsOn,days),timezone)};
+ }catch{return fail();}
 }
