@@ -1972,3 +1972,7 @@ Validation: five browser-request contracts passed (mock fetch); one real-browser
 ## 2026-11-11: read recovery deployed; live access check failed
 
 Web deployment 82f516a2-3d96-4ec8-ad35-375c84cdd61c for b1162d6 is SUCCESS. The authenticated live verifier failed at onboarding with Business unavailable. Independent reads confirmed login 200, businesses 200 with an empty list, and both previous QA and primary business guided-brief URLs returning 404. This does not establish deletion or its cause. Do not count the live journey as passed or bypass tenant access checks. Evidence: docs/evidence/workspace-read-recovery-deployed.json. No generation or publication submitted. Full product completion remains outstanding.
+
+## 2026-11-11: Vecteezy adapter foundation
+
+Implemented typed server-only v2 photo search and original-JPG download adapter. Fixed vendor origin, bounded responses, finite timeout, no credential forwarding through redirects, sanitized errors, commercial/non-AI search filters, preserved attribution obligations and no retry of uncertain billable downloads. Six mocked contract tests passed; TypeScript build passed. Owner confirmed AI-use permission and requested internal-only source records. No vendor call, download charge, deployment or generation integration claimed. Durable acquisition, safe private media copy, business-taste selection and creative-reference wiring remain unfinished. Existing workspace access investigation and full onboarding acceptance remain open.
