@@ -2012,3 +2012,7 @@ Build and 24 selected contracts passed. Two disposable PostgreSQL stock tests pa
 - Added operator support for scoped stock grants and migration 104 extending future-business provider defaults. Verified there is no intervening replacement of the inheritance function after migration 057.
 - Operator foundation suite passed 15/15, including explicit AI permission, cap validation, preview/apply idempotency and future-business stock grant inheritance. External providers were not called.
 - Replaced stale M0-only README with current journey, source map, harness/provider behavior, visual principles, verification commands and explicit deployment/live acceptance limitations. No UI or live deployment change claimed.
+
+### Previous business access explained (2026-11-11)
+
+Read-only live API and administrator database checks confirmed active owner membership, preserved brand rows, and logical removal records for both previous primary/QA businesses at 13:19:46Z and 13:20:19Z. The recorded removal actor matches the test account; which person or automation initiated it is not established. This supersedes the unexplained access-regression interpretation. No restoration, permission changes, generation or publication performed. Fresh acceptance requires an active test business. API latest observed deployment remains 0d95c98f and schema ends at migration 101; stock migrations 102–104 and updated worker are not deployed. Evidence: workspace-access-removal-diagnosis.json.

@@ -9,7 +9,7 @@ This README describes the current source checkout as of 11 November 2026. It is 
 **Important current limitations:**
 
 - Vecteezy authentication and photo search have passed live checks. Stock selection, acquisition, image-reference transport and persistence have passed local tests with mocked external generation. A live stock-backed creative, grant activation and deployment are still pending.
-- The latest recorded deployed access check signed in successfully but returned an empty business list and unavailable business pages. Its cause remains unresolved. Earlier successful page checks do not override this result.
+- The previous QA and primary businesses are logically removed. Read-only database inspection confirmed removal records associated with the test account, explaining their unavailable pages. Fresh live acceptance needs an active test business; no automatic restoration was performed. See [access diagnosis](docs/evidence/workspace-access-removal-diagnosis.json).
 - Full live acceptance of research, mood board revision/approval, monthly generation and calendar review remains outstanding.
 - Social publishing requires configured platform credentials, a connected account and explicit permission. A rendered Connect button is not verification of publishing.
 - Production readiness, scale, complete visual fidelity and all external-provider journeys are not certified by this document.

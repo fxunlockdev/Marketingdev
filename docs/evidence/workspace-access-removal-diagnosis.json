@@ -1,0 +1,35 @@
+{
+  "checked_at": "2026-11-11T15:03:42.952528+00:00",
+  "read_only": true,
+  "login_status": 200,
+  "workspaces_status": 200,
+  "accessible_workspaces": 1,
+  "business_list_status": 200,
+  "accessible_businesses": 0,
+  "database_owner_membership_active": true,
+  "database_owned_brand_rows": 10,
+  "previous_businesses": [
+    {
+      "id": "77ab73a3-67c7-447c-a339-d2f9b160042b",
+      "active": false
+    },
+    {
+      "id": "2af3603a-c1f3-42ab-87b9-cdd60ff25d8c",
+      "active": false
+    }
+  ],
+  "removal_events": [
+    {
+      "removed_at": "2026-11-11T13:19:46.382Z",
+      "removed_by_test_account": true
+    },
+    {
+      "removed_at": "2026-11-11T13:20:19.686Z",
+      "removed_by_test_account": true
+    }
+  ],
+  "conclusion": "Previous target businesses are logically removed; unavailable pages are expected. No automatic restoration performed. Removal actor identity does not establish which human or automation initiated removal.",
+  "latest_observed_api_deployment": "0d95c98f-3e2b-4e43-aad8-81e54a5b8d72",
+  "applied_migration_latest": "101_single_business_accounts.sql",
+  "stock_rollout_pending": true
+}
