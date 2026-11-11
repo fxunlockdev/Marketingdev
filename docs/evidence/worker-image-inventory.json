@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-11T00:55:43.978Z",
+  "checked_at": "2026-11-11T02:26:20.956Z",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:4b7b20e156d413880e3ff8c2a979fc8dac4bc9073bd7efd16b554def01377beb",
+      "image_id": "sha256:149839770a55837ef9e809b0ee09eff165fc800540c6c02c9591dfe6de78a8de",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,5 +38,5 @@
       "user": "65534:65534"
     }
   ],
-  "scope": "Recovery worker activated and registration verified; see railway-provider-activation.json. Does not certify complete product or live provider acceptance."
+  "scope": "Starter concept worker built locally for dev e194662; activation pending."
 }

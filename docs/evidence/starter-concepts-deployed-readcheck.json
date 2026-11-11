@@ -1,0 +1,107 @@
+{
+  "prefill": {
+    "revision": 1,
+    "hasOffering": true,
+    "hasAudience": false
+  },
+  "checked_at": "2026-11-11T02:28:16.233Z",
+  "scope": "Authenticated deployed page reads only. No generation, approval, scheduling or publication.",
+  "pages": [
+    {
+      "section": "guided-onboarding",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/guided-onboarding",
+      "headings": [
+        "Your creative direction",
+        "Your brand, brought together.",
+        "Courtyard Studio QA",
+        "Warm, inviting, neighbourly, elegant",
+        "0 of 1 posts ready"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "monthly-planning",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/monthly-planning",
+      "headings": [
+        "Plan my content",
+        "Let’s plan your content"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "overview",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/overview",
+      "headings": [
+        "Hello, Vilol",
+        "Your attention",
+        "Some creations need attention",
+        "Coming up",
+        "This week’s treat: Seasonal flavours meet local warmth.",
+        "Meet up, share a coffee, and make your day brighter—together.",
+        "Warmth in every morning—real neighbours, fresh coffee, and simple joys shared in the heart of the community.",
+        "Performance",
+        "Research & ideas",
+        "Your content plans",
+        "Weekly campaign",
+        "Weekly content"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "content-plan",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/content-plan",
+      "headings": [
+        "Calendar",
+        "Some posts need attention",
+        "Nov 11 – Nov 17, 2026",
+        "Wed, Nov 11",
+        "Thu, Nov 12",
+        "Fri, Nov 13",
+        "Sat, Nov 14",
+        "Sun, Nov 15",
+        "Mon, Nov 16",
+        "Tue, Nov 17"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "review",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/review",
+      "headings": [
+        "Approvals",
+        "Nov 11 – Dec 10, 2026"
+      ],
+      "alerts": [
+        ""
+      ]
+    },
+    {
+      "section": "create",
+      "url": "/b/2af3603a-c1f3-42ab-87b9-cdd60ff25d8c/create",
+      "headings": [
+        "Make content",
+        "Get things done",
+        "Your idea lands here."
+      ],
+      "alerts": [
+        ""
+      ]
+    }
+  ],
+  "errors": [],
+  "failedRequests": [],
+  "source_commit": "e194662555b42403158a5b829457eff022be7db3",
+  "delivery_branch": "dev",
+  "deployments": {
+    "api": "e1778976-90fe-4915-a5a5-f206bbc75226",
+    "web": "375c85b7-5140-4e3c-ace3-8d7e0742e295"
+  }
+}

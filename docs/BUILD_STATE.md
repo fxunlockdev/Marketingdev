@@ -1938,3 +1938,9 @@ New dedicated research results require two bounded starter concepts, one static 
 Validation: API build and web typecheck passed; contracts 376 passed / 1 skipped; disposable PostgreSQL guided foundation 12 passed (MOCK OpenAI); focused browser mood board revision/approval test passed at 1440, 768 and 390 widths with accessibility checks (MOCK API). Database assertions verify each saved generation request contains only its matching starter concept. This change is not yet deployed or live-provider verified. Remaining ZIP coverage, full live journey and worker rollout remain outstanding.
 
 Owner now requests a single delivery branch: push/deploy future completed work to dev only; leave feat/astryx-refinement unchanged.
+
+## 2026-11-11: starter concept API and web deployment
+
+Source e194662 on dev uploaded to API e1778976-90fe-4915-a5a5-f206bbc75226 and web 375c85b7-5140-4e3c-ace3-8d7e0742e295; both observed SUCCESS. Authenticated deployed read checks passed six pages, no page exceptions or failing API requests, four saved mood board images decoded. Approved QA business opens recurring monthly planning without repeating onboarding. Evidence: docs/evidence/starter-concepts-deployed-readcheck.json. These are saved-state reads, not a new provider generation proof. Screenshot inspection still finds cramped spacing around monthly planning actions and helper copy.
+
+Research worker image built as sha256:149839770a55837ef9e809b0ee09eff165fc800540c6c02c9591dfe6de78a8de. Bundle dbdabcf8065b5e27a99072aa5169a6a73e75ba4648a87c413f6f9f063644dfed (386859857 bytes) is transferring in exec session 67674, process 75649. Transfer has not yet reported completion. Do not restart without reconciling this handle and transfer evidence. Worker import and coordinated activation remain pending. No new live provider generation or publication was submitted. Full ZIP fidelity and full updated journey completion remain unproven.
