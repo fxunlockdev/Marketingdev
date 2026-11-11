@@ -917,7 +917,7 @@ test('stock-backed creative persists selected photo and finished output without 
  transport=async(url,init)=>{
   if(new URL(url).pathname==='/v1/responses'){
    const body=JSON.parse(init.body),properties=body.text?.format?.schema?.properties;
-   if(properties?.query)return response({query:'calm dental office'});
+   if(properties?.queries)return response({queries:['calm dental office']});
    if(properties?.resource_id)return response({resource_id:42});
    return standard(url,init);
   }
@@ -939,4 +939,44 @@ test('stock-backed creative persists selected photo and finished output without 
   await stockHandler.run(scope(job));
   assert.deepEqual({searches,downloads,images},{searches:1,downloads:1,images:1});
  }finally{transport=undefined;}
+});
+
+test('stock-backed creative still succeeds without stock when the photo cannot be used, and records why',async()=>{
+ const {StockAssets}=await import('../../dist/stock-assets.js'),{StockError}=await import('../../dist/vecteezy-client.js');
+ await grant();
+ const stockJobs=new AssetJobs(worker,store,{scan:async()=>{}});
+ let downloads=0,images=0,choice=42;
+ const stock=new StockAssets(stockJobs,{configured:true,search:async()=>[{id:42,title:'Calm dental office',previewURL:null,aiGenerated:false}],download:async()=>{downloads++;throw new StockError('STOCK_DOWNLOAD_UNKNOWN');}},{fetch:async()=>{throw Error('unreachable');}});
+ const stockHandler=new CreativeJobs(stockJobs,skills,provider,undefined,stock);
+ transport=async(url,init)=>{
+  if(new URL(url).pathname==='/v1/responses'){
+   const properties=JSON.parse(init.body).text?.format?.schema?.properties;
+   if(properties?.queries)return response({queries:['calm dental office','bright clinic reception']});
+   if(properties?.resource_id)return response({resource_id:choice});
+   return standard(url,init);
+  }
+  images++;assert.equal(new URL(url).pathname,'/v1/images/generations');
+  assert.doesNotMatch(JSON.parse(init.body).prompt,/Visual inspiration only|Base photograph/);
+  return Response.json({created:1,data:[{b64_json:png.toString('base64')}]});
+ };
+ try{
+  await admin.query('DELETE FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
+  const ungranted=await submit('Create a calm dental reminder image');
+  await stockHandler.run(scope(ungranted));
+  assert.deepEqual(await row(ungranted),{status:'succeeded',error_code:null});
+  assert.deepEqual((await admin.query('SELECT outcome,skip_reason FROM app.stock_selections WHERE job_id=$1',[ungranted.id])).rows[0],{outcome:'skipped',skip_reason:'STOCK_GRANT_REQUIRED'});
+  await admin.query("INSERT INTO app.stock_grants(organization_id,brand_id,enabled,ai_use_authorized,max_daily_downloads,expires_at) VALUES($1,$2,true,true,5,now()+interval '1 hour')",[org.id,brand.id]);
+  const uncertain=await submit('Create a calm dental welcome image');
+  await stockHandler.run(scope(uncertain));
+  // An uncertain download no longer leaves the creative, and with it the brand, waiting.
+  assert.deepEqual(await row(uncertain),{status:'succeeded',error_code:null});
+  assert.deepEqual((await admin.query('SELECT a.status,s.outcome,s.skip_reason FROM app.stock_acquisitions a JOIN app.stock_selections s USING(job_id) WHERE a.job_id=$1',[uncertain.id])).rows[0],{status:'unknown',outcome:'skipped',skip_reason:'STOCK_DOWNLOAD_UNKNOWN'});
+  choice=0;
+  const unfit=await submit('Create a calm dental hygiene image');
+  await stockHandler.run(scope(unfit));
+  assert.deepEqual(await row(unfit),{status:'succeeded',error_code:null});
+  assert.equal((await admin.query('SELECT skip_reason FROM app.stock_selections WHERE job_id=$1',[unfit.id])).rows[0].skip_reason,'STOCK_NO_RELEVANT_RESULT');
+  await stockHandler.run(scope(uncertain));
+  assert.deepEqual({downloads,images},{downloads:1,images:3});
+ }finally{transport=undefined;await admin.query('DELETE FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);}
 });
