@@ -2,6 +2,7 @@ type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string):Promise<
  pages:WebsitePage[];captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture['snapshots'][number]}[]}>;
  visualErrors:{url:string;code:string}[];coverage:Record<string,any>;
 }>};
+import {exhaustedIntakeOutcome} from "./intake-outcome.js";
 import {BUSINESS_RESEARCH_AGENT_VERSION} from './guided-campaign-contracts.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
 import { randomUUID } from "node:crypto";
@@ -562,14 +563,12 @@ export class IntakeJobs {
           (await db.query("SELECT analysis_job_id FROM app.intake_dependencies WHERE analysis_job_id=$1", [j.id])).rowCount) {
         return this.finish(db,j,"failed","WEBSITE_PREREQUISITE_TIMEOUT");
       }
-      return this.finish(
-        db,
-        j,
-        j.kind === "brand.analyze" ? "unknown" : "failed",
-        j.kind === "brand.analyze"
-          ? "AI_SUBMISSION_REQUIRES_REVIEW"
-          : "WEBSITE_RETRIES_EXHAUSTED",
-      );
+      // Only an uncertain paid call needs review. Anything else stays retryable.
+      const call = j.kind === "brand.analyze"
+        ? ((await db.query("SELECT status FROM app.analysis_calls WHERE job_id=$1", [j.id])).rows[0]?.status ?? null)
+        : null;
+      const outcome = exhaustedIntakeOutcome(j.kind, call);
+      return this.finish(db, j, outcome.status, outcome.code);
     });
   }
 }

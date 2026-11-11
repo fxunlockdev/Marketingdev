@@ -584,6 +584,27 @@ test('durable onboarding dependencies cancel after failed capture and cannot exp
  await assert.rejects(intake.submit(alice,business.id,{kind:'brand.analyze',autoAnalyze:true},randomUUID()),/only available/);
 });
 
+test('exhausted analysis is retryable unless a paid call is uncertain',async()=>{
+ const business=(await admin.query("SELECT id FROM app.brands WHERE organization_id=$1 AND name='Maxun fixture'",[org.id])).rows[0];
+ const handler=new IntakeJobs(jobs,undefined,analyzer(async()=>{throw Error('MODEL_MUST_NOT_RUN');}));
+ const exhausted=async call=>{
+  const parent=await intake.submit(alice,business.id,{kind:'website.extract',autoAnalyze:true},randomUUID());
+  const child=(await intake.read(alice,business.id)).jobs.find(j=>j.kind==='brand.analyze'&&j.status==='queued');
+  await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[parent.id]);
+  await admin.query("UPDATE app.jobs SET status='retrying',attempt=3 WHERE id=$1",[child.id]);
+  if(call)await admin.query("INSERT INTO app.analysis_calls(job_id,organization_id,brand_id,review_revision,model,reserved_micros,input_sha256,status) VALUES($1,$2,$3,0,'MOCK-model',1,'test',$4)",[child.id,org.id,business.id,call]);
+  const status=await handler.fail({organizationId:org.id,brandId:business.id,jobId:child.id});
+  return {status,code:(await row(child)).error_code,child};
+ };
+ // No provider call was ever recorded: nothing to review, so the customer may retry.
+ const early=await exhausted(null);
+ assert.equal(early.status,'failed');assert.equal(early.code,'AI_ANALYSIS_FAILED_BEFORE_SUBMISSION');
+ // A submitted call with no recorded result may have been charged: keep it under review.
+ const uncertain=await exhausted('submitted');
+ assert.equal(uncertain.status,'unknown');assert.equal(uncertain.code,'AI_SUBMISSION_REQUIRES_REVIEW');
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[uncertain.child.id]);
+});
+
 test('Temporal resumes the capture-to-analysis wait after worker restart without a browser', {skip:!config.storage}, async()=>{
  const {Worker,NativeConnection}=await import('@temporalio/worker');
  const {Client,Connection}=await import('@temporalio/client');
