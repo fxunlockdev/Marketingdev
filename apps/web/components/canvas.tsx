@@ -657,6 +657,7 @@ export function CreativeProject({
         (v) => v.id === (id ?? value.project.latest_version_id),
       )!;
       setSelected(v.id);
+      setSaveState("");
       const draft = v.id === value.project.latest_version_id ? readCanvasDraft(projectId, v.id) : null;
       history.reset(structuredClone(draft?.design ?? v.design));
       setCaption(draft?.caption ?? v.caption);

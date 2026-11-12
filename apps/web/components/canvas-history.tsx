@@ -6,15 +6,26 @@ const LIMIT=100,COALESCE_MS=600,DRAFT_PREFIX='desvio:canvas-draft:';
 type History={past:Design[];future:Design[]};
 export type CanvasHistory={edit:(next:Design)=>void;reset:(design:Design)=>void;undo:()=>void;redo:()=>void;canUndo:boolean;canRedo:boolean};
 
+/** Which layer property an edit changed; only repeats of the same change merge into one undo step. */
+function changeKey(before:Design,after:Design):string{
+ if(before.layers.length!==after.layers.length)return 'layers';
+ for(const [i,layer] of after.layers.entries()){
+  const prior=before.layers[i] as Record<string,unknown>,fields=Object.keys(layer).filter(k=>JSON.stringify(prior?.[k])!==JSON.stringify((layer as Record<string,unknown>)[k]));
+  if(prior?.id!==layer.id)return 'layers';
+  if(fields.length)return `${layer.id}:${fields.sort().join(',')}`;
+ }
+ return 'design';
+}
 /** Undo and redo for canvas edits. Rapid changes to the same design (typing, dragging) are one step. */
 export function useCanvasHistory(design:Design|undefined,setDesign:(design:Design)=>void):CanvasHistory{
- const stacks=useRef<History>({past:[],future:[]}),current=useRef(design),last=useRef(0);
+ const stacks=useRef<History>({past:[],future:[]}),current=useRef(design),last=useRef(0),lastKey=useRef('');
  const [,setTick]=useState(0);
  current.current=design;
  const commit=useCallback((next:History,shown?:Design)=>{stacks.current=next;if(shown){current.current=shown;setDesign(shown);}setTick(n=>n+1);},[setDesign]);
  const edit=useCallback((next:Design)=>{
-  const previous=current.current,now=Date.now(),merge=now-last.current<COALESCE_MS,h=stacks.current;
-  last.current=now;
+  const previous=current.current,now=Date.now(),key=previous?changeKey(previous,next):'',h=stacks.current;
+  const merge=now-last.current<COALESCE_MS&&key===lastKey.current;
+  last.current=now;lastKey.current=key;
   commit(previous&&!merge?{past:[...h.past,previous].slice(-LIMIT),future:[]}:{past:h.past,future:[]},next);
  },[commit]);
  const reset=useCallback((next:Design)=>{last.current=0;commit({past:[],future:[]},next);},[commit]);
