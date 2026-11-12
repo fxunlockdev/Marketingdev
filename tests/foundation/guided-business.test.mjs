@@ -572,3 +572,22 @@ test('an uncertain early capture never blocks for good: release it, then submit 
  assert.equal((await jobs('website.extract')).length,2);
  assert.equal((await guided.read(alice,target.id)).prefill_status,'canceled');
 });
+
+test('the first guided monthly plan also requests the brand strategy once, without blocking the plan',async()=>{
+ const {requestInitialStrategy}=await import('../../dist/strategy-store.js');
+ const {org,brand}=await readyBusiness();
+ const board=await boards.create(alice,brand.id,{revision:1},randomUUID());await completeBoardFixture(brand,org,board);
+ await guided.save(alice,brand.id,{revision:1,brief,step:3});await boards.approve(alice,brand.id,board.id);
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gpt-6-astra',now()+interval '1 hour',900000000,12.5,50,'LOCAL TEST ONLY')",[org.id,brand.id]);
+ const result=await campaigns.create(alice,brand.id,{moodboard_id:board.id,starts_on:'2026-12-01',duration:'week',channels:['instagram'],static_count:2,carousel_count:0,timezone:'UTC'},randomUUID());
+ const plan=(await admin.query('SELECT r.input FROM app.guided_campaigns g JOIN app.planning_requests r ON r.job_id=g.planning_job_id WHERE g.id=$1',[result.id])).rows[0];
+ assert.equal(plan.input.task,'content_plan');assert.equal(plan.input.strategy,undefined,'no approved strategy yet');
+ const strategy=(await admin.query("SELECT r.request_key,r.selected_model,r.input,j.status FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.brand_id=$1 AND r.input->>'task'='strategy'",[brand.id])).rows;
+ assert.equal(strategy.length,1);assert.equal(strategy[0].request_key,`strategy:initial:${brand.id}`);assert.equal(strategy[0].status,'queued');assert.equal(strategy[0].selected_model,'gpt-6-astra');
+ assert.equal(await plans.scope(alice,brand.id,true,(db,b)=>requestInitialStrategy(db,b,brand.id,alice)),undefined,'only once per business');
+ // Without a planning grant nothing is queued and the plan still starts.
+ const other=await readyBusiness(),board2=await boards.create(alice,other.brand.id,{revision:1},randomUUID());await completeBoardFixture(other.brand,other.org,board2);
+ await guided.save(alice,other.brand.id,{revision:1,brief,step:3});await boards.approve(alice,other.brand.id,board2.id);
+ await campaigns.create(alice,other.brand.id,{moodboard_id:board2.id,starts_on:'2026-12-01',duration:'week',channels:['instagram'],static_count:2,carousel_count:0,timezone:'UTC'},randomUUID());
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.planning_requests WHERE brand_id=$1 AND input->>'task'='strategy'",[other.brand.id])).rows[0].n,0);
+});

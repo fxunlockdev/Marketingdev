@@ -68,6 +68,45 @@ export async function applyStrategyGraph(db:PoolClient,scope:KnowledgeScope,row:
  return {nodes:applied.nodes.length,edges:applied.edges.filter(e=>e.id).length};
 }
 
+/** Queues one strategy run in the caller's business transaction: idempotent per request key, one active run, a daily cap. */
+export async function queueStrategy(db:PoolClient,b:Scope,id:string,user:string,v:Record<string,unknown>,requestKey:string,requestHash:string):Promise<{id:string;status:string}>{
+ const prior=(await db.query('SELECT r.request_hash,j.id,j.status FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,requestKey])).rows[0];
+ if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another strategy request');return {id:prior.id,status:prior.status};}
+ const recent=(await db.query("SELECT count(*) FILTER(WHERE j.status IN ('queued','running','retrying','unknown'))::int AS active,count(*)::int AS today FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->>'task'='strategy' AND (j.created_at>now()-interval '1 day' OR j.status IN ('queued','running','retrying','unknown'))",[b.organization_id,id])).rows[0];
+ if(recent.active)throw new ConflictException('A brand strategy is already being prepared');
+ if(recent.today>=DAILY_STRATEGY_REQUESTS)throw new ConflictException('Daily strategy request limit reached');
+ const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,id])).rows[0];
+ if(!brain)throw new ConflictException('Confirm your brand profile before building a strategy');
+ if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
+ const prefs=(await db.query('SELECT goal,timezone,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
+ if(!prefs||prefs.step!==3)throw new ConflictException('Finish your brand goals before building a strategy');
+ const {step,...preferences}=prefs;
+ const grounded=await groundedStrategyContext(db,b.organization_id,id,v);
+ let input:StrategyInput;
+ try{input=validateStrategyInput({task:'strategy',brand:{id:brain.id,sha256:brain.sha256,learning:await planningLearning(db),facts:brain.snapshot.facts.map((f:{id:string;field:string;value:string})=>({id:f.id,field:f.field,value:f.value}))},preferences,...grounded});}
+ catch{throw new BadRequestException('Check the research evidence and context supplied for this strategy');}
+ const grant=(await db.query("SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,id])).rows[0];
+ // The worker compares scheduled_at with its own clock; use the API clock, as plan requests do, not the database's.
+ const job=randomUUID(),due=new Date().toISOString();
+ await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);
+ await db.query("INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'openai',$9,$10)",[job,b.organization_id,id,brain.id,JSON.stringify(input),hash(canonicalJSON(input)),requestKey,requestHash,grant?.model??null,due]);
+ await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',$4)",[job,b.organization_id,id,due]);
+ await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
+ return {id:job,status:'queued'};
+}
+
+/** The first strategy for a business, requested once with its first guided monthly plan so the strategy is ready to
+ * review for the next one. Never blocks the caller: with no planning grant, or on any refusal, nothing is queued. */
+export async function requestInitialStrategy(db:PoolClient,b:Scope,brand:string,user:string):Promise<string|undefined>{
+ const exists=(await db.query("SELECT 1 FROM app.brand_strategies WHERE organization_id=$1 AND brand_id=$2 UNION ALL SELECT 1 FROM app.planning_requests WHERE organization_id=$1 AND brand_id=$2 AND input->>'task'='strategy' LIMIT 1",[b.organization_id,brand])).rowCount;
+ if(exists||!(await db.query("SELECT 1 FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,brand])).rowCount)return undefined;
+ await db.query('SAVEPOINT initial_strategy');
+ try{
+  const queued=await queueStrategy(db,b,brand,user,{},`strategy:initial:${brand.toLowerCase()}`,hash(canonicalJSON({initial:true,brand:brand.toLowerCase()})));
+  await db.query('RELEASE SAVEPOINT initial_strategy');return queued.id;
+ }catch{await db.query('ROLLBACK TO SAVEPOINT initial_strategy');return undefined;}
+}
+
 /** Customer side of the brand strategy: ask for one, read the versions, approve a draft. */
 export class BrandStrategies{
  constructor(readonly plans:ContentPlan){}
@@ -77,29 +116,7 @@ export class BrandStrategies{
   if(typeof key!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('An Idempotency-Key is required');
   const requestKey=`strategy:${key}`,requestHash=hash(canonicalJSON({strategy:v,user}));
   return this.plans.scope(user,id,true,async(db:PoolClient,b:Scope)=>{
-   const prior=(await db.query('SELECT r.request_hash,j.id,j.status FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,requestKey])).rows[0];
-   if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another strategy request');return {id:prior.id,status:prior.status};}
-   const recent=(await db.query("SELECT count(*) FILTER(WHERE j.status IN ('queued','running','retrying','unknown'))::int AS active,count(*)::int AS today FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->>'task'='strategy' AND (j.created_at>now()-interval '1 day' OR j.status IN ('queued','running','retrying','unknown'))",[b.organization_id,id])).rows[0];
-   if(recent.active)throw new ConflictException('A brand strategy is already being prepared');
-   if(recent.today>=DAILY_STRATEGY_REQUESTS)throw new ConflictException('Daily strategy request limit reached');
-   const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,id])).rows[0];
-   if(!brain)throw new ConflictException('Confirm your brand profile before building a strategy');
-   if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
-   const prefs=(await db.query('SELECT goal,timezone,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
-   if(!prefs||prefs.step!==3)throw new ConflictException('Finish your brand goals before building a strategy');
-   const {step,...preferences}=prefs;
-   const grounded=await groundedStrategyContext(db,b.organization_id,id,v);
-   let input:StrategyInput;
-   try{input=validateStrategyInput({task:'strategy',brand:{id:brain.id,sha256:brain.sha256,learning:await planningLearning(db),facts:brain.snapshot.facts.map((f:{id:string;field:string;value:string})=>({id:f.id,field:f.field,value:f.value}))},preferences,...grounded});}
-   catch{throw new BadRequestException('Check the research evidence and context supplied for this strategy');}
-   const grant=(await db.query("SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,id])).rows[0];
-   // The worker compares scheduled_at with its own clock; use the API clock, as plan requests do, not the database's.
-   const job=randomUUID(),due=new Date().toISOString();
-   await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);
-   await db.query("INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'openai',$9,$10)",[job,b.organization_id,id,brain.id,JSON.stringify(input),hash(canonicalJSON(input)),requestKey,requestHash,grant?.model??null,due]);
-   await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',$4)",[job,b.organization_id,id,due]);
-   await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
-   return {id:job,status:'queued'};
+   return queueStrategy(db,b,id,user,v,requestKey,requestHash);
   });
  }
  /** Every version, newest first, with the state of any run still in progress. */

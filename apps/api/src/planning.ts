@@ -10,7 +10,7 @@ import {ContentPlan} from './content-plan.js';
 import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {planningContext,type PlanningContext,type PlanningInput,type PostIdeaPurpose} from './planning-contracts.js';
-import {approvedStrategy} from './strategy-store.js';
+import {approvedStrategy,requestInitialStrategy} from './strategy-store.js';
 /** Supplies the knowledge-graph context pack, market research notes and learned preferences for one plan request,
  * and the graph nodes the pack drew on (kept on the request as provenance, never sent to the model). */
 export type PlanningContextSource=(db:PoolClient,scope:{organization_id:string;brand_id:string},request:{brief:string;goal:string})=>Promise<(PlanningContext&{used_node_ids?:string[]})|undefined>;
@@ -98,6 +98,8 @@ export class Planning {
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
    if(conversation&&cycle===0)await db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",[randomUUID(),b.organization_id,id,conversation,job,`${brief.trim()||'Plan content for this business.'}\n${v.planning_mode==='natural'?`AI chooses the plan length and mix from this request, starting ${v.starts_on}.`:`${count} posts over ${days} days, starting ${v.starts_on}; ${videos} videos. ${cycles} planning cycle(s).`}${input.reference_plan?`\nContext: ${input.reference_plan.title}. Create a new draft plan.`:''}`]);
    }
+   // The first guided monthly plan also asks for the brand strategy once, so it is ready to review before the next plan.
+   if(!ideas&&scoped?.single&&!input.strategy)await requestInitialStrategy(db,b,id,user);
    return {id:first,status:'queued',output_plan_id:null,loop_id:loop,thread_id:conversation??null};
   };return scoped?action(scoped.db,scoped.b):this.plans.scope(user,id,true,action);
  }
