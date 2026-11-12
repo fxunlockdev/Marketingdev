@@ -67,7 +67,11 @@ function GuidedCreateChat({business}:{business:{id:string;name:string;role:strin
    catch(e){if(e instanceof ApiError&&[400,403,404,409,422,429].includes(e.status)){if(snapshot.mode==='strategy'){setStrategyQuote(undefined);setQuoteRetry(n=>n+1);}const editable={...current.current,request:undefined};setDraft(editable);await persist(editable);}throw e;}
   });
   if(next.mode==='campaign'){const waiting={...next,thread:r.thread_id,messages:[...next.messages,{role:'assistant' as const,text:'Your planning request is saved. I’m finding the right topics. You can leave while it runs.'}]};setDraft(waiting);await persist(waiting);return;}
-  if(next.mode==='post'){const savedPost={...next,request:undefined,data:{...next.data,created_slot:r.id??r.slot_id},messages:[...next.messages,{role:'assistant' as const,text:['video','reel'].includes(next.data.format)?'Your post is saved. Choose a starting image and review the video script in the canvas.':'Your post is saved. I’m creating its visuals in the canvas.'}]};await persist(savedPost);setDraft(savedPost);return;}
+  if(next.mode==='post'){const slotId=r.id??r.slot_id;const savedPost={...next,request:undefined,data:{...next.data,created_slot:slotId},messages:[...next.messages,{role:'assistant' as const,text:['video','reel'].includes(next.data.format)?'Your post is saved. Choose a starting image and review the video script in the canvas.':'Your post is saved. I’m creating its visuals in the canvas.'}]};await persist(savedPost);setDraft(savedPost);
+   // "Approve brief & create visual" is the approval: start the image or carousel now, once. Videos keep their own
+   // script approval. The stable key makes a repeated click or a reload replay the same request, never a second one.
+   if(!['video','reel'].includes(next.data.format)&&slotId)await api(`${root}/content-plans/${next.data.campaign}/generate-images`,{slots:[{id:slotId,revision:r.revision??1}]},'POST',`guided-create:${slotId}`);
+   return;}
   const destination=next.mode==='strategy'?'strategies':`campaign-post?slot=${encodeURIComponent(r.id??r.slot_id??'')}`;
   await clearDraft({...empty(),result:destination});router.push(`/b/${business.id}/${destination}`);
  }catch(e){setError(e);}finally{setBusy(false);locked.current=false;}}
