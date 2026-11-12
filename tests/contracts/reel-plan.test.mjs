@@ -47,3 +47,11 @@ test('Runway refuses an over-long prompt by name instead of cutting it',()=>{
  const body=JSON.parse(c.prepare({...intent,prompt:'Approved'}).body);
  assert.deepEqual(body.input,{referenceImages:[{uri:'https://media.example.com/a.png',role:'first'}],promptText:'Approved',duration:5,aspectRatio:'9:16',resolution:'1080p',audio:false});
 });
+test('brand palette keeps captions legible and the end card on brand',async()=>{
+ const {brandPalette,brandName,reelEndCard}=await import('../../dist/reel-plan.js');
+ assert.deepEqual(brandPalette([{field:'colors',value:'Navy #1B2A49 and cream #F5EEDC'}]),{caption:{foreground:'#ffffff',background:'#1b2a49'},card:{background:'#1b2a49',foreground:'#ffffff'}});
+ assert.deepEqual(brandPalette([{field:'colors',value:'Lemon #FFE45C'}]),{caption:{foreground:'#ffffff',background:'#111111'},card:{background:'#ffe45c',foreground:'#111111'}});
+ assert.deepEqual(brandPalette([]).card,{background:'#111111',foreground:'#ffffff'});
+ assert.equal(brandName([{field:'brand_name',value:' Groomday '}]),'Groomday');
+ assert.deepEqual(reelEndCard('Groomday','Book a visit',{foreground:'#ffffff',background:'#111111'}),{headline:'Groomday',cta:'Book a visit',foreground:'#ffffff',background:'#111111',duration_ms:2000});
+});

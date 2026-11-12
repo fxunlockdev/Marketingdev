@@ -309,6 +309,84 @@ test('approved export to original video skills, durable provider stage, actual m
  assert.equal(plansCalled,beforeText);assert.equal(submits,beforeDeniedVideo);
 });
 
+test('multi-shot reel: approved export to original video shots in order, cut with captions and end card (MOCK providers)',async()=>{
+ const [{VideoReferences},{VideoCanvas},{VideoJobs},{VideoProviderJobs},{VideoRenderer},{CreativeJobs},{CreativeProvider},{SkillRuntime},{VideoDownload},{RunwayClient},{reelShots},{prepareVideoImage},{prepareSkillImage},{execFileSync},{default:OpenAI}]=await Promise.all([
+  import('../../dist/video-references.js'),import('../../dist/video-canvas.js'),import('../../dist/video-jobs.js'),import('../../dist/video-provider-jobs.js'),import('../../dist/video-renderer.js'),import('../../dist/creative-jobs.js'),import('../../dist/creative-provider.js'),import('../../dist/skill-runtime.js'),import('../../dist/video-download.js'),import('../../dist/runway-client.js'),import('../../dist/reel-plan.js'),import('../../scripts/video-runtime-image.mjs'),import('../../scripts/skill-test-image.mjs'),import('node:child_process'),import('openai')]);
+ const image=prepareVideoImage(),skillImage=prepareSkillImage(),encryptionKey='cd'.repeat(32);
+ const clip=Buffer.from(execFileSync('docker',['run','--rm','--network','none','--read-only','--cap-drop=ALL','--security-opt','no-new-privileges','--memory','512m','--cpus','1','--tmpfs','/tmp:rw,noexec,nosuid,size=32m','--entrypoint','python',image,'-c',"import sys,base64; sys.path.insert(0,'/runtime'); import runtime as r; r.command('ffmpeg',['-v','error','-f','lavfi','-i','testsrc2=size=360x640:duration=5:rate=24','-c:v','libx264','-threads','1','-pix_fmt','yuv420p','/tmp/test.mp4']); print(base64.b64encode(open('/tmp/test.mp4','rb').read()).decode())"],{encoding:'utf8',timeout:30000}).trim(),'base64');
+ const v=await fixture(),e=await render(v);await canvas.review(editor.id,brand.id,v.id,{decision:'in_review',feedback:'For a reel',revision:1});
+ const approval=await exports.approve(alice.id,brand.id,e.id,{sha256:e.sha256,source_sha256:v.sha256,context_type:'canvas',context_id:v.id,context_revision:2,confirmed:true});
+ const refs=new VideoReferences(canvas,jobs,encryptionKey,renderer.image,'test'),service=new VideoCanvas(canvas,refs,true);
+ const thread=(await admin.query('SELECT thread_id FROM app.creative_projects WHERE id=$1',[v.project_id])).rows[0].thread_id;
+ await admin.query("INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL TEST',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour',budget_micros=10000000",[org.id,brand.id]);
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL TEST',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour',budget_micros=10000000,max_create_micros=100000",[org.id,brand.id]);
+ const brief={title:'TEST reel',caption:'TEST FIXTURE reel caption',video_prompt:'TEST FIXTURE warm studio light, product on a linen table.',fact_ids:null,warnings:[],
+  beats:[{start_ms:0,end_ms:5000,action:'Hands place the product',camera:'Slow push in'},{start_ms:5000,end_ms:10000,action:'Light sweeps across the label',camera:'Orbit left'},{start_ms:10000,end_ms:15000,action:'Product sits in a calm room',camera:'Static wide'}],
+  overlays:[{text:'New this week',start_ms:0,end_ms:3000,position:'top',foreground:'#ffffff',background:'#111111'}]};
+ const text=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
+  const wire=JSON.parse(init.body),message=wire.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')),input=JSON.parse(message.content.slice(message.content.indexOf('\n')+1));
+  assert.equal(input.duration_seconds,15);
+  return Response.json({object:'response',id:'resp_mock_reel',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify({...brief,fact_ids:[input.brand.facts[0].id]}),annotations:[]}]}]});
+ }}));
+ // Every request the adapter sends to Runway is recorded exactly as serialized.
+ const sent=[],references=new Map(),tasks=new Map();let failSubmit=-1,submits=0;
+ const runway=new RunwayClient({mode:'test',secret:'fixture',referenceOrigins:['https://media.example.com']},async(url,init)=>{
+  const u=new URL(url);sent.push({method:init.method,path:u.pathname,body:init.body?JSON.parse(init.body):null});
+  if(u.pathname==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
+  if(u.pathname==='/v1/generate/video'){if(submits++===failSubmit)throw new TypeError('network lost after send');const id=randomUUID(),body=JSON.parse(init.body);tasks.set(id,body);return Response.json({id,dryRun:false,routing:{model:'gen4.5',provider:'runway',configId:body.configId,resolvedSettings:{optimizeFor:'quality',priceCeiling:10},estimatedCost:{credits:9}}});}
+  const id=u.pathname.split('/').pop();return Response.json({id,status:'SUCCEEDED',progress:1,output:['https://video.example.org/'+id+'.mp4']});
+ });
+ const bind=runway.withBudget.bind(runway);
+ runway.withBudget=(intent,cap)=>{const uri='https://media.example.com/'+intent.idempotencyKey;references.set(uri,intent.referenceURL);return bind({...intent,referenceURL:uri},cap);};
+ const provider=new VideoProviderJobs(jobs,runway,encryptionKey),creative=new CreativeJobs(jobs,new SkillRuntime(skillImage),text);
+ const downloader=new VideoDownload(['https://video.example.org'],{fetch:async()=>({status:200,headers:{'content-type':'video/mp4','content-length':String(clip.length)},bytes:clip})});
+ const pipeline=new VideoJobs(jobs,refs,creative,provider,downloader,new VideoRenderer(image));
+ const body={prompt:'Three-shot reel of our approved product',channel:'instagram',duration_seconds:15,shots:3,generate:true,creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},reference:{export_id:e.id,approval_id:approval.id,source_sha256:v.sha256,export_sha256:e.sha256,confirmed:true}};
+ assert.throws(()=>service.submit(alice.id,brand.id,thread,{...body,shots:6},randomUUID()),/2 to 5 shots/);
+ const key=randomUUID(),j=await service.submit(alice.id,brand.id,thread,body,key);assert.equal((await service.submit(alice.id,brand.id,thread,body,key)).id,j.id);
+ const shotRows=(await admin.query('SELECT s.*,j.status,j.kind FROM app.reel_shots s JOIN app.jobs j ON j.id=s.job_id WHERE s.parent_job_id=$1 ORDER BY shot_index',[j.id])).rows;
+ assert.deepEqual(shotRows.map(r=>[r.shot_index,r.duration_seconds,r.kind,r.status]),[[0,5,'creative.video','queued'],[1,5,'creative.video','queued'],[2,5,'creative.video','queued']]);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.job_dispatch WHERE job_id=ANY($1)',[shotRows.map(r=>r.job_id)])).rows[0].n,0);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.video_references WHERE job_id=ANY($1) AND export_sha256=$2',[shotRows.map(r=>r.job_id),e.sha256])).rows[0].n,3);
+ await assert.rejects(service.submit(alice.id,brand.id,thread,{...body,prompt:'Another'},randomUUID()),/running/);
+ // Shots are submitted one at a time: the next only after the previous clip is saved.
+ assert.equal(await pipeline.step(scope(j)),'accepted');assert.equal(submits,1);
+ assert.equal(await pipeline.step(scope(j)),'accepted');assert.equal(submits,2);
+ const mid=(await service.list(alice.id,brand.id)).runs.find(r=>r.id===j.id);assert.equal(mid.shot_count,3);assert.deepEqual(mid.shots.map(s=>s.saved),[true,false,false]);assert.ok(mid.provider_progress>0.3);
+ assert.equal(await pipeline.step(scope(j)),'accepted');assert.equal(submits,3);
+ assert.equal(await pipeline.step(scope(j)),'succeeded');assert.equal(submits,3);
+ // What Runway received: the exact approved per-shot prompt, full-resolution approved frame, 1080p, 9:16, 5 s, no audio.
+ const approved=(await admin.query('SELECT approved_brief FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0].approved_brief;
+ const expected=reelShots(approved,null,3,15),posts=sent.filter(r=>r.path==='/v1/generate/video');
+ assert.equal(posts.length,3);
+ for(const [i,post] of posts.entries()){
+  assert.deepEqual(Object.keys(post.body).sort(),['configId','input']);assert.equal(post.body.configId,'desvio-video-quality-v1-10');
+  assert.deepEqual({...post.body.input,referenceImages:undefined},{promptText:expected[i].prompt,duration:5,aspectRatio:'9:16',resolution:'1080p',audio:false,referenceImages:undefined});
+  assert.equal(post.body.input.referenceImages.length,1);assert.equal(post.body.input.referenceImages[0].role,'first');
+  assert.ok(post.body.input.promptText.startsWith(approved.video_prompt+'\n'));assert.ok(post.body.input.promptText.includes(approved.beats[i].action));
+ }
+ assert.equal(sent.filter(r=>r.method==='DELETE').length,0);
+ const versionId=(await admin.query('SELECT output_version_id FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0].output_version_id,version=await service.version(alice.id,brand.id,versionId);
+ assert.equal(version.width,1080);assert.equal(version.height,1920);assert.equal(version.duration_ms,17000);assert.equal(version.shot_count,3);
+ assert.equal(version.manifest.reel.shots.length,3);assert.deepEqual(version.manifest.reel.shots.map(s=>s.prompt),expected.map(s=>s.prompt));
+ assert.equal(version.manifest.end_card.headline,'Render fixtures');assert.deepEqual(version.manifest.audio,{bed:'silence',voiceover:null});assert.equal(version.manifest.metadata.fps,24);
+ assert.deepEqual(version.manifest.overlays,[{...brief.overlays[0]}]);
+ const row=(await admin.query('SELECT * FROM app.video_versions WHERE id=$1',[versionId])).rows[0];assert.equal(digest(await store.read(row.object_key,64*1024*1024)),row.sha256);
+ const saved=(await admin.query('SELECT s.sha256,j.status FROM app.reel_shots s JOIN app.jobs j ON j.id=s.job_id WHERE s.parent_job_id=$1 ORDER BY shot_index',[j.id])).rows;
+ assert.ok(saved.every(s=>s.sha256&&s.status==='succeeded'));
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.video_reference_leases WHERE job_id=ANY($1) AND state<>'revoked'",[shotRows.map(r=>r.job_id)])).rows[0].n,0);
+ for(const local of references.values())assert.equal((await fetch(local)).status,404);
+ assert.equal(await pipeline.step(scope(j)),'succeeded');assert.equal(submits,3);
+
+ // A lost paid response on shot two holds it unknown: shot three is never sent and nothing is resubmitted.
+ failSubmit=submits+1;const lost=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Second reel'},randomUUID());
+ assert.equal(await pipeline.step(scope(lost)),'accepted');assert.equal(await pipeline.step(scope(lost)),'unknown');
+ for(let i=0;i<2;i++)assert.equal(await pipeline.step(scope(lost)),'unknown');
+ assert.equal(submits,5);assert.equal((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[lost.id])).rows[0].status,'unknown');
+ const lostShots=(await admin.query('SELECT j.status FROM app.reel_shots s JOIN app.jobs j ON j.id=s.job_id WHERE s.parent_job_id=$1 ORDER BY shot_index',[lost.id])).rows.map(r=>r.status);
+ assert.deepEqual(lostShots,['succeeded','unknown','canceled']);
+});
+
 test('carousel is one immutable ordered composition; scoped reviewers approve exact canonical slides and edits invalidate it',async()=>{
  const {Carousels}=await import('../../dist/carousels.js'),service=new Carousels(canvas,renderer.image);
  const a=await fixture(),b=await fixture(),ea=await render(a),eb=await render(b);

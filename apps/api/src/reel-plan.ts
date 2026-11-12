@@ -101,3 +101,20 @@ export function reelSamples(shots:ReelShot[],captions:ReelCaption[],endCard:bool
 export function videoTarget(aspect:string|null|undefined):VideoTarget{
  return aspect==='square'?{width:1024,height:1024}:aspect==='landscape'?{width:1536,height:1024}:aspect==='portrait'?{width:1080,height:1350}:{width:1080,height:1920};
 }
+
+export type BrandPalette={caption:{foreground:string;background:string};card:{foreground:string;background:string}};
+const luminance=(hex:string):number=>{const [r,g,b]=[1,3,5].map(i=>parseInt(hex.slice(i,i+2),16)/255).map(c=>c<=0.03928?c/12.92:((c+0.055)/1.055)**2.4);return 0.2126*r!+0.7152*g!+0.0722*b!;};
+/** Caption and end-card colours from the approved brand colours. Captions stay legible: light text on
+ * the brand colour only when it is dark enough, otherwise on near-black. */
+export function brandPalette(facts:{field:string;value:string}[]):BrandPalette{
+ const hex=facts.filter(f=>f.field==='colors').flatMap(f=>f.value.match(/#[0-9a-f]{6}\b/gi)??[]).map(h=>h.toLowerCase());
+ const primary=hex[0]??'#111111',dark=luminance(primary)<0.18;
+ return {caption:{foreground:'#ffffff',background:dark?primary:'#111111'},card:{background:primary,foreground:luminance(primary)>0.4?'#111111':'#ffffff'}};
+}
+/** The brand's first named font, used to pick the renderer's serif or sans family. */
+export function brandFont(facts:{field:string;value:string}[]):string|null{
+ return facts.find(f=>f.field==='fonts')?.value??null;
+}
+export function brandName(facts:{field:string;value:string}[]):string{
+ return facts.find(f=>f.field==='brand_name')?.value.trim()||'';
+}
