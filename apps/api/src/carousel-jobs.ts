@@ -9,6 +9,7 @@ import {carouselFingerprint} from './carousels.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {assertLearningCurrent} from './learning-context.js';
 import {packForJob,promptKnowledge,type StoredKnowledge} from './knowledge-production.js';
+import {approvedDirection} from './image-direction.js';
 const terminal=new Set(['succeeded','rejected','failed','canceled','unknown']);
 export class CarouselJobs {
  constructor(readonly jobs:AssetJobs,readonly creative:CreativeJobs,readonly exporter:ExportJobs){}
@@ -39,10 +40,14 @@ export class CarouselJobs {
     validateCarouselInput(r.input);if(hash(canonicalJSON(r.input))!==r.input_sha256)throw new CreativeError('CAROUSEL_INPUT_CHANGED');await assertLearningCurrent(db,r.memory_context);
     const children=(await db.query('SELECT position,generation_job_id,export_job_id FROM app.carousel_children WHERE parent_job_id=$1 ORDER BY position',[j.id])).rows;if(children.length!==r.input.slide_count||children.some((c,i)=>c.position!==i))throw new CreativeError('CAROUSEL_CHILDREN_INVALID');
     const knowledge=r.plan?undefined:await this.knowledgeContext(db,j,r);
-    await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);return {...r,children,knowledge};
+    // The approved mood board is the creative direction. Only one locked before this request, so replays plan the same.
+    const board=r.plan?null:(await db.query('SELECT m.direction,m.feedback FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC,m.id LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0];
+    const direction=board?approvedDirection(board,String(r.input.prompt??'')):null;
+    await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);return {...r,children,knowledge,direction};
    });
    if(r.terminal)return {state:r.terminal};
-   const plan=r.plan??await this.creative.runtime.carouselPlan(r.input,message=>this.creative.planCall(scope,message,r,16000),r.knowledge?promptKnowledge(r.knowledge):undefined);validateCarouselResult(plan,r.input);
+   const plannerInput=r.direction?{...r.input,brand:{...r.input.brand,creative_direction:r.direction}}:r.input;
+   const plan=r.plan??await this.creative.runtime.carouselPlan(plannerInput,message=>this.creative.planCall(scope,message,r,16000),r.knowledge?promptKnowledge(r.knowledge):undefined);validateCarouselResult(plan,r.input);
    await this.jobs.transaction(scope,async(db,j)=>{const live=(await db.query('SELECT canceled FROM app.carousel_requests WHERE job_id=$1',[j.id])).rows[0];if(live.canceled||!await this.jobs.permitted(db,j))throw new CreativeError('CREATIVE_ACCESS_REVOKED');await db.query('UPDATE app.carousel_requests SET plan=$2 WHERE job_id=$1',[j.id,JSON.stringify(plan)]);});
    return {state:'ready',children:r.children};
   }catch(error){if(!(error instanceof CreativeError))throw error;return {state:await this.stop(scope,error.code==='CREATIVE_ACCESS_REVOKED'?'canceled':'rejected',error.code)};}
