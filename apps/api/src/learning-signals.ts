@@ -57,6 +57,8 @@ const THEMES:readonly [string,RegExp][]=[
 ];
 const FIELD_NAMES:Record<DiffField,string>={headline:'headlines',body:'body text',cta:'calls to action',caption:'captions',hook:'hooks'};
 type Dated={at:number};
+/** The database stamps signals with its own clock, which can run slightly ahead of this process. */
+const CLOCK_SKEW_MS=5*60*1000;
 type Tally={count:number;of:number;recent:number;last:number};
 const tally=(hits:Dated[],of:number,now:number):Tally=>({count:hits.length,of,recent:hits.filter(h=>now-h.at<=RECENT_DAYS*86400000).length,last:Math.max(...hits.map(h=>h.at))});
 const statement=(kind:PreferenceStatement['kind'],text:string,t:Tally,unit:string):PreferenceStatement=>({kind,statement:`${text}: ${t.count} of ${t.of} ${unit}`,count:t.count,of:t.of,recent:t.recent,last_seen:new Date(t.last).toISOString()});
@@ -66,7 +68,7 @@ type Parsed=Dated&{kind:SignalKind;reason:string;diff:SignalDiff;context:SignalC
 function parse(rows:readonly SignalRow[],now:number):Parsed[]{
  return rows.flatMap((row):Parsed[]=>{
   const at=row.created_at instanceof Date?row.created_at.getTime():Date.parse(String(row.created_at));
-  if(!Number.isFinite(at)||at>now||now-at>WINDOW_DAYS*86400000||!SIGNAL_KINDS.includes(row.kind as SignalKind))return [];
+  if(!Number.isFinite(at)||at>now+CLOCK_SKEW_MS||now-at>WINDOW_DAYS*86400000||!SIGNAL_KINDS.includes(row.kind as SignalKind))return [];
   return [{at,kind:row.kind as SignalKind,reason:clean(row.reason,SIGNAL_REASON_MAX),diff:signalDiff(row.diff),context:signalContext(row.context)}];
  });
 }
@@ -106,7 +108,7 @@ export function summariseSignals(rows:readonly SignalRow[],now:Date):PreferenceS
  return [...reasonStatements(signals,clock),...decisionStatements(signals,clock),...editStatements(signals,clock),...reworkStatements(signals,clock)]
   .sort((a,b)=>b.count-a.count||b.count/b.of-a.count/a.of||a.statement.localeCompare(b.statement)).slice(0,MAX_STATEMENTS);
 }
-export const recentSignalsSQL=`SELECT kind,reason,diff,context,created_at FROM app.creative_signals WHERE created_at>$1::timestamptz-interval '${WINDOW_DAYS} days' AND created_at<=$1 ORDER BY created_at DESC,id LIMIT 500`;
+export const recentSignalsSQL=`SELECT kind,reason,diff,context,created_at FROM app.creative_signals WHERE created_at>$1::timestamptz-interval '${WINDOW_DAYS} days' AND created_at<=$1::timestamptz+interval '5 minutes' ORDER BY created_at DESC,id LIMIT 500`;
 export async function signalSummary(db:Queryable,now:Date=new Date()):Promise<PreferenceStatement[]>{
  return summariseSignals((await db.query(recentSignalsSQL,[now.toISOString()])).rows as SignalRow[],now);
 }
