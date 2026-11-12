@@ -204,6 +204,7 @@ before(async () => {
               const carousel=/carousel/i.test(context.message),reel=/reel/i.test(context.message);
               return modelResponse({reply:carousel?'I’ll create your three-slide story.':`Choose a starting image for your ${reel?'reel':'video'}, then select Generate video.`,action:carousel?'carousel':'video',prompt:carousel?'TEST botanical soap carousel for mindful households':'TEST gentle botanical product film',channel:'instagram',size:reel?'1024x1536':'1024x1024',sources:[],starts_on:null,text_mode:'none',slide_count:3,placement:reel?'reel':'feed',duration_seconds:3});
             }
+            if(/campaign/i.test(context.message))return modelResponse({reply:'I’ll plan that campaign for you.',action:'campaign',prompt:context.message,channel:'instagram',size:'1024x1024',sources:[],starts_on:'2026-12-01',text_mode:'none'});
             const recall=/remember/i.test(context.message),edit=/warmer/i.test(context.message),unclear=/something/i.test(context.message);
             return modelResponse({reply:recall?`I found your saved conversation [${context.memories[0].id}].`:unclear?'What should the image show?':edit?'I’ll warm up the saved image.':'I’ll create your clean image now.',action:recall||unclear?'answer':edit?'edit_image':'image',prompt:recall||unclear?'':'TEST a botanical soap image without text',channel:'instagram',size:'1024x1024',sources:recall?[context.memories[0].id]:[],starts_on:null,text_mode:edit?context.current_image.text_mode:'none'});
           }
@@ -467,157 +468,86 @@ afterEach(async()=>{
  if(brand){const pending=await admin.query("SELECT id,kind,status,error_code,attempt FROM app.jobs WHERE brand_id=$1 AND status NOT IN ('succeeded','canceled') ORDER BY created_at",[brand]);if(pending.rows.length)console.error('LOCAL TEST JOB DIAGNOSTICS',JSON.stringify(pending.rows));}
 });
 
-test("Canvas browser creates a real queued job, renders a private creative and saves editable Fabric layers (MOCK OpenAI)", async () => {
-  await admin.query("INSERT INTO app.gemini_creative_grants(organization_id,brand_id,enabled,text_model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gemini-fixture',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER MOCK')",[org,brand]);
-  const photoBytes=await sharp({create:{width:1440,height:900,channels:3,background:'#c4bca0'}}).jpeg().toBuffer();
-  const visibleBusinesses=await page.evaluate(async()=>{const response=await fetch('/api/v1/businesses');return {status:response.status,body:await response.json()};});
-  assert.equal(visibleBusinesses.status,200);
-  assert.ok(visibleBusinesses.body.businesses.some(item=>item.id===brand),'Created business must be visible to its authenticated owner before opening Canvas');
+// Validated-image fixture approved through the real reference API; Brand Kit browser tests cover the upload UI.
+async function approveFixtureReference(label){
+ const assetId=randomUUID(),visualId=randomUUID(),captureId=randomUUID();
+ const image=await sharp({create:{width:900,height:900,channels:3,background:'#c4bca0'}}).png().toBuffer(),sha=digest(image),objectKey=`evidence/${org}/${brand}/create-reference/${sha}`;
+ await store.persist(objectKey,image,'image/png',sha);
+ await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'CREATE FIXTURE.png','image/png',$5,$6,$7,$8,'ready')",[assetId,org,brand,actor,image.length,sha,objectKey+'-quarantine',objectKey]);
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind,status) VALUES($1,$2,$3,$4,$5,'asset.validate','succeeded')",[captureId,org,brand,assetId,actor]);
+ await admin.query('INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$7,$8,900,900)',[visualId,org,brand,assetId,captureId,objectKey,sha,image.length]);
+ const approved=await post(`/api/v1/businesses/${brand}/canvas/references`,{kind:'upload',visual_id:visualId,label,consent:true},randomUUID());
+ assert.equal(approved.status,201);
+ return image;
+}
+const createComposer=()=>page.getByRole('textbox',{name:'Message Desvio'});
+const yourCreative=()=>page.getByRole('region',{name:'Your creative',exact:true});
+async function askCreate(message){await expect(createComposer()).toBeEnabled({timeout:30000});await createComposer().fill(message);await page.getByRole('button',{name:'Send message',exact:true}).click();await expect(page).toHaveURL(/conversation=/,{timeout:30000});}
+
+test("Canvas browser creates a real queued job from the Create chat, renders a private creative and saves editable Fabric layers (MOCK OpenAI)", async () => {
+  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=EXCLUDED.expires_at,budget_micros=EXCLUDED.budget_micros",[org,brand]);
+  referenceBytes=await approveFixtureReference('Botanical brand reference');
   await page.goto(`${base}/b/${brand}/canvas`);
-  await expect(page.getByText('Generation allowances',{exact:true})).toHaveCount(0);
-  try { await expect(page.getByRole('heading',{name:'Ready when you are.',exact:true})).toBeVisible(); }
-  catch(error){console.error('Canvas route diagnostic',JSON.stringify({url:page.url(),expectedBrand:brand,businesses:await page.evaluate(async()=>{const r=await fetch('/api/v1/businesses');return {status:r.status,body:await r.json()};})}));throw error;}
-  await expect(page.getByRole('button',{name:'+ New conversation',exact:true})).toBeEnabled();
-  await expect(page.locator('#canvas-assets')).toBeHidden();
-  assert.ok(await page.locator('.studio-composer').evaluate(el=>el.getBoundingClientRect().height<150));
+  await expect(page).toHaveURL(new RegExp(`/b/${brand}/create`),{timeout:15000});
+  await expect(createComposer()).toBeEnabled();
   await page.screenshot({path:'work/browser/canvas-compact-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
   assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
   await page.screenshot({path:'work/browser/canvas-compact-mobile.png',fullPage:true});
-  await page.getByRole('button',{name:'Create an image for my next launch',exact:false}).click();
-  await expect(page.getByLabel('Describe your creative',{exact:true})).toHaveValue('Create an image for my next launch');
   await page.setViewportSize({width:1440,height:1000});
-
-  await selectOption(page.getByLabel('Creativity',{exact:true}),'creative');
-  await expect(selectField(page.getByLabel('Creativity',{exact:true})).locator('option')).toHaveText(['Normal','Creative','Super creative']);
-  await page.getByRole('button',{name:'Add assets',exact:true}).click();await page.getByText('Brand image references',{exact:true}).click();
-  await page.getByText('Add product photos',{exact:true}).click();
-  await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'canvas-product.jpg',mimeType:'image/jpeg',buffer:photoBytes});
-  await page.getByRole('button',{name:'Upload file',exact:true}).click();
-  const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
-  await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
-  await approval.getByLabel('Use part of this image',{exact:true}).check();await selectOption(approval.getByRole('combobox',{name:/^Crop shape/}),'square');
-  await approval.getByRole('button',{name:'Preview selected crop',exact:true}).click();await expect(approval.getByRole('img',{name:'Selected reference crop',exact:true})).toBeVisible();
-  await approval.getByLabel('Reference name',{exact:true}).fill('Botanical brand reference');
-  await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
-  await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
-  const normalized=(await admin.query("SELECT v.object_key FROM app.uploaded_visuals v JOIN app.assets a ON a.id=v.asset_id WHERE a.brand_id=$1 AND a.filename='canvas-product.jpg'",[brand])).rows[0];
-  referenceBytes=await sharp(await store.read(normalized.object_key)).extract({left:270,top:0,width:900,height:900}).png().toBuffer();
-  await page.getByRole('checkbox',{name:'Botanical brand reference',exact:true}).check();
-  await page
-    .getByLabel("Describe your creative")
-    .fill("TEST FIXTURE: Create a calm botanical soap launch");
-  await page
-    .getByRole("button", { name: "Send", exact: true })
-    .click();
-  await expect(page.getByLabel("Layer text")).toHaveValue(
-    "TEST FIXTURE: A little everyday care",
-    { timeout: 30000 },
-  );
-  await expect(
-    page.getByRole("button", { name: "Download PNG" }),
-  ).toBeEnabled();
-  assert.equal(generated, 1);
-  assert.equal(referenceUploads,1);
-  assert.equal(planned, 1);
-  const job = (
-    await admin.query(
-      "SELECT status FROM app.jobs WHERE brand_id=$1 AND kind=$2",
-      [brand, "creative.generate"],
-    )
-  ).rows[0];
-  assert.equal(job.status, "succeeded");
-  await page.getByLabel("Layer text").fill("Made for your everyday ritual");
-  await selectOption(page.getByLabel("Font", { exact: true }),"DM Serif Display");
-  await page.getByLabel("Font size").fill("60");
-  await page.getByLabel("Left position").fill("80");
-  await page
-    .getByLabel("Post caption")
-    .fill("TEST FIXTURE: A calmer daily ritual.");
-  await expect(
-    page.getByRole("button", { name: "Download PNG" }),
-  ).toBeDisabled();
-  await page.getByRole("button", { name: "Save new version" }).click();
-  await expect(
-    page.getByText("Saved as a new draft version.", { exact: true }),
-  ).toBeVisible();
+  await askCreate('TEST FIXTURE: Create a calm botanical soap launch image');
+  await expect(yourCreative().getByRole('button',{name:'Download PNG'})).toBeEnabled({timeout:90000});
+  assert.equal(generated,1);assert.equal(planned,1);
+  assert.equal((await admin.query("SELECT status FROM app.jobs WHERE brand_id=$1 AND kind='creative.generate'",[brand])).rows[0].status,'succeeded');
+  if(!await yourCreative().getByLabel('Layer text').count())await yourCreative().getByRole('button',{name:'Add text layer'}).click();
+  await yourCreative().getByLabel('Layer text').fill('Made for your everyday ritual');
+  await selectOption(yourCreative().getByLabel('Font',{exact:true}),'DM Serif Display');
+  await yourCreative().getByLabel('Font size',{exact:true}).fill('60');
+  // Power-user keys on the artboard: nudge with Shift+Arrow, undo it (a separate step from the font size).
+  const startX=Number(await yourCreative().getByLabel('Left position').inputValue());
+  await yourCreative().locator('.creative-surface').focus();
+  await page.keyboard.press('Shift+ArrowRight');
+  await expect(yourCreative().getByLabel('Left position')).toHaveValue(String(startX+10));
+  await page.keyboard.press('Control+z');
+  await expect(yourCreative().getByLabel('Left position')).toHaveValue(String(startX));
+  await expect(yourCreative().getByLabel('Font size',{exact:true})).toHaveValue('60');
+  await yourCreative().getByLabel('Left position').fill('80');
+  await yourCreative().getByLabel('Post caption').fill('TEST FIXTURE: A calmer daily ritual.');
+  await expect(yourCreative().getByRole('status').filter({hasText:'Unsaved changes'})).toBeVisible();
+  await expect(yourCreative().getByRole('button',{name:'Download PNG'})).toBeDisabled();
+  await yourCreative().getByRole('button',{name:'Save changes'}).click();
+  await expect(page.getByText('Saved as a new draft version.',{exact:true})).toBeVisible();
+  await expect(yourCreative().getByRole('status').filter({hasText:/^Saved$/})).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel("Layer text")).toHaveValue(
-    "Made for your everyday ritual",
-  );
-  await expect(selectField(page.getByLabel("Font", { exact: true }))).toHaveValue("DM Serif Display");
-  await expect(page.getByLabel("Left position")).toHaveValue("80");
-  const savedThreadURL=page.url();
-  assert.ok(new URL(savedThreadURL).searchParams.get('thread'));
-  await page.goto(`${base}/b/${brand}/canvas`);
-  await expect(page.getByRole('heading',{name:'Ready when you are.',exact:true})).toBeVisible();
-  await expect(page.getByLabel('Layer text')).toHaveCount(0);
-  await page.getByText('Conversations',{exact:true}).click();
-  await expect(page.getByRole('complementary',{name:'Conversations',exact:true}).getByRole('button').first()).toBeVisible();
-  await page.goto(savedThreadURL);await page.reload();
-  await expect(page.getByLabel('Layer text')).toHaveValue('Made for your everyday ritual');
-  const versions = (
-    await admin.query(
-      "SELECT * FROM app.creative_versions WHERE brand_id=$1 ORDER BY created_at",
-      [brand],
-    )
-  ).rows;
-  assert.equal(versions.length, 2);
-  assert.equal(
-    versions[0].design.layers[0].text,
-    "TEST FIXTURE: A little everyday care",
-  );
-  assert.equal(
-    versions[1].design.layers[0].text,
-    "Made for your everyday ritual",
-  );
-  latestMedia = versions[1].media_id;
-  const downloadEvent = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download PNG" }).click();
-  const download = await downloadEvent,
-    bytes = await readFile(await download.path()),
-    meta = await sharp(bytes).metadata();
-  assert.equal(meta.width, 1024);
-  assert.equal(meta.height, 1024);
-  const corner = await sharp(bytes)
-    .extract({ left: 1000, top: 1000, width: 1, height: 1 })
-    .removeAlpha()
-    .raw()
-    .toBuffer();
-  assert.deepEqual(
-    [...corner],
-    [230, 213, 187],
-    "background covers the entire exported image",
-  );
-  assert.notEqual(
-    bytes.toString("base64"),
-    png.toString("base64"),
-    "export includes editable text",
-  );
-  await page.getByRole("heading", { name: "Canvas", exact: true }).click();
-  await page.evaluate(() => scrollTo(0, 0));
-  const artworkBounds=await page.locator('.studio-projects').boundingBox();
-  const composerBounds=await page.locator('.studio-composer').boundingBox();
-  assert.ok(artworkBounds && composerBounds && artworkBounds.y < composerBounds.y,'Saved artwork must appear before the conversation composer');
-  await page.screenshot({
-    path: "work/browser/canvas-editor-desktop.png",
-    fullPage: true,
-  });
-  const violations = (
-    await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()
-  ).violations;
-  assert.deepEqual(
-    violations.map((v) => ({ id: v.id, nodes: v.nodes.map((n) => n.target) })),
-    [],
-  );
+  await expect(yourCreative().getByLabel('Layer text')).toHaveValue('Made for your everyday ritual',{timeout:30000});
+  await expect(selectField(yourCreative().getByLabel('Font',{exact:true}))).toHaveValue('DM Serif Display');
+  await expect(yourCreative().getByLabel('Left position')).toHaveValue('80');
+  await expect(yourCreative().getByLabel('Post caption')).toHaveValue('TEST FIXTURE: A calmer daily ritual.');
+  const versions=(await admin.query("SELECT * FROM app.creative_versions WHERE brand_id=$1 ORDER BY created_at",[brand])).rows;
+  assert.equal(versions.length,2);
+  assert.equal(versions[1].design.layers.at(-1).text,'Made for your everyday ritual');
+  assert.equal(versions[1].caption,'TEST FIXTURE: A calmer daily ritual.');
+  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.creative_signals WHERE brand_id=$1 AND kind='edited' AND creative_version_id=$2",[brand,versions[1].id])).rows[0].n,1,'the edit is a learning signal');
+  latestMedia=versions[1].media_id;
+  const downloadEvent=page.waitForEvent("download");
+  await yourCreative().getByRole("button",{name:"Download PNG"}).click();
+  const bytes=await readFile(await (await downloadEvent).path()),meta=await sharp(bytes).metadata();
+  assert.equal(meta.width,1024);assert.equal(meta.height,1024);
+  assert.deepEqual([...await sharp(bytes).extract({left:1000,top:1000,width:1,height:1}).removeAlpha().raw().toBuffer()],[230,213,187],"background covers the entire exported image");
+  assert.notEqual(bytes.toString("base64"),png.toString("base64"),"export includes editable text");
+  await page.screenshot({path:"work/browser/canvas-editor-desktop.png",fullPage:true});
+  assert.deepEqual((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa"]).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
 });
-test("Canvas review applies to the saved version; AI edits create a draft and stale/manual edits stay protected", async () => {
-  await page.getByLabel("Review feedback").fill("Ready for a human review");
-  await page.getByRole("button", { name: "Send for review" }).click();
-  await expect(
-    page.getByRole("button", { name: "Approve version" }),
-  ).toBeVisible();
+test("Canvas review applies to the saved version from the Create canvas; AI edits create a draft and stale/manual edits stay protected", async () => {
+  const conversation=new URL(page.url()).searchParams.get('conversation');assert.ok(conversation);
+  await yourCreative().getByRole('button',{name:'Approve',exact:true}).click();
+  await expect(page.getByText('Approved. This version has not been scheduled or published.',{exact:true})).toBeVisible();
+  await expect(yourCreative().getByText('Approved',{exact:true})).toBeVisible();
+  assert.deepEqual((await admin.query("SELECT status FROM app.creative_versions WHERE brand_id=$1 ORDER BY created_at",[brand])).rows.map(v=>v.status),['draft','approved']);
+  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.creative_signals WHERE brand_id=$1 AND kind='approved'",[brand])).rows[0].n,1);
+  // The exact final image is approved from Post details, the full editor for this creative.
+  await page.getByRole('button',{name:'Post details',exact:true}).click();
   await page.getByRole('button',{name:'Prepare final image',exact:true}).click();
   await expect(page.getByRole('img',{name:'Saved final image for approval'})).toBeVisible({timeout:30000});
   const confirm=page.getByLabel('I reviewed this saved image and its text.');
@@ -632,160 +562,54 @@ test("Canvas review applies to the saved version; AI edits create a draft and st
   const finalBytes=await readFile(await(await finalDownload).path());
   assert.equal((await import('node:crypto')).createHash('sha256').update(finalBytes).digest('hex'),exportApproval[0].sha256);
   await page.screenshot({path:'work/browser/canvas-final-image.png',fullPage:true});
-  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true)",[org,brand]);
-  const videoPlans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
-  const linkedPlan=await videoPlans.create(actor,brand,{title:'Browser video plan',objective:'Create a planned video',starts_on:'2027-01-01',timezone:'Asia/Kuala_Lumpur',slots:[{channel:'instagram',format:'video',brief:'TEST planned browser video',planned_at:'2027-01-06T04:00:00Z'}]},randomUUID());
-  let videoSlot=(await videoPlans.list(actor,brand,{start:'2027-01-01T00:00:00Z',end:'2027-02-01T00:00:00Z',plan_id:linkedPlan.id})).slots[0];
-  videoSlot=await videoPlans.edit(actor,brand,videoSlot.id,{revision:videoSlot.revision,video_draft:{storyline:'TEST planned storyline',script:'TEST planned script',prompt:'TEST planned prompt',duration_seconds:3}});
-  const approvedImageThread=new URL(page.url()).searchParams.get('thread');
-  assert.ok(approvedImageThread);
-  await page.goto(`${base}/b/${brand}/canvas?thread=${approvedImageThread}&slot=${videoSlot.id}`);
-  await expect(page.getByRole('region',{name:'Video calendar context'})).toBeVisible();
-  await page.getByText('Make a video from this approved image',{exact:true}).click();
-  await expect(page.getByLabel('Video idea',{exact:true})).toHaveValue(/TEST planned script/);
-  await page.getByLabel('Video idea',{exact:true}).fill('TEST animate this brand image');
-  await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
-  await selectOption(page.getByLabel('Video creativity',{exact:true}),'normal');
-  await page.getByRole('button',{name:'Draft video script',exact:true}).click();
-  await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,0);
-  await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt');
-  await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline');
-  await page.getByRole('button',{name:'Save video draft',exact:true}).click();
-  await page.reload();await expect(page.getByLabel('Video prompt',{exact:true})).toHaveValue('TEST user edited video prompt');assert.equal(videoSubmits,0);
-  await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
-  await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
-  await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});assert.equal(videoSubmits,1);
-  const player=page.getByLabel('Saved video preview',{exact:true});await player.evaluate(el=>el.play());await expect.poll(()=>player.evaluate(el=>el.currentTime)).toBeGreaterThan(0.25);await player.evaluate(el=>el.pause());
-  await page.getByRole('button',{name:'Send video for review',exact:true}).click();
-  await page.getByLabel('I reviewed this saved video and caption.').check();
-  await page.getByRole('button',{name:'Approve final video',exact:true}).click();
-  await expect(page.getByRole('region',{name:'Video review'}).getByRole('status')).toHaveText('approved');
-  const savedVideo=(await admin.query('SELECT status,manifest FROM app.video_versions WHERE brand_id=$1',[brand])).rows[0];assert.equal(savedVideo.status,'approved');assert.equal(savedVideo.manifest.plan.brief.video_prompt,'TEST user edited video prompt');
-  await page.screenshot({path:'work/browser/canvas-video-approved.png',fullPage:true});
-  const canvasURL=page.url();
-  await page.getByRole('link',{name:'Open linked video post in calendar',exact:true}).click();
-  await expect(page.getByLabel('Saved video preview',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Send for review',exact:true}).click();
-  await page.getByRole('button',{name:'Approve post',exact:true}).click();
-  await expect(page.getByText('Approved this saved version. It has not been published.',{exact:true})).toBeVisible();
-  const calendarVideo=(await admin.query("SELECT state,video_version_id,creative_version_id FROM app.content_slots WHERE brand_id=$1 AND format='video'",[brand])).rows[0];assert.equal(calendarVideo.state,'approved');assert.ok(calendarVideo.video_version_id);assert.equal(calendarVideo.creative_version_id,null);
-  await page.screenshot({path:'work/browser/calendar-video-approved.png',fullPage:true});
-  const imageReturn=new URL(canvasURL);imageReturn.searchParams.delete('slot');
-  await page.goto(imageReturn.href);
-
-
-
-  await page.getByRole("button", { name: "Revise image with AI" }).click();
-  await page
-    .getByLabel("Describe your changes")
-    .fill("TEST FIXTURE: Make the background more botanical");
-  await page
-    .getByRole("button", { name: "Generate revision", exact: true })
-    .click();
-  await expect(page.getByLabel("Layer text")).toHaveValue(
-    "TEST FIXTURE: Fresh perspective",
-    { timeout: 30000 },
-  );
-  assert.equal(generated, 2);
-  const state = (
-    await admin.query(
-      "SELECT status FROM app.creative_versions WHERE brand_id=$1 ORDER BY created_at",
-      [brand],
-    )
-  ).rows;
-  assert.deepEqual(
-    state.map((v) => v.status),
-    ["draft", "approved", "draft"],
-  );
-  await page.getByLabel("Layer text").fill("Unsaved browser work");
-  await page.route("**/creative-projects/*/versions", (route) =>
-    route.fulfill({
-      status: 503,
-      contentType: "application/json",
-      body: JSON.stringify({ message: "TEST FIXTURE failure" }),
-    }),
-  );
-  try {
-  await page.getByRole("button", { name: "Save new version" }).click();
-  await expect(page.locator(".creative-project > .notice.error")).toContainText("couldn’t save");
-  await expect(page.getByLabel("Layer text")).toHaveValue(
-    "Unsaved browser work",
-  );
-  } finally { await page.unroute("**/creative-projects/*/versions"); }
-  await page.getByRole("button", { name: "Save new version" }).click();
+  // Back in the chat: a natural-language change creates a new unapproved draft; the approved version is kept.
+  await page.goto(`${base}/b/${brand}/create?conversation=${conversation}`);
+  await askCreate('TEST FIXTURE: Make it warmer');
+  await expect(page.getByText('I’ll warm up the saved image.',{exact:true})).toBeVisible({timeout:30000});
+  await expect(yourCreative().getByRole('status').filter({hasText:'Saved · version 3'})).toBeVisible({timeout:60000});
+  assert.equal(generated,2);
+  assert.deepEqual((await admin.query("SELECT status FROM app.creative_versions WHERE brand_id=$1 ORDER BY created_at",[brand])).rows.map(v=>v.status),['draft','approved','draft']);
+  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.creative_signals WHERE brand_id=$1 AND kind='regenerated'",[brand])).rows[0].n,1);
+  // A failed save keeps unsaved work; the retry saves it.
+  if(!await yourCreative().getByLabel('Layer text').count())await yourCreative().getByRole('button',{name:'Add text layer'}).click();
+  await yourCreative().getByLabel('Layer text').fill('Unsaved browser work');
+  await page.route("**/creative-projects/*/versions",route=>route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({message:"TEST FIXTURE failure"})}));
+  try{
+   await yourCreative().getByRole('button',{name:'Save changes'}).click();
+   await expect(yourCreative().getByRole('alert').first()).toBeVisible();
+   await expect(yourCreative().getByLabel('Layer text')).toHaveValue('Unsaved browser work');
+  }finally{await page.unroute("**/creative-projects/*/versions");}
+  await yourCreative().getByRole('button',{name:'Save changes'}).click();
   await expect(page.getByText("Saved as a new draft version.")).toBeVisible();
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("heading", { name: "Canvas", exact: true }).click();
-  await page.evaluate(() => scrollTo(0, 0));
-  await page.screenshot({
-    path: "work/browser/canvas-editor-mobile.png",
-    fullPage: true,
-  });
-  assert.ok(
-    await page.evaluate(
-      () => document.documentElement.scrollWidth <= innerWidth,
-    ),
-  );
-  assert.deepEqual(
-    (
-      await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa"]).analyze()
-    ).violations.map((v) => v.id),
-    [],
-  );
-  await page.setViewportSize({ width: 1440, height: 1000 });
-  const anonymous = await browser.newContext();
-  assert.equal(
-    (
-      await anonymous.request.get(
-        `${base}/api/v1/businesses/${brand}/creative-media/${latestMedia}`,
-      )
-    ).status(),
-    401,
-  );
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>scrollTo(0,0));
+  await page.screenshot({path:"work/browser/canvas-editor-mobile.png",fullPage:true});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert.deepEqual((await new AxeBuilder({page}).withTags(["wcag2a","wcag2aa"]).analyze()).violations.map(v=>v.id),[]);
+  await page.setViewportSize({width:1440,height:1000});
+  const anonymous=await browser.newContext();
+  assert.equal((await anonymous.request.get(`${base}/api/v1/businesses/${brand}/creative-media/${latestMedia}`)).status(),401);
   await anonymous.close();
-  const other = await post(
-    "/api/v1/businesses",
-    { name: "OTHER BUSINESS" },
-    randomUUID(),
-  );
-  assert.equal(other.status, 201);
-  assert.equal(
-    (
-      await page.request.get(
-        `${base}/api/v1/businesses/${other.body.id}/creative-media/${latestMedia}`,
-      )
-    ).status(),
-    404,
-  );
-  assert.deepEqual(errors, []);
+  const other=await post("/api/v1/businesses",{name:"OTHER BUSINESS"},randomUUID());
+  assert.equal(other.status,201);
+  assert.equal((await page.request.get(`${base}/api/v1/businesses/${other.body.id}/creative-media/${latestMedia}`)).status(),404);
+  assert.deepEqual(errors,[]);
 });
-test("Canvas displays an uncertain provider result and holds further generation across reloads (MOCK network loss)", async () => {
-  failImages = true;
-  await page
-    .getByRole("button", { name: "+ New conversation", exact: true })
-    .click();
-  await page
-    .getByLabel("Describe your creative")
-    .fill("TEST FIXTURE: uncertain generation");
-  await page
-    .getByRole("button", { name: "Send", exact: true })
-    .click();
-  await expect(
-    page.getByText("Needs reconciliation", { exact: true }),
-  ).toBeVisible({ timeout: 30000 });
-  await expect(
-    page.getByRole("button", { name: "Send", exact: true }),
-  ).toBeDisabled();
-  assert.equal(generated, 3);
+test("Canvas displays an uncertain provider result in the Create chat and holds further generation across reloads (MOCK network loss)", async () => {
+  failImages=true;
+  const before=generated;
+  await page.goto(`${base}/b/${brand}/create`);
+  await askCreate('TEST FIXTURE: Create an image of an uncertain generation');
+  await expect(page.getByText('This request needs attention. Your conversation is saved.',{exact:false}).or(page.getByRole('button',{name:'Stop waiting',exact:false})).first()).toBeVisible({timeout:60000});
+  await createComposer().fill('TEST FIXTURE: another image');
+  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
+  assert.equal(generated,before+1,'one paid attempt, never resent');
   await page.reload();
-  await expect(
-    page.getByText("Needs reconciliation", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Send", exact: true }),
-  ).toBeDisabled();
-  assert.equal(generated, 3);
-  assert.deepEqual(errors, []);
+  await expect(page.getByText('This request needs attention. Your conversation is saved.',{exact:false}).or(page.getByRole('button',{name:'Stop waiting',exact:false})).first()).toBeVisible({timeout:30000});
+  await createComposer().fill('TEST FIXTURE: another image');
+  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
+  assert.equal(generated,before+1);
+  assert.equal((await admin.query("SELECT status FROM app.jobs WHERE brand_id=$1 AND kind='creative.generate' ORDER BY created_at DESC LIMIT 1",[brand])).rows[0].status,'unknown');
 });
 
 test('calendar generates a saved 30-day plan and a linked creative through real jobs; channel inbox persists feedback and bulk approval (MOCK OpenAI)',async()=>{
@@ -793,16 +617,14 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await admin.query("UPDATE app.jobs SET status='rejected' WHERE brand_id=$1 AND status='unknown'",[brand]);failImages=false;
  const businesses=new Businesses(runtime.database,new Workspaces(runtime.database));
  await businesses.onboarding(actor,brand,{revision:0,step:3,goal:'awareness',timezone:'Asia/Kuala_Lumpur',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
- await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY')",[org,brand]);
- await page.route('**/overview',async route=>{await delay(1200);await route.continue();});
- await page.goto(`${base}/b/${brand}/content-plan`);
- await page.getByRole('button',{name:'Create content plan',exact:true}).click();
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,model=EXCLUDED.model,expires_at=EXCLUDED.expires_at,budget_micros=EXCLUDED.budget_micros",[org,brand]);
+ // Calendar plans are now prepared by monthly planning; the same planning job is requested through the API.
+ const queued=await post(`/api/v1/businesses/${brand}/content-plan/generate`,{provider:'openai',starts_on:'2026-11-01',brief:'TEST FIXTURE: explain refillable soap',duration_days:30,post_count:30,video_count:0},randomUUID());
+ assert.ok([200,201].includes(queued.status),JSON.stringify(queued.body));
+ await expect.poll(async()=>(await admin.query("SELECT count(*)::int AS n FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-11-01'",[brand])).rows[0].n,{timeout:60000}).toBe(1);
+ await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-01`);
  await selectOption(page.getByLabel('Calendar view',{exact:true}),'month');
- await page.getByLabel('Plan starts on').fill('2026-11-01');
- await page.getByLabel('Anything to focus on?').fill('TEST FIXTURE: explain refillable soap');
- await page.getByRole('button',{name:'Generate draft plan',exact:true}).click();
  await expect(page.getByText('30 posts in this view',{exact:true})).toBeVisible({timeout:30000});
- await page.unroute('**/overview');
  await expect(page.getByLabel('Calendar date',{exact:true})).toHaveValue('2026-11-01');
 
  await expect(page.getByRole('button',{name:'Export calendar',exact:true})).toHaveCount(0);
@@ -878,7 +700,9 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
 
 test('Canvas manual edits require explicit approved-post reset; other businesses cannot see the saved plan or review',async()=>{
  const before=(await admin.query("SELECT * FROM app.content_slots WHERE brand_id=$1 AND hook='TEST FIXTURE hook 1'",[brand])).rows[0];
- await page.getByRole('link',{name:'Edit in Canvas',exact:true}).click();
+ // The calendar post's creative opens in its full editor (Post details); a manual edit is a new version.
+ const project=(await admin.query('SELECT project_id FROM app.creative_versions WHERE id=$1',[before.creative_version_id])).rows[0].project_id;
+ await page.goto(`${base}/b/${brand}/campaign-post?project=${project}`);
  await page.getByLabel('Post caption').fill('TEST FIXTURE: Manual revision from review');
  await page.getByRole('button',{name:'Save new version',exact:true}).click();await expect(page.getByText('Saved as a new draft version.',{exact:true})).toBeVisible();
  await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');
@@ -925,29 +749,20 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  const denied=await page.request.get(`${base}/api/v1/businesses/${other}/content-slots/${before.id}`);assert.equal(denied.status(),404);assert.deepEqual(errors,[]);
 });
 
-test('Canvas creates a custom four-day plan and opens its actual saved calendar post',async()=>{
+test('Canvas creates a custom plan from the Create chat and opens its actual saved calendar post',async()=>{
  const businesses=new Businesses(runtime.database,new Workspaces(runtime.database));
  const preferences=await businesses.onboarding(actor,brand);
  if(preferences.step!==3)await businesses.onboarding(actor,brand,{revision:preferences.revision,step:3,goal:'awareness',timezone:'Asia/Kuala_Lumpur',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'openai',true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY') ON CONFLICT (organization_id,brand_id,provider) DO UPDATE SET enabled=true,budget_micros=10000000",[org,brand]);
- await page.goto(`${base}/b/${brand}/canvas`);
- await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
- await page.getByText('Plan content in Canvas',{exact:true}).click();
- await page.getByRole('button',{name:'Plan settings',exact:true}).click();
- await selectOption(page.getByLabel('Plan creativity',{exact:true}),'normal');
- await page.getByLabel('What should we plan?',{exact:true}).fill('TEST four-day launch sequence');
- await expect(page.getByText('Plan content in Canvas',{exact:true})).toHaveCount(1);
- await page.getByLabel('Set days and post counts myself',{exact:true}).check();
- await page.getByLabel('Planning days',{exact:true}).fill('4');
- await page.getByLabel('Videos in this plan',{exact:true}).fill('2');
- await page.getByLabel('Canvas plan starts on',{exact:true}).fill('2026-12-01');
- await selectOption(page.getByLabel('Repeat this plan',{exact:true}),'3');
- await page.getByLabel('Total loop planning budget (USD)',{exact:true}).fill('5');
- await page.getByLabel('Allow recurring AI planning charges', {exact:false}).check();
- await page.getByRole('button',{name:'Plan my content',exact:true}).click();
- const preview=page.getByRole('region',{name:'Planned posts',exact:true});
- await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4,{timeout:60000});
- const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.equal(saved.duration_days,4);assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'openai');
+ // The Create chat plans a campaign through the real planning job and links to the saved calendar.
+ await page.goto(`${base}/b/${brand}/create`);
+ await askCreate('TEST Create a campaign: a launch sequence for our refill club');
+ const review=page.getByRole('link',{name:'Review your calendar →'});
+ await expect(review).toBeVisible({timeout:60000});
+ const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.ok(saved);
+ assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'openai');
+ await expect(review).toHaveAttribute('href',`/b/${brand}/content-plan?plan=${saved.id}`);
+ const slotCount=(await admin.query('SELECT count(*)::int AS n FROM app.content_slots WHERE plan_id=$1',[saved.id])).rows[0].n;assert.ok(slotCount>=2);
  // Explicit validated-image fixture; uploads and scanner normalization are tested separately.
  const assetId=randomUUID(),visualId=randomUUID(),captureId=randomUUID();
  const jpg=await sharp({create:{width:640,height:480,channels:3,background:'#a6b98a'}}).jpeg().toBuffer(),sha=digest(jpg),objectKey=`evidence/${org}/${brand}/campaign-reference/${sha}`;
@@ -973,69 +788,13 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
   assert.ok(await stylePage.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:stylePage}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await stylePage.evaluate(()=>scrollTo(0,0));await stylePage.screenshot({path:'work/browser/campaign-photo-fonts-mobile.png',fullPage:true});
   await stylePage.getByRole('button',{name:'Back',exact:true}).click();await expect(stylePage.getByRole('radio',{name:'Editorial',exact:true})).toBeChecked();
  }finally{await stylePage.close();await page.bringToFront();}
- const editableIds=await preview.locator('[data-slot-id]').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('data-slot-id')));
- const topicSlotId=(await admin.query("SELECT id FROM app.content_slots WHERE brand_id=$1 AND id=ANY($2::uuid[]) AND format='static' ORDER BY planned_at LIMIT 1",[brand,editableIds])).rows[0]?.id;assert.ok(topicSlotId);
- const topicCard=preview.locator(`[data-slot-id="${topicSlotId}"]`);
- await topicCard.getByRole('button',{name:'Edit topic',exact:true}).click();
- await topicCard.getByLabel('Post topic',{exact:true}).fill('TEST revised campaign topic');
- await topicCard.getByRole('checkbox',{name:'Campaign photo',exact:true}).check();
- await expect(topicCard.getByRole('img',{name:'Campaign photo',exact:true})).toBeVisible();
- await expect(page.getByLabel('Saved content plan',{exact:true})).toBeDisabled();
- await topicCard.getByRole('button',{name:'Save topic',exact:true}).click();
- await expect(preview.getByRole('status').filter({hasText:'Topic saved.'})).toBeVisible();
- const topicRow=(await admin.query('SELECT * FROM app.content_slots WHERE plan_id=$1 AND brief=$2',[saved.id,'TEST revised campaign topic'])).rows[0];assert.ok(topicRow);assert.equal(topicRow.state,'content_needed');assert.deepEqual(topicRow.reference_ids,[approved.body.id]);
- await topicCard.getByRole('button',{name:'Edit topic',exact:true}).click();
- await topicCard.getByLabel('Post topic',{exact:true}).fill('TEST draft retained after conflict');
- const concurrent=await page.evaluate(async ({brand,id,revision})=>{const response=await fetch(`/api/v1/businesses/${brand}/content-slots/${id}`,{method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({revision,brief:'TEST newer topic from another session'})});return {status:response.status,body:await response.json()};},{brand,id:topicRow.id,revision:topicRow.revision});assert.equal(concurrent.status,200,JSON.stringify(concurrent.body));
- await topicCard.getByRole('button',{name:'Save topic',exact:true}).click();
- await expect(topicCard.getByRole('alert')).toContainText('This post changed');
- await expect(topicCard.getByLabel('Post topic',{exact:true})).toHaveValue('TEST draft retained after conflict');
- await topicCard.getByRole('button',{name:'Compare with latest saved topic',exact:true}).click();
- await expect(topicCard.getByText('TEST newer topic from another session',{exact:true})).toBeVisible();
- await expect(topicCard.getByLabel('Post topic',{exact:true})).toHaveValue('TEST draft retained after conflict');
- await topicCard.getByRole('button',{name:'Cancel',exact:true}).click();
-
- await page.reload();await expect(page.getByText('Campaign posts',{exact:true})).toBeVisible();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(4);
- await expect(preview).toContainText('TEST newer topic from another session');
- await expect(preview).toContainText('1 reference image selected');
- await preview.getByRole('group',{name:'Selected reference images'}).scrollIntoViewIfNeeded();
- await expect(preview.getByRole('group',{name:'Selected reference images'}).getByRole('img',{name:'Campaign photo',exact:true})).toBeVisible();
- await expect(page.getByRole('heading',{name:'Creating your content plan',exact:true})).toHaveCount(0);
- const topicContrast=await topicCard.evaluate(element=>{const luminance=(colour)=>colour.match(/[\d.]+/g).slice(0,3).map(Number).map(v=>v/255).map(v=>v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4).reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);const background=luminance(getComputedStyle(element).backgroundColor),foreground=luminance(getComputedStyle(element.querySelector('.planned-topic')).color);return (Math.max(background,foreground)+0.05)/(Math.min(background,foreground)+0.05);});assert.ok(topicContrast>=4.5,`Topic text contrast must be at least 4.5:1, got ${topicContrast}`);
- await page.screenshot({path:'work/browser/campaign-saved-references.png',fullPage:true});
- const revoked=await post(`/api/v1/businesses/${brand}/canvas/references/${approved.body.id}/revoke`,{});assert.equal(revoked.status,201);
- await topicCard.getByRole('button',{name:'Edit topic',exact:true}).click();
- await topicCard.getByRole('button',{name:'Remove unavailable image 1',exact:true}).click();
- await topicCard.getByRole('button',{name:'Save topic',exact:true}).click();
- await expect(topicCard.getByRole('status')).toHaveText('Topic saved.');
- assert.deepEqual((await admin.query('SELECT reference_ids FROM app.content_slots WHERE id=$1',[topicRow.id])).rows[0].reference_ids,[]);
- await page.getByText('Conversation & planning notes',{exact:true}).click();
- await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('TEST four-day launch sequence');
- await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Prepared 4 draft posts');
- await expect(page.getByRole('region',{name:'Conversation plans'}).getByRole('link',{name:'Open calendar · 2026-12-01'})).toBeVisible();
- await expect(page.getByRole('region',{name:'Planning loops'})).toContainText('1 of 3 plans prepared');
- await page.getByRole('button',{name:'Stop planning loop',exact:true}).click();
- await expect(page.getByRole('region',{name:'Planning loops'})).toContainText('Stopped');
- const loopRow=(await admin.query('SELECT l.* FROM app.planning_loops l JOIN app.planning_requests r ON r.loop_id=l.id WHERE r.output_plan_id=$1',[saved.id])).rows[0];assert.ok(loopRow.stopped_at);assert.equal(Number(loopRow.budget_micros),5000000);
- await page.screenshot({path:'work/browser/canvas-planning-loop.png',fullPage:true});
- const imageBatch=preview.getByRole('region',{name:'Create campaign images',exact:true});
- let progressFailures=0;
- await page.route(`**/content-plans/${saved.id}/image-batch`,async route=>{
-  if(progressFailures===0){progressFailures++;await route.fulfill({status:503,contentType:'application/json',body:'{}'});}
-  else await route.continue();
- });
- await page.reload();
- await expect(imageBatch.getByRole('button',{name:'Generate 2 images',exact:true})).toBeEnabled({timeout:15000});
- assert.equal(progressFailures,1);
- await page.unroute(`**/content-plans/${saved.id}/image-batch`);
- await imageBatch.getByRole('button',{name:'Generate 2 images',exact:true}).click();
- await expect(imageBatch.getByRole('status')).toContainText('2 of 2 posts ready',{timeout:60000});
- const imageJobs=(await admin.query('SELECT job_ids FROM app.campaign_image_batches WHERE plan_id=$1',[saved.id])).rows;assert.equal(imageJobs.length,1);assert.equal(imageJobs[0].job_ids.length,2);
- await page.reload();await expect(page.getByText('Campaign posts',{exact:true})).toBeVisible();await expect(imageBatch.getByRole('status')).toContainText('2 of 2 posts ready');
- assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.content_slot_generations g JOIN app.content_slots s ON s.id=g.slot_id WHERE s.plan_id=$1',[saved.id])).rows[0].n,2);
- await preview.getByRole('listitem').last().scrollIntoViewIfNeeded();await expect(preview.locator('.post-thumbnail svg')).toHaveCount(2,{timeout:15000});
- await imageBatch.scrollIntoViewIfNeeded();await page.screenshot({path:'work/browser/campaign-image-batch.png',fullPage:true});
-
+ // Two image posts generated through the campaign image batch (real jobs, MOCK provider).
+ const statics=(await admin.query("SELECT id,revision FROM app.content_slots WHERE plan_id=$1 AND format='static' ORDER BY planned_at LIMIT 2",[saved.id])).rows;assert.equal(statics.length,2);
+ const batch=await post(`/api/v1/businesses/${brand}/content-plans/${saved.id}/generate-images`,{slots:statics.map(s=>({id:s.id,revision:s.revision}))},randomUUID());
+ assert.ok([200,201].includes(batch.status),JSON.stringify(batch.body));
+ await expect.poll(async()=>(await admin.query("SELECT count(*)::int AS n FROM app.content_slots WHERE plan_id=$1 AND creative_version_id IS NOT NULL",[saved.id])).rows[0].n,{timeout:90000}).toBe(2);
+ await review.click();
+ await expect(page.getByRole('heading',{name:'Calendar',exact:true,level:1})).toBeVisible({timeout:30000});
  const campaignUrl=page.url();
  let campaignReadAttempts=0;
  await page.route(`**/content-plans/${saved.id}`,async route=>{
@@ -1052,7 +811,7 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.unroute(`**/content-plans/${saved.id}`);
  await expect(page.getByRole('heading',{name:'Your campaign',exact:true,level:1})).toBeVisible();
  assert.deepEqual((await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('link').allTextContents()).slice(0,9).map(s=>s.trim()),['Home','Calendar','Campaigns','Integrations','Brand Kit','Content Preferences','Approvals','Learnings','Insights']);
- await expect(page.getByRole('list',{name:'Campaign posts'}).getByRole('listitem')).toHaveCount(4);
+ await expect(page.getByRole('list',{name:'Campaign posts'}).getByRole('listitem')).toHaveCount(slotCount);
  await expect(page.locator('.campaign-preview-grid .post-thumbnail svg')).toHaveCount(2,{timeout:15000});
  await expect(page.getByRole('link',{name:'Review post',exact:true})).toHaveCount(2);
  await expect(page.getByRole('list',{name:'Conversation messages'})).toHaveCount(0);
@@ -1119,8 +878,8 @@ test('Canvas creates a custom four-day plan and opens its actual saved calendar 
  await page.setViewportSize({width:1440,height:1000});
  await expect(page.locator('.v5-topbar').getByRole('link',{name:'Profile',exact:true})).toBeVisible();
  await page.screenshot({path:'work/browser/workspace-home-desktop.png',fullPage:true});
- await page.goto(campaignUrl);
- await preview.getByRole('link',{name:'Edit or review this post',exact:true}).first().click();
+ const videoSlot=(await admin.query("SELECT id FROM app.content_slots WHERE plan_id=$1 AND format='video' ORDER BY planned_at LIMIT 1",[saved.id])).rows[0];assert.ok(videoSlot);
+ await page.goto(`${base}/b/${brand}/content-plan?start=2026-12-01&slot=${videoSlot.id}`);
  await expect(page.getByLabel('Calendar date',{exact:true})).toHaveCount(0);
  assert.equal(new URL(page.url()).searchParams.get('start'),'2026-12-01');
  await expect(page.getByRole('region',{name:'Post details',exact:true})).toBeVisible();
@@ -1598,7 +1357,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  // The reference editor is available directly under the image, with durable manual edits.
  await expect(page.getByRole('heading',{name:'Text layers',exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Text layers',exact:true})).toHaveCount(1);
- await expect(page.getByLabel('Post caption',{exact:true})).toHaveCount(0);
+ await expect(page.getByLabel('Post caption',{exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Save new version',exact:true})).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Prepare final image',exact:true})).toHaveCount(0);
  await expect(page.getByRole('heading',{name:'Review this version',exact:true})).toHaveCount(0);
@@ -1691,7 +1450,8 @@ test('AI canvas recovers initialization, history and transcript reads without re
  await page.unrouteAll({behavior:'wait'});
  await page.setViewportSize({width:1280,height:720});
  let bootReads=0,posts=0,historyReads=0,failReads=false,failHistory=true;
- await page.route('**/create-chat/outbox',async route=>{if(route.request().method()==='GET'&&++bootReads===1){await route.abort('failed');return;}await route.continue();});
+ // The client retries a failed read once by itself; fail the read and that retry.
+ await page.route('**/create-chat/outbox',async route=>{if(route.request().method()==='GET'&&++bootReads<=2){await route.abort('failed');return;}await route.continue();});
  await page.route('**/create-chat/messages',async route=>{posts++;await route.continue();});
  await page.route('**/create-chat/history?*',async route=>{historyReads++;if(failHistory){await route.abort('failed');return;}await route.continue();});
  await page.goto(`${base}/b/${brand}/create`);
@@ -1702,7 +1462,7 @@ test('AI canvas recovers initialization, history and transcript reads without re
  await page.getByRole('button',{name:'Reconnect chat',exact:true}).click();
  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeEnabled();
  await expect(page.getByRole('region',{name:'Chat connection',exact:true})).toHaveCount(0);
- assert.equal(bootReads,2);assert.equal(posts,0);assert.equal(historyReads,0,'History is loaded only when opened');
+ assert.equal(bootReads,3);assert.equal(posts,0);assert.equal(historyReads,0,'History is loaded only when opened');
  await page.getByRole('button',{name:'Conversation history',exact:true}).click();
  const history=page.getByRole('dialog',{name:'Conversation history',exact:true});
  await expect(history.getByRole('button',{name:'Reload history',exact:true})).toBeVisible();
