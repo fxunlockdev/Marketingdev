@@ -16,6 +16,54 @@ test('Postforme foreign remote-account collision cannot overwrite existing tenan
 test('Postforme disconnected accounts and expired attempts are honest persisted states',async()=>{await admin.query("UPDATE app.postforme_attempts SET expires_at=now()-interval '1 second' WHERE id=$1",[attempt.attempt_id]);await assert.rejects(service.finish(alice,session,brand.id,{attempt_id:attempt.attempt_id}));service.client.accounts=async()=>[];await service.refresh(alice,brand.id);assert.equal((await service.read(alice,brand.id)).accounts[0].status,'disconnected');});
 test('Postforme unknown publication is durable, replays without a provider write and reconciles only matching identity',async()=>{const {canonicalJSON,hash}=await import('../../dist/brand-brain.js');const account=(await admin.query('SELECT id,remote_id FROM app.postforme_accounts WHERE brand_id=$1',[brand.id])).rows[0],plan=randomUUID(),slot=randomUUID(),publication=randomUUID(),requestKey=randomUUID(),at=new Date(Date.now()+3600000).toISOString();await admin.query("INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,created_by,request_key,request_hash) VALUES($1,$2,$3,'Mock plan','Test','2026-10-28','UTC',$4,$5,$6)",[plan,org.id,brand.id,alice,randomUUID(),'a'.repeat(64)]);await admin.query("INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by) VALUES($1,$2,$3,$4,'instagram',$5,'static','Mock brief','','','',$6)",[slot,org.id,brand.id,plan,at,alice]);const body={slot_id:slot,revision:1,export_id:randomUUID(),channel_id:account.id,confirmed:true};await admin.query("INSERT INTO app.postforme_publications(id,organization_id,brand_id,account_id,slot_id,revision,request_key,request_hash,proof,caption,scheduled_at,phase) VALUES($1,$2,$3,$4,$5,1,$6,$7,'{}','Mock caption',$8,'unknown')",[publication,org.id,brand.id,account.id,slot,requestKey,hash(canonicalJSON({user:alice,body})),at]);service.publishing=true;const start=calls;assert.deepEqual(await service.submit(alice,brand.id,body,requestKey),{id:publication,phase:'unknown'});assert.equal(calls,start);await assert.rejects(service.submit(alice,brand.id,{...body,revision:2},requestKey));service.client.call=async path=>{calls++;if(path.includes('social-post-results'))return {data:[{post_id:'remote-post',social_account_id:account.remote_id,success:true,platform_data:{url:'https://instagram.com/p/mock'}}]};return {data:[{id:'remote-post',external_id:publication,caption:'Mock caption',scheduled_at:at,social_accounts:[{id:'foreign-account'}],status:'processed'}]};};await service.reconcile(alice,brand.id,publication);assert.equal((await admin.query('SELECT phase FROM app.postforme_publications WHERE id=$1',[publication])).rows[0].phase,'unknown');service.client.call=async path=>path.includes('social-post-results')?{data:[{post_id:'remote-post',social_account_id:account.remote_id,success:true,platform_data:{url:'https://instagram.com/p/mock'}}]}:{data:[{id:'remote-post',external_id:publication,caption:'Mock caption',scheduled_at:at,social_accounts:[{id:account.remote_id}],status:'processed'}]};assert.equal((await service.reconcile(alice,brand.id,publication)).observed_state,'published');await assert.rejects(service.reconcile(bob,foreign.id,publication));});
 
+test('learning loop: scheduled collection snapshots published posts idempotently and insights read them under RLS',async()=>{
+ const {collect,syncSnapshotSQL}=await import('../../dist/learning-sync.js'),{readPostformeObservations}=await import('../../dist/learning-observations.js'),{insightObservations}=await import('../../dist/insights.js');
+ const dispatch=new Pool({connectionString:config.jobs.dispatcherDatabaseUrl});
+ const account=(await admin.query('SELECT id,remote_id FROM app.postforme_accounts WHERE brand_id=$1',[brand.id])).rows[0];
+ await admin.query("UPDATE app.postforme_accounts SET status='connected' WHERE id=$1",[account.id]);
+ try{
+  const pub=(await admin.query("SELECT id,scheduled_at FROM app.postforme_publications WHERE brand_id=$1 AND observed_state='published'",[brand.id])).rows[0];
+  const now=new Date(pub.scheduled_at.getTime()+2*3600000);let fetches=0;
+  const client={call:async path=>{fetches++;assert.ok(path.startsWith('/v1/social-account-feeds/'+encodeURIComponent(account.remote_id)));return {data:[{social_account_id:account.remote_id,platform_post_id:'pp-1',platform:'instagram',caption:'Mock caption',posted_at:pub.scheduled_at.toISOString(),platform_url:'https://instagram.com/p/mock/',metrics:{likes:7,views:120}}]};}};
+  assert.deepEqual(await collect({pool:dispatch,client,now}),{due:1,collected:1,missing:0,accounts:1,failed_accounts:0,rate_limited:false});
+  assert.equal((await collect({pool:dispatch,client,now})).due,0);assert.equal(fetches,1);
+  const row=[pub.id,org.id,brand.id,account.id,'1h','available','{"likes":999}',null,now.toISOString()];
+  assert.equal((await dispatch.query(syncSnapshotSQL,row)).rowCount,0,'a checkpoint is written once');
+  const foreignOrg=(await admin.query('SELECT organization_id FROM app.brands WHERE id=$1',[foreign.id])).rows[0].organization_id;
+  await assert.rejects(dispatch.query(syncSnapshotSQL,[pub.id,foreignOrg,foreign.id,account.id,'24h','missing','{}',null,now.toISOString()]),e=>['42501','23503'].includes(e.code));
+  await assert.rejects(dispatch.query('SELECT proof FROM app.postforme_publications'),e=>e.code==='42501');
+  await assert.rejects(dispatch.query('SELECT username FROM app.postforme_accounts'),e=>e.code==='42501');
+  assert.equal((await dispatch.query("SELECT count(*)::int n FROM app.postforme_publications WHERE observed_state<>'published'")).rows[0].n,0);
+  await assert.rejects(database.transaction(alice,org.id,true,db=>db.query(syncSnapshotSQL,[pub.id,org.id,brand.id,account.id,'24h','missing','{}',null,now.toISOString()]),brand.id),e=>e.code==='42501');
+  const seen=await database.transaction(alice,org.id,false,db=>readPostformeObservations(db),brand.id);
+  assert.equal(seen.published,1);assert.equal(seen.observations.length,1);const [o]=seen.observations;
+  assert.deepEqual(o.metrics,{likes:7,views:120});assert.equal(o.publication_id,pub.id);assert.equal(o.hours_since_publish,2);
+  assert.equal(o.attribution.channel,'instagram');assert.equal(o.attribution.format,'static');assert.equal(o.attribution.timezone,'UTC');assert.ok(o.attribution.posted_weekday);assert.equal(o.attribution.stock_used,null);
+  assert.equal((await database.transaction(alice,org.id,false,db=>insightObservations(db),brand.id)).source,'postforme');
+  const other=await database.transaction(bob,foreignOrg,false,db=>insightObservations(db),foreign.id);
+  assert.deepEqual(other,{source:'postiz_legacy',observations:[]},'another business sees neither the posts nor the snapshots');
+ }finally{await admin.query("UPDATE app.postforme_accounts SET status='disconnected' WHERE id=$1",[account.id]);await dispatch.end();}
+});
+
+test('learning loop: customer signals are append-only, actor-bound and private to the business',async()=>{
+ const {recordSignal,signalSummary}=await import('../../dist/learning-signals.js');
+ const slot=(await admin.query('SELECT id FROM app.content_slots WHERE brand_id=$1 LIMIT 1',[brand.id])).rows[0].id,scope={organizationId:org.id,brandId:brand.id,actorId:alice};
+ const write=(user,input,as=user)=>database.transaction(user,org.id,true,db=>recordSignal(db,{...scope,actorId:as},input),brand.id);
+ for(const reason of ['Too many people','No faces please'])await write(alice,{kind:'rejected',slot_id:slot,reason,context:{format:'static'}});
+ await write(alice,{kind:'edited',slot_id:slot,diff:{headline:{before:'A long headline',after:'Short'}}});
+ await assert.rejects(write(viewer,{kind:'approved',slot_id:slot}));
+ await assert.rejects(database.transaction(viewer,org.id,false,db=>recordSignal(db,{...scope,actorId:viewer},{kind:'approved',slot_id:slot}),brand.id),e=>['42501','25006'].includes(e.code),'the database itself refuses a read-only member');
+ await assert.rejects(write(alice,{kind:'approved',slot_id:slot},bob),e=>e.code==='42501','a signal cannot be recorded as someone else');
+ await assert.rejects(write(alice,{kind:'approved',slot_id:randomUUID()}),e=>e.code==='23503');
+ const summary=await database.transaction(viewer,org.id,false,db=>signalSummary(db),brand.id);
+ assert.deepEqual(summary.map(s=>s.statement),['Rejection reasons mention people: 2 of 2 rejections with a reason']);
+ const foreignOrg=(await admin.query('SELECT organization_id FROM app.brands WHERE id=$1',[foreign.id])).rows[0].organization_id;
+ assert.deepEqual(await database.transaction(bob,foreignOrg,false,db=>signalSummary(db),foreign.id),[]);
+ await assert.rejects(database.transaction(bob,foreignOrg,true,db=>recordSignal(db,{organizationId:org.id,brandId:brand.id,actorId:bob},{kind:'approved',slot_id:slot}),foreign.id));
+ for(const sql of ["UPDATE app.creative_signals SET reason='rewritten'",'DELETE FROM app.creative_signals'])await assert.rejects(database.transaction(alice,org.id,true,db=>db.query(sql),brand.id),e=>e.code==='42501');
+ assert.equal((await admin.query('SELECT count(*)::int n FROM app.creative_signals WHERE brand_id=$1',[brand.id])).rows[0].n,3);
+});
+
 test('disabled platforms cannot initiate OAuth and existing records remain accessible',async()=>{
  const limited=new Postforme(service.connections,{},'mock-key',false,['instagram','tiktok']);
  let invoked=false;limited.client={call:async()=>{invoked=true;throw Error('must not call');}};
