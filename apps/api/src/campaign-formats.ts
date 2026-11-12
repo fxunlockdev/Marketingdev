@@ -25,8 +25,9 @@ type Dimensions={width:number;height:number};
 /** Specs normalised for a video. Tracked out of band so stored and compared specs stay unchanged. */
 const VIDEO_SPECS=new WeakSet<CreativeSpec>();
 /** The size a new creative is composed at. A portrait image is a true 4:5 feed post; the provider's
- * 2:3 output is cover-cropped to it (see creative-framing). Portrait video keeps 2:3, the size the
- * video renderer supports. */
+ * 2:3 output is cover-cropped to it (see creative-framing). A spec normalised for a portrait video
+ * still reports the provider's 2:3 source size here; the finished portrait video itself is rendered
+ * at a true 4:5 (1080x1350, see videoTarget in reel-plan), and its starting frame is a 4:5 image. */
 export function creativeDimensions(spec:CreativeSpec):Dimensions{
  if(spec.aspect==='portrait'&&VIDEO_SPECS.has(spec))return {width:1024,height:1536};
  return {square:{width:1024,height:1024},portrait:{width:1024,height:1280},landscape:{width:1536,height:1024},vertical:{width:1080,height:1920}}[spec.aspect];
