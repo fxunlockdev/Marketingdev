@@ -41,9 +41,12 @@ test('portrait feed posts are composed at 4:5 from the 2:3 provider size; 2:3 po
  assert.deepEqual(normalizeCreativeSpec(portrait,'video','linkedin'),portrait,'the stored spec is unchanged');
 });
 test('creative storage uses one rolling, archive-aware window for every path',async()=>{
- assert.match(creativeMediaUsageSQL,new RegExp(`interval '${GENERATION_LIMITS.windowDays} days'`));assert.match(creativeMediaUsageSQL,/archived_at IS NOT NULL/);
+ // The rolling, archive-aware count lives in one database function (migration 142) so it stays fast under RLS.
+ assert.equal(creativeMediaUsageSQL,'SELECT app.creative_media_used($1,$2,$3) AS n');
+ const fn=(await import('node:fs')).readFileSync(new URL('../../database/migrations/142_creative_media_usage.sql',import.meta.url),'utf8');
+ assert.match(fn,/archived_at IS NOT NULL/);assert.match(fn,/make_interval\(days=>window_days\)/);
  const seen=[];const used=await creativeMediaUsed({query:async(sql,params)=>{seen.push([sql,params]);return {rows:[{n:'123'}]};}},'org','brand');
- assert.equal(used,123);assert.deepEqual(seen,[[creativeMediaUsageSQL,['org','brand']]]);
+ assert.equal(used,123);assert.deepEqual(seen,[[creativeMediaUsageSQL,['org','brand',GENERATION_LIMITS.windowDays]]]);
  assert.ok(creativeStorageFits(GENERATION_LIMITS.storageBytes-GENERATION_LIMITS.reserveBytes));
  assert.ok(!creativeStorageFits(GENERATION_LIMITS.storageBytes-GENERATION_LIMITS.reserveBytes+1));
  assert.ok(!creativeStorageFits(0,Math.floor(GENERATION_LIMITS.storageBytes/GENERATION_LIMITS.reserveBytes)+1));

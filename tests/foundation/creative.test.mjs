@@ -1292,3 +1292,20 @@ test('review reads expose bounded quality fields, never the raw checker report',
  assert.deepEqual(slot.qa,shown);
  assert.equal((await slotCreatives.detail(alice,brand.id,(await plannedSlot()).id)).slot.qa,null,'a post without a creative has no quality fields');
 });
+
+test('creative storage usage is one fast scoped count for the app and the worker, and refuses other businesses',async()=>{
+ const {creativeMediaUsed}=await import('../../dist/creative-storage.js');
+ const job=await submit('Storage usage check');
+ const viaApp=await database.transaction(alice,org.id,false,db=>creativeMediaUsed(db,org.id,brand.id),brand.id);
+ const started=Date.now();
+ const viaWorker=await jobs.transaction(scope(job),db=>creativeMediaUsed(db,org.id,brand.id));
+ assert.ok(Date.now()-started<2000,'the worker count must stay well inside its statement timeout');
+ assert.equal(viaWorker,viaApp);
+ const expected=Number((await admin.query("SELECT COALESCE(sum(m.bytes),0) AS n FROM app.creative_media m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.created_at>now()-interval '30 days' AND NOT EXISTS(SELECT 1 FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id WHERE v.media_id=m.id AND p.archived_at IS NOT NULL)",[org.id,brand.id])).rows[0].n);
+ assert.equal(viaApp,expected);
+ // Neither path can read another business's usage.
+ const other=randomUUID();
+ await assert.rejects(database.transaction(alice,org.id,false,db=>creativeMediaUsed(db,org.id,other),brand.id),e=>e.code==='42501');
+ await assert.rejects(jobs.transaction(scope(job),db=>creativeMediaUsed(db,org.id,other)),e=>e.code==='42501');
+ await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[job.id]);
+});
