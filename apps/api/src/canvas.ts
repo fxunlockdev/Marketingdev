@@ -1,6 +1,6 @@
 import {generationTimingEstimate} from './generation-timing.js';
 import {parseCreateDraft} from './create-chat-draft.js';
-import {normalizeCreativeSpec,creativeSourceSize,creativeDimensions} from "./campaign-formats.js";
+import {normalizeCreativeSpec,creativeSourceSize,matchesCreativeDimensions} from "./campaign-formats.js";
 import {planningLearning} from './learning-context.js';
 import {recordSignal} from './learning-signals.js';
 import {editSignal,manifestContext} from './creative-edit-signal.js';
@@ -323,9 +323,9 @@ export class Canvas {
             "Open the latest version before requesting an image edit",
           );
         if(version.skill_manifest?.creative_spec&&!creativeSpec)throw new BadRequestException("Keep the saved post format when editing this image");
-        const target=creativeSpec?creativeDimensions(creativeSpec):null;
         if (creativeSpec && version.skill_manifest?.creative_spec && ['placement','aspect','slide_count'].some(k=>(version.skill_manifest.creative_spec as any)[k]!==(creativeSpec as any)[k]))throw new BadRequestException("Keep the current post placement when editing this image");
-        if (target?version.width!==target.width||version.height!==target.height:`${version.width}x${version.height}` !== v.size)
+        // A 2:3 portrait made before 4:5 stays editable at its own size.
+        if (creativeSpec?!matchesCreativeDimensions(creativeSpec,version):`${version.width}x${version.height}` !== v.size)
           throw new BadRequestException(
             "Keep the current dimensions when editing this image",
           );

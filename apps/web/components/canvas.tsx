@@ -48,6 +48,8 @@ type Conversation = {
   planning_runs: {id:string;status:string;cancel_requested:boolean;output_plan_id:string|null;scheduled_at:string;starts_on:string}[];
   projects: { id: string; title: string; latest_version_id: string | null }[];
 };
+/** The provider size a placement is generated at; portrait and vertical are cropped from 2:3. */
+const sourceSize=(aspect:string)=>aspect==='square'?'1024x1024':aspect==='landscape'?'1536x1024':'1024x1536';
 type Version = {
   id: string;
   sha256: string;
@@ -281,7 +283,7 @@ export function CanvasScreen({ business }: { business: Business }) {
           format: edit?.run.format ?? format,
           ...(edit?.version.skill_manifest?.creative_spec?{creative_spec:edit.version.skill_manifest.creative_spec}:{}),
           size: edit
-            ? (edit.version.skill_manifest?.creative_spec?.aspect==='vertical'?'1024x1536':`${edit.version.design.width}x${edit.version.design.height}`)
+            ? (edit.version.skill_manifest?.creative_spec?sourceSize(edit.version.skill_manifest.creative_spec.aspect):`${edit.version.design.width}x${edit.version.design.height}`)
             : size,
           parent_version_id: edit?.version.id ?? null,
           ...(referenceIds.length?{reference_ids:referenceIds}:{}),

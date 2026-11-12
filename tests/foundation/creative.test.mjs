@@ -1237,3 +1237,27 @@ test('retrying failed campaign posts records one signal per post; a refused retr
  assert.deepEqual(await signals(),[{kind:'retried',slot_id:s.id,reason:'Retried after generation failed',context:{format:'static',channel:'linkedin',pillar:'Education'},actor_id:alice}]);
  await canvas.cancel(alice,brand.id,retried.jobs[0].id);await handler.run(scope(retried.jobs[0]));
 });
+test('portrait feed posts are composed at 4:5; a 2:3 portrait made earlier stays editable at its own size',async()=>{
+ const portrait={placement:'feed',aspect:'portrait',slide_count:null};
+ transport=directedTransport({images:[await coloured(1024,1536,'#335577')]});
+ const j=await canvas.submit(alice,brand.id,thread.id,{...request('Create a portrait post'),size:'1024x1536',creative_spec:portrait},randomUUID());
+ assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));
+ const v=await versionOf(j);
+ assert.equal(v.width,1024);assert.equal(v.height,1280);assert.equal(v.design.width,1024);assert.equal(v.design.height,1280);
+ assert.deepEqual(v.skill_manifest.framing.crop,{left:0,top:128,width:1024,height:1280});
+ assert.match(transport.log.prompts[0],/1024x1280/);
+ // A legacy 2:3 portrait: the same stored image, recorded at the size portraits used to be.
+ const legacy=(await admin.query('SELECT v.id,v.media_id,v.project_id FROM app.creative_requests r JOIN app.creative_versions v ON v.id=r.output_version_id WHERE r.job_id=$1',[j.id])).rows[0];
+ const legacyBytes=await coloured(1024,1536,'#557733'),legacyKey=`creative/${org.id}/${brand.id}/${j.id}/${digest(legacyBytes)}`;
+ await store.persist(legacyKey,legacyBytes,'image/png',digest(legacyBytes));
+ await admin.query('UPDATE app.creative_media SET object_key=$2,sha256=$3,bytes=$4,height=1536 WHERE id=$1',[legacy.media_id,legacyKey,digest(legacyBytes),legacyBytes.length]);
+ await admin.query("UPDATE app.creative_versions SET design=jsonb_set(design,'{height}','1536') WHERE id=$1",[legacy.id]);
+ await assert.rejects(async()=>canvas.submit(alice,brand.id,thread.id,{...request('Wrong size edit'),size:'1024x1024',creative_spec:portrait,parent_version_id:legacy.id},randomUUID()),/source size/);
+ transport=directedTransport({images:[await coloured(1024,1536,'#775533')]});
+ const edit=await canvas.submit(alice,brand.id,thread.id,{...request('Make it brighter'),size:'1024x1536',creative_spec:portrait,parent_version_id:legacy.id},randomUUID());
+ assert.equal(await handler.run(scope(edit)),'succeeded',JSON.stringify(await row(edit)));
+ const child=await versionOf(edit);
+ assert.equal(child.width,1024);assert.equal(child.height,1536,'the legacy size is kept so saved layers still fit');assert.equal(child.design.height,1536);
+ assert.equal(child.skill_manifest.framing??null,null);
+ assert.ok(!transport.log.prompts[0].includes('is cropped from this canvas'),'no crop is described when nothing is cropped');
+});

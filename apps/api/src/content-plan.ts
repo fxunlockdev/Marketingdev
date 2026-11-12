@@ -1,4 +1,4 @@
-import {normalizeCreativeSpec,creativeDimensions,type CreativeSpec} from './campaign-formats.js';
+import {normalizeCreativeSpec,matchesCreativeDimensions,type CreativeSpec} from './campaign-formats.js';
 import {carouselPages,currentCarousel,carouselFingerprint} from './carousels.js';
 import {calendarExport} from './calendar-export.js';
 import {validateVideoConcept} from './video-concept.js';
@@ -98,10 +98,11 @@ export class ContentPlan {
   return {...row,pages};
  }
  async matchSpec(specification:CreativeSpec|null,creative:any,video:any,carousel:any){
-  if(!specification)return;const dimensions=creativeDimensions(specification);
-  if(creative&&(creative.design?.width!==dimensions.width||creative.design?.height!==dimensions.height))throw new ConflictException('Choose artwork matching this post’s dimensions');
+  if(!specification)return;
+  // New portrait artwork is 4:5; portrait artwork saved before that (2:3) can still be attached.
+  if(creative&&!matchesCreativeDimensions(specification,creative.design))throw new ConflictException('Choose artwork matching this post’s dimensions');
   if(video&&canonicalJSON(video.creative_spec??null)!==canonicalJSON(specification))throw new ConflictException('Choose video generated for this placement and aspect');
-  if(carousel&&(carousel.pages.length!==specification.slide_count||carousel.pages.some((p:any)=>p.width!==dimensions.width||p.height!==dimensions.height)))throw new ConflictException('Choose a carousel with matching slide count and dimensions');
+  if(carousel&&(carousel.pages.length!==specification.slide_count||carousel.pages.some((p:any)=>!matchesCreativeDimensions(specification,p))))throw new ConflictException('Choose a carousel with matching slide count and dimensions');
  }
  async event(db:PoolClient,user:string,s:any,action:string,feedback='') {
   const snapshot={creative_spec:s.creative_spec??null,reference_ids:s.reference_ids??[],plan_id:s.plan_id,channel:s.channel,planned_at:s.planned_at,format:s.format,brief:s.brief,pillar:s.pillar,hook:s.hook,cta:s.cta,state:s.state,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,video_version_id:s.video_version_id,video_sha256:s.video_sha256,video_draft:s.video_draft,carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,...(s.storyline?{storyline:s.storyline}:{})};

@@ -399,3 +399,24 @@ test('topic and brief edits record one bounded before/after signal; date-only an
  assert.deepEqual(row.context,{format:'static',channel:'linkedin',pillar:'Education'});
  assert.equal(edited.revision,moved.revision+1);
 });
+test('portrait posts accept new 4:5 artwork and 2:3 portrait artwork made earlier, but not other sizes',async()=>{
+ const artwork=async(width,height)=>{
+  const thread=await canvas.createThread(alice.id,brand.id,{title:`Portrait ${width}x${height}`},randomUUID());
+  const projectId=randomUUID(),job=randomUUID(),media=randomUUID(),id=randomUUID();
+  await admin.query('INSERT INTO app.creative_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[projectId,org.id,brand.id,thread.id,'TEST FIXTURE portrait',alice.id]);
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.generate','succeeded')",[job,org.id,brand.id,alice.id]);
+  await admin.query('INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,1,$7,$8)',[media,org.id,brand.id,job,'TEST_FIXTURE_NOT_REAL_MEDIA','0'.repeat(64),width,height]);
+  const d={schema_version:1,width,height,background_media_id:media,layers:[]},sha=hash(canonicalJSON({design:d,caption:'TEST FIXTURE',brain_id:brainId}));
+  await admin.query('INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,brain_id,job_id,media_id,design,caption,skill_manifest,sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,org.id,brand.id,projectId,brainId,job,media,JSON.stringify(d),'TEST FIXTURE','{}',sha,alice.id]);
+  await admin.query('UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1',[projectId,id]);
+  return id;
+ };
+ const portrait={placement:'feed',aspect:'portrait',slide_count:null};
+ const [fresh,legacy,square]=[await artwork(1024,1280),await artwork(1024,1536),await artwork(1024,1024)];
+ let [s]=await create([{...slot('instagram',null),creative_spec:portrait}]);
+ await assert.rejects(plans.edit(alice.id,brand.id,s.id,{revision:s.revision,creative_version_id:square}),/dimensions/);
+ s=await plans.edit(alice.id,brand.id,s.id,{revision:s.revision,creative_version_id:fresh});assert.equal(s.creative_version_id,fresh);
+ s=await plans.edit(alice.id,brand.id,s.id,{revision:s.revision,creative_version_id:legacy});assert.equal(s.creative_version_id,legacy);assert.equal(s.state,'draft_ready');
+ s=await plans.review(alice.id,brand.id,s.id,reviewBody(s,'pending_review'));s=await plans.review(alice.id,brand.id,s.id,reviewBody(s,'approved'));
+ assert.equal(s.state,'approved','a legacy portrait can still be reviewed and approved');
+});

@@ -11,7 +11,7 @@ import {resolveTextMode,inImageCopy} from './image-typography.js';
 import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,nearStockCopy,type QaAttempt,type QaExpectation,type QaReport,type StockSourceCheck,type StockSourceReport} from './image-qa.js';
 import {frameCreative,frameDirection} from "./creative-framing.js";
 import {approvedDirection} from "./image-direction.js";
-import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
+import {normalizeCreativeSpec,creativeDimensions,legacyCreativeDimensions} from "./campaign-formats.js";
 import {approvedBrandFont} from './brand-typography.js';
 import {savedCampaignFont} from './campaign-design.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
@@ -452,7 +452,10 @@ export class CreativeJobs {
       );
       const artwork=request.creative_spec?.artwork;
       const textMode=resolveTextMode({brief:plan.brief,artwork,parent:parent?{hasOverlayText:parent.design.layers.some((l:any)=>String(l.text??'').trim()),textMode:parent.skill_manifest?.text_mode}:null});
-      const frame=request.creative_spec?frameDirection(normalizeCreativeSpec(request.creative_spec,request.format,request.channel)):undefined;
+      // The placement's true size. An edit of a 2:3 portrait made before 4:5 keeps its size, so its saved layers still fit.
+      const placement=request.creative_spec?normalizeCreativeSpec(request.creative_spec,request.format,request.channel):null;
+      const target=placement?(parent&&legacyCreativeDimensions(placement,parent.design)?{width:Number(parent.design.width),height:Number(parent.design.height)}:creativeDimensions(placement)):null;
+      const frame=placement&&target?frameDirection(placement,target):undefined;
       const basePrompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork,frame,approvedDirection:approvedDirection(moodboard,request.prompt)});
       const render=async(step:'image'|'image:retry',prompt:string)=>{
       const wire = this.provider.imageRequest(
@@ -486,13 +489,12 @@ export class CreativeJobs {
             referenceImages,
           );
           let framing:unknown=null;
-          if(request.creative_spec){
-            const spec=normalizeCreativeSpec(request.creative_spec,request.format,request.channel),target=creativeDimensions(spec);
+          if(placement&&target){
             if(output.width!==target.width||output.height!==target.height){
               // Keep provider output for provenance; fill the placement edge to edge (the prompt states the trimmed margin).
               const sourceKey=`creative/${scope.organizationId}/${scope.brandId}/${scope.jobId}/${output.sha256}`;
               await this.jobs.store.persist(sourceKey,output.bytes,"image/png",output.sha256);
-              const framed=await frameCreative(output.bytes,spec);
+              const framed=await frameCreative(output.bytes,placement,'cover',target);
               framing=framed.framing;
               output={...output,bytes:Buffer.from(framed.bytes),sha256:framed.sha256,width:framed.width,height:framed.height};
             }
