@@ -2,7 +2,7 @@
 // sign-up (with the emailed verification link) → sign-in → add a business → five-step
 // onboarding → research → mood board → monthly plan with storylines → approve → generated
 // images → open a post → approve it. Screenshots go to work/local-shots.
-import {mkdirSync} from 'node:fs';
+import {mkdirSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {setTimeout as sleep} from 'node:timers/promises';
@@ -14,7 +14,7 @@ import {mailbox} from './mail-sink.mjs';
 const SHOTS=join(ROOT,'work/local-shots');
 const LONG=300000;
 
-export async function runJourney(state,{website='https://example.com',headed=false}={}){
+export async function runJourney(state,{website='https://example.com',headed=false,create=false}={}){
  mkdirSync(SHOTS,{recursive:true});
  const base=`http://127.0.0.1:${state.ports.web}`,results=[];
  const browser=await chromium.launch({headless:!headed});
@@ -69,6 +69,8 @@ export async function runJourney(state,{website='https://example.com',headed=fal
    await page.getByRole('button',{name:'Continue'}).click();
    await expect(page).toHaveURL(/\/b\/[0-9a-f-]{36}\/guided-onboarding/);
    businessId=page.url().match(/\/b\/([0-9a-f-]{36})\//)[1];
+   // Local-only test account, kept (mode 600, git-ignored) so a later run can sign in again.
+   writeFileSync(join(ROOT,'work/local-stack/journey-account.json'),JSON.stringify({email,password,businessId}),{mode:0o600});
    return businessId;
   });
   await step('onboarding steps 1–5',async()=>{
@@ -188,6 +190,8 @@ export async function runJourney(state,{website='https://example.com',headed=fal
    await page.waitForLoadState('networkidle');
    await shot('approvals');
   });
+  // The power-user Create journey runs on the same business, with its approved strategy and mood board.
+  if(create){const {runCreateJourney}=await import('./create-journey.mjs');await runCreateJourney({page,base,businessId,step,state});}
  }catch{/* recorded in results */}
  finally{await browser.close();}
  return {results,shots:SHOTS,email};
