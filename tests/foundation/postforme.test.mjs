@@ -41,7 +41,7 @@ test('learning loop: scheduled collection snapshots published posts idempotently
   assert.equal(o.attribution.channel,'instagram');assert.equal(o.attribution.format,'static');assert.equal(o.attribution.timezone,'UTC');assert.ok(o.attribution.posted_weekday);assert.equal(o.attribution.stock_used,null);
   assert.equal((await database.transaction(alice,org.id,false,db=>insightObservations(db),brand.id)).source,'postforme');
   const other=await database.transaction(bob,foreignOrg,false,db=>insightObservations(db),foreign.id);
-  assert.deepEqual(other,{source:'postiz_legacy',observations:[]},'another business sees neither the posts nor the snapshots');
+  assert.deepEqual(other,{source:'postforme',observations:[]},'another business sees neither the posts nor the snapshots');
  }finally{await admin.query("UPDATE app.postforme_accounts SET status='disconnected' WHERE id=$1",[account.id]);await dispatch.end();}
 });
 
