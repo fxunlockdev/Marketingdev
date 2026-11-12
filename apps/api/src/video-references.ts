@@ -1,7 +1,7 @@
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
 import {Canvas} from './canvas.js';
 import {AssetJobs,type JobScope} from './jobs.js';
-import {digest,ObjectStore} from './object-store.js';
+import {digest,ObjectStore,referenceContentType,type ReferenceContentType} from './object-store.js';
 import {object,uuid} from './workspaces.js';
 import {VideoStateError,VideoVault} from './video-vault.js';
 import {localMockRunway} from './video-mock-provider.js';
@@ -62,6 +62,8 @@ export class VideoReferenceBindings {
  }
 }
 
+function leasedType(bytes:Buffer):ReferenceContentType{try{return referenceContentType(bytes);}catch{throw new VideoStateError('REFERENCE_MEDIA_INTEGRITY_FAILED');}}
+
 /** Internal parent-workflow component. No customer route or provider call here.
  * Explicit user consent binds an existing owned video job to exact approved
  * pixels. The lease URL stays encrypted in the worker ledger, never in model
@@ -103,7 +105,8 @@ export class VideoReferences extends VideoReferenceBindings {
     if(!lease){
      // Use the database transaction clock used by the lease RLS ceiling.
      const expires=new Date((await db.query("SELECT date_trunc('second',now())+interval '8 hours' AS expires")).rows[0].expires),key=`video-reference/${j.organization_id}/${j.brand_id}/${j.id}/${p.sha256}`;
-     const url=await this.#store.referenceURL(key,expires);
+     // The link names the stored image's own type: an uploaded JPEG product photo is served as image/jpeg.
+     const url=await this.#store.referenceURL(key,expires,leasedType(await this.#store.read(p.object_key)));
      lease=(await db.query('INSERT INTO app.video_reference_leases(job_id,organization_id,brand_id,object_key,sha256,bytes,encrypted_url,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *',[j.id,j.organization_id,j.brand_id,key,p.sha256,p.bytes,this.#vault.seal(scope,'reference',{url}),expires])).rows[0];
     }
     if(!['prepared','active'].includes(lease.state))throw new VideoStateError('REFERENCE_LEASE_REVOKED');
@@ -115,7 +118,7 @@ export class VideoReferences extends VideoReferenceBindings {
    // resurrect a concurrently revoked bearer URL. Prepared leases may replay.
    const bytes=await this.#store.read(lease.state==='active'?lease.object_key:source.object_key);
    if(bytes.length!==lease.bytes||digest(bytes)!==lease.sha256)throw new VideoStateError('REFERENCE_MEDIA_INTEGRITY_FAILED');
-   if(lease.state==='prepared')await this.#store.persist(lease.object_key,bytes,bytes[0]===0xff&&bytes[1]===0xd8?'image/jpeg':'image/png',lease.sha256);
+   if(lease.state==='prepared')await this.#store.persist(lease.object_key,bytes,leasedType(bytes),lease.sha256);
    return await this.transaction(scope,async(db,j)=>{
     await this.proof(db,j);
     const r=(await db.query('SELECT * FROM app.video_reference_leases WHERE job_id=$1',[j.id])).rows[0];

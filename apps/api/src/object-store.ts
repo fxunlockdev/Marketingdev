@@ -10,6 +10,13 @@ export const MAX_UPLOAD_BYTES=20*1024*1024;
 export const MAX_CANONICAL_VIDEO_BYTES=64*1024*1024;
 export const digest=(bytes:Buffer)=>createHash('sha256').update(bytes).digest('hex');
 export class InvalidAsset extends Error {constructor(readonly code:string){super(code);}}
+export type ReferenceContentType='image/png'|'image/jpeg';
+/** The type of a stored video reference, read from its bytes: only PNG and JPEG are ever leased. */
+export function referenceContentType(bytes:Buffer):ReferenceContentType{
+  if(bytes.length>=8&&bytes.subarray(0,8).equals(Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a])))return 'image/png';
+  if(bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff)return 'image/jpeg';
+  throw new InvalidAsset('REFERENCE_MEDIA_TYPE_INVALID');
+}
 export class ObjectStore {
   readonly client:S3Client;
   readonly previews=new ImagePreviews(key=>this.read(key));
@@ -25,11 +32,12 @@ export class ObjectStore {
     return getSignedUrl(this.client,new GetObjectCommand({Bucket:this.config.bucket,Key:key,
       ResponseContentDisposition:`attachment; filename="${filename}"`,ResponseContentType:type}),{expiresIn:60});
   }
-  async referenceURL(key:string,expiresAt:Date) {
+  async referenceURL(key:string,expiresAt:Date,contentType:ReferenceContentType='image/png') {
     const uuid='[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}';
     const signingDate=new Date(Math.floor(Date.now()/1000)*1000),expiresIn=Math.min(8*3600,Math.floor((expiresAt.getTime()-signingDate.getTime())/1000));
-    if(!new RegExp(`^video-reference/${uuid}/${uuid}/${uuid}/[a-f0-9]{64}$`).test(key)||!Number.isInteger(expiresIn)||expiresIn<60||expiresIn>8*3600)throw new InvalidAsset('REFERENCE_LEASE_INVALID');
-    return getSignedUrl(this.client,new GetObjectCommand({Bucket:this.config.bucket,Key:key,ResponseContentType:'image/png',ResponseContentDisposition:'attachment; filename="desvio-reference.png"'}),{expiresIn,signingDate});
+    if(!new RegExp(`^video-reference/${uuid}/${uuid}/${uuid}/[a-f0-9]{64}$`).test(key)||!Number.isInteger(expiresIn)||expiresIn<60||expiresIn>8*3600||!['image/png','image/jpeg'].includes(contentType))throw new InvalidAsset('REFERENCE_LEASE_INVALID');
+    const extension=contentType==='image/jpeg'?'jpg':'png';
+    return getSignedUrl(this.client,new GetObjectCommand({Bucket:this.config.bucket,Key:key,ResponseContentType:contentType,ResponseContentDisposition:`attachment; filename="desvio-reference.${extension}"`}),{expiresIn,signingDate});
   }
   async read(key:string,limit=MAX_UPLOAD_BYTES):Promise<Buffer> {
     if(!Number.isSafeInteger(limit)||limit<1||limit>MAX_CANONICAL_VIDEO_BYTES)throw new InvalidAsset('OBJECT_READ_LIMIT_INVALID');

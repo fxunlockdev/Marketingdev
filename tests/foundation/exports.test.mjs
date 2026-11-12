@@ -666,7 +666,7 @@ test('uploaded product photo video consent is scoped, hash-bound, replay-safe an
  await assert.rejects(refs.bind(alice.id,brand.id,videoJob,{...input,source_sha256:'0'.repeat(64)}));
  await refs.bind(alice.id,brand.id,videoJob,input);await refs.bind(alice.id,brand.id,videoJob,input);
  const proof=await refs.verify(scope({id:videoJob}));assert.equal(proof.brand_reference_id,approved.id);assert.equal(proof.sha256,upload.sha256);
- const lease=await refs.prepare(scope({id:videoJob}));assert.equal(digest(Buffer.from(await(await fetch(lease.url)).arrayBuffer())),upload.sha256);
+ const lease=await refs.prepare(scope({id:videoJob}));const served=await fetch(lease.url);assert.equal(served.headers.get('content-type'),'image/jpeg','A JPEG product photo is labelled as JPEG for the video provider');assert.match(served.headers.get('content-disposition'),/desvio-reference\.jpg/);assert.equal(digest(Buffer.from(await served.arrayBuffer())),upload.sha256);
  await canvas.revokeReference(alice.id,brand.id,approved.id);
  await assert.rejects(refs.verify(scope({id:videoJob})),/REFERENCE_APPROVAL_CHANGED/);
  await assert.rejects(refs.prepare(scope({id:videoJob})),/REFERENCE_APPROVAL_CHANGED/);
