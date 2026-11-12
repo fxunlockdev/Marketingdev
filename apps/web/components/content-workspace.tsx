@@ -1,5 +1,6 @@
 "use client";
 import {CreativeRecovery} from './creative-recovery';
+import {CreativeQuality,InImageHeadline,headlineFeedback} from './creative-quality';
 import {MonthlyPlanReview} from './monthly-plan-review';
 import {DesvioSelect} from './desvio-select';
 import "./post-details-spacing.css";
@@ -870,6 +871,25 @@ export function SlotPanel({
     } catch (e) { setError(e); await load(); }
     finally { setBusy(false); }
   }
+  // One path for "Revise creative" and "Regenerate with new headline": the customer's words are the feedback.
+  function regenerate(text: string) {
+    const body = {
+      revision: s.revision,
+      feedback: text,
+      reference_ids:referenceIds,
+      reset_approval: reset,
+    };
+    void act(async () => {
+      await api(
+        `${root}/content-slots/${slotId}/generate-creative`,
+        body,
+        "POST",
+        requestKey(key, body),
+      );
+      key.current = null;
+      setReferenceIds([]);
+    }, "Creative request queued. The saved result will appear here.");
+  }
   function review(decision: string) {
     if (editing) return;
     void act(
@@ -942,6 +962,15 @@ export function SlotPanel({
                     previewOnly={!editing}
                     onExportReady={(fn) => setReady(!!fn)}
                   />
+                  <CreativeQuality qa={s.qa} />
+                  {(s.skill_manifest?.text_mode === 'in_image' || s.qa?.text_mode === 'in_image') && !editing && (
+                    <InImageHeadline
+                      key={s.creative_version_id}
+                      headline={s.skill_manifest?.in_image_text?.headline ?? s.qa?.expected_text?.[0] ?? ''}
+                      disabled={busy || dirty || referenceDirty || !!active || !!held || s.has_newer_version || s.state === 'cancelled' || (s.state === 'approved' && !reset)}
+                      onRegenerate={canWrite ? headline => regenerate(headlineFeedback(headline)) : undefined}
+                    />
+                  )}
                   {canWrite && editing && s.state !== 'cancelled' && <div className="post-design-actions">
                     {<>
                       <Field label="Caption">{id=><textarea id={id} value={editCaption} maxLength={3000} disabled={busy||!!savedEdit} onChange={e=>setEditCaption(e.target.value)}/>}</Field>
@@ -1170,24 +1199,7 @@ export function SlotPanel({
                       (s.state === "approved" && !reset) ||
                       s.has_newer_version
                     }
-                    onClick={() => {
-                      const body = {
-                        revision: s.revision,
-                        feedback,
-                        reference_ids:referenceIds,
-                        reset_approval: reset,
-                      };
-                      void act(async () => {
-                        await api(
-                          `${root}/content-slots/${slotId}/generate-creative`,
-                          body,
-                          "POST",
-                          requestKey(key, body),
-                        );
-                        key.current = null;
-                        setReferenceIds([]);
-                      }, "Creative request queued. The saved result will appear here.");
-                    }}
+                    onClick={() => regenerate(feedback)}
                   >
                     {s.creative_version_id
                       ? "Revise creative"

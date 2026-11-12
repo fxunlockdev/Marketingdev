@@ -1279,3 +1279,16 @@ test('the worker storage check uses the same 30-day window as Canvas, so older w
   await admin.query('DELETE FROM app.creative_media WHERE job_id=ANY($1::uuid[])',[jobs]);await admin.query('DELETE FROM app.jobs WHERE id=ANY($1::uuid[])',[jobs]);
  }
 });
+test('review reads expose bounded quality fields, never the raw checker report',async()=>{
+ const checked=(await admin.query("SELECT v.id,v.project_id,v.qa FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id AND p.latest_version_id=v.id JOIN app.creative_media m ON m.id=v.media_id WHERE v.brand_id=$1 AND v.qa->>'verdict' IN ('pass','flag') AND m.width=1024 AND m.height=1024 ORDER BY v.created_at DESC LIMIT 1",[brand.id])).rows[0];
+ assert.ok(checked,'an earlier test stored a checked creative');
+ const fields=['expected_text','found_text','message','notes','retried','text_matches','text_mode','verdict'];
+ const shown=(await canvas.project(alice,brand.id,checked.project_id)).versions.find(v=>v.id===checked.id).qa;
+ assert.deepEqual(Object.keys(shown).sort(),fields);assert.equal(shown.verdict,checked.qa.verdict);assert.match(shown.message,/^(Text checked|Checked|Needs a look)/);
+ assert.ok(!JSON.stringify(shown).includes(checked.qa.model),'the checker model and attempts stay on the server');
+ const s=await plannedSlot();
+ await plans.edit(alice,brand.id,s.id,{revision:s.revision,creative_version_id:checked.id});
+ const slot=(await slotCreatives.detail(alice,brand.id,s.id)).slot;
+ assert.deepEqual(slot.qa,shown);
+ assert.equal((await slotCreatives.detail(alice,brand.id,(await plannedSlot()).id)).slot.qa,null,'a post without a creative has no quality fields');
+});

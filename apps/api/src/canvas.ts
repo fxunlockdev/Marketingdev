@@ -5,6 +5,7 @@ import {planningLearning} from './learning-context.js';
 import {recordSignal} from './learning-signals.js';
 import {GENERATION_LIMITS} from './creative-budget.js';
 import {creativeMediaUsed,creativeStorageFits} from './creative-storage.js';
+import {qaSummary} from './creative-qa-summary.js';
 import {editSignal,manifestContext} from './creative-edit-signal.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
@@ -408,12 +409,13 @@ export class Canvas {
       if (!p) throw new NotFoundException("Creative not found");
       return {
         project: p,
+        // The stored quality report is reduced to bounded review fields; raw checker output stays here.
         versions: (
           await db.query(
-            "SELECT id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,status,review_revision,reviewed_at,created_at FROM app.creative_versions WHERE organization_id=$1 AND brand_id=$2 AND project_id=$3 ORDER BY created_at DESC,id",
+            "SELECT id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,status,review_revision,reviewed_at,created_at,qa FROM app.creative_versions WHERE organization_id=$1 AND brand_id=$2 AND project_id=$3 ORDER BY created_at DESC,id",
             [b.organization_id, id, projectId],
           )
-        ).rows,
+        ).rows.map(({qa,...version}:{qa:unknown}&Record<string,unknown>)=>({...version,qa:qaSummary(qa)})),
         reviews: (
           await db.query(
             "SELECT r.version_id,r.decision,r.feedback,r.created_at FROM app.creative_reviews r JOIN app.creative_versions v ON v.id=r.version_id WHERE v.project_id=$1 ORDER BY r.created_at",

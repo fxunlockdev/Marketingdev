@@ -1,5 +1,6 @@
 "use client";
 import {DesvioSelect} from './desvio-select';
+import {CreativeQuality,InImageHeadline,type QaSummary} from './creative-quality';
 import chatStyles from "./canvas-chat.module.css";
 import {GeneratedReplacement} from "./generated-replacement";
 import {GenerationNotification} from './generation-notification';
@@ -61,6 +62,7 @@ type Version = {
   review_revision: number;
   created_at: string;
   skill_manifest: any;
+  qa?: QaSummary | null;
 };
 type Project = {
   project: {
@@ -809,6 +811,10 @@ export function CreativeProject({
         readOnly={!write || !latest || busy || editingDisabled}
         onExportReady={exportReady}
       />
+      <CreativeQuality qa={version.qa} />
+      {(version.skill_manifest?.text_mode === 'in_image' || version.qa?.text_mode === 'in_image') && (
+        <InImageHeadline headline={version.skill_manifest?.in_image_text?.headline ?? version.qa?.expected_text?.[0] ?? ''} disabled />
+      )}
       {write&&latest&&<GeneratedReplacement key={`generated:${business.id}:${projectId}:${version.id}`} businessId={business.id} projectId={projectId} parentId={version.id} disabled={dirty||busy} onReady={async id=>{await load(id);setNotice('Your new photo is ready to review.');}}/>}
       {write&&latest&&<StockPicker key={`${business.id}:${projectId}:${version.id}`} businessId={business.id} purpose="replacement" disabled={dirty||busy} onSelected={async referenceId=>{setBusy(true);try{const saved=await api(root+`/stock/projects/${projectId}/replace`,{parent_id:version.id,reference_id:referenceId});await load(saved.id);setNotice('Photo replaced in a new draft. Review the result before using it in a post.');}finally{setBusy(false);}}}/>}
       <Field label="Post caption">

@@ -8,6 +8,7 @@ import type {PoolClient} from 'pg';
 import {campaignDesignDirection,campaignCreativeContext,CAMPAIGN_CREATIVE_PREFIX} from './campaign-design.js';
 import {creativeTextProvider} from "./creative-planning.js";
 import {recordSignal} from './learning-signals.js';
+import {qaSummary} from './creative-qa-summary.js';
 import {
   BadRequestException,
   ConflictException,
@@ -354,13 +355,15 @@ export class SlotCreatives {
     return this.plans.scope(user, id, false, async (db, b) => {
       const slot = (
         await db.query(
-          `SELECT s.*,p.title AS plan_title,p.timezone,p.objective,p.starts_on::text,v.design,COALESCE(v.caption,vv.caption,cv.caption) AS caption,v.skill_manifest,v.media_id,COALESCE(v.project_id,vv.project_id,cv.project_id) AS project_id,COALESCE(c.thread_id,vp.thread_id) AS thread_id,COALESCE(c.latest_version_id,vp.latest_version_id,cp.latest_version_id) AS latest_version_id,cv.status AS carousel_status,(CASE WHEN s.format='carousel' THEN cp.latest_version_id<>cv.id WHEN s.format='video' THEN vp.latest_version_id<>vv.id ELSE c.latest_version_id<>v.id END) AS has_newer_version
+          `SELECT s.*,p.title AS plan_title,p.timezone,p.objective,p.starts_on::text,v.design,COALESCE(v.caption,vv.caption,cv.caption) AS caption,v.skill_manifest,v.qa,v.media_id,COALESCE(v.project_id,vv.project_id,cv.project_id) AS project_id,COALESCE(c.thread_id,vp.thread_id) AS thread_id,COALESCE(c.latest_version_id,vp.latest_version_id,cp.latest_version_id) AS latest_version_id,cv.status AS carousel_status,(CASE WHEN s.format='carousel' THEN cp.latest_version_id<>cv.id WHEN s.format='video' THEN vp.latest_version_id<>vv.id ELSE c.latest_version_id<>v.id END) AS has_newer_version
    FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id LEFT JOIN app.creative_versions v ON v.id=s.creative_version_id LEFT JOIN app.creative_projects c ON c.id=v.project_id LEFT JOIN app.video_versions vv ON vv.id=s.video_version_id LEFT JOIN app.video_projects vp ON vp.id=vv.project_id LEFT JOIN app.carousel_versions cv ON cv.id=s.carousel_version_id LEFT JOIN app.carousel_projects cp ON cp.id=cv.project_id
    WHERE s.organization_id=$1 AND s.brand_id=$2 AND s.id=$3`,
           [b.organization_id, id, slotId],
         )
       ).rows[0];
       if (!slot) throw new NotFoundException("Content slot not found");
+      // Review screens get bounded quality fields, never the raw checker output.
+      slot.qa = qaSummary(slot.qa);
       if(slot.format==='carousel'&&slot.carousel_version_id){try{await this.plans.carousel(db,b.organization_id,id,slot.carousel_version_id,slot.channel);}catch(e){if(e instanceof ConflictException||e instanceof NotFoundException)slot.has_newer_version=true;else throw e;}}
       const events = (
         await db.query(
