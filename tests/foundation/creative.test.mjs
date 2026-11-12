@@ -1092,3 +1092,25 @@ test('a story is composed at true 9:16 with no white padding, the prompt states 
  assert.match(transport.log.prompts[0],/central 80% of the width/);assert.match(transport.log.prompts[0],/top 14% and bottom 20%/);
 });
 
+test('the locked mood board reaches the image prompt of later requests only, through the worker role',async()=>{
+ const board={summary:'TEST FIXTURE: warm neighbourhood practice',rationale:'r',palette:[{role:'primary',hex:'#0f3d2e'},{role:'secondary',hex:'#f4efe6'},{role:'accent',hex:'#ff6b35'}],heading_font:'DM Sans',body_font:'DM Sans',voice:'Friendly',imagery:'TEST FIXTURE: candid reception desks in window light',pillars:['Care'],essential_questions:[],evidence_ids:[]};
+ transport=directedTransport({images:[await coloured(1024,1024,'#101010'),await coloured(1024,1024,'#202020')]});
+ const {log}=transport;
+ const before=await canvas.submit(alice,brand.id,thread.id,request('Create a post before the mood board is locked'),randomUUID());
+ assert.equal(await handler.run(scope(before)),'succeeded');
+ assert.ok(!log.prompts[0].includes('APPROVED CREATIVE DIRECTION'));
+ // Explicit fixture row: the linked preview jobs and versions are not needed to prove the read path.
+ const client=await admin.connect();
+ try{
+  await client.query('BEGIN');await client.query('SET LOCAL session_replication_role=replica');
+  await client.query(`INSERT INTO app.guided_moodboards(id,organization_id,brand_id,brief_revision,ordinal,direction,feedback,image_job_id,carousel_job_id,request_key,request_hash,created_by,approved_at,approved_by,image_version_id,carousel_version_id) VALUES($1,$2,$3,1,1,$4,'TEST FIXTURE: less orange',$5,$6,$7,'fixture',$8,now(),$8,$9,$10)`,[randomUUID(),org.id,brand.id,JSON.stringify(board),randomUUID(),randomUUID(),randomUUID(),alice,randomUUID(),randomUUID()]);
+  await client.query('COMMIT');
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+ const after=await canvas.submit(alice,brand.id,thread.id,request('Create a post after the mood board is locked'),randomUUID());
+ assert.equal(await handler.run(scope(after)),'succeeded');
+ assert.match(log.prompts[1],/APPROVED CREATIVE DIRECTION/);
+ assert.ok(log.prompts[1].includes('TEST FIXTURE: candid reception desks in window light'));
+ assert.ok(log.prompts[1].includes('TEST FIXTURE: less orange'));assert.ok(log.prompts[1].includes('#0f3d2e'));
+ assert.ok(log.prompts[1].includes('Use generous spacing and restrained typography.'));
+ await admin.query('DELETE FROM app.guided_moodboards WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
+});

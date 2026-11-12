@@ -6,6 +6,7 @@ import {buildImagePrompt} from './image-prompt.js';
 import {resolveTextMode,inImageCopy} from './image-typography.js';
 import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,type QaAttempt,type QaExpectation,type QaReport} from './image-qa.js';
 import {frameCreative,frameDirection} from "./creative-framing.js";
+import {approvedDirection} from "./image-direction.js";
 import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
 import {approvedBrandFont} from './brand-typography.js';
 import {savedCampaignFont} from './campaign-design.js';
@@ -344,10 +345,12 @@ export class CreativeJobs {
             : null,
         };
         const references=(await db.query(`SELECT ${referenceColumns},c.position FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id ${referenceJoins} WHERE c.job_id=$1 ORDER BY c.position`,[j.id])).rows;
-        return { request, grant, parent, input, references, actor: j.requested_by };
+        // Only a mood board locked before this request was made: the prompt must be identical on replay.
+        const moodboard=(await db.query('SELECT m.direction,m.feedback FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0]??null;
+        return { request, grant, parent, input, references, moodboard, actor: j.requested_by };
       });
       if (!prepared) return "finished";
-      const { request, grant, input, parent, references } = prepared;
+      const { request, grant, input, parent, references, moodboard } = prepared;
       const referenceImages:Buffer[]=[],referenceManifest:any[]=[];
       for(const r of references){
         if(!r.object_key||!r.sha256)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
@@ -405,7 +408,7 @@ export class CreativeJobs {
       const artwork=request.creative_spec?.artwork;
       const textMode=resolveTextMode({brief:plan.brief,artwork,parent:parent?{hasOverlayText:parent.design.layers.some((l:any)=>String(l.text??'').trim()),textMode:parent.skill_manifest?.text_mode}:null});
       const frame=request.creative_spec?frameDirection(normalizeCreativeSpec(request.creative_spec,request.format,request.channel)):undefined;
-      const basePrompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork,frame});
+      const basePrompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork,frame,approvedDirection:approvedDirection(moodboard,request.prompt)});
       const render=async(step:'image'|'image:retry',prompt:string)=>{
       const wire = this.provider.imageRequest(
         grant.image_model,
