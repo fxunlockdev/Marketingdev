@@ -119,6 +119,15 @@ test('Post for Me lifecycle on the deterministic mock: schedule a whole plan, pu
  await assert.rejects(service.reschedule(alice.id,brand.id,rows[b.slot.id],{scheduled_at:'2020-01-01T09:00',confirmed:true}),/between one minute and 31 days/);
  const moved=await service.reschedule(alice.id,brand.id,rows[b.slot.id],{scheduled_at:later,confirmed:true});
  assert.equal(moved.scheduled_at,later+':00.000Z');assert.equal([...mock.state.posts.values()].find(p=>p.external_id===rows[b.slot.id]).scheduled_at,moved.scheduled_at);assert.equal(mock.state.posts.size,3);
+ // The calendar follows: the post's date moves with its publication. The reviewed revision and its exact
+ // image approval are unchanged (a retry still proves the same approval), and the move is recorded.
+ const slotB=(await admin.query('SELECT planned_at,revision,state FROM app.content_slots WHERE id=$1',[b.slot.id])).rows[0];
+ assert.equal(slotB.planned_at.toISOString(),moved.scheduled_at);assert.equal(slotB.revision,b.slot.revision);assert.equal(slotB.state,'approved');
+ assert.equal(moved.calendar_moved,true);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE action='publication.rescheduled' AND resource_id=$1 AND actor_id=$2",[b.slot.id,alice.id])).rows[0].n,1);
+ await assert.rejects(plans.edit(alice.id,brand.id,b.slot.id,{revision:slotB.revision,brief:'TEST other edit',reset_approval:true}),/Resolve the existing publication/,'other edits of a published post stay blocked');
+ const movedAgain=await service.reschedule(alice.id,brand.id,rows[b.slot.id],{scheduled_at:later.slice(0,11)+'18:30',confirmed:true});
+ assert.equal((await admin.query('SELECT planned_at FROM app.content_slots WHERE id=$1',[b.slot.id])).rows[0].planned_at.toISOString(),movedAgain.scheduled_at,'a second move follows too');
  // Cancel C: deleted remotely first, then freed locally and offered again.
  await assert.rejects(service.cancel(viewer.id,brand.id,rows[c.slot.id]),e=>e.getStatus?.()===403);
  assert.equal((await service.cancel(alice.id,brand.id,rows[c.slot.id])).phase,'canceled');assert.equal(mock.state.posts.size,2);

@@ -22,6 +22,19 @@ async function applyOutcome(db:any,id:string,outcome:StatusOutcome,readAt:string
  if(outcome.kind==='unconfirmed'){await db.query("UPDATE app.postforme_publications SET error_code='POSTFORME_OUTCOME_UNCONFIRMED',last_checked_at=now() WHERE id=$1",[id]);return;}
  await db.query("UPDATE app.postforme_publications SET phase='accepted',remote_id=$2,observed_state=$3,release_url=$4,failure_reason=$5,scheduled_at=$6,error_code=NULL,last_checked_at=now() WHERE id=$1 AND phase IN ('accepted','unknown') AND scheduled_at=$7",[id,outcome.remote_id,outcome.state,outcome.release_url,outcome.failure_reason,outcome.scheduled_at,new Date(readAt).toISOString()]);
 }
+/** After a confirmed reschedule, the post's calendar date follows its publication. Only when the post is still
+ * the exact revision that was published (revision check) and this is its only active publication; the reviewed
+ * revision and its image approval stay as they are, and the move is recorded. Returns whether the date moved. */
+export async function moveCalendarDate(db:any,actor:{organizationId:string;brandId:string;actorId:string},publicationId:string,at:Date):Promise<boolean>{
+ const p=(await db.query("SELECT slot_id,revision FROM app.postforme_publications WHERE id=$1 AND phase='accepted'",[publicationId])).rows[0];
+ if(!p)return false;
+ const others=(await db.query("SELECT 1 FROM app.postforme_publications WHERE slot_id=$1 AND id<>$2 AND phase NOT IN ('rejected','canceled')",[p.slot_id,publicationId])).rowCount;
+ if(others)return false;
+ const moved=(await db.query('UPDATE app.content_slots SET planned_at=$3,updated_at=now() WHERE id=$1 AND revision=$2 AND planned_at<>$3',[p.slot_id,p.revision,at.toISOString()])).rowCount;
+ if(!moved)return (await db.query('SELECT 1 FROM app.content_slots WHERE id=$1 AND revision=$2 AND planned_at=$3',[p.slot_id,p.revision,at.toISOString()])).rowCount>0;
+ await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'publication.rescheduled',$4)",[actor.organizationId,actor.brandId,actor.actorId,p.slot_id]);
+ return true;
+}
 /** Latest requests with what the customer can do next: change (reschedule or cancel) before publishing, or retry after a confirmed failure. */
 export const publicationListSQL=`SELECT p.id,p.created_at,p.slot_id,p.phase,p.observed_state,p.observed_state status,p.scheduled_at,p.caption,p.error_code,p.error_code check_error,p.failure_reason,p.retry_of,p.canceled_at,p.last_checked_at,p.release_url,p.remote_id release_id,a.username account_name,a.platform provider,s.plan_id,
  (p.phase='accepted' AND p.observed_state IN ('unconfirmed','scheduled') AND p.remote_id IS NOT NULL AND p.scheduled_at>now()+interval '2 minutes') AS changeable,
@@ -88,8 +101,8 @@ export class Postforme {
    try{const updated=await client.call(path,'PUT',{caption:op.caption,scheduled_at:at.toISOString(),social_accounts:[op.remote_account],external_id:op.id,media,...(remote.platform_configurations?{platform_configurations:remote.platform_configurations}:{})});
     if(updated?.id!==op.remote_id||Date.parse(updated?.scheduled_at)!==at.getTime())throw new PostformeError('POSTFORME_INVALID_POST',true);}
    catch(e){if(e instanceof PostformeError&&e.ambiguous)await this.markUnconfirmed(user,brand,op.id,'POSTFORME_RESCHEDULE_UNCONFIRMED');throw e;}
-   await this.connections.scope(user,brand,true,async db=>{await db.query("UPDATE app.postforme_publications SET scheduled_at=$2,error_code=NULL WHERE id=$1 AND phase='accepted'",[op.id,at.toISOString()]);});
-   return {id:op.id,phase:'accepted',scheduled_at:at.toISOString()};
+   const calendarMoved=await this.connections.scope(user,brand,true,async(db,b)=>{await db.query("UPDATE app.postforme_publications SET scheduled_at=$2,error_code=NULL WHERE id=$1 AND phase='accepted'",[op.id,at.toISOString()]);return moveCalendarDate(db,{organizationId:b.organization_id,brandId:brand,actorId:user},op.id,at);});
+   return {id:op.id,phase:'accepted',scheduled_at:at.toISOString(),calendar_moved:calendarMoved};
   });
  }
  /** Schedule every approved, ready post of one plan at its planned time. Each post has its own derived request key,
