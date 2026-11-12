@@ -5,10 +5,13 @@ import {canonicalJSON,hash} from './brand-brain.js';
 import type {ContentPlan} from './content-plan.js';
 import {CreativeError} from './creative-contracts.js';
 import {planningLearning} from './learning-context.js';
+import {applyMutations,refId,type EvidenceRef,type KnowledgeScope,type NodeRef} from './knowledge-graph.js';
+import {fromBrandBrainSnapshot} from './knowledge-extract.js';
 import {packForJob,promptKnowledge} from './knowledge-production.js';
-import {marketNotes,researchEvidence,savedResearch} from './strategy-evidence.js';
+import {strategyMutations} from './strategy-graph.js';
+import {evidenceOrigin,marketNotes,researchEvidence,savedResearch} from './strategy-evidence.js';
 import {object,uuid} from './workspaces.js';
-import {strategySnapshot,validateStrategyInput,type StrategyInput,type StrategyResult,type StrategySnapshot} from './strategy-contracts.js';
+import {strategySnapshot,validateStrategyInput,type BrandStrategy,type Evidence,type StrategyInput,type StrategyResult,type StrategySnapshot} from './strategy-contracts.js';
 
 type Scope={organization_id:string};
 const DAILY_STRATEGY_REQUESTS=3;
@@ -42,6 +45,28 @@ export async function groundedStrategyContext(db:PoolClient,organization:string,
  return {...(supplied.evidence===undefined&&evidence.length?{evidence}:{}),...(supplied.market_research===undefined&&notes.length?{market_research:notes}:{}),...(pack?{context_pack:pack}:{}),...supplied};
 }
 
+async function citationTargets(db:PoolClient,scope:KnowledgeScope,brainId:string,jobId:string):Promise<{facts:Map<string,NodeRef>;evidence:Map<string,EvidenceRef>}>{
+ const brain=(await db.query('SELECT snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[scope.organizationId,scope.brandId,brainId])).rows[0];
+ const candidates=new Map<string,NodeRef>();
+ for(const fact of Array.isArray(brain?.snapshot?.facts)?brain.snapshot.facts:[]){
+  // The same mapping the profile approval used, one fact at a time, so the refs match the stored fact nodes.
+  try{const node=fromBrandBrainSnapshot({facts:[fact]}).nodes[0];if(node&&typeof fact.id==='string')candidates.set(fact.id,{type:node.type,key:node.key});}catch{/* An unmappable fact is simply not citable in the graph. */}
+ }
+ const refs=[...candidates.values()];
+ const existing=refs.length?new Set((await db.query("SELECT type,key FROM app.knowledge_nodes WHERE organization_id=$1 AND brand_id=$2 AND status<>'rejected' AND (type,key) IN (SELECT * FROM unnest($3::text[],$4::text[]))",[scope.organizationId,scope.brandId,refs.map(r=>r.type),refs.map(r=>r.key)])).rows.map((r:NodeRef)=>refId(r))):new Set<string>();
+ const facts=new Map([...candidates].filter(([,ref])=>existing.has(refId(ref))));
+ const input=(await db.query('SELECT input FROM app.planning_requests WHERE organization_id=$1 AND brand_id=$2 AND job_id=$3',[scope.organizationId,scope.brandId,jobId])).rows[0]?.input;
+ const evidence=new Map<string,EvidenceRef>();
+ for(const item of (Array.isArray(input?.evidence)?input.evidence:[]) as Evidence[]){const origin=evidenceOrigin(item.id);if(origin)evidence.set(item.id,{...origin,excerpt:String(item.summary).slice(0,500)});}
+ const sources=[...evidence.values()].flatMap(e=>e.sourceId?[e.sourceId]:[]),jobs=[...evidence.values()].flatMap(e=>e.jobId?[e.jobId]:[]);
+ const live=new Set([...(sources.length?(await db.query('SELECT id FROM app.brand_sources WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[])',[scope.organizationId,scope.brandId,sources])).rows:[]),...(jobs.length?(await db.query('SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[])',[scope.organizationId,scope.brandId,jobs])).rows:[])].map((r:{id:string})=>r.id));
+ return {facts,evidence:new Map([...evidence].filter(([,e])=>live.has((e.sourceId??e.jobId) as string)))};
+}
+/** Writes an approved strategy into the business's knowledge graph in the caller's (approval) transaction. */
+export async function applyStrategyGraph(db:PoolClient,scope:KnowledgeScope,row:{brain_id:string;job_id:string;strategy:BrandStrategy},actor:string):Promise<{nodes:number;edges:number}>{
+ const applied=await applyMutations(db,scope,strategyMutations(row.strategy,await citationTargets(db,scope,row.brain_id,row.job_id)),{actor});
+ return {nodes:applied.nodes.length,edges:applied.edges.filter(e=>e.id).length};
+}
 
 /** Customer side of the brand strategy: ask for one, read the versions, approve a draft. */
 export class BrandStrategies{
@@ -89,14 +114,16 @@ export class BrandStrategies{
   strategyId=uuid(strategyId);const v=object(body,['sha256']);
   if(typeof v.sha256!=='string'||!/^[a-f0-9]{64}$/.test(v.sha256))throw new BadRequestException('Include the checksum of the strategy you reviewed');
   return this.plans.scope(user,id,true,async(db:PoolClient,b:Scope)=>{
-   const row=(await db.query('SELECT id,version,status,sha256,strategy FROM app.brand_strategies WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,strategyId])).rows[0];
+   const row=(await db.query('SELECT id,version,status,sha256,strategy,brain_id,job_id FROM app.brand_strategies WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,strategyId])).rows[0];
    if(!row)throw new NotFoundException('Brand strategy not found');
    if(row.sha256!==v.sha256||hash(canonicalJSON(row.strategy))!==row.sha256)throw new ConflictException('This strategy changed. Reload before approving');
    if(row.status==='approved')return {id:row.id,version:row.version,status:'approved'};
    if(!(await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed)throw new ForbiddenException('Only a business owner or admin can approve the strategy');
    const done=await db.query("UPDATE app.brand_strategies SET status='approved',approved_by=$2,approved_at=now() WHERE id=$1 AND status='draft'",[strategyId,user]);
    if(!done.rowCount)throw new ConflictException('This strategy could not be approved. Reload and try again');
-   return {id:row.id,version:row.version,status:'approved'};
+   // The approved strategy becomes knowledge in the same transaction: approval and graph commit together.
+   const graph=await applyStrategyGraph(db,{organizationId:b.organization_id,brandId:id},row,user);
+   return {id:row.id,version:row.version,status:'approved',graph};
   },true);
  }
 }
