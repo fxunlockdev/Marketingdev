@@ -45,7 +45,7 @@ export class ChatConversations {
  async own(db:any,id:string){const c=(await db.query('SELECT * FROM app.chat_conversations WHERE id=$1',[id])).rows[0];if(!c)throw new NotFoundException('Conversation not found');return c;}
  read(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async db=>{
   const conversation=await this.own(db,id);
-  const turns=(await db.query(`SELECT t.job_id AS id,t.message,t.created_at,t.action_result,j.status,j.error_code,a.status AS action_status,a.error_code AS action_error,r.output,r.input->'chat'->'memories' AS source_records FROM app.chat_turns t JOIN app.jobs j ON j.id=t.job_id JOIN app.planning_requests r ON r.job_id=t.job_id LEFT JOIN delivery.chat_actions a ON a.job_id=t.job_id WHERE t.conversation_id=$1 ORDER BY t.created_at,t.job_id LIMIT 150`,[id])).rows;
+  const turns=(await db.query(`SELECT t.job_id AS id,t.message,t.created_at,t.action_result,j.status,j.error_code,a.status AS action_status,a.error_code AS action_error,a.error_message AS action_message,r.output,r.input->'chat'->'memories' AS source_records FROM app.chat_turns t JOIN app.jobs j ON j.id=t.job_id JOIN app.planning_requests r ON r.job_id=t.job_id LEFT JOIN delivery.chat_actions a ON a.job_id=t.job_id WHERE t.conversation_id=$1 ORDER BY t.created_at,t.job_id LIMIT 150`,[id])).rows;
   // Saved versions are the durable chat attachment. No second write or retry-created message.
   const saved_images=(await db.query(`SELECT v.id,v.project_id,v.design,v.created_at,
     (SELECT count(*)::int FROM app.creative_versions prior WHERE prior.project_id=v.project_id AND (prior.created_at,prior.id)<=(v.created_at,v.id)) AS version_number
@@ -55,7 +55,9 @@ export class ChatConversations {
     ORDER BY v.created_at,v.id`,[id,conversation.organization_id,brand])).rows;
   const carousel_runs=(await db.query(`SELECT j.id,j.status,j.error_code,j.cancel_requested,r.project_id,r.output_version_id,r.input->>'slide_count' AS slide_count FROM app.carousel_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.thread_id=$1 ORDER BY j.created_at DESC,j.id`,[id])).rows;
   const carousel_slides=(await db.query(`SELECT c.parent_job_id,c.position,g.status AS generation_status,e.status AS export_status,r.project_id,r.output_version_id FROM app.carousel_children c JOIN app.carousel_requests parent ON parent.job_id=c.parent_job_id JOIN app.creative_requests r ON r.job_id=c.generation_job_id JOIN app.jobs g ON g.id=c.generation_job_id JOIN app.jobs e ON e.id=c.export_job_id WHERE parent.thread_id=$1 ORDER BY c.position`,[id])).rows;
-  return {conversation:{id:conversation.id,title:conversation.title},saved_images,carousel_runs,carousel_slides,turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
+  // An uncertain image anywhere in the business blocks new creatives; name it so the chat can offer its recovery.
+  const blocking_creative=(await db.query("SELECT j.id FROM app.jobs j WHERE j.kind IN ('creative.generate','carousel.generate') AND j.status='unknown' ORDER BY j.created_at DESC,j.id LIMIT 1")).rows[0]?.id??null;
+  return {conversation:{id:conversation.id,title:conversation.title},blocking_creative,saved_images,carousel_runs,carousel_slides,turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
  });}
  submit(user:string,brand:string,body:unknown,key:unknown){
   const v=object(body,['conversation_id','message']);

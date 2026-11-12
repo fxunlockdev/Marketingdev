@@ -12,7 +12,9 @@ export class ChatActionWorker {
     await this.queue.query("UPDATE delivery.chat_actions SET status='completed',error_code=NULL WHERE job_id=$1 AND status='queued'",[r.job_id]);
    }catch(error){
     const permanent=error instanceof HttpException&&error.getStatus()<500;
-    await this.queue.query("UPDATE delivery.chat_actions SET attempts=attempts+1,status=CASE WHEN $2 OR attempts>=4 THEN 'failed' ELSE 'queued' END,next_attempt_at=now()+interval '30 seconds',error_code=$3 WHERE job_id=$1 AND status='queued'",[r.job_id,permanent,permanent?'CHAT_ACTION_NEEDS_ATTENTION':'CHAT_ACTION_TEMPORARILY_UNAVAILABLE']);
+    // Refusals (4xx) carry the API's own customer-facing reason; anything else stays on the server.
+    const reason=permanent?String(error.message).slice(0,300):null;
+    await this.queue.query("UPDATE delivery.chat_actions SET attempts=attempts+1,status=CASE WHEN $2 OR attempts>=4 THEN 'failed' ELSE 'queued' END,next_attempt_at=now()+interval '30 seconds',error_code=$3,error_message=$4 WHERE job_id=$1 AND status='queued'",[r.job_id,permanent,permanent?'CHAT_ACTION_NEEDS_ATTENTION':'CHAT_ACTION_TEMPORARILY_UNAVAILABLE',reason]);
    }
   }
   return rows.length;

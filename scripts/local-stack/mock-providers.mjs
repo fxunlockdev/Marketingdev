@@ -143,12 +143,28 @@ function contentPlan(schema,task){
  const plan=generate(schema,schema,{key:'',index:0},{slots:()=>slots});
  return plan;
 }
+/** The Create chat's interpretation, by keyword: enough to drive every Create path deterministically. */
+function chatDecision(body){
+ let context={};
+ for(const text of inputTexts(body.input)){try{const value=JSON.parse(text);if(value&&typeof value.message==='string')context=value;}catch{/* not the request */}}
+ const message=String(context.message??''),m=message.toLowerCase();
+ const channel=/linkedin/.test(m)?'linkedin':/facebook/.test(m)?'facebook':'instagram';
+ const base={reply:'',action:'answer',prompt:'',channel,size:'1024x1024',sources:[],starts_on:null,text_mode:/no text|without text/.test(m)?'none':'headline',slide_count:3,placement:'feed',duration_seconds:5};
+ const current=context.current_image;
+ if(current&&!/carousel|campaign/.test(m)&&/change|make it|replace|regenerate|headline|brighter|warmer|swap|instead|edit|update|revise/.test(m))
+  return {...base,reply:'Got it. I’ll revise the current image with that change.',action:'edit_image',prompt:message,size:current.size,channel:current.channel??channel};
+ if(/carousel/.test(m)){const n=Number(m.match(/(\d+)[- ]slide/)?.[1]??3);return {...base,reply:`A ${n}-slide carousel, coming right up.`,action:'carousel',prompt:message,slide_count:Math.min(10,Math.max(2,n))};}
+ if(/\bstor(y|ies)\b/.test(m))return {...base,reply:'A story, coming right up.',action:'image',prompt:message,placement:'story',size:'1024x1536',channel:channel==='linkedin'?'instagram':channel};
+ if(/campaign|content plan/.test(m))return {...base,reply:'I’ll plan that campaign.',action:'campaign',prompt:message,starts_on:context.today??null};
+ if(/create|make|design|post|image|\bad\b|advert/.test(m))return {...base,reply:'On it. I’m creating your post with your brand direction.',action:'image',prompt:message,size:/portrait|4:5/.test(m)?'1024x1536':/landscape/.test(m)?'1536x1024':'1024x1024'};
+ return {...base,reply:'Here is an idea based on your brand.'};
+}
 function plannerAnswer(body){
  const format=body.text?.format,task=plannerTask(body);
  if(!format)return 'Ready.';
  const schema=format.schema;
  if(format.name==='desvio_content_plan'&&schema.properties?.slots)return JSON.stringify(contentPlan(schema,task));
- if(format.name==='desvio_chat')return JSON.stringify({reply:'Here is an idea based on your brand.',action:'answer',prompt:'',channel:'instagram',size:'1024x1024',sources:[],starts_on:null,text_mode:'headline',slide_count:3,placement:'feed',duration_seconds:6});
+ if(format.name==='desvio_chat')return JSON.stringify(chatDecision(body));
  return JSON.stringify(generate(schema,schema,{key:'',index:0},{}));
 }
 function planner(body){

@@ -4,7 +4,8 @@ import {DesvioSelect} from './desvio-select';
 import {paintCurvedText} from '../lib/curved-text.mjs';
 import {TextCurveControls} from './text-curve-controls';
 import {ChatLayerControls} from './chat-layer-controls';
-import type {ReactNode,CSSProperties} from 'react';
+import type {ReactNode,CSSProperties,KeyboardEvent} from 'react';
+import type {BrandStyle} from './canvas-post-actions';
 import {readableDesign} from '../../api/src/creative-design';
 import { useEffect, useRef, useState } from "react";
 import { Canvas, FabricImage, Textbox, Rect } from "fabric";
@@ -26,6 +27,8 @@ export function CreativeEditor({
   afterArtwork,
   controlsFooter,
   onExportReady,
+  brandStyle,
+  shortcuts,
 }: {
   businessId: string;
   design: Design;
@@ -36,6 +39,10 @@ export function CreativeEditor({
   afterArtwork?: ReactNode;
   controlsFooter?: ReactNode;
   onExportReady: (download: (() => void) | null) => void;
+  /** The brand's own palette and fonts, offered first in the text controls. */
+  brandStyle?: BrandStyle;
+  /** Keyboard actions owned by the caller (history and saving). Absent when the design is read-only. */
+  shortcuts?: { undo: () => void; redo: () => void; save: () => void; canUndo: boolean; canRedo: boolean };
 }) {
   const host = useRef<HTMLDivElement>(null),
     element = useRef<HTMLCanvasElement>(null),
@@ -252,11 +259,47 @@ export function CreativeEditor({
       )}
     </Field>
   );
+  function duplicateLayer() {
+    if (!layer || design.layers.length >= 10) return;
+    const id = "text-" + crypto.randomUUID().slice(0, 8),
+      offset = Math.round(design.width * 0.03);
+    onChange({ ...design, layers: [...design.layers, { ...layer, id, x: Math.min(layer.x + offset, design.width - layer.width), y: Math.min(layer.y + offset, design.height - 1) }] });
+    setSelected(id);
+  }
+  function removeLayer() {
+    if (!layer) return;
+    const rest = design.layers.filter((l) => l.id !== layer.id);
+    onChange({ ...design, layers: rest });
+    setSelected(rest.at(-1)?.id ?? "");
+  }
+  /** Power-user keys. Text fields keep their own typing, undo and arrow keys. */
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (!shortcuts || previewOnly) return;
+    const target = event.target as HTMLElement,
+      typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable,
+      mod = event.metaKey || event.ctrlKey,
+      key = event.key.toLowerCase();
+    if (mod && key === "s") { event.preventDefault(); shortcuts.save(); return; }
+    if (typing) return;
+    if (mod && key === "z") { event.preventDefault(); if (event.shiftKey) shortcuts.redo(); else shortcuts.undo(); return; }
+    if (mod && key === "y") { event.preventDefault(); shortcuts.redo(); return; }
+    if (mod && key === "d") { event.preventDefault(); duplicateLayer(); return; }
+    if (!mod && (key === "delete" || key === "backspace")) { event.preventDefault(); removeLayer(); return; }
+    const step = event.shiftKey ? 10 : 1,
+      move = ({ arrowleft: [-step, 0], arrowright: [step, 0], arrowup: [0, -step], arrowdown: [0, step] } as Record<string, [number, number]>)[key];
+    if (move && layer && !mod) {
+      event.preventDefault();
+      update({ x: Math.max(0, Math.min(design.width - layer.width, layer.x + move[0])), y: Math.max(0, Math.min(design.height - 1, layer.y + move[1])) });
+    }
+  }
   return (
-    <div className="creative-editor" style={chatControls?{'--artwork-ratio':design.width/design.height} as CSSProperties:undefined}>
+    <div className="creative-editor" onKeyDown={onKeyDown} style={chatControls?{'--artwork-ratio':design.width/design.height} as CSSProperties:undefined}>
       <section className="creative-artboard" aria-label="Creative preview">
         <div
           ref={host}
+          tabIndex={shortcuts ? 0 : undefined}
+          aria-label={shortcuts ? "Artboard. Arrow keys move the selected text layer; Delete removes it; Command or Control with D duplicates it, Z undoes and S saves." : undefined}
+          onMouseDown={() => { if (shortcuts) host.current?.focus({ preventScroll: true }); }}
           className="creative-surface"
           aria-busy={(!ready && !error) || fontsLoading}
         >
@@ -283,7 +326,7 @@ export function CreativeEditor({
         </p>
       </section>
       {afterArtwork}
-      {!previewOnly && chatControls && <ChatLayerControls design={design} layer={layer} readOnly={readOnly} update={update} change={onChange} footer={controlsFooter} select={id=>{setSelected(id);const c=canvas.current,o=c?.getObjects().find(o=>(o as any).layerId===id);if(c&&o){c.setActiveObject(o);c.requestRenderAll();}}}/>}
+      {!previewOnly && chatControls && <ChatLayerControls design={design} brandStyle={brandStyle} layer={layer} readOnly={readOnly} update={update} change={onChange} footer={controlsFooter} select={id=>{setSelected(id);const c=canvas.current,o=c?.getObjects().find(o=>(o as any).layerId===id);if(c&&o){c.setActiveObject(o);c.requestRenderAll();}}}/>}
       {!previewOnly && !chatControls && <fieldset className="creative-layer-controls" disabled={readOnly}>
         <legend>Text layers</legend><div className="creative-text-actions"><ActionButton type="button" disabled={!design.layers.some(l=>l.text.trim())} onClick={()=>onChange(readableDesign(design))} label="Improve text contrast" /><ActionButton type="button" disabled={!design.layers.length} onClick={()=>onChange({...design,layers:[]})} label="Remove all image text" /></div><p className="hint">Use a short headline or leave the image clean. Save your changes to update the post.</p>
         <Field label="Selected layer">

@@ -1309,3 +1309,41 @@ test('creative storage usage is one fast scoped count for the app and the worker
  await assert.rejects(jobs.transaction(scope(job),db=>creativeMediaUsed(db,org.id,other)),e=>e.code==='42501');
  await admin.query("UPDATE app.jobs SET status='canceled' WHERE id=$1",[job.id]);
 });
+
+test('Create canvas alternatives come from the original brief through the same engine, stay grouped and bounded; the creative read carries brand style and its calendar posts',async()=>{
+ const first=await canvas.submit(alice,brand.id,thread.id,request('TEST FIXTURE: Announce the new reminder feature'),randomUUID());
+ assert.ok(['finished','succeeded'].includes(await handler.run(scope(first))));
+ const root=(await admin.query('SELECT project_id FROM app.creative_requests WHERE job_id=$1',[first.id])).rows[0].project_id;
+ await assert.rejects(canvas.submit(viewer,brand.id,thread.id,{variant_of:root,variant_count:2},randomUUID()),/read-only|cannot|permission|not allowed/i);
+ await assert.rejects(canvas.submit(alice,brand.id,thread.id,{variant_of:root,variant_count:4},randomUUID()),/1–3 alternatives/);
+ const key=randomUUID(),made=await canvas.submit(alice,brand.id,thread.id,{variant_of:root,variant_count:2},key);
+ assert.equal(made.variant_of,root);assert.equal(made.variants.length,2);assert.equal(made.id,made.variants[0].id);
+ assert.deepEqual(await canvas.submit(alice,brand.id,thread.id,{variant_of:root,variant_count:2},key),made,'a replayed request queues nothing new');
+ const queued=(await admin.query('SELECT r.prompt,r.size,r.channel,r.format,r.parent_version_id,p.variant_of,p.thread_id FROM app.creative_requests r JOIN app.creative_projects p ON p.id=r.project_id WHERE r.job_id=ANY($1::uuid[]) ORDER BY r.prompt',[made.variants.map(v=>v.id)])).rows;
+ assert.equal(queued.length,2);
+ for(const [i,r] of queued.entries()){
+  assert.match(r.prompt,new RegExp(`^TEST FIXTURE: Announce the new reminder feature\\n\\nAlternative ${i+1} of 2: `));
+  assert.deepEqual([r.size,r.channel,r.format,r.parent_version_id,r.variant_of,r.thread_id],['1024x1024','linkedin','static',null,root,thread.id]);
+ }
+ // Grouped under the first image even when an alternative is the one varied again; at most three alternatives.
+ for(const v of made.variants)assert.ok(['finished','succeeded'].includes(await handler.run(scope(v))));
+ const alternative=(await admin.query('SELECT project_id FROM app.creative_requests WHERE job_id=$1',[made.variants[1].id])).rows[0].project_id;
+ const third=await canvas.submit(alice,brand.id,thread.id,{variant_of:alternative,variant_count:1},randomUUID());
+ assert.equal(third.variant_of,root);
+ assert.ok(['finished','succeeded'].includes(await handler.run(scope(third))));
+ await assert.rejects(canvas.submit(alice,brand.id,thread.id,{variant_of:root,variant_count:1},randomUUID()),/at most 3 alternatives/);
+ const read=await canvas.project(alice,brand.id,alternative);
+ assert.deepEqual(read.variants.map(v=>v.id)[0],root);assert.equal(read.variants.length,4);
+ assert.ok(read.variants.every(v=>v.job_status==='succeeded'&&v.media_id&&v.latest_version_id));
+ assert.equal(read.project.variant_of,root);
+ assert.deepEqual((await canvas.thread(alice,brand.id,thread.id)).projects.find(p=>p.id===alternative).variant_of,root);
+ // Brand fonts come from the approved pairing; only exact hex colours become palette choices.
+ assert.deepEqual(read.brand_style,{colors:[],typography:{headline:{family:'DM Sans',weight:600},body:{family:'DM Sans',weight:400}}});
+ assert.deepEqual(read.slots,[]);
+ // A calendar post holding this creative appears on the creative read, in its plan's time zone.
+ const plan=await plans.create(alice,brand.id,{title:'TEST FIXTURE Create',objective:'Scheduled from Create',starts_on:'2026-12-01',timezone:'Europe/London',slots:[{channel:'instagram',planned_at:'2026-12-03T09:30:00Z',format:'static',brief:'Reminder feature',creative_version_id:read.project.latest_version_id}]},randomUUID());
+ const slots=(await canvas.project(alice,brand.id,alternative)).slots;
+ assert.equal(slots.length,1);
+ assert.deepEqual([slots[0].plan_id,slots[0].state,slots[0].channel,slots[0].timezone,slots[0].creative_version_id,new Date(slots[0].planned_at).toISOString()],[plan.id,'draft_ready','instagram','Europe/London',read.project.latest_version_id,'2026-12-03T09:30:00.000Z']);
+ assert.deepEqual((await canvas.project(alice,brand.id,root)).slots,[],'other alternatives are not scheduled');
+});
