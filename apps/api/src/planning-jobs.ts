@@ -2,6 +2,7 @@ import {acceptsModel} from './model-policy.js';
 import {suggestionMessage,readIdea} from './prompt-suggestions.js';
 import {CHAT_RATES,chatRequest,validateChatDecision} from './chat-contracts.js';
 import {planningReferences,assertPlanningReferences} from './planning-references.js';
+import {withProductPhotos} from './product-photo-match.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
 import {assertLearningCurrent,refreshLearning} from './learning-context.js';
 import {recordPlanPosts,type PlannedSlot} from './planning-knowledge.js';
@@ -164,13 +165,15 @@ export class PlanningJobs {
     const prior=(await db.query('SELECT id FROM app.content_plans WHERE job_id=$1',[j.id])).rows[0];
     if(prior)return this.finish(db,j,'succeeded');
     if((await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0].n>=36)throw new CreativeError('PLAN_LIMIT_REACHED');
-    const selected=new Set(result.plan.slots.flatMap(s=>s.reference_ids??[]));
+    // Static posts the planner left without a reference get the best-matching approved product photo.
+    const slots=withProductPhotos(result.plan.slots,input.references,input.brand.facts);
+    const selected=new Set(slots.flatMap(s=>s.reference_ids??[]));
     await assertPlanningReferences(db,j.organization_id,j.brand_id,(input.references??[]).filter(r=>selected.has(r.id)));
     const planId=randomUUID(),reserved=(await db.query('SELECT sum(reserved_micros)::text AS n FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0].n;
     const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,learning:input.brand.learning??[],strategy:input.strategy?{id:input.strategy.id,version:input.strategy.version,sha256:input.strategy.sha256}:null,context:{context_pack:!!input.context_pack,market_research:input.market_research?.length??0,preferences_learned:input.preferences_learned?.length??0},resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},content_mix:resolved.content_mix??null,source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
     await db.query(`INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,origin,created_by,request_key,request_hash,job_id,brain_id,strategy,skill_manifest,duration_days)
       VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,input.campaign?.name??result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify({...result.plan,...(input.campaign?{campaign:input.campaign}: {})}),JSON.stringify(manifest),resolved.duration_days??30]);
-    for(const [index,s] of result.plan.slots.entries()){
+    for(const [index,s] of slots.entries()){
      const sid=randomUUID();
      await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index,video_draft,reference_ids,creative_spec,storyline,strategy_ref)
        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,[sid,j.organization_id,j.brand_id,planId,s.channel,s.planned_at,s.format,s.brief,s.pillar,s.hook,s.cta,j.requested_by,index,s.video_draft?JSON.stringify(s.video_draft):null,s.reference_ids??[],s.creative_spec?JSON.stringify(s.creative_spec):null,s.storyline?JSON.stringify(s.storyline):null,s.strategy_ref?JSON.stringify(s.strategy_ref):null]);
