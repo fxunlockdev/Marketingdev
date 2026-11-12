@@ -54,6 +54,10 @@ import {Intake} from './intake.js';
 import {BrandBrain} from './brand-brain.js';
 import {Assets} from './assets.js';
 import {ObjectStore} from './object-store.js';
+import {MediaLibrary} from './media-library.js';
+import {createMediaController} from './media-controller.js';
+import {s3PreviewPersistence} from './media-storage.js';
+import {logActivityFailure} from './activity-log.js';
 
 type AuthRequest = Request & { actorId: string; actorEmail: string; sessionId: string; traceId: string };
 const AUTH = Symbol('auth');
@@ -311,7 +315,6 @@ class ExportController {
  constructor(@Inject(CreativeExports) private readonly service:CreativeExports){}
  @Get('creative-versions/:versionId/exports') list(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string){return this.service.list(r.actorId,id,v);}
  @Post('creative-versions/:versionId/exports') submit(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.submit(r.actorId,id,v,body,key);}
- @Get('creative-exports/:exportId/preview') async preview(@Req() r:AuthRequest,@Param('id') id:string,@Param('exportId') e:string){const result=await this.service.preview(r.actorId,id,e);return new StreamableFile(result.bytes,{type:'image/webp',length:result.bytes.length,disposition:'inline'});}
  @Get('creative-exports/:exportId/download') download(@Req() r:AuthRequest,@Param('id') id:string,@Param('exportId') e:string){return this.service.download(r.actorId,id,e);}
  @Post('creative-exports/:exportId/approve') approve(@Req() r:AuthRequest,@Param('id') id:string,@Param('exportId') e:string,@Body() body:unknown){return this.service.approve(r.actorId,id,e,body);}
  @Post('export-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
@@ -379,7 +382,6 @@ class CanvasController {
  @Get('creative-projects/:projectId') project(@Req() r:AuthRequest,@Param('id') id:string,@Param('projectId') p:string){return this.service.project(r.actorId,id,p);}
  @Post('creative-projects/:projectId/versions') save(@Req() r:AuthRequest,@Param('id') id:string,@Param('projectId') p:string,@Body() body:unknown){return this.service.save(r.actorId,id,p,body);}
  @Post('creative-versions/:versionId/review') review(@Req() r:AuthRequest,@Param('id') id:string,@Param('versionId') v:string,@Body() body:unknown){return this.service.review(r.actorId,id,v,body);}
- @Get('creative-media/:mediaId/preview') async mediaPreview(@Req() r:AuthRequest,@Param('id') id:string,@Param('mediaId') m:string){const result=await this.service.mediaPreview(r.actorId,id,m);return new StreamableFile(result.bytes,{type:'image/webp',length:result.bytes.length,disposition:'inline'});}
  @Get('creative-media/:mediaId') media(@Req() r:AuthRequest,@Param('id') id:string,@Param('mediaId') m:string){return this.service.media(r.actorId,id,m);}
  @Post('creative-jobs/:jobId/stop-waiting') stopWaiting(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string,@Body() body:unknown){return this.service.stopWaiting(r.actorId,id,j,body);}
  @Post('creative-jobs/:jobId/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('jobId') j:string){return this.service.cancel(r.actorId,id,j);}
@@ -503,7 +505,11 @@ export async function createApplication(config: Config) {
       try {const response=await auth.handler(request);return response.status>=500?unavailable():response;}
       catch {return unavailable();}
     }));
-    @Module({ controllers: [UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    // Derived previews live in private storage next to their originals; a storage fault only costs the reuse.
+    store.previews.persistTo(s3PreviewPersistence(store.client,config.storage.bucket),error=>logActivityFailure('PreviewStorage',{jobId:'api-previews'},error));
+    // Registered first: it owns the cacheable preview routes (creative media, exports, video posters, carousel covers).
+    @Module({ controllers: [createMediaController(SessionGuard),UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+ {provide:MediaLibrary,useValue:new MediaLibrary(new Canvas(new Businesses(database,workspaces),store))},
  {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning,carousels:CarouselGeneration)=>new ChatConversations(canvas,planning,carousels),inject:[Canvas,Planning,CarouselGeneration]},
  {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},
  {provide:Strategies,useValue:new Strategies(new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage)),new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)))},

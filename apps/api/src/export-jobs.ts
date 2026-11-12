@@ -1,3 +1,4 @@
+import {pregeneratePreviews} from './preview-pregeneration.js';
 import {randomUUID} from 'node:crypto';
 import {AssetJobs,type JobScope} from './jobs.js';
 import {StaticRenderer} from './static-renderer.js';
@@ -24,6 +25,7 @@ export class ExportJobs {
    const bytes=await this.jobs.store.read(v.object_key);if(bytes.length!==v.media_bytes||digest(bytes)!==v.media_sha256)throw new CreativeError('EXPORT_MEDIA_INTEGRITY_FAILED');
    const rendered=await this.renderer.render(v.design,bytes,r.format),key=`exports/${scope.organizationId}/${scope.brandId}/${v.id}/${r.renderer_image.slice(7)}/${rendered.sha256}`;
    await this.jobs.store.persist(key,rendered.bytes,r.format==='png'?'image/png':'image/jpeg',rendered.sha256);
+   await pregeneratePreviews(this.jobs.store.previews,scope,key,rendered.sha256,rendered.bytes);
    return this.jobs.transaction(scope,async(db,j)=>{
     if(terminal.has(j.status))return j.status;if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','EXPORT_ACCESS_REVOKED');
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${j.brand_id}`]);

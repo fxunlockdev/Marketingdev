@@ -1,4 +1,5 @@
 import {acceptsModel} from './model-policy.js';
+import {pregeneratePreviews} from './preview-pregeneration.js';
 import {StockAssets,tooCloseToStock,STOCK_TOO_CLOSE_DISTANCE} from './stock-assets.js';
 import {stockReferenceLabel} from './stock-planning.js';
 import {StockError} from './vecteezy-client.js';
@@ -482,6 +483,7 @@ export class CreativeJobs {
             "image/png",
             output.sha256,
           );
+          await pregeneratePreviews(this.jobs.store.previews,scope,objectKey,output.sha256,output.bytes);
           const media = {
             id: randomUUID(),
             object_key: objectKey,

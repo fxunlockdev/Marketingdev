@@ -1,3 +1,4 @@
+import {pregeneratePreviews} from './preview-pregeneration.js';
 import {randomUUID} from 'node:crypto';
 import sharp from 'sharp';
 import {AssetJobs,type JobScope} from './jobs.js';
@@ -112,6 +113,7 @@ export class HiggsfieldReplacementJobs {
   const bytes=await sharp(response.bytes,{limitInputPixels:24_000_000}).resize(parent.width,parent.height,{fit:'contain',background:'#ffffff'}).png().toBuffer(),sha=digest(bytes),key=`creative/${scope.organizationId}/${scope.brandId}/${scope.jobId}/${sha}`;
   if(bytes.length>20*1024*1024)throw new HiggsfieldImageError('HIGGSFIELD_OUTPUT_INVALID');
   await this.jobs.store.persist(key,bytes,'image/png',sha);
+  await pregeneratePreviews(this.jobs.store.previews,scope,key,sha,bytes);
   return this.jobs.transaction(scope,async(db,j)=>{
    if(terminal.has(j.status))return j.status;
    if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','ACCESS_REVOKED_OR_CANCELED');
