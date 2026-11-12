@@ -1,5 +1,5 @@
 {
-  "scope": "Implemented bootstrap, API and standalone-web inputs only. Worker, provisioner and provider setup require their existing audited contracts; complete deployment automation is pending.",
+  "scope": "Implemented bootstrap, API and standalone-web inputs only. Worker and provider setup require their existing audited contracts; complete deployment automation is pending. The Postiz provisioner is retired: its database role and bootstrap password remain only so existing databases keep their history.",
   "bootstrap": {
     "required": ["APP_MODE", "DESVIO_BOOTSTRAP_CONFIRM", "DESVIO_DATABASE_NAME", "MIGRATION_DATABASE_URL", "APP_DATABASE_PASSWORD", "AUTH_DATABASE_PASSWORD", "MAIL_DATABASE_PASSWORD", "WORKER_DATABASE_PASSWORD", "DISPATCHER_DATABASE_PASSWORD", "POSTIZ_PROVISIONER_DATABASE_PASSWORD"],
     "confirmation": "initialize-isolated-desvio-database",
@@ -15,13 +15,15 @@
   },
   "api": {
     "required": ["APP_MODE", "APP_ORIGIN", "AUTH_SECRET", "AUTH_DATABASE_URL", "APP_DATABASE_URL", "MAIL_DATABASE_URL", "MAIL_ENCRYPTION_KEY", "SMTP_HOST", "SMTP_PORT", "SMTP_USER", "SMTP_PASSWORD", "SMTP_FROM", "S3_ENDPOINT", "S3_REGION", "S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"],
-    "optional": ["PORT", "LISTEN_HOST", "SMTP_SECURE", "RENDER_RUNTIME_IMAGE", "POSTIZ_ENABLED", "POSTIZ_PROVISIONING_ENABLED", "POSTIZ_PUBLISHING_ENABLED", "POSTIZ_OAUTH_ENABLED", "OAUTH_ENCRYPTION_KEY"],
-    "secret_boundary": "No migration administrator, provisioner signing secret or paid model key on this service"
+    "optional": ["PORT", "LISTEN_HOST", "SMTP_SECURE", "RENDER_RUNTIME_IMAGE", "VIDEO_ENABLED", "VIDEO_RUNTIME_IMAGE", "AUTH_INGRESS_SECRET", "PUBLIC_SIGNUP_ENABLED", "POSTFORME_ENABLED", "POSTFORME_API_KEY", "POSTFORME_PUBLISHING_ENABLED", "POSTFORME_PLATFORMS", "PEXELS_API_KEY", "HIGGSFIELD_IMAGES_ENABLED"],
+    "removed": ["OPENAI_API_KEY", "POSTIZ_ENABLED", "POSTIZ_PROVISIONING_ENABLED", "POSTIZ_PUBLISHING_ENABLED", "POSTIZ_OAUTH_ENABLED", "OAUTH_ENCRYPTION_KEY"],
+    "social_provider": "Post for Me is the only publisher and connection provider. Postiz is retired; its historical tables are kept read-only.",
+    "secret_boundary": "No migration administrator, provisioner signing secret or paid model key on this service. Model calls (blog articles included) run on the worker through the skills harness; the only provider secrets read here are POSTFORME_API_KEY and PEXELS_API_KEY"
   },
   "web": {
     "build_required": ["API_ORIGIN"],
     "runtime_required": ["APP_MODE", "APP_ORIGIN", "API_ORIGIN", "S3_BROWSER_ORIGIN"],
     "runtime_optional": ["PORT", "LISTEN_HOST"],
-    "secret_boundary": "No database, SMTP, provider, OAuth or Postiz credentials on this service"
+    "secret_boundary": "No database, SMTP, provider or OAuth credentials on this service"
   }
 }

@@ -1,7 +1,6 @@
 import {configuredPostformePlatforms} from './postforme-client.js';
 import {validIngressSecret} from './auth-ingress.js';
 import {mailConfig} from './mail-config.js';
-import type {SocialWorkerConfig} from './social-jobs.js';
 export type StorageConfig={endpoint:string;region:string;bucket:string;accessKeyId:string;secretAccessKey:string};
 export type ScannerConfig={host:string;port:number};
 export type JobsConfig={workerDatabaseUrl:string;dispatcherDatabaseUrl:string;address:string;namespace:string;taskQueue:string};
@@ -22,23 +21,10 @@ export type Config = {
   renderImage?:string;
   videoRenderImage?:string;
   videoEnabled?:boolean;
-  openaiApiKey?:string;
   postformeApiKey?:string;
   postformePlatforms?:string[];
   postformePublishingEnabled?:boolean;
-  socialEnabled?:boolean;
-  publishingEnabled?:boolean;
-  oauthEncryptionKey?:string;
-  socialProvisioningEnabled?:boolean;
-  socialAuthorizationEnabled?:boolean;
 };
-
-export function socialAuthorizationFromEnv(env:NodeJS.ProcessEnv):boolean {
-  if(env.POSTIZ_OAUTH_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_OAUTH_ENABLED))throw new Error('POSTIZ_OAUTH_ENABLED must be true or false');
-  const enabled=env.POSTIZ_OAUTH_ENABLED==='true';
-  if(enabled&&(env.POSTIZ_ENABLED!=='true'||!/^[a-f0-9]{64}$/i.test(env.OAUTH_ENCRYPTION_KEY??'')))throw new Error('Social authorization requires enabled Postiz and a valid OAuth encryption key');
-  return enabled;
-}
 
 export function configFromEnv(env = process.env): Config {
   const mode = env.APP_MODE;
@@ -66,11 +52,8 @@ export function configFromEnv(env = process.env): Config {
   const smtp=mailConfig(env,mode!);
   const storage=storageFromEnv(env);
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
-  if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
-  const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
-  if(env.POSTIZ_PROVISIONING_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_PROVISIONING_ENABLED))throw new Error('POSTIZ_PROVISIONING_ENABLED must be true or false');
   const videoRenderImage=env.VIDEO_RUNTIME_IMAGE;if(videoRenderImage&&!/^sha256:[a-f0-9]{64}$/.test(videoRenderImage))throw new Error('VIDEO_RUNTIME_IMAGE must be an exact local image digest');
-  return {postformePlatforms:configuredPostformePlatforms(env.POSTFORME_PLATFORMS),publicSignupEnabled:env.PUBLIC_SIGNUP_ENABLED==='true',openaiApiKey:env.OPENAI_API_KEY?.trim()||undefined,postformeApiKey:env.POSTFORME_ENABLED==='true'?env.POSTFORME_API_KEY?.trim():undefined,postformePublishingEnabled:env.POSTFORME_PUBLISHING_ENABLED==='true',higgsfieldImagesEnabled:env.HIGGSFIELD_IMAGES_ENABLED==='true',pexelsApiKey:env.PEXELS_API_KEY?.trim()||undefined,socialAuthorizationEnabled:socialAuthorizationFromEnv(env),videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',socialProvisioningEnabled:env.POSTIZ_PROVISIONING_ENABLED==='true',oauthEncryptionKey,renderImage,socialEnabled:env.POSTIZ_ENABLED==='true', mode: mode as Config['mode'], origin: origin.origin, authSecret: secret, authIngressSecret,
+  return {postformePlatforms:configuredPostformePlatforms(env.POSTFORME_PLATFORMS),publicSignupEnabled:env.PUBLIC_SIGNUP_ENABLED==='true',postformeApiKey:env.POSTFORME_ENABLED==='true'?env.POSTFORME_API_KEY?.trim():undefined,postformePublishingEnabled:env.POSTFORME_PUBLISHING_ENABLED==='true',higgsfieldImagesEnabled:env.HIGGSFIELD_IMAGES_ENABLED==='true',pexelsApiKey:env.PEXELS_API_KEY?.trim()||undefined,videoRenderImage,videoEnabled:env.VIDEO_ENABLED==='true',renderImage, mode: mode as Config['mode'], origin: origin.origin, authSecret: secret, authIngressSecret,
     authDatabaseUrl: required('AUTH_DATABASE_URL'), appDatabaseUrl: required('APP_DATABASE_URL'),
     mailDatabaseUrl:required('MAIL_DATABASE_URL'),mailEncryptionKey,smtp,storage };
 }
@@ -95,11 +78,6 @@ export function workerConfigFromEnv(env=process.env){
   const documentImage=env.DOCUMENT_PARSER_IMAGE;if(documentImage&&!/^sha256:[a-f0-9]{64}$/.test(documentImage))throw new Error('DOCUMENT_PARSER_IMAGE must be an exact local image digest');
   const skillImage=env.SKILL_RUNTIME_IMAGE;if(skillImage&&!/^sha256:[a-f0-9]{64}$/.test(skillImage))throw new Error('SKILL_RUNTIME_IMAGE must be an exact local image digest');
   const renderImage=env.RENDER_RUNTIME_IMAGE;if(renderImage&&!/^sha256:[a-f0-9]{64}$/.test(renderImage))throw new Error('RENDER_RUNTIME_IMAGE must be an exact local image digest');
-  if(env.POSTIZ_ENABLED!==undefined&&!['true','false'].includes(env.POSTIZ_ENABLED))throw new Error('POSTIZ_ENABLED must be true or false');
-  const social:SocialWorkerConfig|undefined=env.POSTIZ_ENABLED==='true'?{client:{baseURL:required('POSTIZ_BASE_URL'),mediaOrigins:required('POSTIZ_MEDIA_ORIGINS').split(','),callbackOrigin:required('POSTIZ_CALLBACK_ORIGIN'),mode:mode as 'test'|'development'|'staging'},encryptionKey:required('POSTIZ_ENCRYPTION_KEY')}:undefined;
-  const oauthEncryptionKey=env.OAUTH_ENCRYPTION_KEY;if(oauthEncryptionKey&&!/^[a-f0-9]{64}$/i.test(oauthEncryptionKey))throw new Error('OAUTH_ENCRYPTION_KEY must be 32 random bytes as hex');
-  if(oauthEncryptionKey&&oauthEncryptionKey===social?.encryptionKey)throw new Error('OAuth and Postiz credentials require separate keys');
-  const provisionTaskQueue=env.POSTIZ_PROVISION_TASK_QUEUE;if(provisionTaskQueue&&(!/^[A-Za-z0-9_.:-]{1,100}$/.test(provisionTaskQueue)||provisionTaskQueue===jobs.taskQueue))throw new Error('Provisioning requires a separate task queue');
   if(env.VIDEO_ENABLED!==undefined&&!['true','false'].includes(env.VIDEO_ENABLED))throw new Error('VIDEO_ENABLED must be true or false');
   const outputPolicy=env.RUNWAY_OUTPUT_POLICY??'authenticated_provider_result';
   if(!['exact_origins','authenticated_provider_result'].includes(outputPolicy))throw new Error('Invalid video output policy');
@@ -109,15 +87,6 @@ export function workerConfigFromEnv(env=process.env){
   if(higgsfieldImages&&(!/^[a-f0-9]{64}$/i.test(higgsfieldImages.encryptionKey)||higgsfieldImages.encryptionKey===env.VIDEO_ENCRYPTION_KEY))throw new Error('Image replacements require a separate 32-byte encryption key');
   const video=env.VIDEO_ENABLED==='true'?{mode:mode as 'test'|'development'|'staging',image:required('VIDEO_RUNTIME_IMAGE'),encryptionKey:required('VIDEO_ENCRYPTION_KEY'),credentials:required('RUNWAYML_API_SECRET'),outputPolicy:outputPolicy as 'exact_origins'|'authenticated_provider_result',outputOrigins:outputPolicy==='exact_origins'?required('RUNWAY_OUTPUT_ORIGINS').split(','):[]}:undefined;
   if(video&&(!/^sha256:[a-f0-9]{64}$/.test(video.image)||!/^sha256:[a-f0-9]{64}$/.test(renderImage??'')||!skillImage||(!env.OPENAI_API_KEY&&!env.GEMINI_API_KEY)||!/^[a-f0-9]{64}$/i.test(video.encryptionKey)))throw new Error('Video requires pinned renderers, skills, model credentials and a 32-byte encryption key');
-  if(video&&[oauthEncryptionKey,social?.encryptionKey].includes(video.encryptionKey))throw new Error('Video requires a separate encryption key');
   const videoRenderImage=env.VIDEO_RUNTIME_IMAGE;if(videoRenderImage&&!/^sha256:[a-f0-9]{64}$/.test(videoRenderImage))throw new Error('VIDEO_RUNTIME_IMAGE must be an exact local image digest');
-  return {higgsfieldImages,websiteRenderImage,videoRenderImage,video,publishingEnabled:env.POSTIZ_PUBLISHING_ENABLED==='true',storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage,social,oauthEncryptionKey,provisionTaskQueue};
-}
-
-// Deliberately independent of storage, authentication, SMTP and model settings.
-export function provisionerConfigFromEnv(env=process.env){
- const required=envReader(env),mode=required('APP_MODE');if(!['development','test','staging'].includes(mode))throw new Error('Provisioner production launch blocked pending release gate');
- const taskQueue=required('POSTIZ_PROVISION_TASK_QUEUE');if(!/^[A-Za-z0-9_.:-]{1,100}$/.test(taskQueue)||taskQueue===env.TEMPORAL_TASK_QUEUE)throw new Error('Provisioning requires a separate task queue');
- const encryptionKey=required('POSTIZ_ENCRYPTION_KEY'),signingSecret=required('POSTIZ_ENTERPRISE_SIGNING_SECRET');if(!/^[a-f0-9]{64}$/i.test(encryptionKey)||signingSecret.length<32||encryptionKey===signingSecret||encryptionKey===env.OAUTH_ENCRYPTION_KEY)throw new Error('Provisioning requires distinct valid encryption and signing secrets');
- return {databaseUrl:required('POSTIZ_PROVISIONER_DATABASE_URL'),address:required('TEMPORAL_ADDRESS'),namespace:required('TEMPORAL_NAMESPACE'),taskQueue,provider:{client:{baseURL:required('POSTIZ_BASE_URL'),mediaOrigins:required('POSTIZ_MEDIA_ORIGINS').split(','),callbackOrigin:required('POSTIZ_CALLBACK_ORIGIN'),mode:mode as 'test'|'development'|'staging'},encryptionKey,signingSecret}};
+  return {higgsfieldImages,websiteRenderImage,videoRenderImage,video,storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage};
 }

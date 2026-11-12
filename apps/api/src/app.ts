@@ -8,7 +8,6 @@ import {Put} from '@nestjs/common';
 import {resolveIngressAddress} from './auth-ingress.js';
 import {CampaignIdeas} from './campaign-ideas.js';
 import {CampaignBlogs} from './campaign-blogs.js';
-import {CreativeProvider} from './creative-provider.js';
 import {Postforme} from './postforme.js';
 import {UncertainRequests} from './uncertain-requests.js';
 import {HiggsfieldReplacements} from './higgsfield-replacements.js';
@@ -26,8 +25,6 @@ import {VideoCanvas} from './video-canvas.js';
 import {VideoReferenceBindings} from './video-references.js';
 import {BusinessOverview} from './business-overview.js';
 import {Publication} from './publication.js';
-import {SocialProvisioning} from './social-provisioning.js';
-import {SocialOAuth} from './social-oauth.js';
 import {SocialConnections} from './social-connections.js';
 import {CreativeExports} from './creative-exports.js';
 import {SlotCreatives} from './slot-creatives.js';
@@ -254,42 +251,8 @@ class PostformeController {
  @Post('publications/:post/reconcile') reconcile(@Req() r:AuthRequest,@Param('id') id:string,@Param('post') post:string){return this.service.reconcile(r.actorId,id,post);}
 }
 
-@Controller('api/v1/businesses/:id/analytics')
-@UseGuards(SessionGuard)
-class AnalyticsController {
- constructor(@Inject(Publication) private readonly service:Publication){}
- @Get() read(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.analytics(r.actorId,id,query);}
-}
 
-@Controller('api/v1/businesses/:id/publications')
-@UseGuards(SessionGuard)
-class PublicationController {
- constructor(@Inject(Publication) private readonly service:Publication){}
- @Get() list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
- @Post() submit(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,body,key);}
- @Get('ready') ready(@Req() r:AuthRequest,@Param('id') id:string){return this.service.ready(r.actorId,id);}
- @Get(':job/history') history(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.history(r.actorId,id,job);}
- @Post(':job/cancel') cancel(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(r.actorId,id,job);}
- @Post(':job/reconcile') reconcile(@Req() r:AuthRequest,@Param('id') id:string,@Param('job') job:string,@Headers('idempotency-key') key:string){return this.service.reconcile(r.actorId,id,job,key);}
-}
 
-@Controller('api/v1/businesses/:id/connections')
-@UseGuards(SessionGuard)
-class SocialController {
- constructor(@Inject(SocialConnections) private readonly service:SocialConnections,@Inject(SocialOAuth) private readonly oauth:SocialOAuth,@Inject(SocialProvisioning) private readonly provision:SocialProvisioning){}
- @Post('prepare') prepare(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.provision.prepare(req.actorId,id,key);}
- @Post('provisioning/:job/recheck') recheckSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string,@Headers('idempotency-key') key:string){return this.provision.recheck(req.actorId,id,job,key);}
- @Post('provisioning/:job/cancel') cancelSetup(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.provision.cancel(req.actorId,id,job);}
- @Post('oauth/:provider') start(@Req() req:AuthRequest,@Param('id') id:string,@Param('provider') provider:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.oauth.start(req.actorId,req.sessionId,id,key,body,provider);}
- @Get('oauth/:attempt') authorization(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.read(req.actorId,req.sessionId,id,attempt);}
- @Post('oauth/:attempt/callback') callback(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.callback(req.actorId,req.sessionId,id,attempt,body);}
- @Post('oauth/:attempt/cancel') cancelPageSelection(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string){return this.oauth.cancelPageSelection(req.actorId,req.sessionId,id,attempt);}
- @Post('oauth/:attempt/page') selectPage(@Req() req:AuthRequest,@Param('id') id:string,@Param('attempt') attempt:string,@Body() body:unknown){return this.oauth.selectPage(req.actorId,req.sessionId,id,attempt,body);}
- @Get() read(@Req() req:AuthRequest,@Param('id') id:string){return this.service.read(req.actorId,id,req.sessionId);}
- @Post('channels/:channel/disconnect') disconnect(@Req() req:AuthRequest,@Param('id') id:string,@Param('channel') channel:string,@Headers('idempotency-key') key:string,@Body() body:unknown){return this.service.disconnect(req.actorId,id,channel,key,body);}
- @Post('refresh') refresh(@Req() req:AuthRequest,@Param('id') id:string,@Headers('idempotency-key') key:string){return this.service.refresh(req.actorId,id,key);}
- @Post('jobs/:job/cancel') cancel(@Req() req:AuthRequest,@Param('id') id:string,@Param('job') job:string){return this.service.cancel(req.actorId,id,job);}
-}
 
 @Controller('api/v1')
 @UseGuards(SessionGuard)
@@ -539,12 +502,12 @@ export async function createApplication(config: Config) {
     // Derived previews live in private storage next to their originals; a storage fault only costs the reuse.
     store.previews.persistTo(s3PreviewPersistence(store.client,config.storage.bucket),error=>logActivityFailure('PreviewStorage',{jobId:'api-previews'},error));
     // Registered first: it owns the cacheable preview routes (creative media, exports, video posters, carousel covers).
-    @Module({ controllers: [createMediaController(SessionGuard),KnowledgeController,BrandStrategyController,LearningController,UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [createMediaController(SessionGuard),KnowledgeController,BrandStrategyController,LearningController,UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,VideoController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
  {provide:LearningReviews,useValue:new LearningReviews(new Businesses(database,workspaces))},
  {provide:KnowledgeReview,useValue:new KnowledgeReview(new Businesses(database,workspaces))},
  {provide:MediaLibrary,useValue:new MediaLibrary(new Canvas(new Businesses(database,workspaces),store))},
  {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning,carousels:CarouselGeneration)=>new ChatConversations(canvas,planning,carousels),inject:[Canvas,Planning,CarouselGeneration]},
- {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},
+ {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},
  {provide:Strategies,useValue:new Strategies(new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage),planningContextSource),new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)))},
  {provide:HiggsfieldReplacements,useFactory:(canvas:Canvas)=>new HiggsfieldReplacements(canvas,config.higgsfieldImagesEnabled),inject:[Canvas]},
  {provide:UncertainRequests,useValue:new UncertainRequests(new Businesses(database,workspaces))},
@@ -554,7 +517,7 @@ export async function createApplication(config: Config) {
  {provide:VideoCanvas,useFactory:()=>{const canvas=new Canvas(new Businesses(database,workspaces),store);return new VideoCanvas(canvas,new VideoReferenceBindings(canvas,config.renderImage),config.videoEnabled===true);}},
       {provide:CarouselGeneration,useValue:new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},
       {provide:Carousels,useValue:new Carousels(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},
-      {provide:Insights,useValue:new Insights(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Postforme,useValue:new Postforme(new SocialConnections(new Businesses(database,workspaces),true),new Publication(new SocialConnections(new Businesses(database,workspaces),true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),true,config.videoRenderImage),config.postformeApiKey,config.postformePublishingEnabled===true,config.postformePlatforms)},{provide:Publication,useValue:new Publication(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),config.publishingEnabled===true,config.videoRenderImage)},{provide:SocialProvisioning,useValue:new SocialProvisioning(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialProvisioningEnabled===true)},{provide:SocialOAuth,useValue:new SocialOAuth(new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true),config.socialAuthorizationEnabled===true?config.oauthEncryptionKey:undefined)},{provide:SocialConnections,useValue:new SocialConnections(new Businesses(database,workspaces),config.socialEnabled===true,{provisioning:config.socialProvisioningEnabled===true,authorization:config.socialAuthorizationEnabled===true&&!!config.oauthEncryptionKey})},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage),planningContextSource)},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces),config.renderImage)},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)},{provide:GuidedCampaigns,useFactory:(planning:Planning,creatives:SlotCreatives,videos:VideoCanvas)=>new GuidedCampaigns(planning,creatives,config.postformePlatforms??[],new GuidedVideos(videos)),inject:[Planning,SlotCreatives,VideoCanvas]},{provide:GuidedMoodboards,useFactory:(canvas:Canvas,carousels:CarouselGeneration)=>new GuidedMoodboards(canvas,carousels),inject:[Canvas,CarouselGeneration]},{provide:GuidedBusiness,useValue:new GuidedBusiness(new Businesses(database,workspaces),new Intake(new Businesses(database,workspaces),store),config.postformePlatforms??[])}] })
+      {provide:Insights,useValue:new Insights(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},{provide:BusinessOverview,useValue:new BusinessOverview(new Businesses(database,workspaces))},{provide:Postforme,useValue:new Postforme(new SocialConnections(new Businesses(database,workspaces),true),new Publication(new SocialConnections(new Businesses(database,workspaces),true),new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage),true,config.videoRenderImage),config.postformeApiKey,config.postformePublishingEnabled===true,config.postformePlatforms)},{ provide: AUTH, useValue: auth }, { provide: Workspaces, useValue: workspaces },{provide:Team,useValue:team},{provide:Assets,useValue:new Assets(database,store)},{provide:BrandBrain,useValue:new BrandBrain(database)},{provide:Businesses,useValue:new Businesses(database,workspaces)},{provide:CreativeExports,useValue:new CreativeExports(new Canvas(new Businesses(database,workspaces),store),config.renderImage)},{provide:SlotCreatives,useValue:new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage))},{provide:Planning,useValue:new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage),planningContextSource)},{provide:ContentPlan,useValue:new ContentPlan(new Businesses(database,workspaces),config.renderImage)},{provide:Canvas,useValue:new Canvas(new Businesses(database,workspaces),store)},{provide:Intake,useValue:new Intake(new Businesses(database,workspaces),store)},{provide:GuidedCampaigns,useFactory:(planning:Planning,creatives:SlotCreatives,videos:VideoCanvas)=>new GuidedCampaigns(planning,creatives,config.postformePlatforms??[],new GuidedVideos(videos)),inject:[Planning,SlotCreatives,VideoCanvas]},{provide:GuidedMoodboards,useFactory:(canvas:Canvas,carousels:CarouselGeneration)=>new GuidedMoodboards(canvas,carousels),inject:[Canvas,CarouselGeneration]},{provide:GuidedBusiness,useValue:new GuidedBusiness(new Businesses(database,workspaces),new Intake(new Businesses(database,workspaces),store),config.postformePlatforms??[])}] })
     class AppModule {}
     const app = await NestFactory.create(AppModule, new ExpressAdapter(server), { bodyParser: false, logger: false });
     app.useGlobalFilters(new SafeErrors());

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {postformeObservations,matchFeedPost,normaliseProviderURL,postformePublishedSQL,postformeFeedsSQL} from '../../dist/learning-observations.js';
-import {insightObservations,insightObservationsSQL,legacyPostizObservationsSQL} from '../../dist/insights.js';
+import * as insights from '../../dist/insights.js';
+const {insightObservations}=insights;
 
 const account='11111111-1111-4111-8111-111111111111';
 const published=(over={})=>({publication_id:'22222222-2222-4222-8222-222222222222',caption:'Launch day',scheduled_at:'2026-11-01T09:00:00.000Z',release_url:'https://instagram.com/p/abc/',account_id:account,provider:'instagram',account_name:'Studio',slot_format:'static',carousel_version_id:null,video_version_id:null,placement:'feed',...over});
@@ -50,16 +51,16 @@ test('malformed stored feed rows are ignored rather than trusted',()=>{
 });
 
 const db=results=>{const seen=[];return {seen,query:async sql=>{seen.push(sql);const hit=results.find(([needle])=>sql.includes(needle));return {rows:hit?hit[1]:[]};}};};
-test('insights read Post for Me and use the Postiz reader only for a business with no Post for Me posts',async()=>{
- assert.equal(legacyPostizObservationsSQL,insightObservationsSQL);assert.match(legacyPostizObservationsSQL,/app\.post_analytics/);
+test('insights read Post for Me only; Postiz history is never read',async()=>{
+ assert.equal('legacyPostizObservationsSQL' in insights,false);assert.equal('insightObservationsSQL' in insights,false);
  assert.match(postformePublishedSQL,/app\.postforme_publications/);assert.match(postformePublishedSQL,/observed_state='published'/);assert.match(postformeFeedsSQL,/app\.postforme_analytics/);
  const live=db([['postforme_publications',[published()]],['postforme_analytics',feed([feedPost()])],['post_analytics',[{id:'legacy'}]]]);
  const fromPostforme=await insightObservations(live);
  assert.equal(fromPostforme.source,'postforme');assert.equal(fromPostforme.observations.length,1);assert.ok(!live.seen.some(sql=>sql.includes('app.post_analytics')));
  const waiting=await insightObservations(db([['postforme_publications',[published()]],['post_analytics',[{id:'legacy'}]]]));
  assert.deepEqual(waiting,{source:'postforme',observations:[]},'a Post for Me business never falls back to stale Postiz data');
- const legacy=await insightObservations(db([['post_analytics',[{id:'legacy'}]]]));
- assert.deepEqual(legacy,{source:'postiz_legacy',observations:[{id:'legacy'}]});
+ const never=db([['post_analytics',[{id:'legacy'}]]]);
+ assert.deepEqual(await insightObservations(never),{source:'postforme',observations:[]});assert.ok(!never.seen.some(sql=>sql.includes('app.post_analytics')));
 });
 
 import {attribution,postedLocal,layoutArchetype,stockUsed,ATTRIBUTION_DIMENSIONS} from '../../dist/learning-attribution.js';

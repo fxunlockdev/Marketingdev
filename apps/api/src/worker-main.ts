@@ -16,9 +16,6 @@ import {VideoProviderJobs} from './video-provider-jobs.js';
 import {VideoRenderer} from './video-renderer.js';
 import {VideoDownload} from './video-download.js';
 import {RunwayClient} from './runway-client.js';
-import {PublicationJobs} from './publication-jobs.js';
-import {SocialOAuthJobs} from './social-oauth-jobs.js';
-import {SocialJobs,SocialReadRetry} from './social-jobs.js';
 import {ExportJobs} from './export-jobs.js';
 import {StaticRenderer} from './static-renderer.js';
 import {PlanningJobs} from "./planning-jobs.js";
@@ -28,6 +25,7 @@ import {ImageQa} from './image-qa.js';
 import {PostformeClient} from './postforme-client.js';
 import {learningSyncTick,LEARNING_SYNC_INTERVAL_MS} from './learning-schedule.js';
 import {SkillRuntime} from './skill-runtime.js';
+import {BlogJobs} from './blog-jobs.js';
 import {Worker,NativeConnection} from '@temporalio/worker';
 import {Connection,Client} from '@temporalio/client';
 import {Context,ApplicationFailure} from '@temporalio/activity';
@@ -37,6 +35,7 @@ import {workerConfigFromEnv} from './config.js';
 import {AssetJobs,JobDispatcher,assertJobRole,type JobScope} from './jobs.js';
 import {OpenAIWebsiteResearch} from './openai-website-research.js';
 import {IntakeJobs} from './intake-jobs.js';
+import {ResearchKnowledge,KnowledgeExtractor} from './knowledge-research.js';
 
 import {BrandAnalyzer} from './brand-analysis.js';
 import {DocumentJobs} from './document-jobs.js';
@@ -53,22 +52,24 @@ await assertJobRole(pool,'desvio_worker');await assertJobRole(dispatchPool,'desv
 const connection=await NativeConnection.connect({address:config.jobs.address}),clientConnection=await Connection.connect({address:config.jobs.address});
 const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
-const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)));
+// Research and analysis feed the knowledge graph afterwards; extraction never changes a job's outcome.
+const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)),new ResearchKnowledge(jobs,new KnowledgeExtractor(process.env.OPENAI_API_KEY)));
 const imageReplacements=config.higgsfieldImages?new HiggsfieldReplacementJobs(jobs,new HiggsfieldImageClient(config.higgsfieldImages),new ImageReplacementVault(config.higgsfieldImages.encryptionKey)):undefined;
 const creativeProvider=new CreativeProvider(process.env.OPENAI_API_KEY);
 // The vision check shares the creative provider; it is optional per image and never fails a creative.
 const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),creativeProvider,new GeminiPlanner(process.env.GEMINI_API_KEY),process.env.VECTEEZY_API_KEY?new StockAssets(jobs,new VecteezyClient(process.env.VECTEEZY_API_KEY,Number(process.env.VECTEEZY_ACCOUNT_ID))):undefined,new ImageQa(creativeProvider));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
+// Blog articles run here, through the skills harness; the API only enqueues them and holds no model key.
+const blogs=new BlogJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
 const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
-const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled,config.videoRenderImage);
-const social=new SocialJobs(jobs,config.social);
-const socialOAuth=new SocialOAuthJobs(jobs,config.social,config.oauthEncryptionKey);
+// Postiz is retired. A social workflow still open from before is closed without calling any provider.
+const retireSocial=(scope:JobScope)=>jobs.transaction(scope,async(db,job)=>{if(!String(job.kind).startsWith('social.'))throw new Error('JOB_KIND_DENIED');if(['succeeded','rejected','failed','canceled','unknown'].includes(job.status))return job.status;await db.query("UPDATE app.jobs SET status='failed',error_code='POSTIZ_RETIRED',updated_at=now() WHERE id=$1",[job.id]);return 'failed';});
 const exporter=new ExportJobs(jobs,new StaticRenderer(config.renderImage));
 const carousel=new CarouselJobs(jobs,creative,exporter);
 const video=config.video?new VideoJobs(jobs,new VideoReferences(undefined,jobs,config.video.encryptionKey,config.renderImage!,config.video.mode),creative,
  new VideoProviderJobs(jobs,new RunwayClient({mode:config.video.mode,secret:config.video.credentials,referenceOrigins:[new URL(config.storage.endpoint).origin]}),config.video.encryptionKey),
  new VideoDownload(config.video.outputOrigins,undefined,config.video.outputPolicy),new VideoRenderer(config.video.image)):undefined;
-const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue,config.provisionTaskQueue);
+const dispatcher=new JobDispatcher(dispatchPool,new Client({connection:clientConnection,namespace:config.jobs.namespace}),config.jobs.taskQueue);
 async function carouselActivity<T>(scope:JobScope,action:()=>Promise<T>):Promise<T>{const context=Context.current(),timer=setInterval(()=>context.heartbeat(),1000);try{return await action();}catch(e){logActivityFailure('CarouselUnavailable',scope,e);throw ApplicationFailure.retryable('Carousel processing temporarily unavailable','CarouselUnavailable');}finally{clearInterval(timer);}}
 const worker=await Worker.create({connection,namespace:config.jobs.namespace,taskQueue:config.jobs.taskQueue,workflowsPath:fileURLToPath(new URL('./asset-workflow.js',import.meta.url)),
   maxConcurrentActivityTaskExecutions:2,activities:{
@@ -81,13 +82,10 @@ const worker=await Worker.create({connection,namespace:config.jobs.namespace,tas
     failVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.retryable('Video recovery awaits configured worker','VideoUnavailable');return video.exhausted(scope);},
     generateInsights:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await insights.run(scope);}catch(e){logActivityFailure('InsightsUnavailable',scope,e);throw ApplicationFailure.retryable('Analysis temporarily unavailable','InsightsUnavailable');}finally{clearInterval(heartbeat);}},
     failInsights:async(scope:JobScope)=>insights.fail(scope),
-    publishSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.run(scope);}catch(e){logActivityFailure('PublicationUnavailable',scope,e);throw ApplicationFailure.create({message:'Publication processing unavailable',type:'PublicationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
-    reconcileSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.reconcile(scope);}catch(e){logActivityFailure('PublicationCheckUnavailable',scope,e);throw ApplicationFailure.create({message:'Publication check unavailable',type:'PublicationCheckUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
-    failPublication:async(scope:JobScope)=>publication.fail(scope),
-    authorizeSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await socialOAuth.run(scope);}catch(e){logActivityFailure('SocialAuthorizationUnavailable',scope,e);throw ApplicationFailure.create({message:'Authorization processing unavailable',type:'SocialAuthorizationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
-    failSocialOAuth:async(scope:JobScope)=>socialOAuth.fail(scope),
-    syncSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await social.run(scope);}catch(e){logActivityFailure('SocialUnavailable',scope,e);throw ApplicationFailure.create({message:'Connection check temporarily unavailable',type:'SocialUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
-    failSocial:async(scope:JobScope)=>social.fail(scope),
+    generateBlog:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await blogs.run(scope);}catch(e){logActivityFailure('BlogUnavailable',scope,e);throw ApplicationFailure.retryable('Article writing temporarily unavailable','BlogUnavailable');}finally{clearInterval(heartbeat);}},
+    failBlog:async(scope:JobScope)=>blogs.fail(scope),
+    publishSocial:retireSocial,reconcileSocial:async(scope:JobScope)=>({state:await retireSocial(scope)}),failPublication:retireSocial,
+    authorizeSocial:retireSocial,failSocialOAuth:retireSocial,syncSocial:retireSocial,failSocial:retireSocial,
     exportCreative:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await exporter.run(scope);}catch(e){logActivityFailure('ExportUnavailable',scope,e);throw ApplicationFailure.retryable('Export temporarily unavailable','ExportUnavailable');}finally{clearInterval(heartbeat);}},
     failExport:async(scope:JobScope)=>exporter.fail(scope),
     generatePlan:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await planning.run(scope);}catch(e){logActivityFailure("PlanningUnavailable",scope,e);throw ApplicationFailure.retryable("Planning temporarily unavailable","PlanningUnavailable");}finally{clearInterval(heartbeat);}},

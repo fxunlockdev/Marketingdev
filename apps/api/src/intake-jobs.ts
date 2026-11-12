@@ -74,6 +74,8 @@ export class IntakeJobs {
     readonly jobs: AssetJobs,
     readonly analyzer: BrandAnalyzer,
     readonly websiteIntake?: WebsiteIntake,
+    /** Turns a succeeded job's new sources into graph suggestions. Never throws; never changes the job. */
+    readonly knowledge?: { afterSuccess(scope: JobScope): Promise<unknown> },
   ) {}
   private finish(
     db: any,
@@ -92,7 +94,8 @@ export class IntakeJobs {
     const job = await this.jobs.transaction(scope, async (db, j) => {
       if (!["website.extract", "brand.analyze"].includes(j.kind))
         throw new Error("JOB_KIND_DENIED");
-      if (terminal.has(j.status)) return null;
+      // A replay of a succeeded job only catches up on graph extraction, which never pays twice.
+      if (terminal.has(j.status)) return j.status === "succeeded" ? { succeeded: true } : null;
       if (!(await this.jobs.permitted(db, j))) {
         await this.finish(db, j, "canceled", "ACCESS_REVOKED_OR_CANCELED");
         return null;
@@ -114,11 +117,17 @@ export class IntakeJobs {
       return j;
     });
     if (!job) return "finished";
+    if (job.succeeded) {
+      await this.knowledge?.afterSuccess(scope);
+      return "finished";
+    }
     if (job.waiting) return "waiting";
     try {
-      return job.kind === "website.extract"
+      const status = job.kind === "website.extract"
         ? await this.crawl(scope)
         : await this.analyze(scope);
+      if (status === "succeeded") await this.knowledge?.afterSuccess(scope);
+      return status;
     } catch (error) {
       if(monthlyBudgetExceeded(error))error=new IntakeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
       if (!(error instanceof IntakeError)) throw error;

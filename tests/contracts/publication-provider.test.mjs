@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {publicationChannel,validReel} from '../../dist/publication-provider.js';
+import {validReel} from '../../dist/publication-provider.js';
 const valid=()=>({sha256:'a'.repeat(64),bytes:'100000',manifest:{video_sha256:'a'.repeat(64),metadata:{codec:'h264',audio:false,width:1080,height:1920,duration_ms:3000}}});
 test('Reel eligibility requires canonical metadata bound to the approved bytes',()=>{
  assert.equal(validReel(valid()),true);
@@ -9,10 +9,4 @@ test('Reel eligibility requires canonical metadata bound to the approved bytes',
  }
  assert.equal(validReel(null),false);
  assert.equal(validReel({metadata:valid().manifest.metadata,bytes:100000}),false);
-});
-test('Publication destination mapping supports only implemented providers',()=>{
- assert.equal(publicationChannel('linkedin'),'linkedin');
- assert.equal(publicationChannel('instagram-standalone'),'instagram');
- assert.equal(publicationChannel('facebook'),'facebook');
- for(const provider of ['instagram','youtube','tiktok','twitter','google','unknown',''])assert.equal(publicationChannel(provider),null);
 });

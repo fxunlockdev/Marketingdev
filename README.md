@@ -44,7 +44,14 @@ The skill harness runs selected, pinned marketing instructions through an isolat
 - **OpenAI:** planning, supported research/chat operations and image generation/editing through typed adapters.
 - **Runway:** asynchronous video generation, status handling and private output copying. Legacy Higgsfield files remain in the repository and are not evidence of the active video provider.
 - **Vecteezy:** server-side stock-photo search and acquisition for creative reference material. See below for the current rollout boundary.
-- **Social providers:** Post for Me and Postiz adapters exist. Runtime configuration and connection state determine which integration is used; their presence does not make every platform available.
+- **Social provider: Post for Me only.** Connections, publishing, post status and performance metrics all go through Post for Me (`postforme.ts`, `postforme-client.ts`, `learning-sync.ts`). Postiz is retired: its adapters, OAuth and provisioning flows, worker activities and provisioner entrypoint are removed. Its historical tables (`publication_requests`, `social_channels`, `post_analytics` and related) are kept unchanged and are no longer read for insights; a slot with a historical Postiz request is still never offered for publishing again. A platform appears only when it is enabled in `POSTFORME_PLATFORMS` and connected.
+
+### Where model calls run
+
+The API holds no paid model key. Every model call runs on the worker, reserved against the business's allowance before it is made, so a replay never pays twice:
+
+- **Blog articles** (`blog.generate`): the API checks the request, snapshots the topic, direction, approved facts and current draft, and enqueues the job; the web polls the article. The worker writes it through the skills harness (copywriting, content-strategy, product-marketing, Brand Engine and the production rules) with the business's knowledge context pack. An article whose outcome is uncertain can be released with *Stop waiting*; the reservation stays counted.
+- **Research → knowledge graph:** after website/market research or brand analysis succeeds, the worker extracts entities and relations from the new sources as *suggested* graph items with evidence on their sources (`knowledge-research.ts`). Market pages can support competitors and market audiences, pains or personas, tagged as market research, but never a claim about the business itself. Extraction never changes the research job's outcome; failures are recorded in `knowledge_extraction_calls` and skipped.
 
 ## Stock imagery and the visual experience
 

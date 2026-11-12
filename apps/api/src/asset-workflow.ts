@@ -98,3 +98,9 @@ export async function generateCarouselWorkflow(scope:JobScope){
   return await carousel.completeCarousel(scope);
  }catch{return await carouselFinalization.failCarousel(scope);}
 }
+
+type BlogActivities={generateBlog(scope:JobScope):Promise<string>;failBlog(scope:JobScope):Promise<string>};
+// The harness can take up to its own 250-second limit; one generation is never retried after an uncertain call.
+const blog=proxyActivities<BlogActivities>({startToCloseTimeout:'6 minutes',heartbeatTimeout:'5 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'10 seconds',maximumAttempts:3}});
+const blogFinalization=proxyActivities<BlogActivities>({startToCloseTimeout:'20 seconds',retry:{initialInterval:'2 seconds',maximumInterval:'1 minute'}});
+export async function generateBlogWorkflow(scope:JobScope){try{return await blog.generateBlog(scope);}catch{return await blogFinalization.failBlog(scope);}}

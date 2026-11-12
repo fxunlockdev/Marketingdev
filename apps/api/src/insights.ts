@@ -4,15 +4,10 @@ import {ContentPlan} from './content-plan.js';
 import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {readPostformeObservations,type Queryable} from './learning-observations.js';
-export const insightObservationsSQL=`SELECT a.id,r.job_id AS publication_id,r.caption,r.scheduled_at,c.provider,c.name AS account_name,CASE WHEN r.carousel_version_id IS NOT NULL THEN 'carousel' WHEN r.video_version_id IS NOT NULL THEN 'video' ELSE 'static' END AS format,a.semantics,a.series,a.collected_at FROM app.publication_requests r JOIN app.social_channels c ON c.id=r.channel_id JOIN LATERAL(SELECT * FROM app.post_analytics x WHERE x.publication_id=r.job_id ORDER BY x.collected_at DESC,x.id DESC LIMIT 1)a ON true WHERE r.phase='accepted' AND r.observed_state='published' AND a.state='available' ORDER BY r.scheduled_at DESC,r.job_id LIMIT 20`;
-/** @deprecated Postiz is retired. Delete this alias, `insightObservationsSQL` and the fallback branch below once no business relies on Postiz history. */
-export const legacyPostizObservationsSQL=insightObservationsSQL;
-export type InsightObservations={source:'postforme'|'postiz_legacy';observations:Record<string,unknown>[]};
-/** Post for Me is the publisher. A business that has published through it never falls back to Postiz history. */
+export type InsightObservations={source:'postforme';observations:Record<string,unknown>[]};
+/** Post for Me is the only publisher; insights read its metrics only. Postiz history stays in its tables, unread. */
 export async function insightObservations(db:Queryable):Promise<InsightObservations>{
- const live=await readPostformeObservations(db);
- if(live.published)return {source:'postforme',observations:live.observations};
- return {source:'postiz_legacy',observations:(await db.query(legacyPostizObservationsSQL)).rows};
+ return {source:'postforme',observations:(await readPostformeObservations(db)).observations};
 }
 export class Insights {
  constructor(readonly plans:ContentPlan){}

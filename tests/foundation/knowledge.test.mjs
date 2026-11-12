@@ -7,6 +7,10 @@ import {AssetJobs} from '../../dist/jobs.js';
 import {applyMutations,upsertNodes,upsertEdges,attachEvidence,reviewNode,reviewEdge,supersedeNode,neighbourhood} from '../../dist/knowledge-graph.js';
 import {fromBrandBrainSnapshot} from '../../dist/knowledge-extract.js';
 import {buildContextPack} from '../../dist/knowledge-context.js';
+import OpenAI from 'openai';
+import {ResearchKnowledge,KnowledgeExtractor,MARKET_NOTE} from '../../dist/knowledge-research.js';
+import {MARKET_RESEARCH_VERSION} from '../../dist/openai-website-research.js';
+import {IntakeJobs} from '../../dist/intake-jobs.js';
 
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG);
 const admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),worker=new Pool({connectionString:config.jobs.workerDatabaseUrl}),app=new Pool({connectionString:config.appDatabaseUrl});
@@ -36,7 +40,7 @@ const ref=(type,key)=>({type,key});
 test('knowledge tables force row-level security and deny other tenants',async()=>{
  const a=await fixture(),b=await fixture();
  const tables=await admin.query(`SELECT relname,relrowsecurity,relforcerowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='app' AND relname LIKE 'knowledge_%' AND relkind='r' ORDER BY relname`);
- assert.deepEqual(tables.rows.map(t=>t.relname),['knowledge_edges','knowledge_evidence','knowledge_nodes']);
+ assert.deepEqual(tables.rows.map(t=>t.relname),['knowledge_edges','knowledge_evidence','knowledge_extraction_calls','knowledge_nodes']);
  assert.ok(tables.rows.every(t=>t.relrowsecurity&&t.relforcerowsecurity));
  const written=await a.as(a.owner,true,db=>applyMutations(db,a.scope,{nodes:[suggestion('offer','groom','Doorstep groom',{evidence:[{sourceUrl:'https://example.com/',excerpt:'We come to you'}]}),suggestion('pain','no-car','No car')],edges:[link(ref('offer','groom'),'solves',ref('pain','no-car'))]}));
  assert.deepEqual(written.nodes.map(n=>n.outcome),['inserted','inserted']);assert.equal(written.evidence,1);
@@ -295,4 +299,96 @@ test('plan, carousel and video jobs build their packs and record planned posts u
  }
  for(const table of ['carousel_requests','video_requests'])assert.equal((await admin.query("SELECT has_column_privilege('desvio_worker',$1,'knowledge_context','UPDATE') AS ok",[`app.${table}`])).rows[0].ok,true);
  assert.equal((await admin.query("SELECT has_column_privilege('desvio_worker','app.planning_requests','used_node_ids','UPDATE') AS ok")).rows[0].ok,false,'provenance is written once, by the API');
+});
+
+// Research → graph. The model is a local mock; nothing leaves this machine.
+const sha=()=>randomUUID().replaceAll('-','').padEnd(64,'0');
+async function researched(a,kind='website.extract'){
+ const job=await a.job(kind);await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[job.jobId]);
+ await admin.query("INSERT INTO app.analysis_grants(organization_id,brand_id,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by,enabled) VALUES($1,$2,'MOCK-model',now()+interval '1 hour',1000000000,1,1,'LOCAL TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO NOTHING",[a.org,a.brand]);
+ return job;
+}
+async function source(a,text,{market=false,url='https://harbourpine.example/'}={}){
+ const id=randomUUID();
+ await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,$5,$6,$7)",[id,a.org,a.brand,sha(),market?MARKET_RESEARCH_VERSION:'test-site-v1',JSON.stringify(market?{origin:'market'}:{}),url]);
+ await admin.query("INSERT INTO app.brand_chunks(id,organization_id,brand_id,source_id,page,anchor,text) VALUES($1,$2,$3,$4,1,'body',$5)",[randomUUID(),a.org,a.brand,id,text]);
+ return id;
+}
+function extractor(answer,calls){
+ return new KnowledgeExtractor(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_url,init)=>{
+  const body=JSON.parse(init.body);calls.push(body);
+  if(answer instanceof Error)throw answer;
+  const text=typeof answer==='function'?answer(JSON.parse(body.input)):answer;
+  return Response.json({object:'response',id:`resp_${calls.length}`,status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify(text),annotations:[]}]}],usage:{input_tokens:10,output_tokens:10,total_tokens:20}});
+ }}));
+}
+const graphAnswer=input=>{
+ const own=input.sources.find(s=>s.id.startsWith('s')),rival=input.sources.find(s=>s.id.startsWith('m'));
+ return {entities:[
+  {ref:'e1',type:'offer',label:'Doorstep Full Groom',summary:'Groom in a van at the door.',origin:'EXTRACTED',confidence:0.9,evidence:[0]},
+  {ref:'e2',type:'competitor',label:'Paws & Co',summary:'Salon chain in Riga.',origin:'EXTRACTED',confidence:0.9,evidence:[1]},
+  {ref:'e3',type:'offer',label:'Spa Day Package',summary:'A rival offer.',origin:'EXTRACTED',confidence:0.9,evidence:[1]},
+  {ref:'e4',type:'business',label:'Harbour & Pine',summary:'',origin:'EXTRACTED',confidence:0.9,evidence:[0]},
+ ],relations:[
+  {from:'e4',to:'e1',relation:'offers',origin:'EXTRACTED',confidence:0.9,evidence:[0]},
+  {from:'e4',to:'e3',relation:'offers',origin:'EXTRACTED',confidence:0.9,evidence:[1]},
+  {from:'e4',to:'e2',relation:'differentiates_from',origin:'INFERRED',confidence:0.6,evidence:[1]},
+ ],evidence:[{source:own.id,excerpt:'Doorstep Full Groom from 55 EUR'},{source:rival.id,excerpt:'Paws & Co Spa Day Package'}]};
+};
+
+test('a succeeded research job extracts suggestions with evidence on its sources, tags market items, and never pays twice',async()=>{
+ const a=await fixture(),job=await researched(a);
+ const own=await source(a,'Harbour & Pine: Doorstep Full Groom from 55 EUR. We come to your door in Riga.');
+ const rival=await source(a,'Paws & Co Spa Day Package for 80 EUR at our Riga salons.',{market:true,url:'https://pawsco.example/'});
+ const calls=[],research=new ResearchKnowledge(jobs,extractor(graphAnswer,calls));
+ assert.equal(await research.afterSuccess(job),'applied');
+ assert.equal(calls.length,1);assert.equal(calls[0].model,'gpt-6-luna');assert.equal(calls[0].store,false);
+ const nodes=(await admin.query('SELECT id,type,key,status,origin,properties FROM app.knowledge_nodes WHERE organization_id=$1 AND brand_id=$2 ORDER BY type,key',[a.org,a.brand])).rows;
+ assert.deepEqual(nodes.map(n=>`${n.type}:${n.key}:${n.status}`),['business:self:suggested','competitor:paws-co:suggested','offer:doorstep-full-groom:suggested']);
+ const competitor=nodes.find(n=>n.type==='competitor');assert.equal(competitor.properties.scope,'market');assert.ok(competitor.properties.summary.startsWith(MARKET_NOTE));
+ const evidence=(await admin.query('SELECT node_id,edge_id,source_id,job_id FROM app.knowledge_evidence WHERE organization_id=$1 AND brand_id=$2',[a.org,a.brand])).rows;
+ const offer=nodes.find(n=>n.type==='offer');
+ assert.deepEqual(evidence.filter(e=>e.node_id===offer.id).map(e=>[e.source_id,e.job_id]),[[own,job.jobId]]);
+ assert.deepEqual(evidence.filter(e=>e.node_id===competitor.id).map(e=>e.source_id),[rival]);
+ const edges=(await admin.query('SELECT relation,properties FROM app.knowledge_edges WHERE organization_id=$1 AND brand_id=$2 ORDER BY relation',[a.org,a.brand])).rows;
+ assert.deepEqual(edges.map(e=>[e.relation,e.properties.scope??null]),[['differentiates_from','market'],['offers',null]]);
+ const ledger=(await admin.query('SELECT status,reserved_micros,source_ids,applied_at FROM app.knowledge_extraction_calls WHERE job_id=$1',[job.jobId])).rows[0];
+ assert.equal(ledger.status,'succeeded');assert.ok(Number(ledger.reserved_micros)>0);assert.ok(ledger.applied_at);assert.deepEqual([...ledger.source_ids].sort(),[own,rival].sort());
+ // Replays of the same job, and later jobs over the same pages, never call the model again.
+ assert.equal(await research.afterSuccess(job),'applied');
+ const later=await researched(a,'brand.analyze');
+ assert.equal(await research.afterSuccess(later),'skipped');assert.equal(calls.length,1);
+ assert.equal((await admin.query('SELECT error_code FROM app.knowledge_extraction_calls WHERE job_id=$1',[later.jobId])).rows[0].error_code,'KNOWLEDGE_NOTHING_NEW');
+ // The job itself is untouched.
+ assert.equal((await admin.query('SELECT status FROM app.jobs WHERE id=$1',[job.jobId])).rows[0].status,'succeeded');
+});
+
+test('extraction failures are recorded and skipped; the research job keeps its outcome',async()=>{
+ const a=await fixture();await source(a,'Harbour & Pine grooms dogs at the door.');
+ const lost=await researched(a),calls=[];
+ assert.equal(await new ResearchKnowledge(jobs,extractor(new TypeError('socket hang up'),calls)).afterSuccess(lost),'failed');
+ assert.deepEqual((await admin.query('SELECT status,error_code FROM app.knowledge_extraction_calls WHERE job_id=$1',[lost.jobId])).rows[0],{status:'unknown',error_code:'KNOWLEDGE_SUBMISSION_UNKNOWN'});
+ // An uncertain call is never repeated.
+ assert.equal(await new ResearchKnowledge(jobs,extractor(graphAnswer,calls)).afterSuccess(lost),'recorded');
+ const b=await fixture();await source(b,'Harbour & Pine grooms dogs at the door.');
+ const invalid=await researched(b);
+ assert.equal(await new ResearchKnowledge(jobs,extractor({entities:[],relations:[],evidence:[],status:'approved'},calls)).afterSuccess(invalid),'failed');
+ assert.equal((await admin.query('SELECT error_code FROM app.knowledge_extraction_calls WHERE job_id=$1',[invalid.jobId])).rows[0].error_code,'KNOWLEDGE_EXTRACTION_INVALID');
+ const c=await fixture();await source(c,'No grant here.');
+ const ungranted=await c.job('website.extract');await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[ungranted.jobId]);
+ assert.equal(await new ResearchKnowledge(jobs,extractor(graphAnswer,calls)).afterSuccess(ungranted),'skipped');
+ assert.equal((await admin.query('SELECT error_code FROM app.knowledge_extraction_calls WHERE job_id=$1',[ungranted.jobId])).rows[0].error_code,'KNOWLEDGE_GRANT_MISSING');
+ const running=await c.job('website.extract');
+ assert.equal(await new ResearchKnowledge(jobs,extractor(graphAnswer,calls)).afterSuccess(running),'not_applicable');
+ for(const j of [lost,invalid,ungranted])assert.equal((await admin.query('SELECT status FROM app.jobs WHERE id=$1',[j.jobId])).rows[0].status,'succeeded');
+ assert.equal(calls.length,2);
+});
+
+test('a replayed succeeded intake job catches up on extraction through the intake hook',async()=>{
+ const a=await fixture();await source(a,'Harbour & Pine: Doorstep Full Groom from 55 EUR.');await source(a,'Paws & Co Spa Day Package.',{market:true,url:'https://pawsco.example/'});
+ const job=await researched(a),calls=[];
+ const intake=new IntakeJobs(jobs,{configured:false},undefined,new ResearchKnowledge(jobs,extractor(graphAnswer,calls)));
+ assert.equal(await intake.run(job),'finished');assert.equal(calls.length,1);
+ assert.equal((await admin.query('SELECT applied_at IS NOT NULL AS done FROM app.knowledge_extraction_calls WHERE job_id=$1',[job.jobId])).rows[0].done,true);
+ assert.equal(await intake.run(job),'finished');assert.equal(calls.length,1);
 });
