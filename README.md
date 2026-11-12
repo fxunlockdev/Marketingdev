@@ -129,7 +129,7 @@ node scripts/foundation-test.mjs --stock-creative
 node scripts/foundation-test.mjs --operator
 ```
 
-Foundation tests provision disposable local infrastructure; they do not target Railway. Provider mocks in those tests do not prove live provider behavior. `make dev` currently exits with a not-implemented message for the full-stack harness. `npm run dev:web` starts only the web development server, not the backend infrastructure.
+Foundation tests provision disposable local infrastructure; they do not target Railway. Provider mocks in those tests do not prove live provider behavior. `make local` (or `node scripts/local-stack.mjs start`) runs the whole product on this machine with mock or live providers; see [docs/LOCAL_RUN.md](docs/LOCAL_RUN.md). `npm run dev:web` starts only the web development server, not the backend infrastructure.
 
 Live tests require the repository's staging safeguards and provider authorization. Do not run social publication tests on customer accounts without explicit authorization. The release gate should fail when required evidence is missing.
 
