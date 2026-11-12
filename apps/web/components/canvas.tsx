@@ -795,6 +795,7 @@ export function CreativeProject({
         </>}
         onExportReady={exportReady}
       />
+      <Field label="Post caption">{id=><textarea id={id} className="canvas-caption" rows={3} maxLength={3000} value={caption} disabled={!editable} onChange={e=>setCaption(e.target.value)} onKeyDown={e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='s'){e.preventDefault();void save();}}}/>}</Field>
       {write && <StockPicker key={`${business.id}:${projectId}:${version.id}`} businessId={business.id} purpose="replacement" disabled={dirty||busy||!latest||editingDisabled} onSelected={async referenceId=>{setBusy(true);try{const saved=await api(root+`/stock/projects/${projectId}/replace`,{parent_id:version.id,reference_id:referenceId});await syncCalendarPosts(business.id,data.slots??[],saved.id);await load(saved.id);onSaved?.(saved.id);setNotice('Photo replaced in a new draft version. Review it before approving.');}finally{setBusy(false);}}}/>}
       <CanvasPostActions business={business} projectId={projectId} threadId={data.project.thread_id} version={version} latest={latest} slots={data.slots ?? []} variants={data.variants ?? []} dirty={dirty} busy={busy || editingDisabled} onBusy={setBusy} onAsk={onAsk} timezone={timezone || "UTC"} defaultChannel={version.skill_manifest?.channel ?? "instagram"} onReload={async text => { await load(selected); onSaved?.(selected); setNotice(text); }} />
     </article>

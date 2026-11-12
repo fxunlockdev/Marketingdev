@@ -34,3 +34,5 @@
 .canvas-shortcuts dd{margin:0}
 @keyframes canvas-post-reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion:reduce){.canvas-post-panel{animation:none}.canvas-alternatives li{transition:none}.canvas-alternatives li:hover{transform:none}}
+.canvas-caption{width:100%;min-height:calc(var(--control-height) * 2);resize:vertical}
+.canvas-editor-meta{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--ds-space-2)}

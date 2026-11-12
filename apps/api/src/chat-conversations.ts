@@ -55,7 +55,9 @@ export class ChatConversations {
     ORDER BY v.created_at,v.id`,[id,conversation.organization_id,brand])).rows;
   const carousel_runs=(await db.query(`SELECT j.id,j.status,j.error_code,j.cancel_requested,r.project_id,r.output_version_id,r.input->>'slide_count' AS slide_count FROM app.carousel_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.thread_id=$1 ORDER BY j.created_at DESC,j.id`,[id])).rows;
   const carousel_slides=(await db.query(`SELECT c.parent_job_id,c.position,g.status AS generation_status,e.status AS export_status,r.project_id,r.output_version_id FROM app.carousel_children c JOIN app.carousel_requests parent ON parent.job_id=c.parent_job_id JOIN app.creative_requests r ON r.job_id=c.generation_job_id JOIN app.jobs g ON g.id=c.generation_job_id JOIN app.jobs e ON e.id=c.export_job_id WHERE parent.thread_id=$1 ORDER BY c.position`,[id])).rows;
-  return {conversation:{id:conversation.id,title:conversation.title},saved_images,carousel_runs,carousel_slides,turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
+  // An uncertain image anywhere in the business blocks new creatives; name it so the chat can offer its recovery.
+  const blocking_creative=(await db.query("SELECT j.id FROM app.jobs j WHERE j.kind IN ('creative.generate','carousel.generate') AND j.status='unknown' ORDER BY j.created_at DESC,j.id LIMIT 1")).rows[0]?.id??null;
+  return {conversation:{id:conversation.id,title:conversation.title},blocking_creative,saved_images,carousel_runs,carousel_slides,turns:turns.map(({source_records,...t}:any)=>({...t,sources:(source_records??[]).filter((s:any)=>t.output?.sources?.includes(s.id)).map((s:any)=>({id:s.id,title:s.title,kind:s.kind??'conversation'}))}))};
  });}
  submit(user:string,brand:string,body:unknown,key:unknown){
   const v=object(body,['conversation_id','message']);
