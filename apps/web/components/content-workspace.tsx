@@ -1,4 +1,5 @@
 "use client";
+import {PostformePost} from './postforme-post';
 import {CreativeRecovery} from './creative-recovery';
 import {CreativeQuality,InImageHeadline,headlineFeedback} from './creative-quality';
 import {MonthlyPlanReview} from './monthly-plan-review';
@@ -1052,6 +1053,7 @@ export function SlotPanel({
                     </label>
                   )}
 
+              {s.state === "approved" && <PostformePost businessId={business.id} slotId={s.id}/>}
               <details className="post-brief-details" open={!s.creative_version_id&&!s.video_version_id&&!s.carousel_version_id||undefined}>
               <summary>Edit topic & schedule</summary>
               <form

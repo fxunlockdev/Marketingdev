@@ -1,0 +1,12 @@
+.plan{display:grid;gap:12px}
+.plan + .plan{margin-top:20px;padding-top:20px;border-top:1px solid var(--color-border)}
+.planHeading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.planHeading h3{margin:0;font-size:1rem}
+.bulk{display:grid;gap:12px;padding:16px;border:1px solid var(--color-border-emphasized);border-radius:var(--radius-element);background:var(--color-background-muted)}
+.bulk p{margin:0}
+.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.reason{margin:0;padding:8px 12px;border-radius:var(--radius-inner);background:var(--status-danger-wash);color:var(--status-danger)}
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;margin:0}
+.metrics div{padding:8px 10px;border-radius:var(--radius-inner);background:var(--color-background-muted)}
+.metrics dt{font-size:.75rem;color:var(--color-text-secondary);text-transform:capitalize}
+.metrics dd{margin:0;font-weight:600}

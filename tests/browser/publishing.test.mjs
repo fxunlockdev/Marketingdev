@@ -79,7 +79,7 @@ async function mockProvider(p){
   // Retired Postiz endpoints must never be requested by the web app.
   if(/\/businesses\/[^/]+\/(connections|publications|analytics)(\/|$)/.test(u.pathname))provider.push({retired:u.pathname});
   if(req.method()==='POST'&&u.pathname.includes('/postforme/')){provider.push({path:u.pathname,body:req.postDataJSON()});
-   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(u.pathname.endsWith('/publications')?{id:randomUUID(),phase:'accepted'}:{})});}
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(u.pathname.endsWith('/publications')?{id:randomUUID(),phase:'accepted'}:u.pathname.endsWith('/publications/bulk')?{plan_id:req.postDataJSON().plan_id,results:[{slot_id:randomUUID(),outcome:'accepted'},{slot_id:randomUUID(),outcome:'accepted'}],not_ready:0}:{})});}
   return route.continue();
  });
 }
@@ -106,7 +106,41 @@ test('connections and performance render Post for Me without a Postiz history se
  await page.goto(base+`/b/${brand.id}/connections`);
  await expect(page.getByText('Northstar LinkedIn').first()).toBeVisible();
  await expect(page.getByText('Previous connections and history')).toHaveCount(0);
- await page.goto(base+`/b/${brand.id}/publishing`);await page.getByRole('button',{name:'Performance',exact:true}).click();
+ await page.goto(base+`/b/${brand.id}/publishing`);await page.getByRole('button',{name:'Insights',exact:true}).click();
  await expect(page.getByText('Previous publishing performance')).toHaveCount(0);
  assert.deepEqual(provider.filter(r=>r.retired),[]);assert.deepEqual(pageErrors,[]);
+});
+
+test('a whole plan is scheduled at its planned times with one consent, and the publish time can be changed per post',async()=>{
+ const one=await approvedPost('Bulk one'),two=await approvedPost('Bulk two');
+ await admin.query('UPDATE app.content_slots SET plan_id=$1 WHERE id=$2',[one.slot.plan_id,two.slot.id]);
+ await page.goto(base+`/b/${brand.id}/publishing`);
+ const all=page.getByRole('button',{name:'Schedule all 2 approved posts in this plan'});await expect(all).toBeVisible();await all.click();
+ const confirm=page.getByRole('button',{name:'Schedule all posts'});await expect(confirm).toBeDisabled();
+ await page.getByLabel(/I authorize these 2 approved posts/).check();await confirm.click();
+ await expect(page.getByText('2 posts scheduled at their planned times.',{exact:false})).toBeVisible();
+ const bulk=provider.filter(r=>r.path?.endsWith('/postforme/publications/bulk'));assert.equal(bulk.length,1);assert.deepEqual(bulk[0].body,{plan_id:one.slot.plan_id,confirmed:true});
+ const row=page.locator('.publication-ready-list li').filter({hasText:one.v.caption});
+ await row.getByRole('button',{name:'Review and schedule'}).click();
+ const time=page.getByLabel('Publish at');await expect(time).toHaveValue(new Date(one.slot.planned_at).toISOString().slice(0,16));
+ const later=new Date(Date.parse(one.slot.planned_at)+3600000).toISOString().slice(0,16);await time.fill(later);
+ await page.getByLabel(/I authorize this exact image/).check();await page.getByRole('button',{name:'Confirm and schedule'}).click();
+ await expect(page.getByText('Your request is saved.',{exact:false})).toBeVisible();
+ const last=provider.filter(r=>r.path?.endsWith('/postforme/publications')).at(-1);assert.equal(last.body.scheduled_at,later);assert.equal(last.body.slot_id,one.slot.id);
+ assert.deepEqual(pageErrors,[]);
+});
+
+test('insights and the monthly review render honestly with no results, and an accepted recommendation is saved for next month',async()=>{
+ await page.goto(base+`/b/${brand.id}/publishing?view=insights`);
+ await expect(page.getByRole('heading',{name:'No published posts yet'})).toBeVisible();
+ await page.getByRole('button',{name:'Monthly review',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'For next month'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Nothing published this month'})).toBeVisible();
+ const boxes=page.locator('fieldset input[type=checkbox]'),use=page.getByRole('button',{name:'Use this for next month'});
+ for(let i=0;i<await boxes.count();i++)await boxes.nth(i).uncheck();await expect(use).toBeDisabled();
+ await boxes.first().check();await use.click();
+ await expect(page.getByText('Saved. Next month’s plan will use these recommendations.')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Stop using'})).toHaveCount(1);
+ assert.equal((await admin.query('SELECT count(*)::int n FROM app.learning_accepted_changes WHERE brand_id=$1 AND accepted_by=$2',[brand.id,alice.id])).rows[0].n,1);
+ assert.deepEqual(pageErrors,[]);
 });
