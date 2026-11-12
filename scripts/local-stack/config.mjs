@@ -1,7 +1,7 @@
 // Local run stack: paths, ports, generated secrets and per-process environments.
 // Everything lives under work/local-stack (git-ignored). Nothing here is ever used by
 // staging or production; the processes it configures run with APP_MODE=development.
-import {randomBytes} from 'node:crypto';
+import {randomBytes,createHash} from 'node:crypto';
 import {existsSync,mkdirSync,readFileSync,writeFileSync,chmodSync} from 'node:fs';
 import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
@@ -28,7 +28,7 @@ export const BUCKET='desvio-local';
 export const SENDER='accounts@desvio.localhost';
 
 /** Fixed loopback ports so URLs and stored settings survive restarts. --web-port overrides the web port. */
-export const DEFAULT_PORTS=Object.freeze({web:3000,api:3101,postgres:55432,storage:53900,scanner:53310,temporal:57233,temporalHttp:57243,temporalMetrics:57253,smtp:52525,mock:54010});
+export const DEFAULT_PORTS=Object.freeze({web:3000,api:3101,postgres:55432,storage:53900,scanner:53310,temporal:57233,temporalHttp:57243,temporalMetrics:57253,smtp:52525,mock:54010,mockRunway:54011});
 
 const hex=bytes=>randomBytes(bytes).toString('hex');
 const ROLE_KEYS=['APP_DATABASE_PASSWORD','AUTH_DATABASE_PASSWORD','MAIL_DATABASE_PASSWORD','WORKER_DATABASE_PASSWORD','DISPATCHER_DATABASE_PASSWORD','POSTIZ_PROVISIONER_DATABASE_PASSWORD'];
@@ -70,12 +70,15 @@ function storageEnvironment(ports,secrets){
 }
 
 /** Provider settings for one mode. Live keys come only from the operator's shell (`liveKeys`). */
-export function providerEnvironment({mode,ports,liveKeys},service){
+export function providerEnvironment(context,service){
+ const {mode,ports,liveKeys}=context;
  if(mode==='mock'){
   const mock=`http://127.0.0.1:${ports.mock}`;
   // The OpenAI SDK honours OPENAI_BASE_URL; no product change is needed to reach the mock.
   // Vecteezy and Post for Me are not mocked: see docs/LOCAL_RUN.md ("What is mocked").
-  return service==='worker'?{OPENAI_API_KEY:'local-mock-openai-key',OPENAI_BASE_URL:`${mock}/v1`}:{};
+  // With --with-video, video runs against the local mock Runway (scripts/local-stack/mock-runway.mjs).
+  const video=context.images?.video?{VIDEO_ENABLED:'true',...(service==='worker'?{RUNWAYML_API_SECRET:'local-mock-runway-key',DESVIO_MOCK_RUNWAY_URL:`http://127.0.0.1:${ports.mockRunway}`,VIDEO_ENCRYPTION_KEY:createHash('sha256').update(`video:${context.secrets.authSecret}`).digest('hex')}:{})}:{};
+  return service==='worker'?{OPENAI_API_KEY:'local-mock-openai-key',OPENAI_BASE_URL:`${mock}/v1`,...video}:video;
  }
  const env={};
  const pick=(...keys)=>{for(const key of keys)if(liveKeys[key])env[key]=liveKeys[key];};
