@@ -296,6 +296,14 @@ test('approved monthly campaign queues 20 images and 5 carousels once and hands 
  // A recovered attempt should show live progress, not an earlier failure banner.
  const imageBindings=(await admin.query('SELECT * FROM app.content_slot_generations WHERE job_id=ANY($1::uuid[]) ORDER BY job_id',[jobs[0].job_ids])).rows;
  assert.equal(imageBindings.length,20,'All static jobs have a calendar binding');
+ // Every generated asset follows the locked mood board, ranked below brand facts.
+ const lockedBoard=(await admin.query('SELECT direction FROM app.guided_moodboards WHERE id=$1',[board.id])).rows[0].direction;
+ const staticPrompts=(await admin.query('SELECT prompt FROM app.creative_requests WHERE job_id=ANY($1::uuid[])',[imageBindings.map(row=>row.job_id)])).rows;
+ assert.ok(staticPrompts.every(row=>row.prompt.includes('"approved_direction"')&&row.prompt.includes(lockedBoard.palette[0].hex)&&row.prompt.includes('Brand facts win any conflict')),'Static prompts carry the approved mood board');
+ const carouselInputs=(await admin.query('SELECT r.input FROM app.carousel_requests r JOIN app.content_slot_carousel_generations g ON g.job_id=r.job_id WHERE r.job_id=ANY($1::uuid[])',[jobs[0].job_ids])).rows;
+ assert.equal(carouselInputs.length,5);assert.ok(carouselInputs.every(row=>row.input.prompt.includes('Approved creative direction')&&row.input.prompt.includes(lockedBoard.palette[0].hex)),'Carousel prompts carry the approved mood board');
+ const batchState=await campaigns.creatives.batchStatus(alice,brand.id,plan.id);
+ assert.equal(batchState.allowance.items.static.used,20);assert.ok(batchState.jobs.every(job=>job.scheduled_for===null));
  const binding=imageBindings[0],imageJob=binding.job_id;
  await admin.query("UPDATE app.jobs SET status='failed' WHERE id=$1",[imageJob]);
  assert.equal((await campaigns.read(alice,brand.id)).campaigns[0].generation_attention,true);
