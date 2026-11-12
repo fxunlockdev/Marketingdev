@@ -7,7 +7,8 @@ import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {setTimeout as sleep} from 'node:timers/promises';
 import {chromium,expect} from '@playwright/test';
-import {ROOT} from './config.mjs';
+import {ROOT,loadSecrets} from './config.mjs';
+import {adminPool} from './containers.mjs';
 import {mailbox} from './mail-sink.mjs';
 
 const SHOTS=join(ROOT,'work/local-shots');
@@ -51,6 +52,16 @@ export async function runJourney(state,{website='https://example.com',headed=fal
    await page.getByRole('button',{name:'Sign in',exact:true}).click();
    await expect(page.getByLabel('Business name')).toBeVisible();
    await shot('add-business');
+   // Operator grants (workspace defaults) must exist before the business, as in staging.
+   const pool=adminPool({...state,secrets:loadSecrets()},1);
+   try{
+    for(let i=0;;i++){
+     const {rows}=await pool.query('SELECT 1 FROM app.workspace_provider_defaults d JOIN app.personal_accounts p ON p.organization_id=d.organization_id JOIN auth."user" u ON u.id=p.user_id WHERE u.email=$1',[email]);
+     if(rows.length)break;
+     if(i>60)throw new Error('workspace provider defaults were not applied');
+     await sleep(500);
+    }
+   }finally{await pool.end();}
   });
   await step('add a business with a website',async()=>{
    await page.getByLabel('Business name').fill('Harbour Lane Bakery');
@@ -72,7 +83,7 @@ export async function runJourney(state,{website='https://example.com',headed=fal
    await page.getByRole('button',{name:'Quiet Ritual',exact:true}).click();
    await shot('onboarding-3-look');
    await page.getByRole('button',{name:'Continue',exact:true}).click();
-   await expect(page.getByRole('region',{name:/Files|extras|anything/i}).or(page.getByText('Step 4 of 5'))).toBeVisible();
+   await expect(page.getByText('Step 4 of 5',{exact:false})).toBeVisible();
    await shot('onboarding-4-files');
    await page.getByRole('button',{name:'Continue',exact:true}).click();
    await expect(page.getByRole('heading',{name:'Check your brief'})).toBeVisible();

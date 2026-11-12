@@ -82,7 +82,9 @@ export async function supervise(){
   const pool=adminPool(context,2);closers.push(()=>pool.end());
   const renew=async()=>{try{const applied=await refreshGrants(context,pool);if(applied.length)say(`grants applied: ${applied.join(', ')}`);}catch(error){say(`grant renewal failed: ${error.code??error.message}`);}};
   await renew();
-  const timer=setInterval(()=>{if(!stopping)void renew();},5000);closers.push(async()=>clearInterval(timer));
+  // Every second: a new account gets its operator defaults before its owner can add a business.
+  let renewing=false;
+  const timer=setInterval(()=>{if(stopping||renewing)return;renewing=true;void renew().finally(()=>{renewing=false;});},1000);closers.push(async()=>clearInterval(timer));
   update({ready:true,readyAt:new Date().toISOString(),pids:Object.fromEntries([...children].map(([n,c])=>[n,c.pid]))});
   say('stack ready');
  }catch(error){

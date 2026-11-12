@@ -33,9 +33,18 @@ release-gate:
 verify-load:
 	$(PYTHON) -m scripts.verify load
 
-dev:
-	@echo 'NOT_IMPLEMENTED: full-stack dev harness and production provisioning remain pending. Local API foundation tests: npm run test:foundation.'
-	@exit 2
+dev: local
+
+# Whole product on this machine (mock providers by default). See docs/LOCAL_RUN.md.
+.PHONY: local local-stop local-status
+local:
+	node scripts/local-stack.mjs start $(ARGS)
+
+local-stop:
+	node scripts/local-stack.mjs stop
+
+local-status:
+	node scripts/local-stack.mjs status
 
 verify-social:
 	$(PYTHON) -m scripts.verify social
