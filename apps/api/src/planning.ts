@@ -2,7 +2,7 @@ import {normalizeContentMix,contentMixCounts,type ContentMixItem} from './genera
 import type {PoolClient} from 'pg';
 import {planningReferences} from './planning-references.js';
 import {campaignInput} from './campaign-input.js';
-import {approvedLearning} from './learning-context.js';
+import {planningLearning} from './learning-context.js';
 import {addDays,dayStart} from './local-calendar.js';
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
@@ -11,8 +11,9 @@ import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {planningContext,type PlanningContext,type PlanningInput,type PostIdeaPurpose} from './planning-contracts.js';
 import {approvedStrategy} from './strategy-store.js';
-/** Supplies the knowledge-graph context pack, market research notes and learned preferences for one plan request. */
-export type PlanningContextSource=(db:PoolClient,scope:{organization_id:string;brand_id:string})=>Promise<PlanningContext|undefined>;
+/** Supplies the knowledge-graph context pack, market research notes and learned preferences for one plan request,
+ * and the graph nodes the pack drew on (kept on the request as provenance, never sent to the model). */
+export type PlanningContextSource=(db:PoolClient,scope:{organization_id:string;brand_id:string},request:{brief:string;goal:string})=>Promise<(PlanningContext&{used_node_ids?:string[]})|undefined>;
 import {planHorizon} from './planning-schema.js';
 export class Planning {
  constructor(readonly plans:ContentPlan,readonly context?:PlanningContextSource){}
@@ -44,7 +45,8 @@ export class Planning {
   const action=async(db:PoolClient,b:{organization_id:string})=>{
    const prior=(await db.query('SELECT r.request_hash,j.id,j.status,r.output_plan_id,r.thread_id,r.loop_id FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,key])).rows[0];
    if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another planning request');return {id:prior.id,status:prior.status,output_plan_id:prior.output_plan_id,thread_id:prior.thread_id,loop_id:prior.loop_id};}
-   if((await db.query("SELECT j.id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND NOT coalesce(r.input->'chat' ? 'prompt_suggestion',false) AND (j.status='unknown' OR (j.status IN ('queued','running','retrying') AND r.scheduled_at<=now() AND (r.loop_id IS NULL OR EXISTS(SELECT 1 FROM app.planning_loops l WHERE l.id=r.loop_id AND l.stopped_at IS NULL))))",[b.organization_id,id])).rowCount)throw new ConflictException('A plan is running or its uncertain provider result needs reconciliation');
+   // A brand strategy run is not a plan: it never blocks one.
+   if((await db.query("SELECT j.id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND NOT coalesce(r.input->'chat' ? 'prompt_suggestion',false) AND r.input->>'task' IS DISTINCT FROM 'strategy' AND (j.status='unknown' OR (j.status IN ('queued','running','retrying') AND r.scheduled_at<=now() AND (r.loop_id IS NULL OR EXISTS(SELECT 1 FROM app.planning_loops l WHERE l.id=r.loop_id AND l.stopped_at IS NULL))))",[b.organization_id,id])).rowCount)throw new ConflictException('A plan is running or its uncertain provider result needs reconciliation');
    if((await db.query("SELECT count(*)::int AS n FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND j.created_at>now()-interval '1 day' AND r.input->'chat' IS NULL AND r.input->>'task' IS DISTINCT FROM 'strategy' AND (r.input->'post_ideas' IS NOT NULL)=$3",[b.organization_id,id,!!ideas])).rows[0].n>=(ideas?20:5))throw new ConflictException('Daily planning request limit reached');
    if(!ideas&&(await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0].n>=36)throw new ConflictException('This business has reached its plan limit');
    const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,id])).rows[0];
@@ -52,12 +54,15 @@ export class Planning {
    if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
    const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
    if(!prefs||prefs.step!==3||!prefs.channels.length)throw new ConflictException('Finish your brand goals and choose content channels before planning');
-   const input:PlanningInput={...(ideas?{post_ideas:ideas}:{storylines:true as const}),...(scoped?{max_posts_per_day:2}:{}),task:'content_plan',references:await planningReferences(db,b.organization_id,id),brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:ideas?[ideas.channel as 'instagram'|'facebook'|'linkedin']:mix?[...new Set(mix.map(r=>r.channel))]:campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(mix||v.video_count!==undefined?{video_count:Number(videos)}:{}),...(mix?{content_mix:mix}:{})};
+   const input:PlanningInput={...(ideas?{post_ideas:ideas}:{storylines:true as const}),...(scoped?{max_posts_per_day:2}:{}),task:'content_plan',references:await planningReferences(db,b.organization_id,id),brand:{id:brain.id,sha256:brain.sha256,learning:await planningLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:ideas?[ideas.channel as 'instagram'|'facebook'|'linkedin']:mix?[...new Set(mix.map(r=>r.channel))]:campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(mix||v.video_count!==undefined?{video_count:Number(videos)}:{}),...(mix?{content_mix:mix}:{})};
+   let usedNodes:string[]=[];
    if(!ideas){
     // Ground the plan in the owner-approved strategy and whatever the graph and learning loop supply. All optional.
     const strategy=await approvedStrategy(db,b.organization_id,id);
     if(strategy)input.strategy=strategy;
-    try{Object.assign(input,planningContext(await this.context?.(db,{organization_id:b.organization_id,brand_id:id})));}catch{throw new ConflictException('The planning context for this business exceeds its limits');}
+    const {used_node_ids,...supplied}=await this.context?.(db,{organization_id:b.organization_id,brand_id:id},{brief,goal:prefs.goal})??{};
+    try{Object.assign(input,planningContext(supplied));}catch{throw new ConflictException('The planning context for this business exceeds its limits');}
+    usedNodes=(used_node_ids??[]).slice(0,600);
    }
    if(campaign)input.campaign=campaign;
    if(v.planning_mode==='natural')input.planning_mode='natural';
@@ -88,7 +93,7 @@ export class Planning {
    const due=cycle===0?new Date().toISOString():dayStart(cycleInput.preferences.starts_on,input.preferences.timezone);
    if(cycleInput.preferences.starts_on>'2100-12-01'||(cycle>0&&Date.parse(due)<=Date.now()))throw new BadRequestException('Future loop cycles must start in the future');
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);
-   await db.query('INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,loop_id,scheduled_at,thread_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[job,b.organization_id,id,brain.id,JSON.stringify(cycleInput),hash(canonicalJSON(cycleInput)),cycle===0?key:`loop:${loop}:${cycle}`,requestHash,provider,grant?.model??null,loop,due,conversation??null]);
+   await db.query('INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,loop_id,scheduled_at,thread_id,used_node_ids) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14::uuid[])',[job,b.organization_id,id,brain.id,JSON.stringify(cycleInput),hash(canonicalJSON(cycleInput)),cycle===0?key:`loop:${loop}:${cycle}`,requestHash,provider,grant?.model??null,loop,due,conversation??null,usedNodes]);
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',$4)",[job,b.organization_id,id,due]);
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
    if(conversation&&cycle===0)await db.query("INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",[randomUUID(),b.organization_id,id,conversation,job,`${brief.trim()||'Plan content for this business.'}\n${v.planning_mode==='natural'?`AI chooses the plan length and mix from this request, starting ${v.starts_on}.`:`${count} posts over ${days} days, starting ${v.starts_on}; ${videos} videos. ${cycles} planning cycle(s).`}${input.reference_plan?`\nContext: ${input.reference_plan.title}. Create a new draft plan.`:''}`]);

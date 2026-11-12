@@ -20,6 +20,7 @@ import {CreativeProvider} from '../../dist/creative-provider.js';
 import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
 import {generatedStrategy} from '../fixtures/strategy.mjs';
 import {BrandStrategies} from '../../dist/strategy-store.js';
+import {planningContextSource} from '../../dist/planning-knowledge.js';
 import {planOutputTokens} from '../../dist/planning-contracts.js';
 import {MODEL_POLICY} from '../../dist/model-policy.js';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});
@@ -570,5 +571,20 @@ test('brand strategy routes ground the request in saved research, and approval w
   const before=(await admin.query('SELECT count(*)::int AS n FROM app.knowledge_nodes WHERE brand_id=$1',[b.id])).rows[0].n;
   assert.equal((await api(`${path}/${draft.id}/approve`,{method:'POST',body:{sha256:draft.sha256}})).status,201);
   assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.knowledge_nodes WHERE brand_id=$1',[b.id])).rows[0].n,before);
+  // The product's planner reads the graph: approved strategy, the pack with persona and angle knowledge, labelled market notes.
+  const grounded=new Planning(plans,planningContextSource),job=await grounded.submit(alice,b.id,{starts_on:'2026-11-01',brief:'A month for clinic owners'},randomUUID());
+  const request=(await admin.query('SELECT used_node_ids FROM app.planning_requests WHERE job_id=$1',[job.id])).rows[0];assert.ok(request.used_node_ids.length>0,'pack provenance is stored');
+  assert.equal(await handler.run(scope(b,job)),'succeeded');
+  const plan=wires.at(-1).input;assert.equal(plan.task,'content_plan');assert.equal(plan.strategy.id,draft.id);
+  assert.ok(plan.context_pack.items.some(i=>i.type==='persona'&&i.standing==='approved')&&plan.context_pack.items.some(i=>i.standing==='unproven'));
+  assert.equal(plan.context_pack.used_node_ids,undefined,'provenance never reaches the model');
+  assert.match(plan.market_research[0],/third-party/);
+  const posts=(await admin.query("SELECT n.id FROM app.knowledge_nodes n WHERE n.brand_id=$1 AND n.type='post' AND n.properties->>'planned'='true'",[b.id])).rows;assert.equal(posts.length,30);
+  const used=(await admin.query("SELECT f.type,count(*)::int AS n FROM app.knowledge_edges e JOIN app.knowledge_nodes f ON f.id=e.from_node WHERE e.brand_id=$1 AND e.relation='used_in' GROUP BY f.type",[b.id])).rows;
+  assert.ok(used.some(r=>r.type==='angle'&&r.n===30)&&used.some(r=>r.type==='persona'),JSON.stringify(used));
+  // The next pack's ledger shows what this plan already used.
+  const again=await grounded.submit(alice,b.id,{starts_on:'2026-12-01',brief:'Next month'},randomUUID());
+  const ledger=(await admin.query('SELECT input FROM app.planning_requests WHERE job_id=$1',[again.id])).rows[0].input.context_pack.ledger;
+  assert.ok(ledger.some(entry=>entry.type==='angle'&&entry.uses>0),JSON.stringify(ledger));
  }finally{transport=undefined;}
 });
