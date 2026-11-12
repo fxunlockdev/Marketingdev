@@ -156,6 +156,8 @@ export async function runJourney(state,{website='https://example.com',headed=fal
     await sleep(15000);
     await page.getByRole('button',{name:'Refresh posts'}).click();
    }
+   await expect(page.getByText('Loading…')).toHaveCount(0,{timeout:30000});
+   await expect(page.getByText('Draft ready').first()).toBeVisible();
    await shot('calendar-drafts-ready');
    return '4 drafts ready';
   });
