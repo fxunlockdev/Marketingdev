@@ -275,3 +275,24 @@ test('owners list and review knowledge through the API service; editors cannot r
  assert.equal(replaced.superseded_by,door.id);
  await assert.rejects(service.supersede(a.owner,a.brand,vans.id,{replacement:door.id}),/replacement/);
 });
+
+test('plan, carousel and video jobs build their packs and record planned posts under the worker role',async()=>{
+ const {packForJob}=await import('../../dist/knowledge-production.js');
+ const {recordPlanPosts}=await import('../../dist/planning-knowledge.js');
+ const a=await fixture(),approved={status:'approved',origin:'owner',confidence:1};
+ await a.as(a.owner,true,db=>applyMutations(db,a.scope,{nodes:[suggestion('angle','test-angle-1-for-persona-1','TEST angle 1 for persona_1',approved),suggestion('format','static','static',approved),suggestion('persona','gone','Gone',{status:'approved',origin:'owner',confidence:1})],edges:[]},{actor:a.owner}));
+ const plan=await a.job('plan.generate');
+ const strategy={id:randomUUID(),version:1,sha256:'0'.repeat(64),personas:[{id:'persona_1',name:'Gone'}],pains:[{id:'pain_1',persona_id:'persona_1',statement:'TEST pain missing from the graph'}],angles:[{id:'angle_1',persona_id:'persona_1',pain_id:'pain_1',awareness:'problem_aware',angle:'TEST angle 1 for persona_1'}],formats:[],pillars:[]};
+ const slots=[1,2].map(n=>({id:randomUUID(),hook:`TEST hook ${n}`,format:'static',pillar:'x',creative_spec:null,strategy_ref:{persona_id:'persona_1',pain_id:'pain_1',angle_id:'angle_1'}}));
+ const written=await jobs.transaction(plan,db=>recordPlanPosts(db,plan,plan.jobId,slots,strategy));
+ assert.deepEqual(written.nodes.map(n=>n.outcome),['inserted','inserted']);
+ const used=(await admin.query("SELECT f.type,count(*)::int AS n FROM app.knowledge_edges e JOIN app.knowledge_nodes f ON f.id=e.from_node WHERE e.brand_id=$1 AND e.relation='used_in' GROUP BY f.type ORDER BY f.type",[a.brand])).rows;
+ assert.deepEqual(used,[{type:'angle',n:2},{type:'format',n:2},{type:'persona',n:2}],'the missing pain is skipped, not dangling');
+ assert.equal((await jobs.transaction(plan,db=>recordPlanPosts(db,plan,plan.jobId,slots,strategy))).nodes[0].outcome,'touched','a replay changes nothing');
+ for(const kind of ['carousel.generate','creative.video']){
+  const job=await a.job(kind),stored=await jobs.transaction(job,db=>packForJob(db,job,kind==='creative.video'?'video':'carousel','TEST angle'));
+  assert.equal(stored.status,'ready');assert.ok(stored.prompt.items.length>0);
+ }
+ for(const table of ['carousel_requests','video_requests'])assert.equal((await admin.query("SELECT has_column_privilege('desvio_worker',$1,'knowledge_context','UPDATE') AS ok",[`app.${table}`])).rows[0].ok,true);
+ assert.equal((await admin.query("SELECT has_column_privilege('desvio_worker','app.planning_requests','used_node_ids','UPDATE') AS ok")).rows[0].ok,false,'provenance is written once, by the API');
+});
