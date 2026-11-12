@@ -12,6 +12,8 @@ import {temporalBinary} from '../storage-test-services.mjs';
 import {probes} from './health.mjs';
 import {adminPool} from './containers.mjs';
 import {refreshGrants} from './database.mjs';
+import {startMockRunway,grantMockVideo} from './mock-runway.mjs';
+import {configureProviders} from '../configure-providers.mjs';
 
 const log=createWriteStream(join(PATHS.logs,'stack.log'),{flags:'a'});
 const say=line=>log.write(`[${new Date().toISOString()}] ${line}\n`);
@@ -69,6 +71,7 @@ export async function supervise(){
  try{
   closers.push((await startMailSink(context.ports.smtp,say)).close);
   if(context.mode==='mock')closers.push((await startMockProviders(context.ports.mock,say)).close);
+  if(context.mode==='mock'&&context.images?.video)closers.push((await startMockRunway(context.ports.mockRunway??54011,say,{logFile:join(PATHS.logs,'runway-requests.jsonl')})).close);
   const temporal=await temporalBinary();
   launch('temporal',temporal,['server','start-dev','--ip','127.0.0.1','-p',String(context.ports.temporal),'--http-port',String(context.ports.temporalHttp),'--metrics-port',String(context.ports.temporalMetrics),
    '--headless','-n',TEMPORAL_NAMESPACE,'-f',join(PATHS.temporal,'temporal.db'),'--log-level','error'],{PATH:process.env.PATH,HOME:process.env.HOME});
@@ -80,7 +83,7 @@ export async function supervise(){
   launch('web',process.execPath,['node_modules/next/dist/bin/next','start','apps/web','-H','127.0.0.1','-p',String(context.ports.web)],webEnvironment(context));
   await waitFor('web',probes.web,context,90000);say('web ready');
   const pool=adminPool(context,2);closers.push(()=>pool.end());
-  const renew=async()=>{try{const applied=await refreshGrants(context,pool);if(applied.length)say(`grants applied: ${applied.join(', ')}`);}catch(error){say(`grant renewal failed: ${error.code??error.message}`);}};
+  const renew=async()=>{try{const applied=[...await refreshGrants(context,pool),...(context.mode==='mock'&&context.images?.video?await grantMockVideo(pool,configureProviders,'desvio'):[])];if(applied.length)say(`grants applied: ${applied.join(', ')}`);}catch(error){say(`grant renewal failed: ${error.code??error.message}`);}};
   await renew();
   // Every second: a new account gets its operator defaults before its owner can add a business.
   let renewing=false;

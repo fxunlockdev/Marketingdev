@@ -4,6 +4,7 @@ import {AssetJobs,type JobScope} from './jobs.js';
 import {digest,ObjectStore} from './object-store.js';
 import {object,uuid} from './workspaces.js';
 import {VideoStateError,VideoVault} from './video-vault.js';
+import {localMockRunway} from './video-mock-provider.js';
 const live=new Set(['queued','running','retrying']);
 const proofSQL=`SELECT e.*,v.project_id,v.status,v.review_revision,v.sha256 AS version_sha256,v.reviewed_by,p.latest_version_id,a.id AS approval_id,a.context_revision,a.context_type,a.context_id
  FROM (SELECT * FROM app.creative_exports WHERE format='png') e JOIN app.creative_versions v ON v.id=e.version_id JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_export_approvals a ON a.export_id=e.id
@@ -67,7 +68,7 @@ export class VideoReferences extends VideoReferenceBindings {
   super(canvas,rendererImage);
   if(!/^sha256:[a-f0-9]{64}$/.test(rendererImage))throw new VideoStateError('REFERENCE_RENDERER_REQUIRED');
   const endpoint=new URL(jobs.store.config.endpoint);
-  if(!['test','development','staging'].includes(mode)||endpoint.username||endpoint.password||endpoint.hash||endpoint.search||endpoint.protocol!=='https:'&&!(mode==='test'&&endpoint.protocol==='http:'&&['127.0.0.1','[::1]'].includes(endpoint.hostname)))throw new VideoStateError('REFERENCE_STORAGE_ORIGIN_INVALID');
+  if(!['test','development','staging'].includes(mode)||endpoint.username||endpoint.password||endpoint.hash||endpoint.search||endpoint.protocol!=='https:'&&!((mode==='test'||mode==='development'&&localMockRunway()!==null)&&endpoint.protocol==='http:'&&['127.0.0.1','[::1]'].includes(endpoint.hostname)))throw new VideoStateError('REFERENCE_STORAGE_ORIGIN_INVALID');
   this.#jobs=jobs;this.#store=jobs.store;this.#vault=new VideoVault(key);this.#image=rendererImage;
  }
  private transaction<T>(scope:JobScope,fn:(db:any,j:any)=>Promise<T>){return this.#jobs.transaction(scope,async(db,j)=>{

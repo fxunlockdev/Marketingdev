@@ -1025,23 +1025,35 @@ test('staging creative acceptance runner exercises real customer APIs and pauses
 
 test('uploaded product photo starts video without static generation, then feedback regenerates through prompt approval (MOCK providers)',async()=>{
  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
- await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);
- await page.getByRole('button',{name:'+ New conversation',exact:true}).click();
- await page.getByText('Brand image references',{exact:true}).click();
- await page.getByText('Add product photos',{exact:true}).click();
- await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'video-product.png',mimeType:'image/png',buffer:png});
- await page.getByRole('button',{name:'Upload file',exact:true}).click();
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ // Canvas is retired: a planned video post's page is where a starting image is chosen.
+ const uploadPlans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
+ const uploadPlan=await uploadPlans.create(actor,brand,{title:'Uploaded photo video',objective:'Video from a product photo',starts_on:'2027-07-10',timezone:'UTC',slots:[{channel:'instagram',format:'video',creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},brief:'TEST animate my uploaded product',planned_at:'2027-07-11T10:00:00Z'}]},randomUUID());
+ const uploadSlot=(await admin.query('SELECT id FROM app.content_slots WHERE plan_id=$1',[uploadPlan.id])).rows[0];
+ // Product photos are uploaded from Create's video image picker; the post page then offers approved ones.
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create`);
+ await page.getByRole('button',{name:'Reel',exact:true}).click();
+ await page.getByRole('textbox',{name:'Message Desvio'}).fill('Create a reel about our uploaded product, 3 seconds');
+ await page.getByRole('button',{name:'Send message',exact:true}).click();
+ const uploadFlow=page.getByRole('region',{name:'Video conversation',exact:true});await expect(uploadFlow).toBeVisible({timeout:60000});
+ await uploadFlow.getByRole('button',{name:'Choose or upload image',exact:true}).click();
+ const uploadPicker=page.getByRole('dialog',{name:'Choose a video image',exact:true});
+ await uploadPicker.getByText('Add product photos',{exact:true}).click();
+ await uploadPicker.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'video-product.png',mimeType:'image/png',buffer:png});
+ await uploadPicker.getByRole('button',{name:'Upload file',exact:true}).click();
  const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});
  await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});
  await approval.getByLabel('Reference name',{exact:true}).fill('Video product reference');
  await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();
  await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();
+ await expect(uploadPicker.getByRole('button',{name:'Use Video product reference for video',exact:true})).toBeVisible({timeout:30000});
+ await uploadPicker.getByRole('button',{name:'Close image picker',exact:true}).click();
  const imageCalls=generated,before=videoSubmits;
+ await page.goto(`${base}/b/${brand}/campaign-post?slot=${uploadSlot.id}`);
  await page.getByRole('button',{name:'Use Video product reference for video',exact:true}).click();
- const request=page.getByRole('region',{name:'Creative conversation',exact:true});
- await request.getByLabel('Describe your creative',{exact:true}).fill('TEST animate my uploaded product');
- await request.getByLabel('Video length (seconds)',{exact:true}).fill('3');
- await request.getByRole('button',{name:'Send',exact:true}).click();
+ await expect(page.getByText('Make a video from this approved image',{exact:true})).toBeVisible();
+ await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');
+ await page.getByRole('button',{name:'Draft video script',exact:true}).click();
  await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});assert.equal(videoSubmits,before);assert.equal(generated,imageCalls);
  async function approvePrompt(){
   await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for uploaded photo');
@@ -1076,6 +1088,36 @@ test('uploaded product photo starts video without static generation, then feedba
  await expect(page.locator('.upcoming-post .post-cover').first()).toBeVisible();
  await page.screenshot({path:'work/browser/home-video-cover.png',fullPage:true});
 
+});
+
+test('created starting frame works where an uploaded product photo starts video: image engine frame, owner approval, full-size export to the paid request (MOCK providers)',async()=>{
+ await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
+ const plans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
+ const plan=await plans.create(actor,brand,{title:'Frame-first video',objective:'Video without a product photo',starts_on:'2027-07-01',timezone:'UTC',slots:[{channel:'instagram',format:'video',creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},brief:'TEST frame-first video of morning bread',planned_at:'2027-07-02T10:00:00Z'}]},randomUUID());
+ const slot=(await admin.query('SELECT id FROM app.content_slots WHERE plan_id=$1',[plan.id])).rows[0];
+ const imagesBefore=generated,videosBefore=videoSubmits;
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/campaign-post?slot=${slot.id}`);
+ const context=page.getByRole('region',{name:'Create a starting frame',exact:true});
+ await expect(page.getByText('TEST frame-first video of morning bread',{exact:true}).first()).toBeVisible({timeout:30000});
+ await context.getByRole('button',{name:'Create a starting frame',exact:true}).click();
+ const frame=context.getByRole('img',{name:'Created starting frame for the video',exact:true});
+ await expect(frame).toBeVisible({timeout:150000});assert.equal(generated,imagesBefore+1,'The frame is one normal image-engine generation');assert.equal(videoSubmits,videosBefore);
+ const request=(await admin.query("SELECT r.size,r.creative_spec,r.prompt FROM app.creative_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.brand_id=$1 ORDER BY j.created_at DESC LIMIT 1",[brand])).rows[0];
+ assert.equal(request.size,'1024x1536');assert.equal(request.creative_spec,null,'Composed at the largest portrait size the final-image export supports');assert.match(request.prompt,/no words, letters, numbers or captions/);
+ await page.screenshot({path:'work/browser/video-starting-frame.png'});
+ await context.getByRole('button',{name:'Use this starting frame',exact:true}).click();
+ for(const deadline=Date.now()+150000;!(await page.getByText('Make a video from this approved image',{exact:true}).count());){const alert=await context.getByRole('alert').allInnerTexts();if(alert.length)throw new Error(`starting frame approval failed: ${alert.join(' | ')}`);if(Date.now()>deadline)throw new Error('starting frame approval did not finish');await new Promise(r=>setTimeout(r,1000));}
+ const exported=(await admin.query("SELECT e.id,e.sha256,e.width,e.height,v.status,v.design FROM app.creative_exports e JOIN app.jobs j ON j.id=e.job_id JOIN app.creative_versions v ON v.id=e.version_id JOIN app.creative_export_approvals a ON a.export_id=e.id WHERE e.brand_id=$1 AND e.format='png' ORDER BY j.created_at DESC LIMIT 1",[brand])).rows[0];
+ assert.equal(exported.status,'approved');assert.deepEqual([exported.width,exported.height],[exported.design.width,exported.design.height],'The export is the frame at its full composed size');assert.deepEqual([exported.width,exported.height],[1024,1536]);
+ await page.getByRole('button',{name:'Draft video script',exact:true}).click();
+ await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:90000});assert.equal(videoSubmits,videosBefore);
+ await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
+ await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();
+ await expect.poll(()=>videoSubmits,{timeout:90000}).toBe(videosBefore+1);
+ const bound=(await admin.query('SELECT r.export_id,r.export_sha256,r.brand_reference_id,q.slot_id FROM app.video_requests q JOIN app.video_references r ON r.job_id=q.job_id WHERE q.slot_id=$1',[slot.id])).rows[0];
+ assert.equal(bound.export_id,exported.id);assert.equal(bound.export_sha256,exported.sha256);assert.equal(bound.brand_reference_id,null);assert.equal(bound.slot_id,slot.id);
+ assert.equal(generated,imagesBefore+1,'Approving the frame and the video never generates another image');
+ const accessibility=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(accessibility.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);
 });
 
 test('Archive displays removed posts and restores a real draft across reloads',async()=>{

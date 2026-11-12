@@ -48,7 +48,7 @@ test('three-second compatible profile preserves duration and legacy replay while
  let paid=0;const slug='desvio-video-short-quality-v1-100';
  const c=client((u,i)=>{if(i.method==='GET')return Response.json({data:[],hasMore:false});const b=JSON.parse(i.body);if(u.pathname==='/v1/routers'){assert.deepEqual(b.settings.models,{mode:'allow_new_except',ids:['wan3']});return Response.json({...b,id:randomUUID()});}paid++;assert.equal(b.input.duration,3);assert.equal(b.input.resolution,'720p');assert.equal(b.input.promptText,'Self-contained approved direction');assert.equal(b.input.model,undefined);return Response.json({...receipt(),routing:{...receipt().routing,configId:slug}});});
  const v={...intent(c),durationSeconds:3,prompt:'Self-contained approved direction',routingProfile:'short-clip-v1'};await c.submit(v,c.prepare(v).sha256);assert.equal(paid,1);
- assert.throws(()=>c.prepare({...v,prompt:'x'.repeat(1001)}),/INPUT_INVALID/);
+ assert.throws(()=>c.prepare({...v,prompt:'x'.repeat(1001)}),/RUNWAY_PROMPT_TOO_LONG/);
  assert.throws(()=>c.prepare({...v,durationSeconds:5}),/INPUT_INVALID/);
  const legacy=c.prepare({...v,routingProfile:undefined});assert.equal(JSON.parse(legacy.body).input.resolution,'1080p');assert.equal(legacy.configId,router().slug);
 });
@@ -65,4 +65,20 @@ test('Runway observed insufficient-credit rejection is explicit and never retrie
  const c=client((u,i)=>{if(i.method==='GET')return Response.json({data:[router()],hasMore:false});submits++;return Response.json({error:'You do not have enough credits to run this task.'},{status:400});});
  const v=intent(c);await assert.rejects(c.submit(v,c.prepare(v).sha256),e=>e.code==='RUNWAY_INSUFFICIENT_CREDITS'&&e.outcome==='rejected');assert.equal(submits,1);
  const other=client((u,i)=>i.method==='GET'?Response.json({data:[router()],hasMore:false}):Response.json({error:'Private prompt mentions credits and secret reference URL'},{status:400}));const o=intent(other);await assert.rejects(other.submit(o,other.prepare(o).sha256),e=>e.code==='RUNWAY_REQUEST_REJECTED'&&!e.message.includes('Private'));
+});
+test('local mock Runway is honoured only in development or test mode on an http 127.0.0.1 origin',async()=>{
+ const {localMockRunway}=await import('../../dist/video-mock-provider.js');
+ assert.equal(localMockRunway({APP_MODE:'development'}),null);
+ assert.equal(localMockRunway({APP_MODE:'development',DESVIO_MOCK_RUNWAY_URL:'http://127.0.0.1:54011'}),'http://127.0.0.1:54011');
+ for(const [mode,value] of [['staging','http://127.0.0.1:54011'],['production','http://127.0.0.1:54011'],['development','https://api.dev.runwayml.com'],['development','http://10.0.0.5:80'],['development','http://127.0.0.1'],['development','http://localhost:54011']])assert.throws(()=>localMockRunway({APP_MODE:mode,DESVIO_MOCK_RUNWAY_URL:value}));
+ const previous={mode:process.env.APP_MODE,url:process.env.DESVIO_MOCK_RUNWAY_URL};
+ process.env.APP_MODE='development';process.env.DESVIO_MOCK_RUNWAY_URL='http://127.0.0.1:54011';
+ try{
+  const seen=[];const c=new RunwayClient({mode:'development',secret:'local-mock',referenceOrigins:['http://127.0.0.1:53900']},async(url,init)=>{seen.push(String(url));const id=randomUUID();return Response.json({id:url.pathname.split('/').pop(),status:'SUCCEEDED',output:['http://127.0.0.1:54011/outputs/x.mp4']});});
+  const key=randomUUID();const v={kind:'image',model:RUNWAY_VIDEO_MODEL,idempotencyKey:randomUUID(),referenceURL:'http://127.0.0.1:53900/bucket/ref.png?sig=1',prompt:'Approved',durationSeconds:5,sound:'off',aspectRatio:'9:16',maxCredits:10};
+  assert.equal(JSON.parse(c.prepare(v).body).input.referenceImages[0].uri,v.referenceURL);
+  assert.throws(()=>c.prepare({...v,referenceURL:'http://127.0.0.1:9999/other.png'}),/INPUT_INVALID/);
+  assert.equal((await c.status(key)).videoURL,'http://127.0.0.1:54011/outputs/x.mp4');assert.ok(seen[0].startsWith('http://127.0.0.1:54011/v1/tasks/'));
+  assert.throws(()=>new RunwayClient({mode:'staging',secret:'s',referenceOrigins:['http://127.0.0.1:53900']}),/CONFIG_INVALID/);
+ }finally{process.env.APP_MODE=previous.mode;if(previous.url===undefined)delete process.env.DESVIO_MOCK_RUNWAY_URL;else process.env.DESVIO_MOCK_RUNWAY_URL=previous.url;if(previous.mode===undefined)delete process.env.APP_MODE;}
 });

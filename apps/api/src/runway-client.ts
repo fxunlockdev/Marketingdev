@@ -1,8 +1,13 @@
 import {createHash} from 'node:crypto';
 import {websiteURL} from './safe-web.js';
 import {VideoProviderError} from './video-provider.js';
+import {localMockRunway,loopbackURL} from './video-mock-provider.js';
 export const RUNWAY_VIDEO_MODEL='runway/router'; // Entitlement, not a model sent to Runway.
 export const RUNWAY_API_VERSION='2024-11-06';
+/** promptText limits encoded from the audited router contract (ADR 0052): the 3-second short-clip profile
+ * takes 1000 characters, the quality router more. Longer prompts are refused by name, never shortened. */
+export const RUNWAY_PROMPT_MAX=26000;
+export const RUNWAY_SHORT_PROMPT_MAX=1000;
 export class RunwayError extends VideoProviderError {}
 export type RunwayIntent={kind:'image';model:typeof RUNWAY_VIDEO_MODEL;idempotencyKey:string;referenceURL:string;prompt:string;durationSeconds:number;sound:'off';aspectRatio:'9:16'|'16:9'|'1:1'|'3:4'|'4:3';maxCredits?:number;routingProfile?:'short-clip-v1'};
 export const validRunwaySecret=(v:unknown):v is string=>typeof v==='string'&&/^[\x21-\x7e]{1,2048}$/.test(v);
@@ -10,19 +15,21 @@ const uuid=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]
 const fail=():never=>{throw Error('invalid');};
 const record=(v:any):Record<string,any>=>v&&typeof v==='object'&&!Array.isArray(v)?v:fail();
 const id=(v:any):string=>typeof v==='string'&&uuid.test(v)?v:fail();
-const url=(v:any)=>{if(typeof v!=='string'||/[\s\x00-\x1f\x7f\\]/.test(v))return fail();const u=websiteURL(v,true);if(u.protocol!=='https:'||u.hash)return fail();return u;};
+const url=(v:any,loopback=false)=>{if(typeof v!=='string'||/[\s\x00-\x1f\x7f\\]/.test(v))return fail();if(loopback&&loopbackURL(v)){const u=new URL(v);if(u.hash)fail();return u;}const u=websiteURL(v,true);if(u.protocol!=='https:'||u.hash)return fail();return u;};
 /** Audited HTTP transport: no implicit SDK retries, redirects or unbounded JSON.
  * Router creation is non-generative; only /generate/video can incur a video charge.
  * A lost paid POST is held unknown, never retried. See ADR 0052. */
 export class RunwayClient {
  readonly providerName='runway';
- #secret:string;#base='https://api.dev.runwayml.com';#origins:Set<string>;#timeout:number;
+ #secret:string;#base='https://api.dev.runwayml.com';#origins:Set<string>;#timeout:number;#loopback=false;
  constructor(config:{mode:'test'|'development'|'staging';secret:string;referenceOrigins:string[];timeoutMs?:number;testBaseURL?:string},private transport:typeof fetch=fetch){
   try{
    if(!['test','development','staging'].includes(config.mode)||!validRunwaySecret(config.secret))fail();this.#secret=config.secret;
+   const mock=config.mode==="staging"?null:localMockRunway();
+   if(mock&&!config.testBaseURL){this.#base=mock;this.#loopback=true;}
    if(config.testBaseURL){const u=new URL(config.testBaseURL);if(config.mode!=='test'||u.origin!==config.testBaseURL||u.protocol!=='http:'||!['127.0.0.1','[::1]'].includes(u.hostname)||!u.port)fail();this.#base=u.origin;}
    if(!Array.isArray(config.referenceOrigins)||!config.referenceOrigins.length||config.referenceOrigins.length>10)fail();
-   this.#origins=new Set(config.referenceOrigins.map(s=>{const u=url(s);if(u.origin!==s)fail();return s;}));
+   this.#origins=new Set(config.referenceOrigins.map(s=>{const u=url(s,this.#loopback);if(u.origin!==s)fail();return s;}));
    this.#timeout=config.timeoutMs??30000;if(!Number.isInteger(this.#timeout)||this.#timeout<10||this.#timeout>60000)fail();
   }catch{throw new RunwayError('RUNWAY_CONFIG_INVALID');}
  }
@@ -33,9 +40,10 @@ export class RunwayClient {
   return {...intent,maxCredits};
  }
  prepare(intent:RunwayIntent){
+  if(typeof intent?.prompt==='string'&&intent.prompt.length>(intent.routingProfile==='short-clip-v1'?RUNWAY_SHORT_PROMPT_MAX:RUNWAY_PROMPT_MAX))throw new RunwayError('RUNWAY_PROMPT_TOO_LONG');
   try{
    record(intent);id(intent.idempotencyKey);
-   if(intent.kind!=='image'||intent.model!==RUNWAY_VIDEO_MODEL||intent.sound!=='off'||!this.#origins.has(url(intent.referenceURL).origin)||typeof intent.prompt!=='string'||!intent.prompt.trim()||intent.prompt.length>26000||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(intent.prompt)||!Number.isInteger(intent.durationSeconds)||intent.durationSeconds<3||intent.durationSeconds>15||!['9:16','16:9','1:1','3:4','4:3'].includes(intent.aspectRatio)||!Number.isInteger(intent.maxCredits)||intent.maxCredits!<1||intent.maxCredits!>10000)fail();
+   if(intent.kind!=='image'||intent.model!==RUNWAY_VIDEO_MODEL||intent.sound!=='off'||!this.#origins.has(url(intent.referenceURL,this.#loopback).origin)||typeof intent.prompt!=='string'||!intent.prompt.trim()||intent.prompt.length>26000||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(intent.prompt)||!Number.isInteger(intent.durationSeconds)||intent.durationSeconds<3||intent.durationSeconds>15||!['9:16','16:9','1:1','3:4','4:3'].includes(intent.aspectRatio)||!Number.isInteger(intent.maxCredits)||intent.maxCredits!<1||intent.maxCredits!>10000)fail();
    if(intent.routingProfile!==undefined&&(intent.routingProfile!=='short-clip-v1'||intent.durationSeconds!==3||intent.prompt.length>1000))fail();
    if(Object.keys(intent).some(k=>!['kind','model','idempotencyKey','referenceURL','prompt','durationSeconds','sound','aspectRatio','maxCredits','routingProfile'].includes(k)))fail();
    const short=intent.routingProfile==='short-clip-v1';
@@ -106,7 +114,7 @@ export class RunwayClient {
   try{
    const states:Record<string,string>={PENDING:'queued',THROTTLED:'queued',RUNNING:'in_progress',SUCCEEDED:'completed',FAILED:'failed',CANCELLED:'canceled'};
    if(id(r.id)!==requestId||!Object.hasOwn(states,r.status))fail();
-   const videoURL=r.status==='SUCCEEDED'?url(Array.isArray(r.output)&&r.output.length===1?r.output[0]:null).href:null;
+   const videoURL=r.status==='SUCCEEDED'?url(Array.isArray(r.output)&&r.output.length===1?r.output[0]:null,this.#loopback&&String(r.output?.[0]).startsWith(this.#base+'/')).href:null;
    return {state:states[r.status]!,videoURL,errorCode:r.status==='FAILED'?'RUNWAY_GENERATION_FAILED':null,...(typeof r.progress==='number'&&Number.isFinite(r.progress)&&r.progress>=0&&r.progress<=1?{progress:r.progress}:{})};
   }catch{throw new RunwayError('RUNWAY_RESPONSE_INVALID');}
  }

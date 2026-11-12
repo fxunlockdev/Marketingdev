@@ -2,6 +2,7 @@ import {isAuthenticatedVideoOutput,type AuthenticatedVideoOutput} from './video-
 import { createHash } from 'node:crypto';
 import { SafeWeb, websiteURL } from './safe-web.js';
 import {MAX_CANONICAL_VIDEO_BYTES} from './object-store.js';
+import {localMockRunway} from './video-mock-provider.js';
 
 export const MAX_VIDEO_DOWNLOAD_BYTES = MAX_CANONICAL_VIDEO_BYTES;
 export class VideoDownloadError extends Error {
@@ -35,6 +36,8 @@ export class VideoDownload {
     return this.fetchOutput(output.url,true);
   }
   private async fetchOutput(remoteURL:string,authenticated:boolean):Promise<{ state:'untrusted_video';bytes:Buffer;sha256:string }> {
+    const mock = authenticated ? localMockRunway() : null;
+    if (mock && remoteURL.startsWith(mock + '/')) return this.fetchMock(remoteURL);
     let url: URL;
     try { url = checkedURL(remoteURL); if (!(authenticated && this.policy==='authenticated_provider_result') && !this.#origins.has(url.origin)) throw new Error(); }
     catch { throw new VideoDownloadError('VIDEO_DOWNLOAD_URL_BLOCKED'); }
@@ -54,5 +57,16 @@ export class VideoDownload {
       throw new VideoDownloadError('VIDEO_DOWNLOAD_INVALID');
     }
     return { state: 'untrusted_video', bytes: response.bytes, sha256: createHash('sha256').update(response.bytes).digest('hex') };
+  }
+  /** Output of the local mock Runway: same type and size checks, plain fetch to the loopback mock only. */
+  private async fetchMock(remoteURL: string): Promise<{ state: 'untrusted_video'; bytes: Buffer; sha256: string }> {
+    let response: Response;
+    try { response = await fetch(remoteURL, { redirect: 'error', cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(60000) }); }
+    catch { throw new VideoDownloadError('VIDEO_DOWNLOAD_FAILED'); }
+    if (response.status !== 200) throw new VideoDownloadError('VIDEO_DOWNLOAD_HTTP_ERROR');
+    if (!/^video\/mp4(?:\s*;|$)/i.test(response.headers.get('content-type') ?? '') || Number(response.headers.get('content-length') ?? 0) > MAX_VIDEO_DOWNLOAD_BYTES) throw new VideoDownloadError('VIDEO_DOWNLOAD_INVALID');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length < 24 || bytes.length > MAX_VIDEO_DOWNLOAD_BYTES) throw new VideoDownloadError('VIDEO_DOWNLOAD_INVALID');
+    return { state: 'untrusted_video', bytes, sha256: createHash('sha256').update(bytes).digest('hex') };
   }
 }
