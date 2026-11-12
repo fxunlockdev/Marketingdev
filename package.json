@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Multi-tenant Marketing OS; implementation in progress",
   "scripts": {
-    "test:contracts": "node --test tests/contracts/*.test.mjs",
+    "test:contracts": "node --test tests/contracts/*.test.mjs tests/quality/brand-engine-recipes.test.mjs tests/quality/image-pipeline.test.mjs tests/quality/quality-eval.test.mjs",
     "build": "tsc -p tsconfig.json",
     "start:api": "node dist/main.js",
     "local": "node scripts/local-stack.mjs start",

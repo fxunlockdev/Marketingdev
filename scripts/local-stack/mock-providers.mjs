@@ -206,7 +206,9 @@ function multipartFields(buffer,contentType){
  return fields;
 }
 async function imageResponse(fields){
- const size=['1024x1024','1536x1024','1024x1536'].includes(fields.size)?fields.size:'1024x1024';
+ // Answer the size that was asked for (including 2K masters), within sane bounds, like the real API.
+ const asked=/^(\d{3,4})x(\d{3,4})$/.exec(String(fields.size??'')),fits=asked&&[asked[1],asked[2]].every(n=>Number(n)>=256&&Number(n)<=4096);
+ const size=fits?fields.size:'1024x1024';
  const png=await placeholderImage(fields.prompt??'',size);
  return {created:Math.floor(Date.now()/1000),data:[{b64_json:png.toString('base64')}],output_format:'png',size,quality:fields.quality??'low',
   usage:{input_tokens:100,input_tokens_details:{text_tokens:100,image_tokens:0},output_tokens:1000,total_tokens:1100}};

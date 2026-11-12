@@ -33,7 +33,7 @@ export async function grantSet({mode,spendCapUsd,stock},now=Date.now()){
  const budget=kind=>mode==='live'?Math.floor(spendCapUsd*1e6*LIVE_SHARES[kind]):MOCK_BUDGET_MICROS;
  const grants=[
   {kind:'onboarding',enabled:true,expires_at,...recommended.onboarding,budget_micros:budget('onboarding'),max_tokens_per_image:2000},
-  {kind:'creative',enabled:true,expires_at,...recommended.creative,quality:mode==='live'?'medium':'low',budget_micros:budget('creative'),max_image_request_micros:Math.min(budget('creative'),500000)},
+  {kind:'creative',enabled:true,expires_at,...recommended.creative,quality:mode==='live'?recommended.creative.quality??'high':'low',budget_micros:budget('creative'),max_image_request_micros:Math.min(budget('creative'),500000)},
   {kind:'planning',enabled:true,expires_at,...recommended.planning,budget_micros:budget('planning')},
   {kind:'insights',enabled:true,expires_at,...recommended.insights,budget_micros:budget('insights')},
  ];
