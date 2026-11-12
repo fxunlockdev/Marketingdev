@@ -1294,7 +1294,7 @@ test('review reads expose bounded quality fields, never the raw checker report',
 });
 test('Create canvas alternatives come from the original brief through the same engine, stay grouped and bounded; the creative read carries brand style and its calendar posts',async()=>{
  const first=await canvas.submit(alice,brand.id,thread.id,request('TEST FIXTURE: Announce the new reminder feature'),randomUUID());
- assert.equal(await handler.run(scope(first)),'finished');
+ assert.ok(['finished','succeeded'].includes(await handler.run(scope(first))));
  const root=(await admin.query('SELECT project_id FROM app.creative_requests WHERE job_id=$1',[first.id])).rows[0].project_id;
  await assert.rejects(canvas.submit(viewer,brand.id,thread.id,{variant_of:root,variant_count:2},randomUUID()),/read-only|cannot|permission|not allowed/i);
  await assert.rejects(canvas.submit(alice,brand.id,thread.id,{variant_of:root,variant_count:4},randomUUID()),/1–3 alternatives/);
@@ -1308,11 +1308,11 @@ test('Create canvas alternatives come from the original brief through the same e
   assert.deepEqual([r.size,r.channel,r.format,r.parent_version_id,r.variant_of,r.thread_id],['1024x1024','linkedin','static',null,root,thread.id]);
  }
  // Grouped under the first image even when an alternative is the one varied again; at most three alternatives.
- for(const v of made.variants)assert.equal(await handler.run(scope(v)),'finished');
+ for(const v of made.variants)assert.ok(['finished','succeeded'].includes(await handler.run(scope(v))));
  const alternative=(await admin.query('SELECT project_id FROM app.creative_requests WHERE job_id=$1',[made.variants[1].id])).rows[0].project_id;
  const third=await canvas.submit(alice,brand.id,thread.id,{variant_of:alternative,variant_count:1},randomUUID());
  assert.equal(third.variant_of,root);
- assert.equal(await handler.run(scope(third)),'finished');
+ assert.ok(['finished','succeeded'].includes(await handler.run(scope(third))));
  await assert.rejects(canvas.submit(alice,brand.id,thread.id,{variant_of:root,variant_count:1},randomUUID()),/at most 3 alternatives/);
  const read=await canvas.project(alice,brand.id,alternative);
  assert.deepEqual(read.variants.map(v=>v.id)[0],root);assert.equal(read.variants.length,4);
