@@ -102,6 +102,18 @@ async function waitFor(f) {
   }
   throw new Error("Local service did not become ready");
 }
+/** Compares decoded pixels with a compact failure message. A failing deepEqual over raw image buffers builds a
+ * multi-megabyte diff that can get the test process killed, hiding every later result. `preview` allows a resized copy. */
+async function assertSamePixels(actualBytes, expectedBytes, message, {preview = false} = {}) {
+  const actual = sharp(actualBytes).ensureAlpha(), meta = await actual.metadata(), expected = sharp(expectedBytes).ensureAlpha();
+  const expectedMeta = await sharp(expectedBytes).metadata();
+  if (!preview) assert.deepEqual([meta.width, meta.height], [expectedMeta.width, expectedMeta.height], `${message}: dimensions`);
+  const a = await actual.raw().toBuffer(), b = await expected.resize(meta.width, meta.height, {fit: "fill"}).raw().toBuffer();
+  if (!preview) { assert.ok(a.equals(b), `${message}: pixels differ`); return; }
+  let difference = 0;
+  for (let i = 0; i < a.length; i++) difference += Math.abs(a[i] - b[i]);
+  assert.ok(difference / a.length < 4, `${message}: mean pixel difference ${(difference / a.length).toFixed(2)}`);
+}
 async function post(path, body, key) {
   return page.evaluate(
     async ({ path, body, key }) => {
@@ -815,14 +827,14 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
  assert.deepEqual((await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('link').allTextContents()).slice(0,9).map(s=>s.trim()),['Home','Calendar','Create','Approvals','Brand Kit','Strategy','What Desvio knows','Content Preferences','Integrations']);
  await expect(page.getByRole('list',{name:'Campaign posts'}).getByRole('listitem')).toHaveCount(slotCount);
  await expect(page.locator('.campaign-preview-grid .post-thumbnail svg')).toHaveCount(2,{timeout:15000});
- await expect(page.getByRole('link',{name:'Review post',exact:true})).toHaveCount(2);
+ await expect(page.getByRole('button',{name:'Review post',exact:true})).toHaveCount(2);
  await expect(page.getByRole('list',{name:'Conversation messages'})).toHaveCount(0);
  await page.setViewportSize({width:390,height:844});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
  await page.screenshot({path:'work/browser/dedicated-campaign-review-mobile.png',fullPage:true});
  await page.setViewportSize({width:1440,height:1000});
- await page.getByRole('link',{name:'Review post',exact:true}).first().click();
+ await page.getByRole('button',{name:'Review post',exact:true}).first().click();
  const focused=page.getByRole('region',{name:'Post details',exact:true});
  await expect(focused.getByRole('region',{name:'Creative preview',exact:true})).toBeVisible();
  await expect(page.getByLabel('Calendar date',{exact:true})).toHaveCount(0);
@@ -981,7 +993,8 @@ test('Create chat generates an entire carousel, reviews its saved slides after r
  const carouselCover=page.locator('.daily-post .post-cover');
  await expect(carouselCover).toBeVisible();await expect.poll(()=>carouselCover.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
  const coverPixels=await carouselCover.evaluate(img=>{const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.getContext('2d').drawImage(img,0,0);return canvas.toDataURL('image/png').split(',')[1];});
- assert.deepEqual(await sharp(Buffer.from(coverPixels,'base64')).ensureAlpha().raw().toBuffer(),await sharp(bundleEntries[0].bytes).ensureAlpha().raw().toBuffer());
+ // The calendar shows a resized preview of the carousel's first slide.
+ await assertSamePixels(Buffer.from(coverPixels,'base64'),bundleEntries[0].bytes,'calendar carousel cover',{preview:true});
  await page.screenshot({path:'work/browser/carousel-calendar-cover.png',fullPage:true});
 
 
@@ -1074,7 +1087,7 @@ test('uploaded product photo starts video without static generation, then feedba
  await page.goto(`${base}/b/${brand}/content-plan?start=${new Intl.DateTimeFormat('en-CA',{timeZone:calendarZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(startDay+'T23:00:00Z'))}&plan=${created.body.id}&view=day`);
  const cover=page.locator('.daily-post .post-cover');await expect(cover).toBeVisible();await expect.poll(()=>cover.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
  const posterPixels=await cover.evaluate(img=>{const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.getContext('2d').drawImage(img,0,0);return canvas.toDataURL('image/png').split(',')[1];});
- assert.deepEqual(await sharp(Buffer.from(posterPixels,'base64')).ensureAlpha().raw().toBuffer(),await sharp(await store.read(latestVideo.poster_key)).ensureAlpha().raw().toBuffer());
+ await assertSamePixels(Buffer.from(posterPixels,'base64'),await store.read(latestVideo.poster_key),'video poster');
  await page.goto(`${base}/b/${brand}/overview`);
  await expect(page.getByRole('region',{name:'Upcoming posts',exact:true}).locator('.post-cover').first()).toBeVisible({timeout:30000});
  await page.screenshot({path:'work/browser/home-video-cover.png',fullPage:true});
