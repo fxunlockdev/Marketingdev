@@ -222,7 +222,7 @@ before(async () => {
           );
           if(input.task==='video')return modelResponse({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]});
           if(input.task==='carousel'){const plan=carouselPlan(input.slide_count);for(const slide of plan.slides){slide.fact_ids=[input.brand.facts[0].id];slide.headline=`Story ${slide.position}`;slide.body='';slide.cta='';}return modelResponse(plan);}
-          if(input.task==='content_plan'){const settings=input.planning_mode==='natural'?{duration_days:7,post_count:7,video_count:2}:null;return modelResponse(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input));}
+          if(input.task==='content_plan'){const settings=input.planning_mode==='natural'?(/four-day/i.test(JSON.stringify(input))?{duration_days:4,post_count:4,video_count:2}:{duration_days:7,post_count:7,video_count:2}):null;return modelResponse(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input));}
           planned++;
           const brief = {
             headline:
@@ -285,7 +285,7 @@ before(async () => {
     planned++;const brief={headline:planned===1?'TEST FIXTURE: A little everyday care':'TEST FIXTURE: Fresh perspective',body:'Refillable botanical soap',cta:'Explore the collection',caption:'TEST FIXTURE: Botanical soap, made for your everyday ritual.',image_prompt:'TEST FIXTURE: Still life with room for text',palette:['#e6d5bb','#201e1d'],fact_ids:[input.brand.facts.find(f=>f.field==='offering').id],warnings:['TEST FIXTURE — no live generation']};
     return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(brief)}]},finishReason:'STOP'}]});
    }
-   const settings=input.planning_mode==='natural'?{duration_days:7,post_count:7,video_count:2}:null;
+   const settings=input.planning_mode==='natural'?(/four-day/i.test(JSON.stringify(input))?{duration_days:4,post_count:4,video_count:2}:{duration_days:7,post_count:7,video_count:2}):null;
    return Response.json({candidates:[{content:{role:'model',parts:[{text:JSON.stringify(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input))}]},finishReason:'STOP'}]});
   }}}));
   const handler = new CreativeJobs(
@@ -749,17 +749,17 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  const denied=await page.request.get(`${base}/api/v1/businesses/${other}/content-slots/${before.id}`);assert.equal(denied.status(),404);assert.deepEqual(errors,[]);
 });
 
-test('Canvas creates a custom plan from the Create chat and opens its actual saved calendar post',async()=>{
+test('Canvas creates a custom four-day plan from the Create chat and opens its actual saved calendar post',async()=>{
  const businesses=new Businesses(runtime.database,new Workspaces(runtime.database));
  const preferences=await businesses.onboarding(actor,brand);
  if(preferences.step!==3)await businesses.onboarding(actor,brand,{revision:preferences.revision,step:3,goal:'awareness',timezone:'Asia/Kuala_Lumpur',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'openai',true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY') ON CONFLICT (organization_id,brand_id,provider) DO UPDATE SET enabled=true,budget_micros=10000000",[org,brand]);
  // The Create chat plans a campaign through the real planning job and links to the saved calendar.
  await page.goto(`${base}/b/${brand}/create`);
- await askCreate('TEST Create a campaign: a launch sequence for our refill club');
+ await askCreate('TEST Create a campaign: a four-day launch sequence for our refill club');
  const review=page.getByRole('link',{name:'Review your calendar →'});
  await expect(review).toBeVisible({timeout:60000});
- const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.ok(saved);
+ const saved=(await admin.query("SELECT id,duration_days FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];assert.ok(saved);assert.equal(saved.duration_days,4);
  assert.equal((await admin.query('SELECT provider FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].provider,'openai');
  await expect(review).toHaveAttribute('href',`/b/${brand}/content-plan?plan=${saved.id}`);
  const slotCount=(await admin.query('SELECT count(*)::int AS n FROM app.content_slots WHERE plan_id=$1',[saved.id])).rows[0].n;assert.ok(slotCount>=2);
