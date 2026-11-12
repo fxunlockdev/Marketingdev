@@ -41,3 +41,6 @@ CREATE POLICY worker_base ON app.reel_shots FOR UPDATE TO desvio_worker USING(ap
 GRANT SELECT,INSERT ON app.reel_shots TO desvio_app;
 GRANT SELECT ON app.reel_shots TO desvio_worker;
 GRANT UPDATE(object_key,sha256,bytes,manifest) ON app.reel_shots TO desvio_worker;
+-- A shot job re-checks its reel's calendar post (revision, format, state) before any paid call.
+CREATE POLICY reel_shot_slot_read ON app.content_slots FOR SELECT TO desvio_worker USING(app.video_scope(organization_id,brand_id) AND EXISTS(
+ SELECT 1 FROM app.reel_shots s JOIN app.video_requests r ON r.job_id=s.parent_job_id WHERE s.job_id=app.job_context() AND r.slot_id=content_slots.id));

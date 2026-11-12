@@ -382,6 +382,14 @@ test('multi-shot reel: approved export to original video shots in order, cut wit
  for(const local of references.values())assert.equal((await fetch(local)).status,404);
  assert.equal(await pipeline.step(scope(j)),'succeeded');assert.equal(submits,3);
 
+ // A reel for a calendar post: every shot re-checks the post before its paid call, and the cut attaches to the post.
+ const reelPlan=await plans.create(alice.id,brand.id,{title:'Reel plan',objective:'Planned reel',starts_on:'2027-03-01',timezone:'UTC',slots:[{channel:'instagram',format:'video',creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},brief:'TEST planned reel',planned_at:'2027-03-02T08:00:00Z'}]},randomUUID());
+ await attachRefinement(reelPlan.id);
+ const reelRange={start:'2027-03-01T00:00:00Z',end:'2027-04-01T00:00:00Z',plan_id:reelPlan.id},reelSlot=(await plans.list(alice.id,brand.id,reelRange)).slots[0];
+ const planned=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Planned reel',slot_id:reelSlot.id,slot_revision:reelSlot.revision},randomUUID());
+ for(let i=0;i<3;i++)assert.equal(await pipeline.step(scope(planned)),'accepted');assert.equal(await pipeline.step(scope(planned)),'succeeded');
+ const plannedSlot=(await plans.list(alice.id,brand.id,reelRange)).slots[0];assert.equal(plannedSlot.state,'draft_ready');assert.ok(plannedSlot.video_version_id);assert.equal(submits,6);
+
  // Vision QA on sampled frames: captions that do not read trigger one re-render (no regeneration), then pass.
  let inspections=0;
  const qaText=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
@@ -396,7 +404,7 @@ test('multi-shot reel: approved export to original video shots in order, cut wit
  const checked=new VideoJobs(jobs,refs,new CreativeJobs(jobs,new SkillRuntime(skillImage),qaText,undefined,undefined,new ImageQa(qaText)),provider,downloader,new VideoRenderer(image));
  const qaJob=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Checked reel'},randomUUID());
  for(let i=0;i<3;i++)assert.equal(await checked.step(scope(qaJob)),'accepted');
- assert.equal(await checked.step(scope(qaJob)),'succeeded');assert.equal(inspections,2);assert.equal(submits,6);
+ assert.equal(await checked.step(scope(qaJob)),'succeeded');assert.equal(inspections,2);assert.equal(submits,9);
  const checkedVersion=await service.version(alice.id,brand.id,(await admin.query('SELECT output_version_id FROM app.video_requests WHERE job_id=$1',[qaJob.id])).rows[0].output_version_id);
  const report=checkedVersion.manifest.quality;
  assert.equal(report.verdict,'pass');assert.equal(report.retried,true);assert.equal(report.rerendered,true);assert.equal(report.attempts.length,2);assert.equal(report.frames.length,1);
@@ -408,7 +416,7 @@ test('multi-shot reel: approved export to original video shots in order, cut wit
  failSubmit=submits+1;const lost=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Second reel'},randomUUID());
  assert.equal(await pipeline.step(scope(lost)),'accepted');assert.equal(await pipeline.step(scope(lost)),'unknown');
  for(let i=0;i<2;i++)assert.equal(await pipeline.step(scope(lost)),'unknown');
- assert.equal(submits,8);assert.equal((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[lost.id])).rows[0].status,'unknown');
+ assert.equal(submits,11);assert.equal((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[lost.id])).rows[0].status,'unknown');
  const lostShots=(await admin.query('SELECT j.status FROM app.reel_shots s JOIN app.jobs j ON j.id=s.job_id WHERE s.parent_job_id=$1 ORDER BY shot_index',[lost.id])).rows.map(r=>r.status);
  assert.deepEqual(lostShots,['succeeded','unknown','canceled']);
  // The uncertain reel blocks the next video until the owner stops waiting; nothing is resubmitted.
@@ -419,7 +427,9 @@ test('multi-shot reel: approved export to original video shots in order, cut wit
  assert.equal(stopped.status,201,JSON.stringify(stopped.body));assert.equal(stopped.body.status,'canceled');
  assert.deepEqual((await admin.query('SELECT j.status FROM app.reel_shots s JOIN app.jobs j ON j.id=s.job_id WHERE s.parent_job_id=$1 ORDER BY shot_index',[lost.id])).rows.map(r=>r.status),['succeeded','canceled','canceled']);
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.video_reservations r JOIN app.reel_shots s ON s.job_id=r.job_id WHERE s.parent_job_id=$1 AND r.state='held'",[lost.id])).rows[0].n,2);
- assert.equal(await pipeline.step(scope(lost)),'canceled');assert.equal(submits,8);
+ assert.equal(await pipeline.step(scope(lost)),'canceled');assert.equal(submits,11);
+ // Earlier requests in this file count towards the daily limit of ten; age them so only the release is under test.
+ await admin.query("UPDATE app.jobs SET created_at=now()-interval '2 days' WHERE brand_id=$1 AND kind='creative.video'",[brand.id]);
  const next=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Third reel'},randomUUID());assert.ok(next.id);
 });
 

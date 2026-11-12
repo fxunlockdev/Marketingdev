@@ -227,7 +227,7 @@ export class VideoJobs {
     plan={...plan,brief:request.approved_brief};
     validateVideoPlanningResult(plan,context.input);
     await this.transaction(scope,async(db)=>assertLearningCurrent(db,request.memory_context));
-    if(request.shot_count>1)return this.reelStep(scope,request,plan.brief);
+    if(request.shot_count>1)return await this.reelStep(scope,request,plan.brief);
     const lease=await this.references.prepare(scope);
     await this.references.verify(scope);
     await this.provider.prepare(scope,{kind:'image',model:RUNWAY_VIDEO_MODEL,idempotencyKey:scope.jobId,referenceURL:lease.url,...(request.duration_seconds===3?{routingProfile:'short-clip-v1'}:{}),prompt:plan.brief.video_prompt+'\nScript:\n'+plan.brief.beats.map((b:any)=>`${b.start_ms}-${b.end_ms}ms: ${b.action} Camera: ${b.camera}`).join('\n'),durationSeconds:request.duration_seconds,sound:'off',aspectRatio:runwayAspect(request.creative_spec?.aspect)},async(db,j)=>{
