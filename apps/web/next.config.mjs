@@ -10,6 +10,9 @@ if (
 export default {
   output: process.env.DESVIO_STANDALONE === "true" ? "standalone" : undefined,
   poweredByHeader: false,
+  // Private media is cached per user by the browser only. The image optimizer keeps one shared
+  // server-side cache that is not keyed by session, so it must never be able to fetch a local path.
+  images: { unoptimized: true, localPatterns: [], remotePatterns: [] },
   webpack(config) {
     // Shared pure API helpers use NodeNext .js imports; resolve their TS sources in the web bundle.
     config.resolve.extensionAlias = {...config.resolve.extensionAlias, ".js": [".ts", ".tsx", ".js"]};
