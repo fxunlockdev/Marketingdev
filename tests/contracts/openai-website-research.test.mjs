@@ -110,7 +110,7 @@ test('market research fails closed on unfinished, refused, unsearched, malformed
  const oversized=marketOutput();oversized.notes[0].text='x'.repeat(1201);oversized.notes[1].section='brand_fact';
  const {pages}=marketResearchPages(marketResponse(oversized),'https://example.org/');assert.ok(!JSON.stringify(pages).includes('xxxx')&&!pages.some(p=>p.url==='https://rival-one.test/'));
 });
-const marketLedger=({budget=100000000,used=0,monthly=false}={})=>{
+const marketLedger=({budget=100000000,used=0,monthly=false,kind='website.extract'}={})=>{
  const state={row:null,inserts:0};
  const db={query:async(sql,args)=>{
   if(sql.startsWith('SELECT * FROM app.market_research_calls'))return {rows:state.row?[state.row]:[]};
@@ -120,7 +120,7 @@ const marketLedger=({budget=100000000,used=0,monthly=false}={})=>{
   if(sql.startsWith('UPDATE app.market_research_calls')){state.row={...state.row,status:sql.includes("'succeeded'")?'succeeded':args[1],result:JSON.parse(sql.includes("'succeeded'")?args[2]:args[2])};return {rows:[]};}
   return {rows:[{revision:1}],rowCount:1};
  }};
- return {state,jobs:{transaction:async(_,fn)=>fn(db,{id:'job',kind:'website.extract',organization_id:'org',brand_id:'brand'}),permitted:async()=>true}};
+ return {state,jobs:{transaction:async(_,fn)=>fn(db,{id:'job',kind,organization_id:'org',brand_id:'brand'}),permitted:async()=>true}};
 };
 test('the market step reserves once, replays its saved result and never pays twice',async()=>{
  const {OpenAIWebsiteResearch,MARKET_RESEARCH_RESERVATION_MICROS}=await import('../../dist/openai-website-research.js');let paid=0;
@@ -179,4 +179,39 @@ test('consulted sources are bounded and only http(s)',async()=>{
  assert.ok(consulted.size<=200);assert.ok(![...consulted.keys()].some(u=>!u.startsWith('http')||u.includes('127.0.0.1')));
  // Citations are never crowded out by a long list of search results.
  assert.ok(consulted.has('https://cited.test/'));
+});
+
+// ---- Early research: audience suggestions and competitor-only follow-up ----
+test('market research returns bounded audience suggestions with its notes',async()=>{
+ const {marketResearchPages,MARKET_RESEARCH_SCHEMA}=await import('../../dist/openai-website-research.js');
+ assert.ok(MARKET_RESEARCH_SCHEMA.required.includes('audience_suggestions'));
+ const value={...marketOutput(),audience_suggestions:[' Practice managers losing mornings to phone tag ','Practice managers losing mornings to phone tag','x'.repeat(201),7,'New clinics needing shared calendars','Dentists with recall backlogs','A fourth']};
+ const {audience}=marketResearchPages(marketResponse(value),'https://example.org/');
+ assert.deepEqual(audience,['Practice managers losing mornings to phone tag','New clinics needing shared calendars','Dentists with recall backlogs']);
+ // Older or partial output without suggestions still parses.
+ assert.deepEqual(marketResearchPages(marketResponse(),'https://example.org/').audience,[]);
+});
+test('the competitor-only follow-up names only the uncovered competitors, with smaller limits',async()=>{
+ const {marketResearchRequest,MARKET_FOLLOWUP_RESERVATION_MICROS,MARKET_RESEARCH_RESERVATION_MICROS}=await import('../../dist/openai-website-research.js');
+ const full=marketResearchRequest('https://example.org/',marketBrief),follow=marketResearchRequest('https://example.org/',marketBrief,['New Rival']);
+ assert.deepEqual(JSON.parse(follow.input).named_competitors,['New Rival']);assert.equal(JSON.parse(follow.input).mode,'competitors_only');
+ assert.equal(JSON.parse(full.input).mode,'market');
+ assert.ok(follow.max_tool_calls<full.max_tool_calls&&follow.max_output_tokens<full.max_output_tokens);
+ assert.match(follow.instructions,/only the named competitors/i);assert.ok(!follow.instructions.includes('New Rival'));
+ assert.ok(MARKET_FOLLOWUP_RESERVATION_MICROS>0&&MARKET_FOLLOWUP_RESERVATION_MICROS<MARKET_RESEARCH_RESERVATION_MICROS);
+ assert.throws(()=>marketResearchRequest('https://example.org/',marketBrief,[]),/AI_/);
+ assert.throws(()=>marketResearchRequest('https://example.org/',marketBrief,['a','b','c','d']),/AI_/);
+});
+test('a competitor-only step records its own reservation and reports no audience suggestions',async()=>{
+ const {OpenAIWebsiteResearch,MARKET_FOLLOWUP_RESERVATION_MICROS}=await import('../../dist/openai-website-research.js');
+ const {state,jobs}=marketLedger({kind:'brand.analyze'});let sent;
+ const provider=new OpenAIWebsiteResearch(undefined,{responses:{create:async(body)=>{sent=body;return marketResponse({...marketOutput(),audience_suggestions:['Should be ignored']});}}});
+ const result=await provider.market(jobs,{},'https://example.org/',marketBrief,['New Rival']);
+ assert.equal(result.summary.status,'completed');assert.deepEqual(result.summary.audience_suggestions,[]);assert.deepEqual(result.summary.competitors_covered,['New Rival']);
+ assert.equal(state.row.reserved_micros,MARKET_FOLLOWUP_RESERVATION_MICROS);assert.deepEqual(JSON.parse(sent.input).named_competitors,['New Rival']);
+ const full=await new OpenAIWebsiteResearch(undefined,{responses:{create:async()=>marketResponse({...marketOutput(),audience_suggestions:['Kept']})}}).market(marketLedger().jobs,{},'https://example.org/',marketBrief);
+ assert.deepEqual(full.summary.audience_suggestions,['Kept']);assert.deepEqual(full.summary.competitors_covered,['Rival One','https://rival-two.test']);
+ // Only an analysis job may run the follow-up; only a capture may run full market research.
+ await assert.rejects(provider.market(jobs,{},'https://example.org/',marketBrief),/ACCESS_REVOKED_OR_CANCELED/);
+ await assert.rejects(provider.market(marketLedger().jobs,{},'https://example.org/',marketBrief,['New Rival']),/ACCESS_REVOKED_OR_CANCELED/);
 });
