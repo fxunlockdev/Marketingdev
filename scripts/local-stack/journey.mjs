@@ -98,6 +98,8 @@ export async function runJourney(state,{website='https://example.com',headed=fal
    // The guided page cannot review visual directions, but approval requires it. See docs/LOCAL_RUN.md.
    await page.goto(`${base}/b/${businessId}/onboarding`);
    await expect(page.getByRole('heading',{name:'Your brand profile'})).toBeVisible();
+   await expect(page.getByRole('button',{name:'Confirm details & continue'})).toBeVisible();
+   await page.waitForLoadState('networkidle');
    const articles=page.getByRole('article',{name:/^Visual direction:/});
    const count=await articles.count();
    for(let i=0;i<count;i++)await articles.nth(i).getByRole('button',{name:'Correct',exact:true}).click();
@@ -143,13 +145,16 @@ export async function runJourney(state,{website='https://example.com',headed=fal
   await step('plan approved; images generated',async()=>{
    await page.getByRole('button',{name:'Approve calendar & generate assets'}).click();
    await sleep(3000);
+   // Poll with the page's own refresh control; reloading the whole app repeatedly trips the sign-in rate limit.
+   await page.goto(planUrl);
+   await page.getByRole('button',{name:'List'}).click();
    for(const deadline=Date.now()+LONG;;){
-    await page.goto(planUrl);
-    await page.getByRole('button',{name:'List'}).click();
+    await expect(page.getByText('Loading…')).toHaveCount(0,{timeout:30000});
     const ready=await page.getByText('Draft ready').count();
     if(ready>=4)break;
     if(Date.now()>deadline)throw new Error(`only ${ready} of 4 drafts ready`);
-    await sleep(8000);
+    await sleep(15000);
+    await page.getByRole('button',{name:'Refresh posts'}).click();
    }
    await shot('calendar-drafts-ready');
    return '4 drafts ready';
@@ -157,9 +162,10 @@ export async function runJourney(state,{website='https://example.com',headed=fal
   await step('open a post; image visible',async()=>{
    await page.getByRole('button',{name:/Instagram · .* Image/}).first().click();
    await expect(page.getByRole('heading',{name:'Post details'})).toBeVisible();
-   const image=page.getByRole('region',{name:'Creative preview'}).locator('img').first();
-   await expect(image).toBeVisible({timeout:60000});
-   await expect.poll(()=>image.evaluate(el=>el.complete&&el.naturalWidth),{timeout:30000}).toBeGreaterThan(0);
+   // The preview is drawn on a canvas by the editor; require real, non-uniform pixels.
+   const canvas=page.getByRole('region',{name:'Creative preview'}).locator('canvas').first();
+   await expect(canvas).toBeVisible({timeout:60000});
+   await expect.poll(()=>canvas.evaluate(el=>{const c=el.getContext('2d'),d=c.getImageData(0,0,el.width,el.height).data,seen=new Set();for(let i=0;i<d.length;i+=4*997)seen.add(`${d[i]>>4},${d[i+1]>>4},${d[i+2]>>4}`);return seen.size;}),{timeout:30000}).toBeGreaterThan(5);
    await shot('post-open');
   });
   await step('post approved',async()=>{
