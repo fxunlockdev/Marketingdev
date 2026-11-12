@@ -97,3 +97,30 @@ test('report: retry never survives as a final verdict, and an unavailable check 
  assert.equal(down.status,'unavailable');assert.equal(down.verdict,'unavailable');
  assert.deepEqual(down.expected_text,['Fresh coats, happy dogs','Book now']);
 });
+
+test('report: an output too close to its stock photo is regenerated once, then flagged, and the closeness is recorded',()=>{
+ const model=MODEL_POLICY.check.model;
+ const checked={step:'qa:1',media_sha256:'a'.repeat(64),status:'checked',finding:good};
+ const near=(step,sha)=>({step,media_sha256:sha,status:'checked',distance:2,too_close:true});
+ const far=(step,sha)=>({step,media_sha256:sha,status:'checked',distance:30,too_close:false});
+ // A passing vision check does not survive an output that is little more than the stock photo.
+ const stillClose=qaReport(model,expectation,[checked,{...checked,step:'qa:2',media_sha256:'b'.repeat(64)}],true,undefined,{threshold:6,checks:[near('qa:1','a'.repeat(64)),near('qa:2','b'.repeat(64))]});
+ assert.equal(stillClose.verdict,'flag');
+ assert.deepEqual(stillClose.stock_source,{threshold:6,checks:[near('qa:1','a'.repeat(64)),near('qa:2','b'.repeat(64))]});
+ const fixed=qaReport(model,expectation,[checked,{...checked,step:'qa:2'}],true,undefined,{threshold:6,checks:[near('qa:1','a'.repeat(64)),far('qa:2','b'.repeat(64))]});
+ assert.equal(fixed.verdict,'pass');
+ // The vision check may be down while the local closeness check still ran.
+ const down={step:'qa:1',media_sha256:'a'.repeat(64),status:'unavailable',reason:'CREATIVE_PROVIDER_REJECTED'};
+ assert.equal(qaReport(model,expectation,[down],false,'CREATIVE_PROVIDER_REJECTED',{threshold:6,checks:[near('qa:1','a'.repeat(64))]}).verdict,'flag');
+ assert.equal(qaReport(model,expectation,[down],false,undefined,{threshold:6,checks:[far('qa:1','a'.repeat(64))]}).verdict,'unavailable');
+ // Without stock nothing is added to the report.
+ assert.equal('stock_source' in qaReport(model,expectation,[checked],false),false);
+ // Notes for the one regeneration say why, with or without a vision finding.
+ const stockOnly=qaRetryNotes(null,expectation,true);
+ assert.ok(stockOnly.startsWith('\nQUALITY REVIEW OF THE PREVIOUS ATTEMPT'));
+ assert.match(stockOnly,/stock photograph/);
+ assert.doesNotMatch(stockOnly,/lettering/);
+ const both=qaRetryNotes({...good,text_matches:false,found_text:['Fresh cots'],verdict:'retry'},expectation,true);
+ assert.ok(both.includes('"Fresh cots"'));assert.match(both,/stock photograph/);
+ assert.doesNotMatch(qaRetryNotes({...good,text_matches:false,found_text:['Fresh cots'],verdict:'retry'},expectation),/stock photograph/);
+});

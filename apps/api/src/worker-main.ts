@@ -24,6 +24,7 @@ import {StaticRenderer} from './static-renderer.js';
 import {PlanningJobs} from "./planning-jobs.js";
 import {CreativeJobs} from './creative-jobs.js';
 import {CreativeProvider} from './creative-provider.js';
+import {ImageQa} from './image-qa.js';
 import {SkillRuntime} from './skill-runtime.js';
 import {Worker,NativeConnection} from '@temporalio/worker';
 import {Connection,Client} from '@temporalio/client';
@@ -50,7 +51,9 @@ const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)));
 const imageReplacements=config.higgsfieldImages?new HiggsfieldReplacementJobs(jobs,new HiggsfieldImageClient(config.higgsfieldImages),new ImageReplacementVault(config.higgsfieldImages.encryptionKey)):undefined;
-const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY),process.env.VECTEEZY_API_KEY?new StockAssets(jobs,new VecteezyClient(process.env.VECTEEZY_API_KEY,Number(process.env.VECTEEZY_ACCOUNT_ID))):undefined);
+const creativeProvider=new CreativeProvider(process.env.OPENAI_API_KEY);
+// The vision check shares the creative provider; it is optional per image and never fails a creative.
+const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),creativeProvider,new GeminiPlanner(process.env.GEMINI_API_KEY),process.env.VECTEEZY_API_KEY?new StockAssets(jobs,new VecteezyClient(process.env.VECTEEZY_API_KEY,Number(process.env.VECTEEZY_ACCOUNT_ID))):undefined,new ImageQa(creativeProvider));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled,config.videoRenderImage);

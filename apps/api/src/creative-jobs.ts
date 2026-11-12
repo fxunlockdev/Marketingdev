@@ -1,11 +1,11 @@
 import {acceptsModel} from './model-policy.js';
-import {StockAssets} from './stock-assets.js';
+import {StockAssets,tooCloseToStock,STOCK_TOO_CLOSE_DISTANCE} from './stock-assets.js';
 import {stockReferenceLabel} from './stock-planning.js';
 import {StockError} from './vecteezy-client.js';
 import {imagePlanningRates} from './creative-planning.js';
 import {buildImagePrompt} from './image-prompt.js';
 import {resolveTextMode,inImageCopy} from './image-typography.js';
-import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,type QaAttempt,type QaExpectation,type QaReport} from './image-qa.js';
+import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,nearStockCopy,type QaAttempt,type QaExpectation,type QaReport,type StockSourceCheck,type StockSourceReport} from './image-qa.js';
 import {frameCreative,frameDirection} from "./creative-framing.js";
 import {approvedDirection} from "./image-direction.js";
 import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
@@ -223,19 +223,35 @@ export class CreativeJobs {
       return {step,media_sha256:media.sha256,status:'unavailable',reason};
     }
   }
-  /** Check the image; on 'retry' regenerate exactly once with the checker's notes. Never loops. */
-  private async inspected<M extends {object_key:string;sha256:string}>(scope:JobScope,first:M,expectation:QaExpectation,regenerate:(notes:string)=>Promise<M>):Promise<{image:M;qa:QaReport|null}>{
+  /** Local comparison of a stored output with its stock photo. A read or decode failure is recorded, never fatal. */
+  private async stockCheck(step:'qa:1'|'qa:2',media:{object_key:string;sha256:string},stock:Buffer):Promise<StockSourceCheck>{
+    try{
+      const bytes=await this.jobs.store.read(media.object_key);
+      if(digest(bytes)!==media.sha256)return {step,media_sha256:media.sha256,status:'unavailable'};
+      const {distance,tooClose}=await tooCloseToStock(stock,bytes);
+      return {step,media_sha256:media.sha256,status:'checked',distance,too_close:tooClose};
+    }catch{
+      return {step,media_sha256:media.sha256,status:'unavailable'};
+    }
+  }
+  /** Check the image; on 'retry', or when it is a near copy of its stock photo, regenerate exactly once
+   * with the notes. Never loops: a second failure is flagged for a person. */
+  private async inspected<M extends {object_key:string;sha256:string}>(scope:JobScope,first:M,expectation:QaExpectation,regenerate:(notes:string)=>Promise<M>,stockPhoto?:Buffer):Promise<{image:M;qa:QaReport|null}>{
     if(!this.qa?.configured)return {image:first,qa:null};
     const model=this.qa.model,initial=await this.qaAttempt(scope,'qa:1',first,expectation);
-    if(initial.status!=='checked'||settleVerdict(initial.finding,expectation)!=='retry')return {image:first,qa:qaReport(model,expectation,[initial],false)};
+    const firstStock:StockSourceReport|undefined=stockPhoto?{threshold:STOCK_TOO_CLOSE_DISTANCE,checks:[await this.stockCheck('qa:1',first,stockPhoto)]}:undefined;
+    const visionRetry=initial.status==='checked'&&settleVerdict(initial.finding,expectation)==='retry',copied=nearStockCopy(firstStock);
+    if(!visionRetry&&!copied)return {image:first,qa:qaReport(model,expectation,[initial],false,undefined,firstStock)};
     let second:M;
-    try{second=await regenerate(qaRetryNotes(initial.finding,expectation));}
+    try{second=await regenerate(qaRetryNotes(visionRetry&&initial.status==='checked'?initial.finding:null,expectation,copied));}
     catch(error){
       const reason=optionalFailure(error);
       if(!reason)throw error;
-      return {image:first,qa:qaReport(model,expectation,[initial],false,reason)};
+      return {image:first,qa:qaReport(model,expectation,[initial],false,reason,firstStock)};
     }
-    return {image:second,qa:qaReport(model,expectation,[initial,await this.qaAttempt(scope,'qa:2',second,expectation)],true)};
+    const retried=await this.qaAttempt(scope,'qa:2',second,expectation);
+    const secondStock=stockPhoto&&firstStock?{...firstStock,checks:[...firstStock.checks,await this.stockCheck('qa:2',second,stockPhoto)]}:undefined;
+    return {image:second,qa:qaReport(model,expectation,[initial,retried],true,undefined,secondStock)};
   }
   async run(scope: JobScope) {
     try {
@@ -386,6 +402,7 @@ export class CreativeJobs {
         });
       }
       if(!carousel)plan = validateSkillResult(plan, input);
+      let stockPhoto:Buffer|undefined;
       if(this.stock){
         const dimensions=String(request.size).split('x').map(Number);
         const orientation=dimensions[0]===dimensions[1]?'square':dimensions[0]>dimensions[1]?'horizontal':'vertical';
@@ -393,6 +410,7 @@ export class CreativeJobs {
         const stock=await this.stock.reference(scope,input,{imagePrompt:plan.brief.image_prompt,orientation,edit:!!parent,brandReferences:references.length,layoutArchetype:(plan.brief as {art_direction?:{layout_archetype?:unknown}}).art_direction?.layout_archetype,artDirection:(plan.brief as {art_direction?:unknown}).art_direction,carouselPosition:carousel?.position??null,vision:(this.planner(request.text_provider) as {acceptsImages?:boolean}).acceptsImages===true},message=>this.planCall(scope,message,request));
         if(stock){
           const stockPng=await sharp(stock.photo,{limitInputPixels:24_000_000}).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
+          stockPhoto=stock.photo;
           referenceImages.push(stockPng);
           referenceManifest.push({kind:`stock_${stock.use}`,label:stockReferenceLabel(stock.use),input_sha256:digest(stockPng)});
         }
@@ -497,7 +515,7 @@ export class CreativeJobs {
       );
       };
       const first=await render('image',basePrompt);
-      const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity),notes=>render('image:retry',basePrompt+notes));
+      const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity),notes=>render('image:retry',basePrompt+notes),stockPhoto);
       return this.jobs.transaction(scope, async (db, j) => {
         if (terminal.has(j.status)) return j.status;
         if (!(await this.jobs.permitted(db, j)))

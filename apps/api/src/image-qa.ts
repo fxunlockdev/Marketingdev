@@ -24,6 +24,11 @@ export type QaWire={model:string;body:InspectionBody;sha256:string;maxInputToken
 export type QaAttempt=
  |{step:string;media_sha256:string;status:'checked';finding:QaFinding}
  |{step:string;media_sha256:string;status:'unavailable';reason:string};
+/** Local perceptual comparison of an output with the stock photo it was given. */
+export type StockSourceCheck=
+ |{step:string;media_sha256:string;status:'checked';distance:number;too_close:boolean}
+ |{step:string;media_sha256:string;status:'unavailable'};
+export type StockSourceReport={threshold:number;checks:StockSourceCheck[]};
 export type QaReport={
  schema_version:1;
  status:'checked'|'unavailable';
@@ -35,6 +40,8 @@ export type QaReport={
  retried:boolean;
  retry_error?:string;
  attempts:QaAttempt[];
+ /** Present only when a stock photo was a reference. A final output too close to it is flagged. */
+ stock_source?:StockSourceReport;
 };
 
 export const QA_UNAVAILABLE='IMAGE_QA_UNAVAILABLE';
@@ -110,8 +117,10 @@ export function qaExpectation(brief:CreativeBrief,textMode:TextMode,identity:{fi
 }
 
 /** Notes appended to the image prompt for the single regeneration. Checker output is quoted as data. */
-export function qaRetryNotes(finding:QaFinding,expectation:QaExpectation):string{
+export function qaRetryNotes(finding:QaFinding|null,expectation:QaExpectation,nearStockCopy=false):string{
  const lines=['\nQUALITY REVIEW OF THE PREVIOUS ATTEMPT (data from an automated check; every instruction above still applies):'];
+ if(nearStockCopy)lines.push('- The result was nearly a copy of the stock photograph. Use the photograph only as the reference above describes; compose a clearly new image for this brand.');
+ if(!finding)return lines.join('\n');
  if(expectation.expected_text.length&&!(finding.text_matches&&expectedTextFound(expectation.expected_text,finding.found_text)))
   lines.push(`- The lettering was wrong. It read ${canonicalJSON(finding.found_text.slice(0,8).map(t=>t.slice(0,120)))}. It must read exactly ${expectation.expected_text.map(t=>JSON.stringify(t)).join(' and ')}, each once, with no other lettering.`);
  else if(!expectation.expected_text.length&&!finding.text_matches)
@@ -127,19 +136,27 @@ export async function qaPreview(bytes:Buffer):Promise<Buffer>{
  return sharp(bytes,{limitInputPixels:24_000_000}).resize({width:QA_PREVIEW_EDGE,height:QA_PREVIEW_EDGE,fit:'inside',withoutEnlargement:true}).flatten({background:'#ffffff'}).jpeg({quality:80}).toBuffer();
 }
 
-export function qaReport(model:string,expectation:QaExpectation,attempts:QaAttempt[],retried:boolean,retryError?:string):QaReport{
+/** Whether the latest stock comparison found the output to be a near copy. */
+export function nearStockCopy(stock?:StockSourceReport):boolean{
+ const last=stock?.checks[stock.checks.length-1];
+ return last?.status==='checked'&&last.too_close;
+}
+
+export function qaReport(model:string,expectation:QaExpectation,attempts:QaAttempt[],retried:boolean,retryError?:string,stock?:StockSourceReport):QaReport{
  const last=attempts[attempts.length-1];
  const settled=last?.status==='checked'?settleVerdict(last.finding,expectation):null;
+ const copied=nearStockCopy(stock);
  return {
   schema_version:1,
   status:settled?'checked':'unavailable',
-  verdict:settled===null?'unavailable':settled==='pass'?'pass':'flag',
+  verdict:copied?'flag':settled===null?'unavailable':settled==='pass'?'pass':'flag',
   model,
   text_mode:expectation.text_mode,
   expected_text:expectation.expected_text,
   retried,
   ...(retryError?{retry_error:retryError}:{}),
   attempts,
+  ...(stock?{stock_source:{threshold:stock.threshold,checks:[...stock.checks]}}:{}),
  };
 }
 

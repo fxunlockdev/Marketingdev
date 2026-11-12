@@ -1154,3 +1154,54 @@ test('the locked mood board reaches the image prompt of later requests only, thr
  assert.ok(log.prompts[1].includes('Use generous spacing and restrained typography.'));
  await admin.query('DELETE FROM app.guided_moodboards WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
 });
+
+test('stock-backed creative that is nearly a copy of its stock photo is regenerated once, then flagged, with the closeness recorded',async()=>{
+ const {StockAssets}=await import('../../dist/stock-assets.js'),{ImageQa}=await import('../../dist/image-qa.js');
+ await grant(100000000);
+ await admin.query('INSERT INTO app.content_allowance_plans(organization_id,static_limit) VALUES($1,200) ON CONFLICT(organization_id) DO UPDATE SET static_limit=200',[org.id]);
+ await admin.query("INSERT INTO app.stock_grants(organization_id,brand_id,enabled,ai_use_authorized,max_daily_downloads,expires_at) VALUES($1,$2,true,true,50,now()+interval '1 hour') ON CONFLICT DO NOTHING",[org.id,brand.id]);
+ // A left-to-right ramp and its mirror image: perceptually unrelated, unlike two flat fills.
+ const ramp=async(width,height,mirror)=>{const raw=Buffer.alloc(width*height*3);for(let y=0;y<height;y++)for(let x=0;x<width;x++){const v=Math.round(255*(mirror?width-1-x:x)/(width-1));raw.fill(v,(y*width+x)*3,(y*width+x)*3+3);}return sharp(raw,{raw:{width,height,channels:3}});};
+ const photo=await (await ramp(512,512,false)).jpeg().toBuffer();
+ const copy=await (await ramp(1024,1024,false)).png().toBuffer(),fresh=await (await ramp(1024,1024,true)).png().toBuffer();
+ const stockJobs=new AssetJobs(worker,store,{scan:async()=>{}});
+ const stock=new StockAssets(stockJobs,{configured:true,search:async()=>[{id:77,title:'Calm dental office',previewURL:null,aiGenerated:false}],download:async()=>({url:'https://example.test/photo.jpg',requiresAttribution:false,attributionURL:null})},{fetch:async()=>({status:200,bytes:photo})});
+ const checked=new CreativeJobs(stockJobs,skills,provider,undefined,stock,new ImageQa(provider));
+ const clean={text_matches:true,found_text:[],brief_fit:5,brand_fit:5,artefacts:[],verdict:'pass'};
+ const scripted=outputs=>{const log={prompts:[],checks:0};return Object.assign(async(url,init)=>{
+  if(new URL(url).pathname==='/v1/responses'){
+   const body=JSON.parse(init.body),properties=body.text?.format?.schema?.properties;
+   if(body.text?.format?.name==='desvio_image_qa'){log.checks++;return response(clean);}
+   if(properties?.queries)return response({queries:['calm dental office']});
+   if(properties?.resource_id)return response({resource_id:77});
+   return standard(url,init);
+  }
+  log.prompts.push(init.body.get('prompt'));
+  return Response.json({created:1,data:[{b64_json:outputs[log.prompts.length-1].toString('base64')}]});
+ },{log});};
+ try{
+  // First output copies the photo: one regeneration with a note, the second is new and passes.
+  transport=scripted([copy,fresh]);
+  let j=await submit('Create a calm dental office image from stock');
+  assert.equal(await checked.run(scope(j)),'succeeded');
+  assert.equal(transport.log.prompts.length,2);
+  assert.match(transport.log.prompts[1],/nearly a copy of the stock photograph/);
+  assert.ok(transport.log.prompts[1].startsWith(transport.log.prompts[0]));
+  let v=await versionOf(j);
+  assert.equal(v.sha256,digest(fresh));assert.equal(v.qa.verdict,'pass');assert.equal(v.qa.retried,true);
+  assert.equal(v.qa.stock_source.threshold,6);
+  assert.deepEqual(v.qa.stock_source.checks.map(c=>[c.step,c.status,c.too_close]),[['qa:1','checked',true],['qa:2','checked',false]]);
+  assert.ok(v.qa.stock_source.checks[0].distance<=6&&v.qa.stock_source.checks[1].distance>16);
+  assert.ok(v.skill_manifest.references.some(r=>r.kind==='stock_inspiration'));
+  // Replay is served from the recorded calls.
+  assert.equal(await checked.run(scope(j)),'finished');assert.equal(transport.log.prompts.length,2);
+  // Both attempts copy the photo: never a third image, the result is flagged for a person.
+  transport=scripted([copy,copy,copy]);
+  j=await submit('Create another calm dental office image from stock');
+  assert.equal(await checked.run(scope(j)),'succeeded');
+  assert.equal(transport.log.prompts.length,2);assert.equal(transport.log.checks,2);
+  v=await versionOf(j);
+  assert.equal(v.qa.verdict,'flag');
+  assert.deepEqual(v.qa.stock_source.checks.map(c=>c.too_close),[true,true]);
+ }finally{transport=undefined;await admin.query('DELETE FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);}
+});
