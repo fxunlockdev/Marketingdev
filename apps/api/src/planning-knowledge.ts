@@ -22,7 +22,7 @@ export type PlanningScope={organization_id:string;brand_id:string};
 export type PlanningRequestText={brief:string;goal?:string};
 export const PLANNER_PREFERENCES=10;
 
-const AVOID_KINDS:ReadonlySet<PreferenceStatement['kind']>=new Set(['rejection_reason','regeneration','stock']);
+const AVOID_KINDS:ReadonlySet<PreferenceStatement['kind']>=new Set(['rejection_reason','change_request','regeneration','stock']);
 /** Signal statements as soft planner constraints: what was rejected or reworked is "avoid", what was approved or edited towards is "prefer". */
 export function learnedPreferences(statements:readonly PreferenceStatement[]):LearnedPreference[]{
  return statements.slice(0,PLANNER_PREFERENCES).map(s=>({kind:AVOID_KINDS.has(s.kind)||(s.kind==='decision'&&s.statement.startsWith('Rejects'))?'avoid' as const:'prefer' as const,statement:s.statement.slice(0,500)}));

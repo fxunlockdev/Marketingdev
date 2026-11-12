@@ -14,7 +14,7 @@ export type SignalInput={kind:SignalKind;slot_id?:string|null;creative_version_i
 export type SignalScope={organizationId:string;brandId:string;actorId:string};
 export type Signal={kind:SignalKind;slot_id:string|null;creative_version_id:string|null;version_kind:'creative'|'carousel'|'video'|null;subject_kind:SignalSubject|null;subject_id:string|null;reason:string;diff:SignalDiff;context:SignalContext};
 export type SignalRow={kind:string;reason:string;diff:unknown;context:unknown;created_at:string|Date};
-export type PreferenceStatement={kind:'rejection_reason'|'decision'|'edit'|'regeneration'|'stock';statement:string;count:number;of:number;recent:number;last_seen:string};
+export type PreferenceStatement={kind:'rejection_reason'|'change_request'|'decision'|'edit'|'regeneration'|'stock';statement:string;count:number;of:number;recent:number;last_seen:string};
 export class SignalError extends Error{constructor(readonly code:'SIGNAL_INVALID'){super(code);}}
 
 export const SIGNAL_REASON_MAX=1000;
@@ -80,9 +80,14 @@ function parse(rows:readonly SignalRow[],now:number):Parsed[]{
   return [{at,kind:row.kind as SignalKind,reason:clean(row.reason,SIGNAL_REASON_MAX),diff:signalDiff(row.diff),context:signalContext(row.context)}];
  });
 }
+function themeStatements(signals:Parsed[],now:number,kind:SignalKind,statementKind:PreferenceStatement['kind'],label:string,unit:string):PreferenceStatement[]{
+ const reasoned=signals.filter(s=>s.kind===kind&&s.reason);if(reasoned.length<2)return [];
+ return THEMES.flatMap(([name,pattern])=>{const hits=reasoned.filter(s=>pattern.test(s.reason));return hits.length>=2?[statement(statementKind,`${label} mention ${name}`,tally(hits,reasoned.length,now),unit)]:[];});
+}
+/** Rejections and change requests both say what the customer does not want. Retries after a failure are not taste. */
 function reasonStatements(signals:Parsed[],now:number):PreferenceStatement[]{
- const reasoned=signals.filter(s=>s.kind==='rejected'&&s.reason);if(reasoned.length<2)return [];
- return THEMES.flatMap(([name,pattern])=>{const hits=reasoned.filter(s=>pattern.test(s.reason));return hits.length>=2?[statement('rejection_reason',`Rejection reasons mention ${name}`,tally(hits,reasoned.length,now),'rejections with a reason')]:[];});
+ return [...themeStatements(signals,now,'rejected','rejection_reason','Rejection reasons','rejections with a reason'),
+  ...themeStatements(signals,now,'changes_requested','change_request','Change requests','change requests with feedback')];
 }
 function decisionStatements(signals:Parsed[],now:number):PreferenceStatement[]{
  const decisions=signals.filter(s=>s.kind==='approved'||s.kind==='rejected'),groups=new Map<string,{label:string;rows:Parsed[]}>();
@@ -104,8 +109,9 @@ function editStatements(signals:Parsed[],now:number):PreferenceStatement[]{
  });
 }
 function reworkStatements(signals:Parsed[],now:number):PreferenceStatement[]{
- const approved=signals.filter(s=>s.kind==='approved'),regenerated=signals.filter(s=>s.kind==='regenerated'),swapped=signals.filter(s=>s.kind==='stock_swapped'),stockApproved=approved.filter(s=>s.context.stock_used===true);
+ const approved=signals.filter(s=>s.kind==='approved'),changes=signals.filter(s=>s.kind==='changes_requested'),regenerated=signals.filter(s=>s.kind==='regenerated'),swapped=signals.filter(s=>s.kind==='stock_swapped'),stockApproved=approved.filter(s=>s.context.stock_used===true);
  return [
+  ...(changes.length>=2?[statement('regeneration','Asks for changes instead of approving',tally(changes,changes.length+approved.length,now),'change requests and approvals')]:[]),
   ...(regenerated.length>=2?[statement('regeneration','Asks for a new version instead of approving',tally(regenerated,regenerated.length+approved.length,now),'regenerations and approvals')]:[]),
   ...(swapped.length>=2?[statement('stock','Swaps the suggested stock photo',tally(swapped,swapped.length+stockApproved.length,now),'stock photo decisions')]:[])
  ];
