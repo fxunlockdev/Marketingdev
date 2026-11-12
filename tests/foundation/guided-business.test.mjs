@@ -654,7 +654,7 @@ test('monthly plan approval accepts an approved starting frame made by the image
  const thread=await canvas.createThread(alice,brand.id,{title:'Video starting frame'},randomUUID());
  const generation=await canvas.submit(alice,brand.id,thread.id,{prompt:'Opening frame: a coffee counter in morning light',format:'static',channel:'instagram',size:'1024x1024'},randomUUID());
  const project=(await admin.query('SELECT project_id FROM app.creative_requests WHERE job_id=$1',[generation.id])).rows[0].project_id;
- const brain=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1 ORDER BY created_at DESC LIMIT 1',[brand.id])).rows[0].id;
+ const brain=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1 LIMIT 1',[brand.id])).rows[0].id;
  const media=randomUUID(),version=randomUUID(),exportJob=randomUUID(),exported=randomUUID(),approval=randomUUID(),source='b'.repeat(64),pixels='c'.repeat(64);
  await admin.query('INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,1,1024,1024)',[media,org.id,brand.id,generation.id,`FIXTURE-${media}`,'d'.repeat(64)]);
  await admin.query("INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,brain_id,job_id,media_id,design,caption,skill_manifest,sha256,created_by,status,reviewed_by,reviewed_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'FIXTURE ONLY','{}',$9,$10,'approved',$10,now())",[version,org.id,brand.id,project,brain,generation.id,media,{schema_version:1,width:1024,height:1024,background_media_id:media,layers:[]},source,alice]);
