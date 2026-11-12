@@ -40,7 +40,7 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
    await page.setViewportSize({width,height:1000});await page.goto(`${origin}/b/${id}/overview`);
    await expect(page.getByRole('heading',{name:'Your attention'})).toBeVisible();
    if(width===1440){await expect(page.getByRole('link',{name:'Home',exact:true})).toBeVisible();await expect(page.getByRole('link',{name:'Dashboard',exact:true})).toHaveCount(0);await expect(page.locator('.header-create')).toBeVisible();}
-   await expect(page.getByRole('link',{name:/2 posts to review/})).toBeVisible();
+   await expect(page.getByRole('link',{name:/2 posts are waiting for your approval/})).toHaveAttribute('href',`/b/${id}/review`);
    await expect(page.getByRole('link',{name:'Plan my content',exact:false})).toHaveAttribute('href',`/b/${id}/monthly-planning`);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    const contrast=await new AxeBuilder({page}).withRules(['color-contrast']).analyze();assert.deepEqual(contrast.violations.map(v=>v.nodes.map(n=>n.target)),[]);

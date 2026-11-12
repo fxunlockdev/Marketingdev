@@ -24,7 +24,8 @@ test('home cards use small previews, preserve overlays and distinguish uncreated
   await expect(page.locator('.post-thumbnail svg image').first()).toHaveAttribute('href',coverPreview);
   await expect(page.locator('.post-thumbnail').first()).toContainText('Saved headline');
   assert.equal(previewReads,1,'duplicate thumbnails share the in-flight preview');assert.equal(originalReads,0);
-  await expect(page.locator('.post-thumbnail').nth(2)).toContainText('No slides generated yet');await expect(page.locator('.upcoming-copy').nth(2)).toContainText('Not generated yet');await expect(page.locator('.upcoming-copy').nth(2)).toContainText('Create carousel');
+  // Home shows a format mark, not an empty preview, for a carousel with no slides yet; its badge says so.
+  const uncreated=page.getByRole('region',{name:'Upcoming posts'}).getByRole('listitem').nth(2);await expect(uncreated.locator('.post-thumbnail')).toHaveCount(0);await expect(uncreated).toContainText('Carousel · Instagram');await expect(uncreated).toContainText('Not generated yet');
   await page.setViewportSize({width:390,height:844});await expect(page.locator('.post-thumbnail svg image').first()).toHaveAttribute('href',coverPreview);
   await page.reload();await expect(page.locator('.post-thumbnail svg image').first()).toHaveAttribute('href',coverPreview);assert.equal(previewReads,2,'a new page authenticates its image request again');
  }finally{await browser.close();}
