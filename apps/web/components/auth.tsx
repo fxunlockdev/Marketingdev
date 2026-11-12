@@ -120,8 +120,8 @@ export function AuthScreen({ mode }: { mode: string }) {
             <em>your brand.</em>
           </h2>
           <p>
-            One account for your business: your brand, your content plan and
-            your approvals, together in one considered workspace.
+            One account for all your businesses: each brand, content plan and
+            set of approvals kept separate, in one considered workspace.
           </p>
         </div>
         <span className="story-foot">
