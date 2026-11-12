@@ -6,6 +6,6 @@
 .desvio-redesign .video-keyframe-frame figcaption{font-size:13px;line-height:1.5;color:var(--brand-muted)}
 .desvio-redesign .video-keyframe-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .desvio-redesign .chat-video-shots{display:flex;flex-wrap:wrap;gap:8px}
-.desvio-redesign .chat-video-shots button{padding:6px 12px;border-radius:999px;border:1px solid var(--brand-border);background:#fff;font:inherit;font-size:13px;color:var(--brand-ink)}
-.desvio-redesign .chat-video-shots button[aria-pressed="true"]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+.desvio-redesign .chat-video-shots button{padding:6px 12px;border-radius:999px;border:1px solid var(--brand-border);background:var(--brand-surface);font:inherit;font-size:13px;color:var(--brand-ink)}
+.desvio-redesign .chat-video-shots button[aria-pressed="true"]{background:var(--brand-ink);color:var(--brand-surface);border-color:var(--brand-ink)}
 .desvio-redesign .chat-video-shots button:focus-visible{outline:2px solid var(--brand-link);outline-offset:2px}
