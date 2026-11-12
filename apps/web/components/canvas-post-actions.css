@@ -1,0 +1,36 @@
+/* Create canvas: approve, schedule, vary and regenerate one creative. Tokens only. */
+.canvas-post-actions{display:grid;gap:var(--ds-space-3);padding:var(--ds-space-4);border:1px solid var(--color-border);border-radius:var(--radius-container);background:var(--color-background-surface);box-shadow:var(--shadow-low)}
+.canvas-post-status{display:flex;flex-wrap:wrap;align-items:center;gap:var(--ds-space-2) var(--ds-space-3);font-size:var(--type-sm);color:var(--color-text-secondary)}
+.canvas-post-when{font-variant-numeric:tabular-nums}
+.canvas-post-link{color:var(--color-text-accent);font-weight:600;text-underline-offset:3px;border-radius:var(--radius-inner);transition:color var(--duration-fast) var(--ease-standard)}
+.canvas-post-link:hover{color:var(--color-text-primary)}
+.canvas-post-link:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
+.canvas-post-buttons{display:flex;flex-wrap:wrap;gap:var(--ds-space-2)}
+.canvas-post-panel{display:grid;gap:var(--ds-space-3);padding:var(--ds-space-3) var(--ds-space-4);border-radius:var(--radius-element);background:var(--color-background-muted);border:1px solid var(--color-border);animation:canvas-post-reveal var(--duration-medium) var(--ease-standard)}
+.canvas-post-panel p{margin:0;font-size:var(--type-sm);color:var(--color-text-secondary);line-height:var(--leading-snug)}
+.canvas-post-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:var(--ds-space-3)}
+.canvas-post-fields input{min-height:var(--control-height);width:100%}
+.canvas-post-regenerate{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));align-items:end}
+.canvas-post-regenerate form{display:grid;gap:var(--ds-space-2);align-content:end}
+.canvas-post-regenerate textarea,.canvas-post-regenerate input{width:100%}
+.canvas-alternatives{display:grid;gap:var(--ds-space-3)}
+.canvas-alternatives header{display:flex;align-items:baseline;justify-content:space-between;gap:var(--ds-space-3)}
+.canvas-alternatives h3{margin:0;font-size:var(--type-base);font-family:var(--font-family-heading)}
+.canvas-alternatives header span{font-size:var(--type-sm);color:var(--color-text-secondary)}
+.canvas-alternatives ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:var(--ds-space-3)}
+.canvas-alternatives li{display:grid;gap:var(--ds-space-2);padding:var(--ds-space-2);border-radius:var(--radius-element);border:1px solid var(--color-border);background:var(--color-background-surface);transition:border-color var(--duration-fast) var(--ease-standard),box-shadow var(--duration-fast) var(--ease-standard),transform var(--duration-fast) var(--ease-standard)}
+.canvas-alternatives li:hover{border-color:var(--color-border-emphasized);box-shadow:var(--shadow-med);transform:translateY(-1px)}
+.canvas-alternatives li[aria-current="true"]{border-color:var(--color-accent);box-shadow:0 0 0 2px var(--color-focus-wash)}
+.canvas-alternative-label{font-size:var(--type-xs);font-weight:600;color:var(--color-text-secondary)}
+.canvas-save-state{display:inline-flex;align-items:center;gap:var(--ds-space-1);font-size:var(--type-xs);font-weight:600;color:var(--color-text-secondary)}
+.canvas-save-state[data-state="unsaved"]{color:var(--color-text-warning)}
+.canvas-save-state[data-state="saved"]{color:var(--color-text-success)}
+.canvas-save-state::before{content:"";width:8px;height:8px;border-radius:var(--radius-full);background:currentColor}
+.canvas-shortcuts{font-size:var(--type-xs);color:var(--color-text-secondary)}
+.canvas-shortcuts summary{cursor:pointer;border-radius:var(--radius-inner)}
+.canvas-shortcuts summary:focus-visible{outline:2px solid var(--color-focus);outline-offset:2px}
+.canvas-shortcuts dl{display:grid;grid-template-columns:auto 1fr;gap:var(--ds-space-1) var(--ds-space-3);margin:var(--ds-space-2) 0 0}
+.canvas-shortcuts dt{font-family:ui-monospace,monospace;font-weight:600;color:var(--color-text-primary)}
+.canvas-shortcuts dd{margin:0}
+@keyframes canvas-post-reveal{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.canvas-post-panel{animation:none}.canvas-alternatives li{transition:none}.canvas-alternatives li:hover{transform:none}}

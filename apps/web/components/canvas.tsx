@@ -22,6 +22,8 @@ import { api } from "./api";
 import { Field, Loading, Notice } from "./primitives";
 import { CreativeEditor, type Design } from "./creative-editor";
 import {CreativeExportPanel} from './creative-export';
+import {CanvasPostActions,syncCalendarPosts,type BrandStyle,type CreativeSlot,type CreativeVariant} from "./canvas-post-actions";
+import {useCanvasHistory,readCanvasDraft,writeCanvasDraft,clearCanvasDraft} from "./canvas-history";
 import { useUnsavedChanges } from "./unsaved";
 type Business = {
   id: string;
@@ -72,8 +74,12 @@ type Project = {
     archived_at?: string | null;
     archive_revision: number;
     thread_id: string;
+    variant_of?: string | null;
   };
   versions: Version[];
+  brand_style?: BrandStyle;
+  slots?: CreativeSlot[];
+  variants?: CreativeVariant[];
   reviews: {
     version_id: string;
     decision: string;
@@ -589,6 +595,7 @@ export function CreativeProject({
   onDisplayed,
   onSaved,
   editingDisabled = false,
+  onAsk,
 }: {
   business: Business;
   projectId: string;
@@ -600,11 +607,15 @@ export function CreativeProject({
   onDisplayed?: (id:string) => void;
   onSaved?: (id:string) => void;
   editingDisabled?: boolean;
+  /** Send an instruction to the Create chat (regenerate with a new headline or feedback). */
+  onAsk?: (message: string) => void;
 }) {
   const root = `/api/v1/businesses/${business.id}`,
     [data, setData] = useState<Project>(),
     [selected, setSelected] = useState(""),
-    [design, setDesign] = useState<Design>(),
+    [design, setRawDesign] = useState<Design>(),
+    [timezone, setTimezone] = useState(""),
+    [saveState, setSaveState] = useState<"" | "saving" | "saved">(""),
     [caption, setCaption] = useState(""),
     [error, setError] = useState<unknown>(),
     [busy, setBusy] = useState(false),
@@ -621,6 +632,8 @@ export function CreativeProject({
     write = ['owner','admin','editor'].includes(business.role) && !data?.project.archived_at,
     reviewer = ["owner", "admin", "reviewer"].includes(business.role) && !data?.project.archived_at;
   dirtyRef.current = dirty;
+  const history = useCanvasHistory(design, setRawDesign);
+  const setDesign = history.edit;
   useUnsavedChanges(dirty || !!feedback || busy);
   const onDirtyRef = useRef(onDirty);
   onDirtyRef.current = onDirty;
@@ -644,10 +657,12 @@ export function CreativeProject({
         (v) => v.id === (id ?? value.project.latest_version_id),
       )!;
       setSelected(v.id);
-      setDesign(structuredClone(v.design));
-      setCaption(v.caption);
+      const draft = v.id === value.project.latest_version_id ? readCanvasDraft(projectId, v.id) : null;
+      history.reset(structuredClone(draft?.design ?? v.design));
+      setCaption(draft?.caption ?? v.caption);
+      if (draft) setNotice("We restored your unsaved edits from this device. Save them or discard them.");
     },
-    [root, projectId],
+    [root, projectId, history.reset],
   );
   useEffect(() => {
     if (dirtyRef.current) {
@@ -662,13 +677,15 @@ export function CreativeProject({
     if (dirty && !confirm("Discard unsaved creative edits?")) return;
     const v = data!.versions.find((v) => v.id === id)!;
     setSelected(v.id);
-    setDesign(structuredClone(v.design));
+    history.reset(structuredClone(v.design));
     setCaption(v.caption);
     setNotice("");
     setError(undefined);
   }
   async function save() {
+    if (busy || !dirty) return;
     setBusy(true);
+    setSaveState("saving");
     setError(undefined);
     try {
       const v = await api(root + `/creative-projects/${projectId}/versions`, {
@@ -676,15 +693,37 @@ export function CreativeProject({
         design,
         caption,
       });
+      clearCanvasDraft(projectId);
+      const moved = await syncCalendarPosts(business.id, data?.slots ?? [], v.id);
       await load(v.id);
       onSaved?.(v.id);
-      setNotice("Saved as a new draft version.");
+      setSaveState("saved");
+      setNotice(moved ? "Saved as a new version. Your calendar post now uses it and needs approval again." : "Saved as a new draft version.");
     } catch (e) {
+      setSaveState("");
       setError(e);
     } finally {
       setBusy(false);
     }
   }
+  function discard() {
+    if (!version) return;
+    clearCanvasDraft(projectId);
+    history.reset(structuredClone(version.design));
+    setCaption(version.caption);
+    setNotice("");
+  }
+  // Unsaved edits survive a reload on this device; saving or discarding clears them.
+  useEffect(() => {
+    if (!version || !design) return;
+    if (dirty) { writeCanvasDraft(projectId, version.id, design, caption); setSaveState(""); }
+  }, [dirty, design, caption, projectId, version]);
+  useEffect(() => {
+    if (!chatLayout) return;
+    let live = true;
+    void api<{timezone?: string}>(root + "/onboarding").then(p => { if (live) setTimezone(p?.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone); }).catch(() => { if (live) setTimezone(Intl.DateTimeFormat().resolvedOptions().timeZone); });
+    return () => { live = false; };
+  }, [root, chatLayout]);
   async function review(decision: string) {
     setBusy(true);
     setError(undefined);
@@ -729,27 +768,35 @@ export function CreativeProject({
         {!error && <Loading />}
       </>
     );
+  const editable = write && latest && !busy && !editingDisabled;
+  const saveLabel = busy && saveState === "saving" ? "Saving…" : dirty ? "Unsaved changes" : saveState === "saved" ? "Saved" : `Saved · version ${data.versions.length - data.versions.findIndex(v => v.id === version.id)}`;
   if (chatLayout) return (
     <article className="creative-project chat-creative-project" aria-label="Canvas artwork editor">
       <Notice error={error} />
       {notice && <p role="status">{notice}</p>}
       {data.project.archived_at && <p role="status">Archived creative · open Post details to restore it.</p>}
+      <div className="canvas-editor-meta"><span className="canvas-save-state" role="status" data-state={busy && saveState === "saving" ? "saving" : dirty ? "unsaved" : "saved"}>{saveLabel}</span>
+        <details className="canvas-shortcuts"><summary>Keyboard shortcuts</summary><dl><dt>⌘/Ctrl Z</dt><dd>Undo</dd><dt>⇧ ⌘/Ctrl Z</dt><dd>Redo</dd><dt>⌘/Ctrl S</dt><dd>Save changes</dd><dt>⌘/Ctrl D</dt><dd>Duplicate text layer</dd><dt>Delete</dt><dd>Remove text layer</dd><dt>Arrows</dt><dd>Nudge 1px (Shift: 10px)</dd></dl></details></div>
       <CreativeEditor
         businessId={business.id}
         design={design}
         onChange={setDesign}
-        readOnly={!write || !latest || busy || editingDisabled}
+        readOnly={!editable}
+        brandStyle={data.brand_style}
+        shortcuts={editable ? { undo: history.undo, redo: history.redo, save: () => void save(), canUndo: history.canUndo, canRedo: history.canRedo } : undefined}
         chatControls
         afterArtwork={<div className="conversation-canvas-strip" aria-label="Creative details">{canvasDetails}<strong>{dirty?"Unsaved changes":label(version.status)}</strong></div>}
         controlsFooter={<>
           <button className="chat-download" disabled={!download||busy||dirty} onClick={()=>{try{download?.();}catch{setError(new Error("The image could not be exported. Reload and retry."));}}}><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>Download PNG</button>
           {write&&latest&&dirty&&<div className="chat-save-actions">
-            <button className="primary" disabled={busy||editingDisabled} onClick={save}>{busy?"Saving…":"Save changes"}</button>
-            <button disabled={busy||editingDisabled} onClick={()=>{setDesign(structuredClone(version.design));setCaption(version.caption);setNotice('');}}>Discard edits</button>
+            <button className="primary" disabled={busy||editingDisabled} onClick={()=>void save()}>{busy?"Saving…":"Save changes"}</button>
+            <button disabled={busy||editingDisabled} onClick={discard}>Discard edits</button>
           </div>}
         </>}
         onExportReady={exportReady}
       />
+      {write && <StockPicker key={`${business.id}:${projectId}:${version.id}`} businessId={business.id} purpose="replacement" disabled={dirty||busy||!latest||editingDisabled} onSelected={async referenceId=>{setBusy(true);try{const saved=await api(root+`/stock/projects/${projectId}/replace`,{parent_id:version.id,reference_id:referenceId});await syncCalendarPosts(business.id,data.slots??[],saved.id);await load(saved.id);onSaved?.(saved.id);setNotice('Photo replaced in a new draft version. Review it before approving.');}finally{setBusy(false);}}}/>}
+      <CanvasPostActions business={business} projectId={projectId} threadId={data.project.thread_id} version={version} latest={latest} slots={data.slots ?? []} variants={data.variants ?? []} dirty={dirty} busy={busy || editingDisabled} onBusy={setBusy} onAsk={onAsk} timezone={timezone || "UTC"} defaultChannel={version.skill_manifest?.channel ?? "instagram"} onReload={async text => { await load(selected); onSaved?.(selected); setNotice(text); }} />
     </article>
   );
   return (
@@ -841,10 +888,7 @@ export function CreativeProject({
             {dirty && (
               <button
                 disabled={busy}
-                onClick={() => {
-                  setDesign(structuredClone(version.design));
-                  setCaption(version.caption);
-                }}
+                onClick={discard}
               >
                 Discard edits
               </button>
