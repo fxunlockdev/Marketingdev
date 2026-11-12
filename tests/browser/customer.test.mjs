@@ -265,7 +265,7 @@ test("V5 signup and real email verification lead to zero businesses and exact na
   // A verified account with no business is taken straight to adding its first one.
   await expect(alice).toHaveURL(base + "/brands/new");
   await expect(alice.getByRole("heading", { name: "Your content. Your brand.", exact: true })).toBeVisible();
-  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Create','Approvals','Brand Kit','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);
+  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Create','Approvals','Brand Kit','Strategy','What Desvio knows','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);
   // Every group heading sits above at least one link; the topbar has no second profile link.
   assert.deepEqual(await alice.locator('#business-nav .nav-group').allTextContents(),['Plan & create','Brand','Results','Library','Workspace']);
   await expect(alice.locator('.v5-topbar a[href="/profile"]')).toHaveCount(0);  await alice.goto(base + "/brands");

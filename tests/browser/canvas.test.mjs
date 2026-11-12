@@ -471,9 +471,10 @@ afterEach(async()=>{
 // Validated-image fixture approved through the real reference API; Brand Kit browser tests cover the upload UI.
 async function approveFixtureReference(label){
  const assetId=randomUUID(),visualId=randomUUID(),captureId=randomUUID();
- const image=await sharp({create:{width:900,height:900,channels:3,background:'#c4bca0'}}).png().toBuffer(),sha=digest(image),objectKey=`evidence/${org}/${brand}/create-reference/${sha}`;
- await store.persist(objectKey,image,'image/png',sha);
- await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'CREATE FIXTURE.png','image/png',$5,$6,$7,$8,'ready')",[assetId,org,brand,actor,image.length,sha,objectKey+'-quarantine',objectKey]);
+ // Normalized uploads are JPEG (see normalizeProductPhoto); the image engine accepts references only in that form.
+ const image=await sharp({create:{width:900,height:900,channels:3,background:{r:196,g:188,b:(160+label.length*7)%256}}}).jpeg().toBuffer(),sha=digest(image),objectKey=`evidence/${org}/${brand}/create-reference/${sha}`;
+ await store.persist(objectKey,image,'image/jpeg',sha);
+ await admin.query("INSERT INTO app.assets(id,organization_id,brand_id,created_by,filename,content_type,expected_bytes,sha256,quarantine_key,canonical_key,state) VALUES($1,$2,$3,$4,'CREATE FIXTURE.jpg','image/jpeg',$5,$6,$7,$8,'ready')",[assetId,org,brand,actor,image.length,sha,objectKey+'-quarantine',objectKey]);
  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,asset_id,requested_by,kind,status) VALUES($1,$2,$3,$4,$5,'asset.validate','succeeded')",[captureId,org,brand,assetId,actor]);
  await admin.query('INSERT INTO app.uploaded_visuals(id,organization_id,brand_id,asset_id,job_id,object_key,sha256,source_sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$7,$8,900,900)',[visualId,org,brand,assetId,captureId,objectKey,sha,image.length]);
  const approved=await post(`/api/v1/businesses/${brand}/canvas/references`,{kind:'upload',visual_id:visualId,label,consent:true},randomUUID());
@@ -622,16 +623,16 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  const queued=await post(`/api/v1/businesses/${brand}/content-plan/generate`,{provider:'openai',starts_on:'2026-11-01',brief:'TEST FIXTURE: explain refillable soap',duration_days:30,post_count:30,video_count:0},randomUUID());
  assert.ok([200,201].includes(queued.status),JSON.stringify(queued.body));
  await expect.poll(async()=>(await admin.query("SELECT count(*)::int AS n FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-11-01'",[brand])).rows[0].n,{timeout:60000}).toBe(1);
- await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-01`);
- await expect(page.getByText(/posts in this view/)).toBeVisible({timeout:30000});
- const calendarView=page.getByLabel('Calendar view',{exact:true}).filter({visible:true}).first();
- if(await calendarView.count())await selectOption(calendarView,'month');
+ // The address names the view: a link to a month opens that month, and reloading keeps it.
+ await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-01&view=month`);
  await expect(page.getByText('30 posts in this view',{exact:true})).toBeVisible({timeout:30000});
+ await page.reload();await expect(page.getByText('30 posts in this view',{exact:true})).toBeVisible({timeout:30000});
+ assert.equal(new URL(page.url()).searchParams.get('view'),'month');
  await expect(page.getByLabel('Calendar date',{exact:true})).toHaveValue('2026-11-01');
 
  await expect(page.getByRole('button',{name:'Export calendar',exact:true})).toHaveCount(0);
  await page.screenshot({path:'work/browser/content-plan-desktop.png',fullPage:true});
- await page.locator('.calendar-filters > summary').click();
+ await page.getByText('Calendar options',{exact:true}).click();await page.locator('.calendar-filters > summary').click();
  await page.getByRole('button',{name:'LinkedIn',exact:true}).click();
  await expect(page.getByText('15 posts in this view',{exact:true})).toBeVisible();
  const beforeMove=(await admin.query("SELECT id,planned_at FROM app.content_slots WHERE brand_id=$1 AND hook='TEST FIXTURE hook 1'",[brand])).rows[0];
@@ -642,8 +643,9 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByRole('button',{name:'Save post changes',exact:true}).click();
  await expect(page.getByText('Post changes saved.',{exact:true})).toBeVisible();
  assert.equal((await admin.query('SELECT planned_at FROM app.content_slots WHERE id=$1',[beforeMove.id])).rows[0].planned_at.toISOString(),'2026-11-02T08:00:00.000Z');
- await page.getByText('Brand image references',{exact:true}).click();
- await page.getByRole('checkbox',{name:'Botanical brand reference',exact:true}).check();
+ // The saved plan already attached the matching approved product photo ("botanical" is in the offer).
+ await page.getByText(/^Brand image references/).click();
+ await expect(page.getByRole('checkbox',{name:'Botanical brand reference',exact:true})).toBeChecked();
  const calendarReferenceUploads=referenceUploads;
  await page.getByRole('button',{name:'Create creative',exact:true}).click();
  await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});
@@ -651,11 +653,12 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  assert.ok(postSlot.creative_version_id);assert.equal(postSlot.state,'draft_ready');
  assert.equal(referenceUploads,calendarReferenceUploads+1);
  await page.getByRole('button',{name:'Close post',exact:true}).click();
- await selectOption(page.getByLabel('Calendar view',{exact:true}),'list');
+ await page.getByRole('group',{name:'Calendar display',exact:true}).getByRole('button',{name:'List',exact:true}).click();
  const thumbnail=page.locator('.plan-list-card').filter({has:page.getByText('TEST FIXTURE hook 1',{exact:true})}).locator('.post-thumbnail');
  await thumbnail.scrollIntoViewIfNeeded();
  await expect(thumbnail).toBeVisible();
- await expect(thumbnail.locator('image')).toHaveAttribute('href',/^blob:/);
+ // Covers load through cacheable private preview URLs (MediaImage), not per-card blobs.
+ await expect(thumbnail.locator('image')).toHaveAttribute('href',/\/creative-media\/[0-9a-f-]+\/preview\?w=\d+$/);
  await thumbnail.click();
  await page.getByText('Edit topic & schedule',{exact:true}).click();
  await page.getByLabel('Creative brief').fill('TEST FIXTURE: owner revised brief');
@@ -670,7 +673,7 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await expect(page.getByRole('button',{name:'Revise creative',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Revise creative',exact:true}).click();
  await expect(page.getByRole('button',{name:'Send for review',exact:true})).toBeEnabled({timeout:30000});
  await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-01`);
- await page.getByRole('button',{name:'Select drafts for review',exact:true}).click();
+ await page.getByText('Calendar options',{exact:true}).click();await page.getByRole('button',{name:'Select drafts for review',exact:true}).click();
  await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();
  await page.getByRole('button',{name:'Send selected drafts for review',exact:true}).click();
  await expect(page.getByText('1 post sent for review. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
@@ -709,11 +712,11 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  await page.getByRole('button',{name:'Save new version',exact:true}).click();await expect(page.getByText('Saved as a new draft version.',{exact:true})).toBeVisible();
  await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');
  await page.locator('.calendar-filters > summary').click();await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();
- await expect(page.getByRole('button',{name:'Attach latest Canvas version',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Attach latest creative version',exact:true})).toBeDisabled();
  await expect(page.locator('.slot-caption')).not.toContainText('Manual revision from review');
  await page.getByText('Edit topic & schedule',{exact:true}).click();
  await page.getByLabel('I understand that changing this post resets approval and requires a new review.').check();
- await page.getByRole('button',{name:'Attach latest Canvas version',exact:true}).click();await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Attach latest creative version',exact:true}).click();await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();
  await expect(page.locator('.slot-caption')).toHaveText('TEST FIXTURE: Manual revision from review');
  const after=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.notEqual(after.creative_version_id,before.creative_version_id);
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='approved'",[before.id])).rows[0].n,2);
@@ -798,7 +801,7 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].n,planningCountBefore);
  await page.unroute(`**/content-plans/${saved.id}`);
  await expect(page.getByRole('heading',{name:'Your campaign',exact:true,level:1})).toBeVisible();
- assert.deepEqual((await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('link').allTextContents()).slice(0,9).map(s=>s.trim()),['Home','Calendar','Campaigns','Integrations','Brand Kit','Content Preferences','Approvals','Learnings','Insights']);
+ assert.deepEqual((await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('link').allTextContents()).slice(0,9).map(s=>s.trim()),['Home','Calendar','Create','Approvals','Brand Kit','Strategy','What Desvio knows','Content Preferences','Integrations']);
  await expect(page.getByRole('list',{name:'Campaign posts'}).getByRole('listitem')).toHaveCount(slotCount);
  await expect(page.locator('.campaign-preview-grid .post-thumbnail svg')).toHaveCount(2,{timeout:15000});
  await expect(page.getByRole('link',{name:'Review post',exact:true})).toHaveCount(2);
@@ -879,27 +882,6 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
 });
 
 
-test('Canvas natural follow-up uses the edited selected plan and opens a new weekly calendar',async()=>{
- const original=(await admin.query("SELECT id FROM app.content_plans WHERE brand_id=$1 AND starts_on='2026-12-01'",[brand])).rows[0];
- const before=(await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at,id',[original.id])).rows;
- const sourceThread=(await admin.query('SELECT thread_id FROM app.planning_requests WHERE output_plan_id=$1',[original.id])).rows[0].thread_id;
- await page.goto(`${base}/b/${brand}/canvas?thread=${sourceThread}`);await page.getByText('Plan content in Canvas',{exact:true}).click();
- await page.getByLabel('Describe your creative',{exact:true}).fill('TEST: Make this a weekly plan with two videos and keep my edited script direction');
- await page.getByLabel('Plan starts on (optional)',{exact:true}).fill('2027-02-01');
- await page.getByRole('button',{name:'Send',exact:true}).click();
- const preview=page.getByRole('region',{name:'Planned posts',exact:true});await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(7,{timeout:60000});await expect(preview).toContainText('7 days · 7 posts · 2 videos');
- const request=(await admin.query("SELECT input,output_plan_id FROM app.planning_requests WHERE brand_id=$1 AND input->>'planning_mode'='natural' AND input->'preferences'->>'starts_on'='2027-02-01'",[brand])).rows[0];
- assert.equal(request.input.reference_plan.id,original.id);assert.ok(request.input.reference_plan.slots.some(s=>s.video_draft?.prompt==='TEST edited calendar video prompt'));assert.ok(request.output_plan_id);
- assert.deepEqual((await admin.query('SELECT id,revision,video_draft FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at,id',[original.id])).rows,before);
- // A slow initial conversation fetch must not replace an already-open planner.
- await page.route('**/canvas/threads',async route=>{await delay(600);await route.continue();});
- await page.reload();await expect(page.getByText('Campaign posts',{exact:true})).toBeVisible();await expect(preview.getByRole('list',{name:'Day-by-day posts'}).getByRole('listitem')).toHaveCount(7);
- await page.unroute('**/canvas/threads');
- await page.getByText('Conversation & planning notes',{exact:true}).click();
- await expect(page.getByRole('list',{name:'Conversation messages'})).toContainText('Make this a weekly plan');
- await page.screenshot({path:'work/browser/canvas-natural-followup.png',fullPage:true});assert.deepEqual(errors,[]);
-});
-
 test('Reviewer can give calendar feedback without editing or generation; Analyst sees read-only controls',async()=>{
  const plans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
  const v=(await admin.query('SELECT v.* FROM app.creative_versions v JOIN app.creative_projects p ON p.latest_version_id=v.id WHERE v.brand_id=$1 ORDER BY v.created_at DESC LIMIT 1',[brand])).rows[0];
@@ -923,58 +905,53 @@ test('Reviewer can give calendar feedback without editing or generation; Analyst
   assert.equal((await admin.query('SELECT state FROM app.content_slots WHERE id=$1',[s.id])).rows[0].state,'changes_requested');
   await admin.query("UPDATE app.business_memberships SET role='analyst' WHERE organization_id=$1 AND brand_id=$2 AND user_id=$3",[org,brand,reviewerId]);
   await reviewPage.reload();await expect(reviewPage.getByLabel('Feedback or creative direction')).toBeDisabled();await expect(reviewPage.getByRole('button',{name:'Approve post',exact:true})).toHaveCount(0);
-  await reviewPage.goto(`${base}/b/${brand}/canvas`);await expect(reviewPage.getByRole('button',{name:'+ New conversation',exact:true})).toBeDisabled();
+  // Create is read-only for an analyst: the conversation composer cannot start new work.
+  await reviewPage.goto(`${base}/b/${brand}/create`);await expect(reviewPage.getByRole('textbox',{name:'Message Desvio'})).toBeDisabled({timeout:30000});
   assert.deepEqual((await new AxeBuilder({page:reviewPage}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);
  }finally{await context.close();}
 });
 
-test('Canvas composes generated slides as one carousel, reviews exact pixels, reorders into a new draft and survives reload',async()=>{
- await page.goto(`${base}/b/${brand}/canvas`);const root=`/api/v1/businesses/${brand}`;const slides=[];
- for(let i=0;i<2;i++){
-  const t=await post(root+'/canvas/threads',{title:`TEST carousel slide ${i+1}`},randomUUID());assert.equal(t.status,201);
-  const j=await post(root+`/canvas/threads/${t.body.id}/messages`,{prompt:`TEST carousel slide ${i+1}: botanical soap story`,format:'static',channel:'linkedin',size:'1024x1024',parent_version_id:null},randomUUID());assert.equal(j.status,201);
-  let slideJob;
-  try { await waitFor(async()=> {
-    slideJob=(await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[j.body.id])).rows[0];
-    assert.ok(!['failed','cancelled'].includes(slideJob.status),`Slide generation failed: ${JSON.stringify(slideJob)}`);
-    return slideJob.status==='succeeded';
-  }); } catch(error) { throw new Error(`Carousel source image did not complete: ${JSON.stringify(slideJob)}`,{cause:error}); }
-  const v=(await admin.query('SELECT v.id,v.sha256 FROM app.creative_requests r JOIN app.creative_versions v ON v.id=r.output_version_id WHERE r.job_id=$1',[j.body.id])).rows[0];
-  const e=await post(root+`/creative-versions/${v.id}/exports`,{source_sha256:v.sha256},randomUUID());assert.equal(e.status,201);
-  await waitFor(async()=> (await admin.query('SELECT count(*)::int AS n FROM app.creative_exports WHERE version_id=$1',[v.id])).rows[0].n===1);
-  slides.push((await admin.query('SELECT id FROM app.creative_exports WHERE version_id=$1',[v.id])).rows[0].id);
- }
- await page.reload();await page.getByText('Options',{exact:true}).click();await page.getByRole('button',{name:'Combine saved images into a carousel',exact:true}).click();const panel=page.getByRole('region',{name:'Carousels',exact:true});
- await panel.getByLabel('Carousel title',{exact:true}).fill('TEST botanical story');await panel.getByLabel('Shared carousel caption',{exact:true}).fill('A single story across two slides.');
- for(let i=0;i<2;i++){await panel.getByRole('button',{name:'Add slide',exact:true}).click();await selectOption(panel.getByLabel(`Saved image for slide ${i+1}`,{exact:true}),slides[i]);await panel.getByLabel(`Alt text for slide ${i+1}`,{exact:true}).fill(`Botanical slide ${i+1}`);}
- const corruptPreview='**/creative-exports/'+slides[0]+'/download';await page.route(corruptPreview,async route=>{const response=await route.fetch(),grant=await response.json();await route.fulfill({response,json:{...grant,sha256:'0'.repeat(64)}});});
- await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(panel.getByText('Carousel saved as a draft. Review the complete slide order and caption.',{exact:true})).toBeVisible();
- const review=panel.getByRole('region',{name:'Review carousel',exact:true}),consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});
- await expect(review.getByText('Slide integrity check failed.',{exact:true})).toBeVisible();await expect(consent).toBeDisabled();await page.unroute(corruptPreview);await review.getByRole('button',{name:'Reload slide preview',exact:true}).click();
- await expect(review.getByRole('button',{name:'Send carousel for review',exact:true})).toBeDisabled();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(review.getByRole('button',{name:'Approve carousel',exact:true})).toBeVisible();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
- await panel.getByRole('button',{name:'Move slide 2 up',exact:true}).click();await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
- const id=await selectField(panel.getByLabel('Saved carousel',{exact:true})).inputValue();await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await selectOption(panel.getByLabel('Saved carousel',{exact:true}),id);await expect(review.getByRole('img').first()).toHaveAttribute('alt','Botanical slide 2');
+test('Create chat carousel: exact-pixel review refuses a corrupted slide, a reorder saves a new draft and survives reload',async()=>{
+ // Rewritten from the retired /canvas composer onto the Create chat carousel editor (same composition outcomes).
+ await page.setViewportSize({width:1280,height:900});await page.goto(`${base}/b/${brand}/create`);
+ await askCreate('TEST compose a carousel: a botanical soap story');
+ const chatCarousel=page.getByRole('region',{name:'Your carousel',exact:true});await expect(chatCarousel.getByRole('img')).toBeVisible({timeout:150000});
+ const conversation=new URL(page.url()).searchParams.get('conversation');
+ const run=(await(await page.request.get(`${base}/api/v1/businesses/${brand}/create-chat/conversations/${conversation}`)).json()).carousel_runs[0];
+ const project=(await admin.query('SELECT id,latest_version_id FROM app.carousel_projects WHERE id=$1',[run.project_id])).rows[0];
+ const pages=(await admin.query('SELECT export_id,alt_text FROM app.carousel_pages WHERE carousel_version_id=$1 ORDER BY position',[project.latest_version_id])).rows;assert.ok(pages.length>=2);
+ const corruptPreview='**/creative-exports/'+pages[0].export_id+'/download';await page.route(corruptPreview,async route=>{try{const response=await route.fetch(),grant=await response.json();await route.fulfill({response,json:{...grant,sha256:'0'.repeat(64)}});}catch{/* The page moved on; nothing to corrupt. */}});
+ // The review mounts with the page, so load it again behind the corrupting route.
+ await page.reload();await expect(chatCarousel.getByRole('img')).toBeVisible({timeout:30000});
+ await chatCarousel.getByText('Caption, slide order & review',{exact:true}).click();
+ const panel=page.getByRole('region',{name:'Carousels',exact:true}),review=panel.getByRole('region',{name:'Review carousel',exact:true}),consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});
+ await expect(review.getByText('Slide integrity check failed.',{exact:true})).toBeVisible({timeout:30000});await expect(consent).toBeDisabled();await page.unroute(corruptPreview);await review.getByRole('button',{name:'Reload slide preview',exact:true}).click();
+ await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(review.getByRole('button',{name:'Approve carousel',exact:true})).toBeVisible();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await panel.getByRole('button',{name:'Move slide 2 up',exact:true}).click();await panel.getByRole('button',{name:'Save carousel',exact:true}).click();await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img').first()).toHaveAttribute('alt',pages[1].alt_text);
+ await page.reload();await expect(chatCarousel.getByRole('img')).toBeVisible({timeout:30000});await chatCarousel.getByText('Caption, slide order & review',{exact:true}).click();await expect(review.getByRole('img').first()).toHaveAttribute('alt',pages[1].alt_text,{timeout:30000});
+ assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.carousel_versions WHERE project_id=$1',[project.id])).rows[0].n),2,'the reorder is a new draft version');
  await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-carousel-mobile.png',fullPage:true});
- const sibling=(await admin.query('SELECT id FROM app.brands WHERE organization_id=$1 AND id<>$2 LIMIT 1',[org,brand])).rows[0]??(await post('/api/v1/businesses',{name:'Carousel isolation test'},randomUUID())).body;assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/carousels/${id}`)).status(),404);
+ const sibling=(await admin.query('SELECT id FROM app.brands WHERE organization_id=$1 AND id<>$2 LIMIT 1',[org,brand])).rows[0]??(await post('/api/v1/businesses',{name:'Carousel isolation test'},randomUUID())).body;assert.equal((await page.request.get(`${base}/api/v1/businesses/${sibling.id}/carousels/${project.id}`)).status(),404);
  assert.deepEqual(errors,[]);
 });
 
 
-test('Canvas generates an entire carousel, reopens it for editing and reviews saved slides after reload',async()=>{
- await page.setViewportSize({width:1280,height:900});await page.goto(`${base}/b/${brand}/canvas`);
- const panel=page.getByRole('region',{name:'Carousels',exact:true});
- const generation=panel.getByRole('region',{name:'Generate a carousel',exact:true});
- const composer=page.getByRole('region',{name:'Creative conversation',exact:true});await composer.getByLabel('Describe your creative',{exact:true}).fill('TEST create a carousel with a coordinated refill story');await composer.getByLabel('Slides',{exact:true}).fill('2');await selectOption(composer.getByLabel('Creativity',{exact:true}),'super');
- await composer.getByRole('button',{name:'Send',exact:true}).click();
- await expect(generation.getByRole('button',{name:'Review generated carousel',exact:true})).toBeVisible({timeout:60000});
- await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();
- const review=panel.getByRole('region',{name:'Review carousel',exact:true});await expect(review.getByText('draft',{exact:true})).toBeVisible();await expect(review.getByRole('img')).toHaveCount(2);
+test('Create chat generates an entire carousel, reviews its saved slides after reload, downloads it and adds it to the calendar',async()=>{
+ // Rewritten from the retired /canvas carousel panel onto the Create chat: same outcomes, current surface.
+ await page.setViewportSize({width:1280,height:900});await page.goto(`${base}/b/${brand}/create`);
+ await askCreate('TEST create a carousel with a coordinated refill story');
+ const chatCarousel=page.getByRole('region',{name:'Your carousel',exact:true});
+ await expect(chatCarousel.getByRole('img')).toBeVisible({timeout:150000});
+ const openReview=async()=>{await chatCarousel.getByText('Caption, slide order & review',{exact:true}).click();};
+ await openReview();
+ const panel=page.getByRole('region',{name:'Carousels',exact:true}),review=panel.getByRole('region',{name:'Review carousel',exact:true});
+ await expect(review.getByText('draft',{exact:true})).toBeVisible({timeout:30000});await expect(review.getByRole('img')).toHaveCount(3);
  const consent=review.getByRole('checkbox',{name:'I reviewed every saved slide, their order, alt text and the shared caption.',exact:true});await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Send carousel for review',exact:true}).click();await expect(consent).toBeEnabled();await consent.check();await review.getByRole('button',{name:'Approve carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
- await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await generation.getByRole('button',{name:'Review generated carousel',exact:true}).click();await expect(review.getByText('approved',{exact:true})).toBeVisible();
+ await page.reload();await expect(chatCarousel.getByRole('img')).toBeVisible({timeout:30000});await openReview();await expect(review.getByText('approved',{exact:true})).toBeVisible({timeout:30000});
  await page.setViewportSize({width:390,height:844});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/canvas-generated-carousel-mobile.png',fullPage:true});
- const carouselDownload=page.waitForEvent('download');await panel.getByRole('button',{name:'Download carousel ZIP',exact:true}).click();const savedBundle=await carouselDownload;assert.equal(savedBundle.suggestedFilename(),'desvio-carousel.zip');const bundleEntries=await readZip(await readFile(await savedBundle.path()));assert.deepEqual(bundleEntries.map(e=>e.name),['slide-01.png','slide-02.png','caption.txt','manifest.json']);const bundleManifest=JSON.parse(bundleEntries[3].bytes.toString());assert.equal(bundleManifest.status_at_download,'approved');assert.equal(bundleManifest.slides.length,2);
+ const carouselDownload=page.waitForEvent('download');await panel.getByRole('button',{name:'Download carousel ZIP',exact:true}).click();const savedBundle=await carouselDownload;assert.equal(savedBundle.suggestedFilename(),'desvio-carousel.zip');const bundleEntries=await readZip(await readFile(await savedBundle.path()));assert.deepEqual(bundleEntries.map(e=>e.name),['slide-01.png','slide-02.png','slide-03.png','caption.txt','manifest.json']);const bundleManifest=JSON.parse(bundleEntries[4].bytes.toString());assert.equal(bundleManifest.status_at_download,'approved');assert.equal(bundleManifest.slides.length,3);
  await panel.getByText('Add carousel to calendar',{exact:true}).click();await panel.getByLabel(/^Carousel calendar time/).fill('2026-11-03T10:00');await panel.getByRole('button',{name:'Add saved carousel to calendar',exact:true}).click();await panel.getByRole('link',{name:'Open carousel in calendar',exact:true}).click();
- const postDetails=page.getByRole('region',{name:'Post details',exact:true});await expect(postDetails.getByRole('region',{name:'Review carousel',exact:true}).getByRole('img')).toHaveCount(2);
+ const postDetails=page.getByRole('region',{name:'Post details',exact:true});await expect(postDetails.getByRole('region',{name:'Review carousel',exact:true}).getByRole('img')).toHaveCount(3,{timeout:30000});
  const postCarousel=postDetails.getByRole('region',{name:'Review carousel',exact:true});
  await expect(postDetails.getByRole('button',{name:'Send for review',exact:true})).toHaveCount(0);
  await expect(postCarousel.getByRole('checkbox')).toBeEnabled();await postCarousel.getByRole('checkbox').check();await postCarousel.getByRole('button',{name:'Send carousel for review',exact:true}).click();
@@ -988,7 +965,8 @@ test('Canvas generates an entire carousel, reopens it for editing and reviews sa
  await page.reload();await expect(postDetails.getByRole('button',{name:'Reopen review',exact:true})).toBeVisible();
  assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:'work/browser/carousel-calendar-review-mobile.png',fullPage:true});
  await postDetails.getByRole('button',{name:'Close post',exact:true}).click();
- await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-03`);
+ const carouselPlan=(await admin.query('SELECT plan_id FROM app.content_slots WHERE id=$1',[slotId])).rows[0].plan_id;
+ await page.goto(`${base}/b/${brand}/content-plan?start=2026-11-03&plan=${carouselPlan}&view=day`);
  const carouselCover=page.locator('.daily-post .post-cover');
  await expect(carouselCover).toBeVisible();await expect.poll(()=>carouselCover.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
  const coverPixels=await carouselCover.evaluate(img=>{const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.getContext('2d').drawImage(img,0,0);return canvas.toDataURL('image/png').split(',')[1];});
@@ -1080,12 +1058,14 @@ test('uploaded product photo starts video without static generation, then feedba
  const latestVideo=(await admin.query('SELECT v.id,v.poster_key,v.poster_sha256,r.channel FROM app.video_versions v JOIN app.video_projects p ON p.latest_version_id=v.id JOIN app.video_requests r ON r.job_id=v.job_id WHERE p.id=$1',[binding.project_id])).rows[0];
  const startDay=new Date().toISOString().slice(0,10);
  const created=await post(`/api/v1/businesses/${brand}/content-plans`,{title:'TEST video cover plan',objective:'Show saved video poster',starts_on:startDay,timezone:'UTC',slots:[{channel:latestVideo.channel,format:'video',brief:'TEST saved video cover',planned_at:startDay+'T23:00:00Z',video_version_id:latestVideo.id}]},randomUUID());assert.equal(created.status,201,JSON.stringify(created.body));
- await page.goto(`${base}/b/${brand}/content-plan?start=${new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kuala_Lumpur',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(startDay+'T23:00:00Z'))}&plan=${created.body.id}`);
+ // The calendar shows days in the business's time zone (set by an earlier test when the whole file runs).
+ const calendarZone=(await(await page.request.get(`${base}/api/v1/businesses/${brand}/onboarding`)).json()).timezone??'UTC';
+ await page.goto(`${base}/b/${brand}/content-plan?start=${new Intl.DateTimeFormat('en-CA',{timeZone:calendarZone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(startDay+'T23:00:00Z'))}&plan=${created.body.id}&view=day`);
  const cover=page.locator('.daily-post .post-cover');await expect(cover).toBeVisible();await expect.poll(()=>cover.evaluate(img=>img.complete&&img.naturalWidth>0)).toBe(true);
  const posterPixels=await cover.evaluate(img=>{const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;canvas.getContext('2d').drawImage(img,0,0);return canvas.toDataURL('image/png').split(',')[1];});
  assert.deepEqual(await sharp(Buffer.from(posterPixels,'base64')).ensureAlpha().raw().toBuffer(),await sharp(await store.read(latestVideo.poster_key)).ensureAlpha().raw().toBuffer());
  await page.goto(`${base}/b/${brand}/overview`);
- await expect(page.locator('.upcoming-post .post-cover').first()).toBeVisible();
+ await expect(page.getByRole('region',{name:'Upcoming posts',exact:true}).locator('.post-cover').first()).toBeVisible({timeout:30000});
  await page.screenshot({path:'work/browser/home-video-cover.png',fullPage:true});
 
 });
@@ -1103,12 +1083,12 @@ test('created starting frame works where an uploaded product photo starts video:
  const frame=context.getByRole('img',{name:'Created starting frame for the video',exact:true});
  await expect(frame).toBeVisible({timeout:150000});assert.equal(generated,imagesBefore+1,'The frame is one normal image-engine generation');assert.equal(videoSubmits,videosBefore);
  const request=(await admin.query("SELECT r.size,r.creative_spec,r.prompt FROM app.creative_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.brand_id=$1 ORDER BY j.created_at DESC LIMIT 1",[brand])).rows[0];
- assert.equal(request.size,'1024x1536');assert.equal(request.creative_spec,null,'Composed at the largest portrait size the final-image export supports');assert.match(request.prompt,/no words, letters, numbers or captions/);
+ assert.equal(request.size,'1024x1536');assert.deepEqual(request.creative_spec,{placement:'story',aspect:'vertical',slide_count:null},'A 9:16 reel starts from a true 9:16 story frame');assert.match(request.prompt,/no words, letters, numbers or captions/);
  await page.screenshot({path:'work/browser/video-starting-frame.png'});
  await context.getByRole('button',{name:'Use this starting frame',exact:true}).click();
  for(const deadline=Date.now()+150000;!(await page.getByText('Make a video from this approved image',{exact:true}).count());){const alert=await context.getByRole('alert').allInnerTexts();if(alert.length)throw new Error(`starting frame approval failed: ${alert.join(' | ')}`);if(Date.now()>deadline)throw new Error('starting frame approval did not finish');await new Promise(r=>setTimeout(r,1000));}
  const exported=(await admin.query("SELECT e.id,e.sha256,e.width,e.height,v.status,v.design FROM app.creative_exports e JOIN app.jobs j ON j.id=e.job_id JOIN app.creative_versions v ON v.id=e.version_id JOIN app.creative_export_approvals a ON a.export_id=e.id WHERE e.brand_id=$1 AND e.format='png' ORDER BY j.created_at DESC LIMIT 1",[brand])).rows[0];
- assert.equal(exported.status,'approved');assert.deepEqual([exported.width,exported.height],[exported.design.width,exported.design.height],'The export is the frame at its full composed size');assert.deepEqual([exported.width,exported.height],[1024,1536]);
+ assert.equal(exported.status,'approved');assert.deepEqual([exported.width,exported.height],[exported.design.width,exported.design.height],'The export is the frame at its full composed size');assert.deepEqual([exported.width,exported.height],[1080,1920]);
  await page.getByRole('button',{name:'Draft video script',exact:true}).click();
  await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:90000});assert.equal(videoSubmits,videosBefore);
  await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();
@@ -1169,14 +1149,14 @@ test('Archive displays standalone Canvas images, retains history and restores th
  const j=await post(`${root}/canvas/threads/${t.body.id}/messages`,{prompt:'TEST FIXTURE: standalone soap image for archive',format:'static',channel:'instagram',size:'1024x1024'},randomUUID());assert.equal(j.status,201);
  let saved;
  await waitFor(async()=>{saved=(await admin.query('SELECT project_id,output_version_id FROM app.creative_requests WHERE job_id=$1',[j.body.id])).rows[0];return !!saved.output_version_id;});
- await page.goto(`${base}/b/${brand}/canvas?thread=${t.body.id}&project=${saved.project_id}`);
+ await page.goto(`${base}/b/${brand}/campaign-post?thread=${t.body.id}&project=${saved.project_id}`);
  await expect(page.getByRole('button',{name:'Archive creative',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Archive creative',exact:true}).click();
  await expect(page.getByRole('button',{name:'Restore creative',exact:true})).toBeVisible();
  await page.goto(`${base}/b/${brand}/archive`);
- await page.getByRole('button',{name:'Canvas creations',exact:true}).click();
+ await page.getByRole('button',{name:'Saved creatives',exact:true}).click();
  await expect(page.getByRole('button',{name:'View creative & history',exact:true})).toHaveCount(1);
- await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();
  await page.getByRole('button',{name:'View creative & history',exact:true}).click();
  await expect(page.getByLabel('Saved version',{exact:true})).toBeVisible();
  await expect(page.getByLabel('Post caption',{exact:true})).toBeDisabled();
@@ -1185,8 +1165,8 @@ test('Archive displays standalone Canvas images, retains history and restores th
  await page.getByRole('button',{name:'Restore creative',exact:true}).click();
  await expect(page.getByRole('button',{name:'Archive creative',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Close history',exact:true}).click();
- await expect(page.getByRole('heading',{name:'No archived Canvas creations',exact:true})).toBeVisible();
- await page.goto(`${base}/b/${brand}/canvas?thread=${t.body.id}&project=${saved.project_id}`);
+ await expect(page.getByRole('heading',{name:'No archived saved creatives',exact:true})).toBeVisible();
+ await page.goto(`${base}/b/${brand}/campaign-post?thread=${t.body.id}&project=${saved.project_id}`);
  await expect(page.getByRole('button',{name:'Archive creative',exact:true})).toBeVisible();
  assert.equal((await admin.query('SELECT archived_at FROM app.creative_projects WHERE id=$1',[saved.project_id])).rows[0].archived_at,null);
 });
@@ -1199,7 +1179,7 @@ test('Stock photo replaces a calendar design, preserves its caption and reloads 
  try{
   const plans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
   const p=await plans.create(actor,brand,{title:'Stock replacement fixture',objective:'Replace a generated background',starts_on:'2027-05-01',timezone:'UTC',slots:[{channel:'instagram',format:'static',brief:'TEST clear product story',planned_at:'2027-05-03T10:00:00Z'}]},randomUUID());
-  await page.goto(`${base}/b/${brand}/content-plan?start=2027-05-03&plan=${p.id}`);const card=page.locator('.daily-post');await card.getByRole('button',{name:'Generate 1 image',exact:true}).click();await expect(card.locator('.post-thumbnail svg')).toBeVisible({timeout:90000});
+  await page.goto(`${base}/b/${brand}/content-plan?start=2027-05-03&plan=${p.id}&view=day`);const card=page.locator('.daily-post');await card.getByRole('button',{name:'Generate 1 image',exact:true}).click();await expect(card.locator('.post-thumbnail svg')).toBeVisible({timeout:90000});
   const before=(await admin.query('SELECT id,creative_version_id,revision FROM app.content_slots WHERE plan_id=$1',[p.id])).rows[0];
   await page.goto(`${base}/b/${brand}/content-plan?slot=${before.id}`);
   const picker=page.locator('.stock-picker').filter({has:page.locator('summary',{hasText:'Replace photo with stock'})});
@@ -1214,23 +1194,25 @@ test('Stock photo replaces a calendar design, preserves its caption and reloads 
 
 test('Archive displays generated carousels with saved slide history and restores without scheduling (MOCK providers)',async()=>{
  // Real authenticated routes, Postgres, object storage and rasterization; only AI transports are doubled.
- await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);
- const composer=page.getByRole('region',{name:'Creative conversation',exact:true});await composer.getByLabel('Describe your creative',{exact:true}).fill('TEST create a carousel for archive history');await composer.getByLabel('Slides',{exact:true}).fill('2');await composer.getByRole('button',{name:'Send',exact:true}).click();
- const panel=page.getByRole('region',{name:'Carousels',exact:true});await expect(panel.getByRole('button',{name:'Review generated carousel',exact:true})).toBeVisible({timeout:90000});await panel.getByRole('button',{name:'Review generated carousel',exact:true}).click();
- const review=panel.getByRole('region',{name:'Review carousel',exact:true});await expect(review.getByRole('img')).toHaveCount(2);
+ // Rewritten from the retired /canvas composer: the carousel is made in the Create chat and archived from its review.
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create`);
+ await askCreate('TEST create a carousel for archive history');
+ const chatCarousel=page.getByRole('region',{name:'Your carousel',exact:true});await expect(chatCarousel.getByRole('img')).toBeVisible({timeout:150000});
+ await chatCarousel.getByText('Caption, slide order & review',{exact:true}).click();
+ const panel=page.getByRole('region',{name:'Carousels',exact:true}),review=panel.getByRole('region',{name:'Review carousel',exact:true});await expect(review.getByRole('img')).toHaveCount(3,{timeout:30000});
  const project=(await admin.query('SELECT id,latest_version_id FROM app.carousel_projects WHERE brand_id=$1 ORDER BY created_at DESC LIMIT 1',[brand])).rows[0];
  const original=(await admin.query('SELECT * FROM app.carousel_versions WHERE id=$1',[project.latest_version_id])).rows[0];const pages=(await admin.query('SELECT creative_version_id,export_id,alt_text FROM app.carousel_pages WHERE carousel_version_id=$1 ORDER BY position',[original.id])).rows;
  const edit=await post(`/api/v1/businesses/${brand}/carousels`,{project_id:project.id,parent_id:original.id,title:original.title,caption:'TEST revised archive carousel caption',channel:original.channel,pages:[...pages].reverse()},randomUUID());assert.equal(edit.status,201,JSON.stringify(edit.body));
- await page.reload();await panel.getByText('Carousels · compose and review slides',{exact:true}).click();await panel.getByRole('button',{name:'Review generated carousel',exact:true}).click();
+ await page.reload();await expect(chatCarousel.getByRole('img')).toBeVisible({timeout:30000});await chatCarousel.getByText('Caption, slide order & review',{exact:true}).click();await expect(panel.getByRole('button',{name:'Archive carousel',exact:true})).toBeVisible({timeout:30000});
  const before=(await admin.query('SELECT id,sha256,status FROM app.carousel_versions WHERE project_id=$1 ORDER BY id',[project.id])).rows;
  const publications=Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n);
  await panel.getByRole('button',{name:'Archive carousel',exact:true}).click();
- await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
- const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(selectField(history.getByLabel('Saved media version',{exact:true})).locator('option')).toHaveCount(2);await expect(history.getByRole('img')).toHaveCount(2);
+ await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
+ const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(selectField(history.getByLabel('Saved media version',{exact:true})).locator('option')).toHaveCount(2);await expect(history.getByRole('img')).toHaveCount(3);
  await expect.poll(()=>history.getByRole('img').evaluateAll(images=>images.every(img=>img.complete&&img.naturalWidth>0))).toBe(true);
- await selectOption(history.getByLabel('Saved media version',{exact:true}),original.id);await expect(history.getByRole('img')).toHaveCount(2);await expect(history.getByRole('button',{name:'Approve carousel',exact:true})).toHaveCount(0);
+ await selectOption(history.getByLabel('Saved media version',{exact:true}),original.id);await expect(history.getByRole('img')).toHaveCount(3);await expect(history.getByRole('button',{name:'Approve carousel',exact:true})).toHaveCount(0);
  await page.screenshot({path:'work/browser/canvas-carousel-archive.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
- await history.getByRole('button',{name:'Restore carousel',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived Canvas creations',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived Canvas creations',exact:true})).toBeVisible();
+ await history.getByRole('button',{name:'Restore carousel',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived saved creatives',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived saved creatives',exact:true})).toBeVisible();
  assert.deepEqual((await admin.query('SELECT id,sha256,status FROM app.carousel_versions WHERE project_id=$1 ORDER BY id',[project.id])).rows,before);assert.equal((await admin.query('SELECT archived_at FROM app.carousel_projects WHERE id=$1',[project.id])).rows[0].archived_at,null);
  assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.content_slots WHERE carousel_version_id=ANY($1::uuid[])',[before.map(v=>v.id)])).rows[0].n),0);assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n),publications);
 });
@@ -1238,30 +1220,34 @@ test('Archive displays generated carousels with saved slide history and restores
 test('Archive displays generated video history, plays saved media and restores across reloads (MOCK providers)',async()=>{
  // Auth, storage, worker, approvals and video rendering are real; provider response uses the fixture MP4.
  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
- await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/canvas`);await page.getByRole('button',{name:'+ New conversation',exact:true}).click();await page.getByRole('button',{name:'Add assets',exact:true}).click();await page.getByText('Brand image references',{exact:true}).click();await page.getByText('Add product photos',{exact:true}).click();await page.getByLabel('Choose a product photo',{exact:true}).setInputFiles({name:'archive-video.png',mimeType:'image/png',buffer:png});await page.getByRole('button',{name:'Upload file',exact:true}).click();
- const approval=page.getByRole('region',{name:'Approve reference: Uploaded product photo',exact:true});await expect(approval.getByLabel('Reference name',{exact:true})).toBeVisible({timeout:60000});await approval.getByLabel('Reference name',{exact:true}).fill('Archive video reference');await approval.getByLabel('I have permission to use this image and allow it to be sent to the AI provider for my business’s creatives.',{exact:true}).check();await approval.getByRole('button',{name:'Approve image reference',exact:true}).click();await page.getByRole('button',{name:'Use Archive video reference for video',exact:true}).click();
- const request=page.getByRole('region',{name:'Creative conversation',exact:true});await request.getByLabel('Describe your creative',{exact:true}).fill('TEST archive video history');await request.getByLabel('Video length (seconds)',{exact:true}).fill('3');await request.getByRole('button',{name:'Send',exact:true}).click();
+ // Rewritten from the retired /canvas conversation: the video is made from its calendar post with an approved product photo.
+ await approveFixtureReference('Archive video reference');
+ const archivePlans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
+ const archivePlan=await archivePlans.create(actor,brand,{title:'Archive video history',objective:'Video versions for the archive',starts_on:'2027-08-01',timezone:'UTC',slots:[{channel:'instagram',format:'video',creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},brief:'TEST archive video history',planned_at:'2027-08-02T10:00:00Z'}]},randomUUID());
+ const archiveSlot=(await admin.query('SELECT id FROM app.content_slots WHERE plan_id=$1',[archivePlan.id])).rows[0];
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/campaign-post?slot=${archiveSlot.id}`);
+ await page.getByRole('button',{name:'Use Archive video reference for video',exact:true}).click();await expect(page.getByText('Make a video from this approved image',{exact:true})).toBeVisible();
+ await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');await page.getByRole('button',{name:'Draft video script',exact:true}).click();
  async function approveArchivePrompt(){await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for archive');await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline for archive');await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();}
  await approveArchivePrompt();await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});const project=(await admin.query('SELECT id FROM app.video_projects WHERE brand_id=$1 ORDER BY created_at DESC LIMIT 1',[brand])).rows[0];
  await page.getByLabel('Video feedback',{exact:true}).fill('TEST softer movement for archive revision');await page.getByRole('button',{name:'Draft a revised video from feedback',exact:true}).click();await approveArchivePrompt();await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[project.id])).rows[0].n),{timeout:150000}).toBe(2);await expect(selectField(page.getByLabel(/^Saved video version/)).locator('option')).toHaveCount(2);
  const before=(await admin.query('SELECT id,sha256,status FROM app.video_versions WHERE project_id=$1 ORDER BY created_at,id',[project.id])).rows;const publications=Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n);
- await page.getByRole('button',{name:'Archive video',exact:true}).click();await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
+ const slotsUsingVideo=Number((await admin.query('SELECT count(*) AS n FROM app.content_slots WHERE video_version_id=ANY($1::uuid[])',[before.map(v=>v.id)])).rows[0].n);const thread=(await admin.query('SELECT thread_id FROM app.video_projects WHERE id=$1',[project.id])).rows[0].thread_id;await page.goto(`${base}/b/${brand}/campaign-post?thread=${thread}`);await page.getByRole('button',{name:'Archive video',exact:true}).click();await expect(page.getByRole('button',{name:'Restore video',exact:true})).toBeVisible();await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
  const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(selectField(history.getByLabel('Saved media version',{exact:true})).locator('option')).toHaveCount(2);
  const failedDownload=`**/video-versions/${before[0].id}/download`;await page.route(failedDownload,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'TEST transient video download failure'})}));
  await selectOption(history.getByLabel('Saved media version',{exact:true}),before[0].id);await expect(history.getByRole('button',{name:'Reload video preview',exact:true})).toBeVisible();await expect(history.getByText('Video preview unavailable',{exact:true})).toBeVisible();await expect(history.locator('video')).toHaveCount(0);
  await page.unroute(failedDownload);await history.getByRole('button',{name:'Reload video preview',exact:true}).click();
  const video=history.locator('video');await expect(video).toBeVisible();await expect.poll(()=>video.evaluate(v=>v.readyState>=2&&v.videoWidth>0),{timeout:60000}).toBe(true);await video.evaluate(async v=>{v.muted=true;await v.play();});await expect.poll(()=>video.evaluate(v=>v.currentTime),{timeout:10000}).toBeGreaterThan(0);await video.evaluate(v=>v.pause());await expect(history.getByRole('button',{name:'Approve final video',exact:true})).toHaveCount(0);
  await page.screenshot({path:'work/browser/canvas-video-archive.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
- await history.getByRole('button',{name:'Restore video',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived Canvas creations',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Canvas creations',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived Canvas creations',exact:true})).toBeVisible();
- assert.deepEqual((await admin.query('SELECT id,sha256,status FROM app.video_versions WHERE project_id=$1 ORDER BY created_at,id',[project.id])).rows,before);assert.equal((await admin.query('SELECT archived_at FROM app.video_projects WHERE id=$1',[project.id])).rows[0].archived_at,null);assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.content_slots WHERE video_version_id=ANY($1::uuid[])',[before.map(v=>v.id)])).rows[0].n),0);assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n),publications);
+ await history.getByRole('button',{name:'Restore video',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived saved creatives',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived saved creatives',exact:true})).toBeVisible();
+ assert.deepEqual((await admin.query('SELECT id,sha256,status FROM app.video_versions WHERE project_id=$1 ORDER BY created_at,id',[project.id])).rows,before);assert.equal((await admin.query('SELECT archived_at FROM app.video_projects WHERE id=$1',[project.id])).rows[0].archived_at,null);assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.content_slots WHERE video_version_id=ANY($1::uuid[])',[before.map(v=>v.id)])).rows[0].n),slotsUsingVideo,'archive and restore schedule nothing new');assert.equal(Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n),publications);
 });
 
 test('Generation notification opt-in survives reload and cancels without sending external mail',async()=>{
- const root=`/api/v1/businesses/${brand}`;
- const t=await post(`${root}/canvas/threads`,{title:'Notification browser fixture'},randomUUID());assert.equal(t.status,201);
- const j=await post(`${root}/canvas/threads/${t.body.id}/messages`,{prompt:'TEST FIXTURE: soap image for notification',format:'static',channel:'instagram',size:'1024x1024'},randomUUID());assert.equal(j.status,201);
- await waitFor(async()=>!!(await admin.query('SELECT output_version_id FROM app.creative_requests WHERE job_id=$1',[j.body.id])).rows[0]?.output_version_id);
- await page.goto(`${base}/b/${brand}/canvas?thread=${t.body.id}`);
+ // The opt-in is offered on a video's saved media (the retired Canvas offered it on standalone images; Create does not).
+ const latest=(await admin.query('SELECT p.thread_id,r.job_id FROM app.video_requests r JOIN app.video_projects p ON p.id=r.project_id JOIN app.jobs j ON j.id=r.job_id WHERE r.brand_id=$1 ORDER BY j.created_at DESC LIMIT 1',[brand])).rows[0];assert.ok(latest,'an earlier test saved a video');
+ const j={body:{id:latest.job_id}};
+ await page.goto(`${base}/b/${brand}/campaign-post?thread=${latest.thread_id}`);
  await page.getByRole('button',{name:'Email me a link when ready',exact:true}).click();
  await expect(page.getByRole('button',{name:'Cancel email',exact:true})).toBeVisible();
  await page.reload();await expect(page.getByRole('button',{name:'Cancel email',exact:true})).toBeVisible();
@@ -1285,7 +1271,8 @@ test('Strategy launch groups a real campaign and dispatches capped images from H
  const businesses=new Businesses(runtime.database,new Workspaces(runtime.database)),preferences=await businesses.onboarding(actor,brand);
  if(preferences.step!==3)await businesses.onboarding(actor,brand,{revision:preferences.revision,step:3,goal:'awareness',timezone:'UTC',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,provider,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,'openai',true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL BROWSER TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,budget_micros=10000000",[org,brand]);
- await page.goto(`${base}/b/${brand}/overview`);await page.getByRole('button',{name:'＋ Create new',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('dialog').getByRole('link',{name:/Add strategy/}).click();
+ // Home no longer has a "Create new" menu; strategies open from their own page.
+ await page.goto(`${base}/b/${brand}/strategies`);
  await expect(page.getByRole('heading',{name:'Your strategies',exact:true})).toBeVisible();await expect(page.locator('.strategy-banner img').first()).toBeVisible();await page.getByRole('article').filter({has:page.getByRole('heading',{name:'Product education',exact:true})}).getByRole('button',{name:'Set up strategy'}).click();
  await page.getByLabel('Strategy name',{exact:true}).fill('TEST visual strategy');await page.getByLabel('Start date',{exact:true}).fill('2027-01-04');
  await expect.poll(async()=>Number(await page.getByLabel('Credit cap per image',{exact:true}).inputValue())).toBeGreaterThan(0);const strategyPlanning=Number(await page.getByLabel('Planning credit cap',{exact:true}).inputValue()),strategyImage=Number(await page.getByLabel('Credit cap per image',{exact:true}).inputValue()),strategyCap=Number(await page.getByLabel('Strategy credit cap',{exact:true}).inputValue());
@@ -1342,7 +1329,7 @@ test('Generated replacement confirms credits, survives reload and preserves sche
  await admin.query("INSERT INTO app.higgsfield_image_grants(organization_id,brand_id,enabled,budget_micros,max_request_micros,expires_at,approved_by) VALUES($1,$2,true,100000,10000,now()+interval '1 hour','TEST')",[org,brand]);
  const plans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
  const p=await plans.create(actor,brand,{title:'Generated replacement fixture',objective:'An editable visual draft',starts_on:'2027-05-01',timezone:'UTC',slots:[{channel:'instagram',format:'static',brief:'TEST clear product story',planned_at:'2027-05-03T10:00:00Z'}]},randomUUID());
- await page.goto(`${base}/b/${brand}/content-plan?start=2027-05-03&plan=${p.id}`);const card=page.locator('.daily-post');await card.getByRole('button',{name:'Generate 1 image',exact:true}).click();await expect(card.locator('.post-thumbnail svg')).toBeVisible({timeout:90000});
+ await page.goto(`${base}/b/${brand}/content-plan?start=2027-05-03&plan=${p.id}&view=day`);const card=page.locator('.daily-post');await card.getByRole('button',{name:'Generate 1 image',exact:true}).click();await expect(card.locator('.post-thumbnail svg')).toBeVisible({timeout:90000});
  const before=(await admin.query('SELECT id,creative_version_id FROM app.content_slots WHERE plan_id=$1',[p.id])).rows[0];
  // A previously approved scheduled post is the fixture under test; generation must not mutate it.
  await admin.query("UPDATE app.content_slots SET state='approved',approved_by=$2,approved_at=now() WHERE id=$1",[before.id,actor]);
@@ -1351,9 +1338,9 @@ test('Generated replacement confirms credits, survives reload and preserves sche
  await expect(page.locator('summary').filter({hasText:'Replace photo with stock'})).toHaveCount(0);await expect(page.getByLabel('Search photos',{exact:true})).toHaveCount(0);
  await picker.locator('summary').click();await picker.getByLabel('Describe the photo',{exact:true}).fill('TEST airy workspace in soft blue daylight');await expect(picker.getByRole('button',{name:'Generate · 1 credit',exact:true})).toBeEnabled();assert.equal(replacementSubmits,0);
  await picker.getByRole('button',{name:'Generate · 1 credit',exact:true}).click();await expect(picker.getByText('Creating your replacement photo…',{exact:true})).toBeVisible();await page.reload();await picker.locator('summary').click();await expect(picker.getByText('Creating your replacement photo…',{exact:true})).toBeVisible();
- replacementReady=true;await expect(page.getByRole('button',{name:'Attach latest Canvas version',exact:true})).toBeVisible({timeout:90000});assert.equal(replacementSubmits,1);
+ replacementReady=true;await expect(page.getByRole('button',{name:'Attach latest creative version',exact:true})).toBeVisible({timeout:90000});assert.equal(replacementSubmits,1);
  const unchanged=(await admin.query('SELECT creative_version_id,state,approved_by FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.equal(unchanged.creative_version_id,before.creative_version_id);assert.equal(unchanged.state,'approved');assert.equal(unchanged.approved_by,actor);
- await expect(page.getByRole('button',{name:'Attach latest Canvas version',exact:true})).toBeDisabled();await page.getByRole('checkbox',{name:/I understand that changing this post/}).check();await page.getByRole('button',{name:'Attach latest Canvas version',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Attach latest creative version',exact:true})).toBeDisabled();await page.getByRole('checkbox',{name:/I understand that changing this post/}).check();await page.getByRole('button',{name:'Attach latest creative version',exact:true}).click();
  await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Saved caption',exact:true})).toBeVisible();
  const after=(await admin.query('SELECT creative_version_id,state,approved_by FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.notEqual(after.creative_version_id,before.creative_version_id);assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.equal(replacementSubmits,1);
  await expect.poll(()=>page.locator('.creative-artboard canvas.lower-canvas').evaluate(canvas=>Array.from(canvas.getContext('2d').getImageData(10,10,1,1).data).slice(0,3))).toEqual([179,217,232]);
@@ -1734,7 +1721,13 @@ test('AI canvas date dialog keeps time controls aligned and validates time at de
 test('AI canvas resumes a guided carousel into generation without leaving an empty calendar post (MOCK providers)',async()=>{
  const businesses=new Businesses(runtime.database,new Workspaces(runtime.database)),preferences=await businesses.onboarding(actor,brand);
  if(preferences.step!==3)await businesses.onboarding(actor,brand,{revision:preferences.revision,step:3,goal:'awareness',timezone:'UTC',cadence:3,channels:['linkedin','instagram'],must_avoid:'No unsupported claims',preferences_edited:true});
- await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/create`);await expect(page.getByRole('navigation',{name:'Create and manage your content'})).toBeVisible();
+ // Any app page will do: the plan and the saved guided draft are prepared through the API, and Create may reopen
+ // whatever conversation an earlier test left (so neither its start menu nor its composer is a reliable signal).
+ // The previous test leaves the date dialog's page in an unsaved state; start from a fresh signed-in tab.
+ const previous=page;page=await previous.context().newPage();await previous.close({runBeforeUnload:false});
+ const leave=dialog=>void dialog.accept();page.on('dialog',leave);
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/content-plan`);await expect(page.getByRole('heading',{name:'Calendar',exact:true,level:1})).toBeVisible({timeout:30000});
+ page.off('dialog',leave);
  const root=`/api/v1/businesses/${brand}`,plan=await post(root+'/content-plans',{title:'Guided carousel test',objective:'Botanical soap',starts_on:'2027-01-06',timezone:'UTC',slots:[{channel:'instagram',format:'static',brief:'Saved planning context',planned_at:'2027-01-06T09:00:00Z'}]},randomUUID());assert.equal(plan.status,201,JSON.stringify(plan.body));
  const prior=await(await page.request.get(base+root+'/create-chat/draft')).json();
  const snapshot={version:1,mode:'post',step:6,data:{topic:'Botanical soap for mindful households',direction:'Clean photography without text',format:'carousel',channel:'instagram',date:'2027-01-06T10:00',campaign:plan.body.id},messages:[{role:'user',text:'Create my carousel'},{role:'assistant',text:'Review your carousel brief.'}]};
