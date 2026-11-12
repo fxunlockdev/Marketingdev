@@ -786,14 +786,15 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
  let campaignReadAttempts=0;
  await page.route(`**/content-plans/${saved.id}`,async route=>{
   campaignReadAttempts++;
-  if(campaignReadAttempts===1){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Temporarily unavailable'})});return;}
+  // The client retries a failed read once by itself; fail the read and that retry.
+  if(campaignReadAttempts<=2){await route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Temporarily unavailable'})});return;}
   await route.continue();
  });
  const planningCountBefore=(await admin.query('SELECT count(*)::int AS n FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].n;
  await page.goto(`${base}/b/${brand}/campaign-review?plan=${saved.id}`);
  await expect(page.getByRole('status').filter({hasText:'Reconnecting'})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Your campaign',exact:true,level:1})).toBeVisible({timeout:15000});
- assert.equal(campaignReadAttempts,2);
+ assert.equal(campaignReadAttempts,3);
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.planning_requests WHERE output_plan_id=$1',[saved.id])).rows[0].n,planningCountBefore);
  await page.unroute(`**/content-plans/${saved.id}`);
  await expect(page.getByRole('heading',{name:'Your campaign',exact:true,level:1})).toBeVisible();
