@@ -55,3 +55,12 @@ test('brand palette keeps captions legible and the end card on brand',async()=>{
  assert.equal(brandName([{field:'brand_name',value:' Groomday '}]),'Groomday');
  assert.deepEqual(reelEndCard('Groomday','Book a visit',{foreground:'#ffffff',background:'#111111'}),{headline:'Groomday',cta:'Book a visit',foreground:'#ffffff',background:'#111111',duration_ms:2000});
 });
+test('an approved monthly video with a reviewed multi-shot storyline is queued as a reel',async()=>{
+ const {monthlyVideoRequest}=await import('../../dist/guided-videos.js');
+ const slot={id:'s1',revision:3,brief:'Morning bake',channel:'instagram',creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},storyline,video_draft:{storyline:'Bake',script:'We bake at five.',prompt:'Warm light',duration_seconds:15}};
+ const reference={brand_reference_id:'r1',source_sha256:'a'.repeat(64),confirmed:true};
+ assert.deepEqual(monthlyVideoRequest(slot,reference),{prompt:'Morning bake\nStoryline: Bake\nScript: We bake at five.\nPrompt: Warm light',channel:'instagram',duration_seconds:15,shots:3,creative_spec:slot.creative_spec,slot_id:'s1',slot_revision:3,reference,generate:true});
+ assert.equal(monthlyVideoRequest({...slot,storyline:{kind:'video',concept:'x',shots:storyline.shots.slice(0,1)}},reference).shots,undefined);
+ assert.equal(monthlyVideoRequest({...slot,storyline:{kind:'video',concept:'x',shots:[...storyline.shots,...storyline.shots]}},reference).shots,5);
+ assert.equal(monthlyVideoRequest({...slot,video_draft:null,storyline:null},reference).duration_seconds,5);
+});
