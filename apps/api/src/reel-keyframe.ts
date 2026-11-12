@@ -10,17 +10,20 @@ type ExportState={renderer_image:string;exports:{id:string;format:string;rendere
 export const KEYFRAME_PROMPT_LIMIT=4000;
 const KEYFRAME_DIRECTION='Create the opening frame of a short video: one photographic still the camera can move through, with a clear subject, depth and room for motion. Show no words, letters, numbers or captions anywhere in the picture; the video adds its own text later.';
 
-/** The image request for a starting frame. Square and landscape frames match the video exactly. Vertical and
- * portrait frames are composed at 1024x1536 (2:3), the tallest size the final-image export can render today;
- * the video provider receives that exact approved PNG and the renderer frames the clip into 9:16 or 4:5.
- * (A true 9:16 / 4:5 frame needs the static export runtime to render those sizes.) */
+/** The image request for a starting frame, composed at the video's own shape: 1:1, 16:9, a true 4:5 portrait
+ * (1024x1280) and a true 9:16 story frame (1080x1920), so the video provider receives exactly the approved frame
+ * at the aspect it animates. LinkedIn has no story placement, so its tall frame stays the provider's 2:3. */
 export function keyframeRequest(input:{prompt:string;channel:string;aspect:KeyframeAspect}):KeyframeRequest{
  const brief=input.prompt.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,' ').trim();
  if(!brief)throw new Error('Describe the video before creating its starting frame');
  const prompt=`${KEYFRAME_DIRECTION}\nVideo brief: ${brief}`;
  if(prompt.length>KEYFRAME_PROMPT_LIMIT)throw new Error('Shorten the video brief to create a starting frame');
- if(input.aspect==='square'||input.aspect==='landscape'){const creative_spec:CreativeSpec={placement:'feed',aspect:input.aspect,slide_count:null};return {prompt,format:'static',channel:input.channel,size:creativeSourceSize(creative_spec),creative_spec};}
- return {prompt,format:'static',channel:input.channel,size:'1024x1536'};
+ const creative_spec=keyframeSpec(input.aspect,input.channel);
+ return creative_spec?{prompt,format:'static',channel:input.channel,size:creativeSourceSize(creative_spec),creative_spec}:{prompt,format:'static',channel:input.channel,size:'1024x1536'};
+}
+function keyframeSpec(aspect:KeyframeAspect,channel:string):CreativeSpec|null{
+ if(aspect!=='vertical')return {placement:'feed',aspect,slide_count:null};
+ return channel==='linkedin'?null:{placement:'story',aspect:'vertical',slide_count:null};
 }
 /** Video aspect for a Create-chat size or placement. */
 export function keyframeAspect(placement:string|undefined,size:string|undefined):KeyframeAspect{
