@@ -103,14 +103,16 @@ export function marketResearchRequest(url:string,brief:GuidedBrief){
   instructions:MARKET_INSTRUCTIONS,input:canonicalJSON(input),
   text:{format:{type:'json_schema' as const,name:'market_research',strict:true,schema:MARKET_RESEARCH_SCHEMA}}};
 }
-/** Pages the provider reports it actually searched or opened. A note whose source is
- * not among them is dropped: the model may not vouch for a page it never saw. */
-function consultedSources(response:any):Map<string,URL>{
- const consulted=new Map<string,URL>(),add=(raw:unknown)=>{const url=sourceKey(raw);if(url)consulted.set(url.href,url);};
- for(const item of response.output??[]){
-  if(item.type==='web_search_call'){add(item.action?.url);for(const source of item.action?.sources??[])add(source?.url);}
-  if(item.type==='message')for(const content of item.content??[])for(const annotation of content.annotations??[])if(annotation.type==='url_citation')add(annotation.url);
- }
+/** Pages the provider reports it searched or opened, or cited on the output text (the
+ * same evidence own-site research relies on). A note whose source is in neither place
+ * is dropped: the model may not vouch for a page it never saw. Citations are read first
+ * so a long list of search results can never crowd them out of the bound. */
+const CONSULTED_SOURCES=200;
+export function consultedSources(response:any):Map<string,URL>{
+ const consulted=new Map<string,URL>(),add=(raw:unknown)=>{if(consulted.size>=CONSULTED_SOURCES)return;const url=sourceKey(raw);if(url)consulted.set(url.href,url);};
+ const output=Array.isArray(response?.output)?response.output:[];
+ for(const item of output)if(item?.type==='message')for(const content of item.content??[])for(const annotation of content?.annotations??[])if(annotation?.type==='url_citation')add(annotation.url);
+ for(const item of output)if(item?.type==='web_search_call'){add(item.action?.url);for(const source of item.action?.sources??[])add(source?.url);}
  return consulted;
 }
 export function marketResearchPages(response:any,url:string):{pages:MarketPage[];discovered:DiscoveredCompetitor[]}{

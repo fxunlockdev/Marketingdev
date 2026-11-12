@@ -151,3 +151,32 @@ test('the market step is skipped without spending when there is no brief, grant,
  const revoked=marketLedger();revoked.jobs.permitted=async()=>false;
  await assert.rejects(new OpenAIWebsiteResearch(undefined,sdk).market(revoked.jobs,{},'https://example.org/',marketBrief),/ACCESS_REVOKED_OR_CANCELED/);
 });
+
+// ---- Source fallback: search-call sources and output-text citations both count ----
+const citedResponse=({sources,annotations})=>{
+ const value={notes:[{section:'market_language',subject:'',text:'Buyers say "chair time".',source_url:'https://trade.test/guide'},{section:'audience_pain',subject:'',text:'Phone tag wastes mornings.',source_url:'https://forum.test/thread'}],discovered_competitors:[{name:'Third Chair',url:'https://third-chair.test/',reason:'Same buyers.'}],audience_suggestions:[]};
+ const text=JSON.stringify(value);
+ return {id:'resp',status:'completed',output:[
+  {type:'web_search_call',status:'completed',action:{type:'search',query:'dental',...(sources?{sources:[{type:'url',url:'https://trade.test/guide'},{type:'url',url:'https://forum.test/thread#top'},{type:'url',url:'https://third-chair.test/about'}]}:{})}},
+  {type:'message',content:[{type:'output_text',text,annotations:annotations?[{type:'url_citation',url:'https://trade.test/guide?utm_source=openai',start_index:0,end_index:5},{type:'url_citation',url:'https://forum.test/thread',start_index:5,end_index:9},{type:'url_citation',url:'https://third-chair.test/',start_index:9,end_index:12},{type:'url_citation',url:'javascript:alert(1)',start_index:0,end_index:1}]:[]}]}]};
+};
+for(const [name,sources,annotations] of [['search sources only',true,false],['citation annotations only',false,true],['both, deduplicated',true,true]])test(`market notes keep a source found in ${name}`,async()=>{
+ const {marketResearchPages}=await import('../../dist/openai-website-research.js');
+ const {pages,discovered}=marketResearchPages(citedResponse({sources,annotations}),'https://example.org/');
+ assert.deepEqual(pages.map(p=>p.url).sort(),['https://forum.test/thread','https://trade.test/guide']);
+ assert.ok(pages.every(p=>p.chunks.length===1));
+ assert.deepEqual(discovered,[{name:'Third Chair',url:'https://third-chair.test/'}]);
+});
+test('market notes with no source in either place are dropped, and the step fails closed',async()=>{
+ const {marketResearchPages}=await import('../../dist/openai-website-research.js');
+ assert.throws(()=>marketResearchPages(citedResponse({sources:false,annotations:false}),'https://example.org/'),/AI_RESEARCH_NO_SOURCES/);
+});
+test('consulted sources are bounded and only http(s)',async()=>{
+ const {consultedSources}=await import('../../dist/openai-website-research.js');
+ const many=Array.from({length:500},(_,i)=>({type:'url',url:`https://site${i}.test/`}));
+ const r={output:[{type:'web_search_call',status:'completed',action:{sources:[{type:'url',url:'ftp://x.test/'},{type:'url',url:'http://127.0.0.1/'},...many]}},{type:'message',content:[{type:'output_text',text:'x',annotations:[{type:'url_citation',url:'https://cited.test/'}]}]}]};
+ const consulted=consultedSources(r);
+ assert.ok(consulted.size<=200);assert.ok(![...consulted.keys()].some(u=>!u.startsWith('http')||u.includes('127.0.0.1')));
+ // Citations are never crowded out by a long list of search results.
+ assert.ok(consulted.has('https://cited.test/'));
+});
