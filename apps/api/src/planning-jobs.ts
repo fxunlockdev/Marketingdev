@@ -3,7 +3,9 @@ import {suggestionMessage,readIdea} from './prompt-suggestions.js';
 import {CHAT_RATES,chatRequest,validateChatDecision} from './chat-contracts.js';
 import {planningReferences,assertPlanningReferences} from './planning-references.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
-import {approvedLearning,assertLearningCurrent} from './learning-context.js';
+import {assertLearningCurrent,refreshLearning} from './learning-context.js';
+import {recordPlanPosts,type PlannedSlot} from './planning-knowledge.js';
+import {logActivityFailure} from './activity-log.js';
 import {ApiError as GeminiAPIError} from '@google/genai';
 import {GeminiPlanner} from './gemini-planner.js';
 import OpenAI from 'openai';
@@ -16,17 +18,13 @@ import {validatePlanningResult,resolvedPlanningInput,planOutputTokens,type Plann
 import {canonicalJSON,hash} from './brand-brain.js';
 import {STRATEGY_OUTPUT_TOKENS,validateStrategyInput,validateStrategyResult,type StrategyResult} from './strategy-contracts.js';
 import {saveDraftStrategy} from './strategy-store.js';
-// The providers still type their limit as 512|4000|16000 and forward the number unchanged.
-// Remove this bridge once creative-provider.ts and gemini-planner.ts accept PlanOutputTokens.
-type ProviderLimit=Parameters<CreativeProvider['plannerRequest']>[2];
-const providerLimit=(tokens:PlanOutputTokens)=>tokens as ProviderLimit;
 const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class PlanningJobs {
  constructor(readonly jobs:AssetJobs,readonly runtime:SkillRuntime,readonly provider:CreativeProvider,readonly gemini:GeminiPlanner=new GeminiPlanner()){}
  finish(db:any,j:any,status:string,code:string|null=null){return db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]).then(()=>status);}
  async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:PlanOutputTokens=16000){
   const provider=providerName==='gemini'?this.gemini:this.provider;
-  const wire=provider.plannerRequest(message,model,providerLimit(maxOutputTokens));
+  const wire=provider.plannerRequest(message,model,maxOutputTokens);
   const prepared=await this.jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='plan.generate')throw new Error('JOB_KIND_DENIED');
    if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
@@ -61,7 +59,7 @@ export class PlanningJobs {
   if('cached' in prepared)return prepared.cached;
   if('blocked' in prepared)throw new CreativeError(prepared.blocked!);
   let result;
-  try{result=await provider.plan(message,model,providerLimit(maxOutputTokens));}catch(error){
+  try{result=await provider.plan(message,model,maxOutputTokens);}catch(error){
    const known=error instanceof CreativeError||((error instanceof OpenAI.APIError||error instanceof GeminiAPIError)&&[400,401,403,404,422,429].includes(error.status??0));
    await this.jobs.transaction(scope,async(db,j)=>{await db.query('UPDATE app.planning_calls SET status=$3 WHERE job_id=$1 AND step=$2',[j.id,message.step,known?'rejected':'unknown']);});
    throw new CreativeError(known?(error instanceof CreativeError?error.code:'PLAN_PROVIDER_REJECTED'):'PLAN_SUBMISSION_UNKNOWN');
@@ -87,7 +85,7 @@ export class PlanningJobs {
       const latest=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[j.organization_id,j.brand_id])).rows[0];
       const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[j.organization_id,j.brand_id])).rows[0];
       if(!latest||hash(canonicalJSON(latest.snapshot))!==latest.sha256||!prefs||prefs.step!==3||!prefs.channels.length)throw new CreativeError('PLAN_BRAND_INTEGRITY_FAILED');
-      const input={...request.input,references:await planningReferences(db,j.organization_id,j.brand_id),brand:{id:latest.id,sha256:latest.sha256,learning:await approvedLearning(db),facts:latest.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{...request.input.preferences,goal:prefs.goal,cadence:prefs.cadence,channels:request.input.content_mix?[...new Set(request.input.content_mix.map((row:any)=>row.channel))]:request.input.campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision}};
+      const input={...request.input,references:await planningReferences(db,j.organization_id,j.brand_id),brand:{id:latest.id,sha256:latest.sha256,learning:await refreshLearning(db,request.input.brand?.learning),facts:latest.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{...request.input.preferences,goal:prefs.goal,cadence:prefs.cadence,channels:request.input.content_mix?[...new Set(request.input.content_mix.map((row:any)=>row.channel))]:request.input.campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision}};
       if(Buffer.byteLength(JSON.stringify(input))>390000)throw new CreativeError('SKILL_INPUT_LIMIT');
       request.execution_input=input;request.execution_sha256=hash(canonicalJSON(input));request.execution_brain_id=latest.id;
       await db.query('UPDATE app.planning_requests SET execution_input=$2,execution_sha256=$3,execution_brain_id=$4 WHERE job_id=$1',[j.id,JSON.stringify(input),request.execution_sha256,latest.id]);
@@ -156,7 +154,7 @@ export class PlanningJobs {
    }
    result=validatePlanningResult(result,input);
    const resolved=resolvedPlanningInput(input,result.plan);
-   return await this.jobs.transaction(scope,async(db,j)=>{
+   const outcome=await this.jobs.transaction(scope,async(db,j)=>{
     if(terminal.has(j.status))return j.status;
     if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
     // Suggestions are saved on the durable request only: never create/schedule posts.
@@ -184,6 +182,8 @@ export class PlanningJobs {
     await db.query('UPDATE app.planning_requests SET output_plan_id=$2 WHERE job_id=$1',[j.id,planId]);
     return this.finish(db,j,'succeeded');
    });
+   if(outcome==='succeeded'&&!input.post_ideas)await this.recordKnowledge(scope,input);
+   return outcome;
   }catch(error){
       if(error instanceof SyntaxError)error=new CreativeError('CHAT_RESPONSE_INVALID');
       if(monthlyBudgetExceeded(error))error=new CreativeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
@@ -194,6 +194,16 @@ export class PlanningJobs {
     return this.finish(db,j,status,error.code);
    });
   }
+ }
+ /** Production record for the graph: a post node per saved slot, linked from the strategy it was planned from.
+  * Optional: a failure is logged and never changes the plan. Re-running it only touches last_seen. */
+ private async recordKnowledge(scope:JobScope,input:PlanningInput):Promise<void>{
+  try{
+   await this.jobs.transaction(scope,async(db,j)=>{
+    const slots=(await db.query('SELECT s.id,s.hook,s.format,s.pillar,s.creative_spec,s.strategy_ref FROM app.content_slots s JOIN app.planning_requests r ON r.output_plan_id=s.plan_id WHERE r.job_id=$1 ORDER BY s.strategy_slot_index LIMIT 120',[j.id])).rows as PlannedSlot[];
+    if(slots.length)await recordPlanPosts(db,{organizationId:j.organization_id,brandId:j.brand_id},j.id,slots,input.strategy);
+   });
+  }catch(error){logActivityFailure('PlanKnowledgeRecord',scope,error);}
  }
  fail(scope:JobScope){return this.jobs.transaction(scope,async(db,j)=>{
   if(j.kind!=='plan.generate')throw new Error('JOB_KIND_DENIED');

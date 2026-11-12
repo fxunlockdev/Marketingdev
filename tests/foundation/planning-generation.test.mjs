@@ -20,6 +20,7 @@ import {CreativeProvider} from '../../dist/creative-provider.js';
 import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
 import {generatedStrategy} from '../fixtures/strategy.mjs';
 import {BrandStrategies} from '../../dist/strategy-store.js';
+import {planningContextSource} from '../../dist/planning-knowledge.js';
 import {planOutputTokens} from '../../dist/planning-contracts.js';
 import {MODEL_POLICY} from '../../dist/model-policy.js';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});
@@ -537,5 +538,53 @@ test('brand strategy on a gpt-6-astra grant: draft, owner approval, then a plan 
   await assert.rejects(plans.edit(alice,b.id,slot.id,{revision:saved.revision,storyline:{kind:'carousel',concept:'x',slides:[]}}),/storyline fields/);
   await assert.rejects(plans.edit(alice,b.id,slot.id,{revision:saved.revision,storyline:{...edited,layout_archetype:'collage'}}),/storyline fields/);
   assert.deepEqual((await plans.history(alice,b.id,slot.id)).events.at(-1).snapshot.storyline,edited);
+ }finally{transport=undefined;}
+});
+
+test('brand strategy routes ground the request in saved research, and approval writes the strategy into the knowledge graph',async()=>{
+ const b=await fresh(),wires=[],own=randomUUID(),market=randomUUID();
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gpt-6-astra',now()+interval '1 hour',900000000,12.5,50,'LOCAL TEST ONLY')",[org.id,b.id]);
+ for(const [id,version,url,text] of [[own,'TEST-own-site-v1','https://clinic.example/','TEST FIXTURE: Book clinic appointments online in two minutes.'],[market,'openai-market-research-v1','https://reviews.example/','TEST FIXTURE: Patients complain about phone queues at clinics.']]){
+  await admin.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,$5,'{}',$6)",[id,org.id,b.id,'a'.repeat(63)+String(id===own?1:2),version,url]);
+  await admin.query("INSERT INTO app.brand_chunks(id,organization_id,brand_id,source_id,page,anchor,text) VALUES($1,$2,$3,$4,1,'p',$5)",[randomUUID(),org.id,b.id,id,text]);
+ }
+ transport=async(url,init)=>{calls++;const wire=JSON.parse(init.body),input=inputFrom(wire);wires.push({wire,input});return modelResponse(input.task==='strategy'?generatedStrategy(input):generatedPlan(input));};
+ try{
+  const path=`/api/v1/businesses/${b.id}/brand-strategy`,key=randomUUID();
+  assert.equal((await api(path,{method:'POST',body:{}})).status,400,'an idempotency key is required');
+  const first=await api(path,{method:'POST',key,body:{}});assert.equal(first.status,201,JSON.stringify(first.body));
+  assert.equal((await api(path,{method:'POST',key,body:{}})).body.id,first.body.id);
+  assert.equal(await handler.run(scope(b,first.body)),'succeeded');
+  const sent=wires.at(-1).input;assert.equal(sent.task,'strategy');
+  assert.deepEqual(sent.evidence.map(e=>[e.id,e.kind]),[[own,'own_site'],[market,'market_research']]);
+  assert.match(sent.market_research[0],/^Market research \(third-party, not a brand fact\)/);
+  const listed=await api(path);assert.equal(listed.status,200);const draft=listed.body.strategies[0];assert.equal(draft.status,'draft');
+  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.knowledge_nodes WHERE brand_id=$1 AND properties->>'source'='brand_strategy'",[b.id])).rows[0].n,0,'a draft is not knowledge');
+  assert.equal((await api(`${path}/${draft.id}/approve`,{method:'POST',body:{sha256:'0'.repeat(64)}})).status,409);
+  const approved=await api(`${path}/${draft.id}/approve`,{method:'POST',body:{sha256:draft.sha256}});assert.equal(approved.status,201,JSON.stringify(approved.body));assert.equal(approved.body.status,'approved');
+  const nodes=(await admin.query("SELECT type,label,status,origin FROM app.knowledge_nodes WHERE brand_id=$1 AND properties->>'source'='brand_strategy'",[b.id])).rows;
+  assert.deepEqual([...new Set(nodes.map(n=>n.type))].sort(),['angle','format','pain','persona','pillar']);
+  assert.ok(nodes.some(n=>n.status==='approved')&&nodes.some(n=>n.status==='suggested'),'unproven items stay suggestions');
+  const cited=(await admin.query("SELECT e.source_id FROM app.knowledge_evidence e JOIN app.knowledge_nodes n ON n.id=e.node_id WHERE n.brand_id=$1 AND n.type='persona'",[b.id])).rows;assert.ok(cited.some(r=>r.source_id===own));
+  const proves=(await admin.query("SELECT f.type FROM app.knowledge_edges e JOIN app.knowledge_nodes f ON f.id=e.from_node WHERE e.brand_id=$1 AND e.relation='proves'",[b.id])).rows;assert.ok(proves.length>0);
+  // Approving again changes nothing; the planner's pack now carries the strategy as knowledge.
+  const before=(await admin.query('SELECT count(*)::int AS n FROM app.knowledge_nodes WHERE brand_id=$1',[b.id])).rows[0].n;
+  assert.equal((await api(`${path}/${draft.id}/approve`,{method:'POST',body:{sha256:draft.sha256}})).status,201);
+  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.knowledge_nodes WHERE brand_id=$1',[b.id])).rows[0].n,before);
+  // The product's planner reads the graph: approved strategy, the pack with persona and angle knowledge, labelled market notes.
+  const grounded=new Planning(plans,planningContextSource),job=await grounded.submit(alice,b.id,{starts_on:'2026-11-01',brief:'A month for clinic owners'},randomUUID());
+  const request=(await admin.query('SELECT used_node_ids FROM app.planning_requests WHERE job_id=$1',[job.id])).rows[0];assert.ok(request.used_node_ids.length>0,'pack provenance is stored');
+  assert.equal(await handler.run(scope(b,job)),'succeeded');
+  const plan=wires.at(-1).input;assert.equal(plan.task,'content_plan');assert.equal(plan.strategy.id,draft.id);
+  assert.ok(plan.context_pack.items.some(i=>i.type==='persona'&&i.standing==='approved')&&plan.context_pack.items.some(i=>i.standing==='unproven'));
+  assert.equal(plan.context_pack.used_node_ids,undefined,'provenance never reaches the model');
+  assert.match(plan.market_research[0],/third-party/);
+  const posts=(await admin.query("SELECT n.id FROM app.knowledge_nodes n WHERE n.brand_id=$1 AND n.type='post' AND n.properties->>'planned'='true'",[b.id])).rows;assert.equal(posts.length,30);
+  const used=(await admin.query("SELECT f.type,count(*)::int AS n FROM app.knowledge_edges e JOIN app.knowledge_nodes f ON f.id=e.from_node WHERE e.brand_id=$1 AND e.relation='used_in' GROUP BY f.type",[b.id])).rows;
+  assert.ok(used.some(r=>r.type==='angle'&&r.n===30)&&used.some(r=>r.type==='persona'),JSON.stringify(used));
+  // The next pack's ledger shows what this plan already used.
+  const again=await grounded.submit(alice,b.id,{starts_on:'2026-12-01',brief:'Next month'},randomUUID());
+  const ledger=(await admin.query('SELECT input FROM app.planning_requests WHERE job_id=$1',[again.id])).rows[0].input.context_pack.ledger;
+  assert.ok(ledger.some(entry=>entry.type==='angle'&&entry.uses>0),JSON.stringify(ledger));
  }finally{transport=undefined;}
 });

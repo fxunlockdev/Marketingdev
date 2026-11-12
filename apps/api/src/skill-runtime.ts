@@ -1,3 +1,4 @@
+import type {PromptKnowledge} from './knowledge-production.js';
 import {planningSchema} from './planning-schema.js';
 import {hasCurrentProductionRules} from './production-skill-pin.js';
 import {carouselPlanSchema,validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
@@ -16,6 +17,10 @@ import {
   type PlannerResponse,
   type SkillResult,
 } from "./creative-contracts.js";
+/** Adds a stored knowledge pack to the brand block the sandbox reads; the sandbox accepts any brand object. */
+function withKnowledge<T extends {brand:object}>(input:T,knowledge?:PromptKnowledge):T{
+  return knowledge?{...input,brand:{...input.brand,knowledge}}:input;
+}
 export class SkillRuntime {
   constructor(readonly image?: string) {}
   get configured() {
@@ -35,12 +40,14 @@ export class SkillRuntime {
     // run() accepts any task payload at runtime; its input union is owned by the other task methods.
     return this.run(input as unknown as PlanningInput,request=>model({...request,content_plan_schema:strategySchema(input)}),value=>validateStrategyResult(value,input));
   }
-  videoPlan(input:VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<VideoPlanningResult> {
+  /** `knowledge`, when given, is the stored context pack. It reaches the sandbox as brand.knowledge only; the
+   * validated input, the schema and the result check stay those of the stored request. */
+  videoPlan(input:VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,knowledge?:PromptKnowledge):Promise<VideoPlanningResult> {
     validateVideoInput(input);
-    return this.run(input,request=>model({...request,video_plan:{fact_ids:input.brand.facts.map(f=>f.id),duration_seconds:input.duration_seconds}}),value=>validateVideoPlanningResult({...value,brief:normalizeGeneratedVideoBrief(value.brief,input)},input));
+    return this.run(withKnowledge(input,knowledge),request=>model({...request,video_plan:{fact_ids:input.brand.facts.map(f=>f.id),duration_seconds:input.duration_seconds}}),value=>validateVideoPlanningResult({...value,brief:normalizeGeneratedVideoBrief(value.brief,input)},input));
   }
   insights(input:InsightInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<any>{return this.run(input,model,value=>validateInsightResult(value,input));}
-  carouselPlan(input:CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<CarouselResult>{validateCarouselInput(input);return this.run(input,request=>model({...request,carousel_plan_schema:carouselPlanSchema(input)}),value=>validateCarouselResult(value,input));}
+  carouselPlan(input:CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,knowledge?:PromptKnowledge):Promise<CarouselResult>{validateCarouselInput(input);return this.run(withKnowledge(input,knowledge),request=>model({...request,carousel_plan_schema:carouselPlanSchema(input)}),value=>validateCarouselResult(value,input));}
   private async run<T>(input:CreativeInput|PlanningInput|VideoPlanningInput|InsightInput|CarouselInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>,validate:(value:any)=>T):Promise<T> {
     if (!this.configured)
       throw new CreativeError("SKILL_RUNTIME_NOT_CONFIGURED");
@@ -129,7 +136,7 @@ export class SkillRuntime {
               )
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               pending = true;
-              void model({...value,chat_response:undefined,video_plan:undefined,content_plan_schema:undefined,carousel_plan_schema:undefined,creative_fact_ids:undefined})
+              void model({...value,chat_response:undefined,video_plan:undefined,content_plan_schema:undefined,carousel_plan_schema:undefined,creative_fact_ids:undefined,images:undefined})
                 .then((result) => {
                   pending = false;
                   if (!settled)

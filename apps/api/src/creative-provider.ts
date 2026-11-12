@@ -1,3 +1,4 @@
+import type {PlanOutputTokens} from './planning-contracts.js';
 import {reasoningEffort} from './model-policy.js';
 import {videoBriefSchema} from './video-planning.js';
 import {chatSchema} from './chat-contracts.js';
@@ -51,7 +52,7 @@ export class CreativeProvider {
   get configured() {
     return !!this.sdk;
   }
-  plannerRequest(request: PlannerRequest, model: string, maxOutputTokens:512|4000|16000=4000) {
+  plannerRequest(request: PlannerRequest, model: string, maxOutputTokens:PlanOutputTokens=4000) {
     if (
       !Number.isInteger(request.step) ||
       request.step < 1 ||
@@ -131,7 +132,7 @@ export class CreativeProvider {
       maxOutputTokens,
     };
   }
-  async plan(request: PlannerRequest, model: string, maxOutputTokens:512|4000|16000=4000): Promise<PlannerResponse> {
+  async plan(request: PlannerRequest, model: string, maxOutputTokens:PlanOutputTokens=4000): Promise<PlannerResponse> {
     if (!this.sdk) throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const response = await this.sdk.responses.create(
       this.plannerRequest(request, model, maxOutputTokens).body,

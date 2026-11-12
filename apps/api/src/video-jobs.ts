@@ -14,6 +14,23 @@ import {RUNWAY_VIDEO_MODEL,RunwayError} from './runway-client.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {digest,MAX_CANONICAL_VIDEO_BYTES} from './object-store.js';
 import {validateVideoPlanningResult,type VideoPlanningInput} from './video-planning.js';
+import {packForJob,promptKnowledge,recordPost,type StoredKnowledge} from './knowledge-production.js';
+import {logActivityFailure} from './activity-log.js';
+/** What a video plan was given beyond its request, stored once so a retry sends the same input. */
+export type VideoKnowledge={knowledge:StoredKnowledge;shot_list:string|null};
+const PROMPT_LIMIT=4000;
+type Shot={visual:string;camera:string;on_screen_text:string};
+/** The shot list the customer reviewed in their plan, as a 'Shot list:' section that fits in `room` characters. Pure. */
+export function shotListSection(storyline:unknown,room:number):string|null{
+ const shots=(storyline as {kind?:unknown;shots?:unknown})?.kind==='video'&&Array.isArray((storyline as {shots?:unknown}).shots)?(storyline as {shots:Shot[]}).shots:[];
+ const head='\nShot list:';let text=head;
+ for(const [i,shot] of shots.entries()){
+  const flat=(v:unknown)=>String(v??'').replace(/[\u0000-\u001f\u007f\s]+/g,' ').trim();
+  const line=`\n${i+1}. ${flat(shot.visual)} Camera: ${flat(shot.camera)}.${flat(shot.on_screen_text)?` On-screen text: ${flat(shot.on_screen_text)}`:''}`;
+  if(text.length+line.length>room)break;text+=line;
+ }
+ return text===head?null:text;
+}
 const terminal=new Set(['succeeded','rejected','failed','canceled','unknown']);
 export class VideoJobs {
  constructor(readonly jobs:AssetJobs,readonly references:VideoReferences,readonly creative:CreativeJobs,readonly provider:VideoProviderJobs,readonly download:VideoDownload,readonly renderer:VideoRenderer){}
@@ -32,6 +49,28 @@ export class VideoJobs {
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`plan:${j.brand_id}`]);
   const s=(await db.query('SELECT revision,state,creative_spec FROM app.content_slots WHERE id=$1',[r.slot_id])).rows[0];
   if(!s||canonicalJSON(s.creative_spec??null)!==canonicalJSON(r.creative_spec??null)||s.revision!==r.slot_revision||['approved','cancelled'].includes(s.state))throw new VideoStateError('VIDEO_CALENDAR_CHANGED');
+ }
+ /** The stored pack and reviewed shot list, or new ones saved before any planner call. A job that already called
+  * a model before packs existed keeps its original input, so its recorded calls still match. */
+ private async knowledgeContext(db:any,j:any,request:any,base:string):Promise<VideoKnowledge>{
+  if(request.knowledge_context)return request.knowledge_context as VideoKnowledge;
+  const started=(await db.query('SELECT 1 FROM app.creative_calls WHERE job_id=$1 LIMIT 1',[j.id])).rowCount;
+  const storyline=!started&&request.slot_id?(await db.query('SELECT storyline FROM app.content_slots WHERE id=$1',[request.slot_id])).rows[0]?.storyline:null;
+  const stored:VideoKnowledge=started?{knowledge:{status:'skipped',reason:'KNOWLEDGE_JOB_ALREADY_STARTED'},shot_list:null}
+   :{knowledge:await packForJob(db,{organizationId:j.organization_id,brandId:j.brand_id},'video',base),shot_list:shotListSection(storyline,PROMPT_LIMIT-base.length)};
+  await db.query('UPDATE app.video_requests SET knowledge_context=$2 WHERE job_id=$1',[j.id,JSON.stringify(stored)]);
+  request.knowledge_context=stored;return stored;
+ }
+ /** Production record for the graph: a post node and used_in edges from the video's pack. Never fails the video. */
+ private async recordKnowledge(scope:JobScope):Promise<void>{
+  try{
+   await this.transaction(scope,async(db,j)=>{
+    const row=(await db.query('SELECT r.knowledge_context,r.output_version_id,r.approved_brief FROM app.video_requests r WHERE r.job_id=$1',[j.id])).rows[0];
+    const knowledge=(row?.knowledge_context as VideoKnowledge|null)?.knowledge;
+    if(!row?.output_version_id||knowledge?.status!=='ready')return;
+    await recordPost(db,{organizationId:j.organization_id,brandId:j.brand_id},{key:`video ${row.output_version_id}`,label:String(row.approved_brief?.title??'Video'),jobId:j.id,properties:{video_version_id:row.output_version_id}},knowledge.used_node_ids);
+   });
+  }catch(error){logActivityFailure('KnowledgeRecord',scope,error);}
  }
  async exhausted(scope:JobScope){
   const state=await this.transaction(scope,async(db,j)=>({status:j.status,phase:(await db.query('SELECT phase FROM app.video_operations WHERE job_id=$1',[j.id])).rows[0]?.phase}));
@@ -70,12 +109,14 @@ export class VideoJobs {
      if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new VideoStateError('VIDEO_BRAND_INTEGRITY_FAILED');
      const grant=await this.creative.plannerGrant(db,j,request.text_provider);
      if(!grant)throw new VideoStateError('VIDEO_TEXT_APPROVAL_REQUIRED');
-     const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,learning:request.memory_context,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:request.prompt+(request.creative_spec?`\nCompose for ${request.creative_spec.placement}, ${request.creative_spec.aspect} framing. Keep the subject and text within this frame.`:''),channel:request.channel,duration_seconds:request.duration_seconds,reference:{kind:'image',sha256:proof.sha256,width:proof.width,height:proof.height,duration_seconds:null,caption:''}};
-     return {input,grant};
+     const base=request.prompt+(request.creative_spec?`\nCompose for ${request.creative_spec.placement}, ${request.creative_spec.aspect} framing. Keep the subject and text within this frame.`:'');
+     const extra=request.plan?(request.knowledge_context as VideoKnowledge|null)??null:await this.knowledgeContext(db,j,request,base);
+     const input:VideoPlanningInput={task:'video',brand:{id:brain.id,sha256:brain.sha256,learning:request.memory_context,facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},prompt:base+(extra?.shot_list??''),channel:request.channel,duration_seconds:request.duration_seconds,reference:{kind:'image',sha256:proof.sha256,width:proof.width,height:proof.height,duration_seconds:null,caption:''}};
+     return {input,grant,knowledge:extra?.knowledge};
     });
     let plan=request.plan;
     if(!plan){
-     plan=await this.creative.runtime.videoPlan(context.input,message=>this.creative.planCall(scope,message,request));
+     plan=await this.creative.runtime.videoPlan(context.input,message=>this.creative.planCall(scope,message,request),context.knowledge?promptKnowledge(context.knowledge):undefined);
      validateVideoPlanningResult(plan,context.input);
      await this.transaction(scope,async(db,j)=>{if(!await this.jobs.permitted(db,j))throw new VideoStateError('VIDEO_ACCESS_REVOKED');await db.query('UPDATE app.video_requests SET plan=$2 WHERE job_id=$1',[j.id,JSON.stringify(plan)]);});
     }
@@ -139,6 +180,7 @@ export class VideoJobs {
     }
     await db.query("UPDATE app.jobs SET status='succeeded',error_code=NULL,updated_at=now() WHERE id=$1",[j.id]);return 'succeeded';
    });
+   if(outcome==='succeeded')await this.recordKnowledge(scope);
    await this.references.revoke(scope);return outcome;
   }catch(error){
    // Status GET failures are retryable, including after cancellation was requested.

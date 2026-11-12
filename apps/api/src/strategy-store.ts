@@ -4,9 +4,14 @@ import type {PoolClient} from 'pg';
 import {canonicalJSON,hash} from './brand-brain.js';
 import type {ContentPlan} from './content-plan.js';
 import {CreativeError} from './creative-contracts.js';
-import {approvedLearning} from './learning-context.js';
+import {planningLearning} from './learning-context.js';
+import {applyMutations,refId,type EvidenceRef,type KnowledgeScope,type NodeRef} from './knowledge-graph.js';
+import {fromBrandBrainSnapshot} from './knowledge-extract.js';
+import {packForJob,promptKnowledge} from './knowledge-production.js';
+import {strategyMutations} from './strategy-graph.js';
+import {evidenceOrigin,marketNotes,researchEvidence,savedResearch} from './strategy-evidence.js';
 import {object,uuid} from './workspaces.js';
-import {strategySnapshot,validateStrategyInput,type StrategyInput,type StrategyResult,type StrategySnapshot} from './strategy-contracts.js';
+import {strategySnapshot,validateStrategyInput,type BrandStrategy,type Evidence,type StrategyInput,type StrategyResult,type StrategySnapshot} from './strategy-contracts.js';
 
 type Scope={organization_id:string};
 const DAILY_STRATEGY_REQUESTS=3;
@@ -32,6 +37,76 @@ export async function saveDraftStrategy(db:PoolClient,job:{id:string;organizatio
  return id;
 }
 
+/** What the client did not send is filled from the business's own saved research and knowledge graph, so a strategy
+ * is grounded without the browser carrying evidence. Client-supplied values are kept as they are. */
+export async function groundedStrategyContext(db:PoolClient,organization:string,brand:string,supplied:Record<string,unknown>):Promise<Record<string,unknown>>{
+ const research=await savedResearch(db,organization,brand),evidence=researchEvidence(research),notes=marketNotes(research,12);
+ const pack=supplied.context_pack===undefined?promptKnowledge(await packForJob(db,{organizationId:organization,brandId:brand},'plan','brand strategy personas pains angles pillars audience competitors offers')):undefined;
+ return {...(supplied.evidence===undefined&&evidence.length?{evidence}:{}),...(supplied.market_research===undefined&&notes.length?{market_research:notes}:{}),...(pack?{context_pack:pack}:{}),...supplied};
+}
+
+async function citationTargets(db:PoolClient,scope:KnowledgeScope,brainId:string,jobId:string):Promise<{facts:Map<string,NodeRef>;evidence:Map<string,EvidenceRef>}>{
+ const brain=(await db.query('SELECT snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[scope.organizationId,scope.brandId,brainId])).rows[0];
+ const candidates=new Map<string,NodeRef>();
+ for(const fact of Array.isArray(brain?.snapshot?.facts)?brain.snapshot.facts:[]){
+  // The same mapping the profile approval used, one fact at a time, so the refs match the stored fact nodes.
+  try{const node=fromBrandBrainSnapshot({facts:[fact]}).nodes[0];if(node&&typeof fact.id==='string')candidates.set(fact.id,{type:node.type,key:node.key});}catch{/* An unmappable fact is simply not citable in the graph. */}
+ }
+ const refs=[...candidates.values()];
+ const existing=refs.length?new Set((await db.query("SELECT type,key FROM app.knowledge_nodes WHERE organization_id=$1 AND brand_id=$2 AND status<>'rejected' AND (type,key) IN (SELECT * FROM unnest($3::text[],$4::text[]))",[scope.organizationId,scope.brandId,refs.map(r=>r.type),refs.map(r=>r.key)])).rows.map((r:NodeRef)=>refId(r))):new Set<string>();
+ const facts=new Map([...candidates].filter(([,ref])=>existing.has(refId(ref))));
+ const input=(await db.query('SELECT input FROM app.planning_requests WHERE organization_id=$1 AND brand_id=$2 AND job_id=$3',[scope.organizationId,scope.brandId,jobId])).rows[0]?.input;
+ const evidence=new Map<string,EvidenceRef>();
+ for(const item of (Array.isArray(input?.evidence)?input.evidence:[]) as Evidence[]){const origin=evidenceOrigin(item.id);if(origin)evidence.set(item.id,{...origin,excerpt:String(item.summary).slice(0,500)});}
+ const sources=[...evidence.values()].flatMap(e=>e.sourceId?[e.sourceId]:[]),jobs=[...evidence.values()].flatMap(e=>e.jobId?[e.jobId]:[]);
+ const live=new Set([...(sources.length?(await db.query('SELECT id FROM app.brand_sources WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[])',[scope.organizationId,scope.brandId,sources])).rows:[]),...(jobs.length?(await db.query('SELECT id FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND id=ANY($3::uuid[])',[scope.organizationId,scope.brandId,jobs])).rows:[])].map((r:{id:string})=>r.id));
+ return {facts,evidence:new Map([...evidence].filter(([,e])=>live.has((e.sourceId??e.jobId) as string)))};
+}
+/** Writes an approved strategy into the business's knowledge graph in the caller's (approval) transaction. */
+export async function applyStrategyGraph(db:PoolClient,scope:KnowledgeScope,row:{brain_id:string;job_id:string;strategy:BrandStrategy},actor:string):Promise<{nodes:number;edges:number}>{
+ const applied=await applyMutations(db,scope,strategyMutations(row.strategy,await citationTargets(db,scope,row.brain_id,row.job_id)),{actor});
+ return {nodes:applied.nodes.length,edges:applied.edges.filter(e=>e.id).length};
+}
+
+/** Queues one strategy run in the caller's business transaction: idempotent per request key, one active run, a daily cap. */
+export async function queueStrategy(db:PoolClient,b:Scope,id:string,user:string,v:Record<string,unknown>,requestKey:string,requestHash:string):Promise<{id:string;status:string}>{
+ const prior=(await db.query('SELECT r.request_hash,j.id,j.status FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,requestKey])).rows[0];
+ if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another strategy request');return {id:prior.id,status:prior.status};}
+ const recent=(await db.query("SELECT count(*) FILTER(WHERE j.status IN ('queued','running','retrying','unknown'))::int AS active,count(*)::int AS today FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->>'task'='strategy' AND (j.created_at>now()-interval '1 day' OR j.status IN ('queued','running','retrying','unknown'))",[b.organization_id,id])).rows[0];
+ if(recent.active)throw new ConflictException('A brand strategy is already being prepared');
+ if(recent.today>=DAILY_STRATEGY_REQUESTS)throw new ConflictException('Daily strategy request limit reached');
+ const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,id])).rows[0];
+ if(!brain)throw new ConflictException('Confirm your brand profile before building a strategy');
+ if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
+ const prefs=(await db.query('SELECT goal,timezone,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
+ if(!prefs||prefs.step!==3)throw new ConflictException('Finish your brand goals before building a strategy');
+ const {step,...preferences}=prefs;
+ const grounded=await groundedStrategyContext(db,b.organization_id,id,v);
+ let input:StrategyInput;
+ try{input=validateStrategyInput({task:'strategy',brand:{id:brain.id,sha256:brain.sha256,learning:await planningLearning(db),facts:brain.snapshot.facts.map((f:{id:string;field:string;value:string})=>({id:f.id,field:f.field,value:f.value}))},preferences,...grounded});}
+ catch{throw new BadRequestException('Check the research evidence and context supplied for this strategy');}
+ const grant=(await db.query("SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,id])).rows[0];
+ // The worker compares scheduled_at with its own clock; use the API clock, as plan requests do, not the database's.
+ const job=randomUUID(),due=new Date().toISOString();
+ await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);
+ await db.query("INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'openai',$9,$10)",[job,b.organization_id,id,brain.id,JSON.stringify(input),hash(canonicalJSON(input)),requestKey,requestHash,grant?.model??null,due]);
+ await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',$4)",[job,b.organization_id,id,due]);
+ await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
+ return {id:job,status:'queued'};
+}
+
+/** The first strategy for a business, requested once with its first guided monthly plan so the strategy is ready to
+ * review for the next one. Never blocks the caller: with no planning grant, or on any refusal, nothing is queued. */
+export async function requestInitialStrategy(db:PoolClient,b:Scope,brand:string,user:string):Promise<string|undefined>{
+ const exists=(await db.query("SELECT 1 FROM app.brand_strategies WHERE organization_id=$1 AND brand_id=$2 UNION ALL SELECT 1 FROM app.planning_requests WHERE organization_id=$1 AND brand_id=$2 AND input->>'task'='strategy' LIMIT 1",[b.organization_id,brand])).rowCount;
+ if(exists||!(await db.query("SELECT 1 FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,brand])).rowCount)return undefined;
+ await db.query('SAVEPOINT initial_strategy');
+ try{
+  const queued=await queueStrategy(db,b,brand,user,{},`strategy:initial:${brand.toLowerCase()}`,hash(canonicalJSON({initial:true,brand:brand.toLowerCase()})));
+  await db.query('RELEASE SAVEPOINT initial_strategy');return queued.id;
+ }catch{await db.query('ROLLBACK TO SAVEPOINT initial_strategy');return undefined;}
+}
+
 /** Customer side of the brand strategy: ask for one, read the versions, approve a draft. */
 export class BrandStrategies{
  constructor(readonly plans:ContentPlan){}
@@ -41,28 +116,7 @@ export class BrandStrategies{
   if(typeof key!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(key))throw new BadRequestException('An Idempotency-Key is required');
   const requestKey=`strategy:${key}`,requestHash=hash(canonicalJSON({strategy:v,user}));
   return this.plans.scope(user,id,true,async(db:PoolClient,b:Scope)=>{
-   const prior=(await db.query('SELECT r.request_hash,j.id,j.status FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,requestKey])).rows[0];
-   if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another strategy request');return {id:prior.id,status:prior.status};}
-   const recent=(await db.query("SELECT count(*) FILTER(WHERE j.status IN ('queued','running','retrying','unknown'))::int AS active,count(*)::int AS today FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->>'task'='strategy' AND (j.created_at>now()-interval '1 day' OR j.status IN ('queued','running','retrying','unknown'))",[b.organization_id,id])).rows[0];
-   if(recent.active)throw new ConflictException('A brand strategy is already being prepared');
-   if(recent.today>=DAILY_STRATEGY_REQUESTS)throw new ConflictException('Daily strategy request limit reached');
-   const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,id])).rows[0];
-   if(!brain)throw new ConflictException('Confirm your brand profile before building a strategy');
-   if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
-   const prefs=(await db.query('SELECT goal,timezone,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
-   if(!prefs||prefs.step!==3)throw new ConflictException('Finish your brand goals before building a strategy');
-   const {step,...preferences}=prefs;
-   let input:StrategyInput;
-   try{input=validateStrategyInput({task:'strategy',brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:{id:string;field:string;value:string})=>({id:f.id,field:f.field,value:f.value}))},preferences,...v});}
-   catch{throw new BadRequestException('Check the research evidence and context supplied for this strategy');}
-   const grant=(await db.query("SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,id])).rows[0];
-   // The worker compares scheduled_at with its own clock; use the API clock, as plan requests do, not the database's.
-   const job=randomUUID(),due=new Date().toISOString();
-   await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);
-   await db.query("INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'openai',$9,$10)",[job,b.organization_id,id,brain.id,JSON.stringify(input),hash(canonicalJSON(input)),requestKey,requestHash,grant?.model??null,due]);
-   await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',$4)",[job,b.organization_id,id,due]);
-   await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
-   return {id:job,status:'queued'};
+   return queueStrategy(db,b,id,user,v,requestKey,requestHash);
   });
  }
  /** Every version, newest first, with the state of any run still in progress. */
@@ -77,14 +131,16 @@ export class BrandStrategies{
   strategyId=uuid(strategyId);const v=object(body,['sha256']);
   if(typeof v.sha256!=='string'||!/^[a-f0-9]{64}$/.test(v.sha256))throw new BadRequestException('Include the checksum of the strategy you reviewed');
   return this.plans.scope(user,id,true,async(db:PoolClient,b:Scope)=>{
-   const row=(await db.query('SELECT id,version,status,sha256,strategy FROM app.brand_strategies WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,strategyId])).rows[0];
+   const row=(await db.query('SELECT id,version,status,sha256,strategy,brain_id,job_id FROM app.brand_strategies WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,strategyId])).rows[0];
    if(!row)throw new NotFoundException('Brand strategy not found');
    if(row.sha256!==v.sha256||hash(canonicalJSON(row.strategy))!==row.sha256)throw new ConflictException('This strategy changed. Reload before approving');
    if(row.status==='approved')return {id:row.id,version:row.version,status:'approved'};
    if(!(await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[b.organization_id,id])).rows[0].allowed)throw new ForbiddenException('Only a business owner or admin can approve the strategy');
    const done=await db.query("UPDATE app.brand_strategies SET status='approved',approved_by=$2,approved_at=now() WHERE id=$1 AND status='draft'",[strategyId,user]);
    if(!done.rowCount)throw new ConflictException('This strategy could not be approved. Reload and try again');
-   return {id:row.id,version:row.version,status:'approved'};
+   // The approved strategy becomes knowledge in the same transaction: approval and graph commit together.
+   const graph=await applyStrategyGraph(db,{organizationId:b.organization_id,brandId:id},row,user);
+   return {id:row.id,version:row.version,status:'approved',graph};
   },true);
  }
 }

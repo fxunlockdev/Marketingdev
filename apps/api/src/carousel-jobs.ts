@@ -8,6 +8,7 @@ import {validateCarouselInput,validateCarouselResult} from './carousel-planning.
 import {carouselFingerprint} from './carousels.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {assertLearningCurrent} from './learning-context.js';
+import {packForJob,promptKnowledge,type StoredKnowledge} from './knowledge-production.js';
 const terminal=new Set(['succeeded','rejected','failed','canceled','unknown']);
 export class CarouselJobs {
  constructor(readonly jobs:AssetJobs,readonly creative:CreativeJobs,readonly exporter:ExportJobs){}
@@ -20,6 +21,15 @@ export class CarouselJobs {
   for(const child of children)for(const id of [child.generation_job_id,child.export_job_id])await this.jobs.transaction(this.childScope(scope,id),async(db,j)=>{if(j.status==='queued'&&j.attempt===0)await db.query("UPDATE app.jobs SET status='canceled',error_code='CAROUSEL_STOPPED',updated_at=now() WHERE id=$1",[j.id]);});
   return result;
  }
+ /** The parent's carousel pack, stored before the first planner call so retries replay the same input.
+  * A parent that called a model before packs existed keeps its original input. */
+ private async knowledgeContext(db:any,j:any,r:any):Promise<StoredKnowledge>{
+  if(r.knowledge_context)return r.knowledge_context as StoredKnowledge;
+  const started=(await db.query('SELECT 1 FROM app.creative_calls WHERE job_id=$1 LIMIT 1',[j.id])).rowCount;
+  const stored:StoredKnowledge=started?{status:'skipped',reason:'KNOWLEDGE_JOB_ALREADY_STARTED'}:await packForJob(db,{organizationId:j.organization_id,brandId:j.brand_id},'carousel',String(r.input.prompt));
+  await db.query('UPDATE app.carousel_requests SET knowledge_context=$2 WHERE job_id=$1',[j.id,JSON.stringify(stored)]);
+  return stored;
+ }
  async plan(scope:JobScope):Promise<{state:string;children?:{generation_job_id:string;export_job_id:string;position:number}[]}>{
   try{
    const r=await this.jobs.transaction(scope,async(db,j)=>{
@@ -28,10 +38,11 @@ export class CarouselJobs {
     if(!this.creative.provider.configured)throw new CreativeError('CREATIVE_PROVIDER_NOT_CONFIGURED');if(!this.exporter.renderer.configured||this.exporter.renderer.image!==r.renderer_image)throw new CreativeError('EXPORT_RENDERER_CHANGED');
     validateCarouselInput(r.input);if(hash(canonicalJSON(r.input))!==r.input_sha256)throw new CreativeError('CAROUSEL_INPUT_CHANGED');await assertLearningCurrent(db,r.memory_context);
     const children=(await db.query('SELECT position,generation_job_id,export_job_id FROM app.carousel_children WHERE parent_job_id=$1 ORDER BY position',[j.id])).rows;if(children.length!==r.input.slide_count||children.some((c,i)=>c.position!==i))throw new CreativeError('CAROUSEL_CHILDREN_INVALID');
-    await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);return {...r,children};
+    const knowledge=r.plan?undefined:await this.knowledgeContext(db,j,r);
+    await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);return {...r,children,knowledge};
    });
    if(r.terminal)return {state:r.terminal};
-   const plan=r.plan??await this.creative.runtime.carouselPlan(r.input,message=>this.creative.planCall(scope,message,r,16000));validateCarouselResult(plan,r.input);
+   const plan=r.plan??await this.creative.runtime.carouselPlan(r.input,message=>this.creative.planCall(scope,message,r,16000),r.knowledge?promptKnowledge(r.knowledge):undefined);validateCarouselResult(plan,r.input);
    await this.jobs.transaction(scope,async(db,j)=>{const live=(await db.query('SELECT canceled FROM app.carousel_requests WHERE job_id=$1',[j.id])).rows[0];if(live.canceled||!await this.jobs.permitted(db,j))throw new CreativeError('CREATIVE_ACCESS_REVOKED');await db.query('UPDATE app.carousel_requests SET plan=$2 WHERE job_id=$1',[j.id,JSON.stringify(plan)]);});
    return {state:'ready',children:r.children};
   }catch(error){if(!(error instanceof CreativeError))throw error;return {state:await this.stop(scope,error.code==='CREATIVE_ACCESS_REVOKED'?'canceled':'rejected',error.code)};}
