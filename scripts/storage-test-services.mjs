@@ -11,6 +11,8 @@ const GARAGE='dxflrs/garage@sha256:9c96caa2612d3411acc5b0e6701fb238dbfba33e533a6
 const CLAM='clamav/clamav@sha256:b5fffca589275b71a4c610afc69d32a8d9c6cf4454c6d06529ddb08da17d0c30';
 const docker=(...args)=>execFileSync('docker',args,{encoding:'utf8',stdio:['ignore','pipe','pipe'],timeout:60000}).trim();
 export async function port(){const server=createServer();await new Promise(r=>server.listen(0,'127.0.0.1',r));const value=server.address().port;await new Promise(r=>server.close(r));return value;}
+/** The pinned, checksum-verified Temporal CLI; the local run stack starts its dev server from it. */
+export async function temporalBinary(){return runtime();}
 async function runtime(){
   const pins={darwin_arm64:'41e0425378fcb4fb5766340b97435e20fe47bbff2d7bf644ec2d51f7662b7c56',darwin_x64:'48cdd6c84c56e27ae8e4d9a47052b89289a9c552dee029b49dd312c6fb72873f',linux_x64:'09a0326a51db84d02735e53542b9ebd8c4758daf47482a9ab0abce15844e60d5',linux_arm64:'6c57c352d52fc3df34412376fd9ba6f74b7e3ace8e426e6cba8600156d36a145'};
   const platform=`${process.platform}_${process.arch}`,hash=pins[platform];if(!hash)throw new Error('Unsupported Temporal test platform');
