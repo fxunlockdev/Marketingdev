@@ -13,14 +13,36 @@ export function normalizeCreativeSpec(value:unknown,format:string,channel:string
  if(format==='carousel'?!Number.isInteger(v.slide_count)||Number(v.slide_count)<2||Number(v.slide_count)>10:v.slide_count!==null)return invalid();
  const artwork=v.artwork as PostArtwork|undefined;
  const typography=artwork?.typography;
- return {placement:v.placement as CreativeSpec['placement'],aspect:v.aspect as CreativeSpec['aspect'],slide_count:v.slide_count as number|null,
+ const spec:CreativeSpec={placement:v.placement as CreativeSpec['placement'],aspect:v.aspect as CreativeSpec['aspect'],slide_count:v.slide_count as number|null,
   ...(artwork?{artwork:{text:artwork.text,...(typography?{typography:{
    headline:{family:typography.headline.family,weight:typography.headline.weight},
    body:{family:typography.body.family,weight:typography.body.weight},
   }}:{})}}:{})};
+ if(format==='video')VIDEO_SPECS.add(spec);
+ return spec;
 }
-export function creativeDimensions(spec:CreativeSpec):{width:number;height:number}{
- return {square:{width:1024,height:1024},portrait:{width:1024,height:1536},landscape:{width:1536,height:1024},vertical:{width:1080,height:1920}}[spec.aspect];
+type Dimensions={width:number;height:number};
+/** Specs normalised for a video. Tracked out of band so stored and compared specs stay unchanged. */
+const VIDEO_SPECS=new WeakSet<CreativeSpec>();
+/** The size a new creative is composed at. A portrait image is a true 4:5 feed post; the provider's
+ * 2:3 output is cover-cropped to it (see creative-framing). Portrait video keeps 2:3, the size the
+ * video renderer supports. */
+export function creativeDimensions(spec:CreativeSpec):Dimensions{
+ if(spec.aspect==='portrait'&&VIDEO_SPECS.has(spec))return {width:1024,height:1536};
+ return {square:{width:1024,height:1024},portrait:{width:1024,height:1280},landscape:{width:1536,height:1024},vertical:{width:1080,height:1920}}[spec.aspect];
+}
+/** Portrait creatives made before 4:5 were stored at the provider's 2:3 size. They stay valid:
+ * they can still be edited (keeping their size) and attached to portrait posts. */
+const LEGACY_DIMENSIONS:Partial<Record<CreativeSpec['aspect'],readonly Dimensions[]>>={portrait:[{width:1024,height:1536}]};
+export function acceptedCreativeDimensions(spec:CreativeSpec):Dimensions[]{
+ return [creativeDimensions(spec),...(LEGACY_DIMENSIONS[spec.aspect]??[])];
+}
+export function matchesCreativeDimensions(spec:CreativeSpec,size:{width?:unknown;height?:unknown}|null|undefined):boolean{
+ return !!size&&acceptedCreativeDimensions(spec).some(d=>d.width===size.width&&d.height===size.height);
+}
+/** True when an existing creative was made at a superseded size for its aspect. */
+export function legacyCreativeDimensions(spec:CreativeSpec,size:{width?:unknown;height?:unknown}|null|undefined):boolean{
+ return !!size&&(LEGACY_DIMENSIONS[spec.aspect]??[]).some(d=>d.width===size.width&&d.height===size.height);
 }
 export function creativeSourceSize(spec:CreativeSpec):'1024x1024'|'1024x1536'|'1536x1024'{
  return spec.aspect==='square'?'1024x1024':spec.aspect==='landscape'?'1536x1024':'1024x1536';

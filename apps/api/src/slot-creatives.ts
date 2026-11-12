@@ -7,6 +7,8 @@ import {campaignRefinementDirection} from './campaign-refinement.js';
 import type {PoolClient} from 'pg';
 import {campaignDesignDirection,campaignCreativeContext,CAMPAIGN_CREATIVE_PREFIX} from './campaign-design.js';
 import {creativeTextProvider} from "./creative-planning.js";
+import {recordSignal} from './learning-signals.js';
+import {qaSummary} from './creative-qa-summary.js';
 import {
   BadRequestException,
   ConflictException,
@@ -188,7 +190,7 @@ export class SlotCreatives {
           ...(selectedReferences.length?{reference_ids:selectedReferences}:{}),
         },
         `slot-job:${sha}`,
-        { db, b, batchJobIds:scoped?.batchJobIds },
+        { db, b, batchJobIds:scoped?.batchJobIds, recordSignal:false },
       );
       const changed = (
         await db.query(
@@ -217,6 +219,9 @@ export class SlotCreatives {
           user,
         ],
       );
+      // Asking for a new image, or giving direction for one, says the previous result was not right yet.
+      if (s.creative_version_id || feedback)
+        await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:"regenerated",slot_id:slotId,creative_version_id:s.creative_version_id??null,version_kind:s.creative_version_id?"creative":null,reason:feedback,context:{format:s.format,channel:s.channel,pillar:s.pillar}});
       return { ...result, thread_id: thread };
     };
     return scoped?action(scoped.db,scoped.b):this.plans.scope(user,id,true,action);
@@ -316,6 +321,8 @@ export class SlotCreatives {
       const reviewed=slots.map(slot=>{const spec=saved.find(s=>s.id===slot.id).creative_spec;return {...slot,...(spec?{creative_spec:spec}:{})};});
       await db.query('INSERT INTO app.campaign_image_batches(organization_id,brand_id,plan_id,request_key,request_hash,job_ids,requested_by,reviewed_slots,credit_cap) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[b.organization_id,id,planId,key,sha,jobIds,user,JSON.stringify(reviewed),v.credit_cap??null]);
       for(const item of items)await db.query('INSERT INTO app.campaign_batch_items(organization_id,brand_id,request_key,slot_id,source_revision,creative_spec,format,job_id,state,scheduled_for,max_cost_micros,planning_cost_micros) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[b.organization_id,id,key,item.slot.id,item.slot.revision,item.slot.creative_spec==null?null:JSON.stringify(item.slot.creative_spec),item.slot.format,item.job,item.job?'queued':item.scheduled?'scheduled':'awaiting_approval',item.scheduled?item.scheduled.toISOString():null,item.scheduled?item.max:null,item.scheduled?item.planning:null]);
+      // A retry of failed posts is a decision too: the customer still wants these posts as planned.
+      if(v.retry_failed)for(const s of saved)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'retried',slot_id:s.id,reason:'Retried after generation failed',context:{format:s.format,channel:s.channel,pillar:s.pillar}});
       return {jobs:await this.batchJobs(db,b.organization_id,id,planId,key)};
     });
   }
@@ -348,13 +355,15 @@ export class SlotCreatives {
     return this.plans.scope(user, id, false, async (db, b) => {
       const slot = (
         await db.query(
-          `SELECT s.*,p.title AS plan_title,p.timezone,p.objective,p.starts_on::text,v.design,COALESCE(v.caption,vv.caption,cv.caption) AS caption,v.skill_manifest,v.media_id,COALESCE(v.project_id,vv.project_id,cv.project_id) AS project_id,COALESCE(c.thread_id,vp.thread_id) AS thread_id,COALESCE(c.latest_version_id,vp.latest_version_id,cp.latest_version_id) AS latest_version_id,cv.status AS carousel_status,(CASE WHEN s.format='carousel' THEN cp.latest_version_id<>cv.id WHEN s.format='video' THEN vp.latest_version_id<>vv.id ELSE c.latest_version_id<>v.id END) AS has_newer_version
+          `SELECT s.*,p.title AS plan_title,p.timezone,p.objective,p.starts_on::text,v.design,COALESCE(v.caption,vv.caption,cv.caption) AS caption,v.skill_manifest,v.qa,v.media_id,COALESCE(v.project_id,vv.project_id,cv.project_id) AS project_id,COALESCE(c.thread_id,vp.thread_id) AS thread_id,COALESCE(c.latest_version_id,vp.latest_version_id,cp.latest_version_id) AS latest_version_id,cv.status AS carousel_status,(CASE WHEN s.format='carousel' THEN cp.latest_version_id<>cv.id WHEN s.format='video' THEN vp.latest_version_id<>vv.id ELSE c.latest_version_id<>v.id END) AS has_newer_version
    FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id LEFT JOIN app.creative_versions v ON v.id=s.creative_version_id LEFT JOIN app.creative_projects c ON c.id=v.project_id LEFT JOIN app.video_versions vv ON vv.id=s.video_version_id LEFT JOIN app.video_projects vp ON vp.id=vv.project_id LEFT JOIN app.carousel_versions cv ON cv.id=s.carousel_version_id LEFT JOIN app.carousel_projects cp ON cp.id=cv.project_id
    WHERE s.organization_id=$1 AND s.brand_id=$2 AND s.id=$3`,
           [b.organization_id, id, slotId],
         )
       ).rows[0];
       if (!slot) throw new NotFoundException("Content slot not found");
+      // Review screens get bounded quality fields, never the raw checker output.
+      slot.qa = qaSummary(slot.qa);
       if(slot.format==='carousel'&&slot.carousel_version_id){try{await this.plans.carousel(db,b.organization_id,id,slot.carousel_version_id,slot.channel);}catch(e){if(e instanceof ConflictException||e instanceof NotFoundException)slot.has_newer_version=true;else throw e;}}
       const events = (
         await db.query(

@@ -1,30 +1,37 @@
 import {randomUUID} from 'node:crypto';
 import type {Queryable} from './learning-observations.js';
 /** Customer decisions as learning signals, summarised deterministically into per-business preference statements. No model call. */
-export const SIGNAL_KINDS=['approved','rejected','edited','regenerated','stock_swapped'] as const;
+export const SIGNAL_KINDS=['approved','rejected','changes_requested','edited','regenerated','retried','stock_swapped'] as const;
 export type SignalKind=typeof SIGNAL_KINDS[number];
-export const SIGNAL_DIFF_FIELDS=['headline','body','cta','caption','hook'] as const;
+export const SIGNAL_DIFF_FIELDS=['headline','body','cta','caption','hook','brief','pillar','storyline'] as const;
 export type DiffField=typeof SIGNAL_DIFF_FIELDS[number];
 export type SignalDiff=Partial<Record<DiffField,{before:string;after:string}>>;
 export type SignalContext={format?:string;channel?:string;pillar?:string;layout_archetype?:string;stock_used?:boolean};
-export type SignalInput={kind:SignalKind;slot_id?:string|null;creative_version_id?:string|null;version_kind?:'creative'|'carousel'|'video'|null;reason?:string|null;diff?:unknown;context?:unknown};
+/** Mood boards and monthly plans have no slot or creative version of their own; they name their subject. */
+export const SIGNAL_SUBJECTS=['moodboard','plan'] as const;
+export type SignalSubject=typeof SIGNAL_SUBJECTS[number];
+export type SignalInput={kind:SignalKind;slot_id?:string|null;creative_version_id?:string|null;version_kind?:'creative'|'carousel'|'video'|null;subject_kind?:SignalSubject|null;subject_id?:string|null;reason?:string|null;diff?:unknown;context?:unknown};
 export type SignalScope={organizationId:string;brandId:string;actorId:string};
-export type Signal={kind:SignalKind;slot_id:string|null;creative_version_id:string|null;version_kind:'creative'|'carousel'|'video'|null;reason:string;diff:SignalDiff;context:SignalContext};
+export type Signal={kind:SignalKind;slot_id:string|null;creative_version_id:string|null;version_kind:'creative'|'carousel'|'video'|null;subject_kind:SignalSubject|null;subject_id:string|null;reason:string;diff:SignalDiff;context:SignalContext};
 export type SignalRow={kind:string;reason:string;diff:unknown;context:unknown;created_at:string|Date};
 export type PreferenceStatement={kind:'rejection_reason'|'decision'|'edit'|'regeneration'|'stock';statement:string;count:number;of:number;recent:number;last_seen:string};
 export class SignalError extends Error{constructor(readonly code:'SIGNAL_INVALID'){super(code);}}
 
 export const SIGNAL_REASON_MAX=1000;
-const DIFF_TEXT_MAX=500,CONTEXT_TEXT_MAX=140,WINDOW_DAYS=180,RECENT_DAYS=30,MAX_STATEMENTS=8,UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DIFF_TEXT_MAX=500,DIFF_BYTES_MAX=7000,CONTEXT_TEXT_MAX=140,WINDOW_DAYS=180,RECENT_DAYS=30,MAX_STATEMENTS=8,UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const clean=(value:unknown,max:number):string=>typeof value==='string'?value.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g,' ').trim().slice(0,max):'';
 const record=(value:unknown):Record<string,unknown>=>value&&typeof value==='object'&&!Array.isArray(value)?value as Record<string,unknown>:{};
 const id=(value:unknown):string|null=>{if(value===null||value===undefined)return null;if(typeof value!=='string'||!UUID.test(value))throw new SignalError('SIGNAL_INVALID');return value.toLowerCase();};
 
-/** Keep only known text fields that actually changed, bounded. */
-export function signalDiff(value:unknown):SignalDiff{
- const source=record(value),out:SignalDiff={};
- for(const field of SIGNAL_DIFF_FIELDS){const change=record(source[field]),before=clean(change.before,DIFF_TEXT_MAX),after=clean(change.after,DIFF_TEXT_MAX);if((before||after)&&before!==after)out[field]={before,after};}
+function diffWithin(source:Record<string,unknown>,max:number):SignalDiff{
+ const out:SignalDiff={};
+ for(const field of SIGNAL_DIFF_FIELDS){const change=record(source[field]),before=clean(change.before,max),after=clean(change.after,max);if((before||after)&&before!==after)out[field]={before,after};}
  return out;
+}
+/** Keep only known text fields that actually changed, bounded per field and in total bytes. */
+export function signalDiff(value:unknown):SignalDiff{
+ const source=record(value);
+ for(let max=DIFF_TEXT_MAX;;max=Math.floor(max/2)){const out=diffWithin(source,max);if(max<=16||Buffer.byteLength(JSON.stringify(out))<=DIFF_BYTES_MAX)return out;}
 }
 export function signalContext(value:unknown):SignalContext{
  const source=record(value),out:SignalContext={};
@@ -34,14 +41,15 @@ export function signalContext(value:unknown):SignalContext{
 }
 export function normaliseSignal(input:unknown):Signal{
  const v=record(input);if(!SIGNAL_KINDS.includes(v.kind as SignalKind))throw new SignalError('SIGNAL_INVALID');
- const slot=id(v.slot_id),version=id(v.creative_version_id),kind=version?(v.version_kind??'creative'):null;
- if((!slot&&!version)||(kind!==null&&!['creative','carousel','video'].includes(kind as string)))throw new SignalError('SIGNAL_INVALID');
- return {kind:v.kind as SignalKind,slot_id:slot,creative_version_id:version,version_kind:kind as Signal['version_kind'],reason:clean(v.reason,SIGNAL_REASON_MAX),diff:signalDiff(v.diff),context:signalContext(v.context)};
+ const slot=id(v.slot_id),version=id(v.creative_version_id),kind=version?(v.version_kind??'creative'):null,subject=id(v.subject_id),subjectKind=v.subject_kind??null;
+ if((!slot&&!version&&!subject)||(kind!==null&&!['creative','carousel','video'].includes(kind as string)))throw new SignalError('SIGNAL_INVALID');
+ if((subject===null)!==(subjectKind===null)||(subjectKind!==null&&!SIGNAL_SUBJECTS.includes(subjectKind as SignalSubject)))throw new SignalError('SIGNAL_INVALID');
+ return {kind:v.kind as SignalKind,slot_id:slot,creative_version_id:version,version_kind:kind as Signal['version_kind'],subject_kind:subjectKind as SignalSubject|null,subject_id:subject,reason:clean(v.reason,SIGNAL_REASON_MAX),diff:signalDiff(v.diff),context:signalContext(v.context)};
 }
 /** Append one signal inside the caller's business-scoped transaction. Call after the review/edit itself has succeeded. */
 export async function recordSignal(db:Queryable,scope:SignalScope,input:SignalInput):Promise<{id:string}>{
  const s=normaliseSignal(input),signal=randomUUID();
- await db.query('INSERT INTO app.creative_signals(id,organization_id,brand_id,slot_id,creative_version_id,version_kind,kind,reason,diff,context,actor_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)',[signal,scope.organizationId,scope.brandId,s.slot_id,s.creative_version_id,s.version_kind,s.kind,s.reason,JSON.stringify(s.diff),JSON.stringify(s.context),scope.actorId]);
+ await db.query('INSERT INTO app.creative_signals(id,organization_id,brand_id,slot_id,creative_version_id,version_kind,kind,reason,diff,context,actor_id,subject_kind,subject_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[signal,scope.organizationId,scope.brandId,s.slot_id,s.creative_version_id,s.version_kind,s.kind,s.reason,JSON.stringify(s.diff),JSON.stringify(s.context),scope.actorId,s.subject_kind,s.subject_id]);
  return {id:signal};
 }
 
@@ -55,7 +63,7 @@ const THEMES:readonly [string,RegExp][]=[
  ['length',/\b(too long|wordy|shorter|shorten|too short)\b/i],
  ['a busy layout',/\b(busy|cluttered|crowded|messy)\b/i]
 ];
-const FIELD_NAMES:Record<DiffField,string>={headline:'headlines',body:'body text',cta:'calls to action',caption:'captions',hook:'hooks'};
+const FIELD_NAMES:Record<DiffField,string>={headline:'headlines',body:'body text',cta:'calls to action',caption:'captions',hook:'hooks',brief:'post briefs',pillar:'content pillars',storyline:'storylines'};
 type Dated={at:number};
 /** The database stamps signals with its own clock, which can run slightly ahead of this process. */
 const CLOCK_SKEW_MS=5*60*1000;

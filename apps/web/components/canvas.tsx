@@ -1,5 +1,6 @@
 "use client";
 import {DesvioSelect} from './desvio-select';
+import {CreativeQuality,InImageHeadline,type QaSummary} from './creative-quality';
 import chatStyles from "./canvas-chat.module.css";
 import {GeneratedReplacement} from "./generated-replacement";
 import {GenerationNotification} from './generation-notification';
@@ -48,6 +49,8 @@ type Conversation = {
   planning_runs: {id:string;status:string;cancel_requested:boolean;output_plan_id:string|null;scheduled_at:string;starts_on:string}[];
   projects: { id: string; title: string; latest_version_id: string | null }[];
 };
+/** The provider size a placement is generated at; portrait and vertical are cropped from 2:3. */
+const sourceSize=(aspect:string)=>aspect==='square'?'1024x1024':aspect==='landscape'?'1536x1024':'1024x1536';
 type Version = {
   id: string;
   sha256: string;
@@ -59,6 +62,7 @@ type Version = {
   review_revision: number;
   created_at: string;
   skill_manifest: any;
+  qa?: QaSummary | null;
 };
 type Project = {
   project: {
@@ -281,7 +285,7 @@ export function CanvasScreen({ business }: { business: Business }) {
           format: edit?.run.format ?? format,
           ...(edit?.version.skill_manifest?.creative_spec?{creative_spec:edit.version.skill_manifest.creative_spec}:{}),
           size: edit
-            ? (edit.version.skill_manifest?.creative_spec?.aspect==='vertical'?'1024x1536':`${edit.version.design.width}x${edit.version.design.height}`)
+            ? (edit.version.skill_manifest?.creative_spec?sourceSize(edit.version.skill_manifest.creative_spec.aspect):`${edit.version.design.width}x${edit.version.design.height}`)
             : size,
           parent_version_id: edit?.version.id ?? null,
           ...(referenceIds.length?{reference_ids:referenceIds}:{}),
@@ -807,6 +811,10 @@ export function CreativeProject({
         readOnly={!write || !latest || busy || editingDisabled}
         onExportReady={exportReady}
       />
+      <CreativeQuality qa={version.qa} />
+      {(version.skill_manifest?.text_mode === 'in_image' || version.qa?.text_mode === 'in_image') && (
+        <InImageHeadline headline={version.skill_manifest?.in_image_text?.headline ?? version.qa?.expected_text?.[0] ?? ''} disabled />
+      )}
       {write&&latest&&<GeneratedReplacement key={`generated:${business.id}:${projectId}:${version.id}`} businessId={business.id} projectId={projectId} parentId={version.id} disabled={dirty||busy} onReady={async id=>{await load(id);setNotice('Your new photo is ready to review.');}}/>}
       {write&&latest&&<StockPicker key={`${business.id}:${projectId}:${version.id}`} businessId={business.id} purpose="replacement" disabled={dirty||busy} onSelected={async referenceId=>{setBusy(true);try{const saved=await api(root+`/stock/projects/${projectId}/replace`,{parent_id:version.id,reference_id:referenceId});await load(saved.id);setNotice('Photo replaced in a new draft. Review the result before using it in a post.');}finally{setBusy(false);}}}/>}
       <Field label="Post caption">

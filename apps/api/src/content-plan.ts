@@ -1,4 +1,4 @@
-import {normalizeCreativeSpec,creativeDimensions,type CreativeSpec} from './campaign-formats.js';
+import {normalizeCreativeSpec,matchesCreativeDimensions,type CreativeSpec} from './campaign-formats.js';
 import {carouselPages,currentCarousel,carouselFingerprint} from './carousels.js';
 import {calendarExport} from './calendar-export.js';
 import {validateVideoConcept} from './video-concept.js';
@@ -9,6 +9,7 @@ import type { PoolClient } from 'pg';
 import { Businesses } from './businesses.js';
 import { canonicalJSON, hash } from './brand-brain.js';
 import { object, uuid } from './workspaces.js';
+import {recordSignal,type SignalDiff} from './learning-signals.js';
 
 function spec(value:unknown,format:string,channel:string):CreativeSpec {try{return normalizeCreativeSpec(value,format,channel);}catch{throw new BadRequestException('Choose a compatible creative format');}}
 const channels = ['linkedin','instagram','facebook'];
@@ -16,6 +17,15 @@ const states = ['content_needed','draft_ready','pending_review','approved','chan
 function text(v:unknown,max:number,empty=false):string {
  if(typeof v!=='string'||(!empty&&!v.trim())||v.length>max||/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v))throw new BadRequestException('Check the plan text fields');
  return v.trim();
+}
+const storylineText=(value:unknown):string=>value==null?'':typeof value==='string'?value:canonicalJSON(value);
+/** What the customer changed in a post's topic, brief and storyline, as before/after text. */
+function topicDiff(before:Record<string,unknown>,after:Record<string,unknown>):SignalDiff{
+ const diff:SignalDiff={};
+ for(const field of ['brief','pillar','hook','cta'] as const){const was=String(before[field]??''),now=String(after[field]??'');if(was!==now)diff[field]={before:was,after:now};}
+ const was=storylineText(before.storyline),now=storylineText(after.storyline);
+ if(was!==now)diff.storyline={before:was,after:now};
+ return diff;
 }
 function revision(v:unknown):number {
  if(!Number.isSafeInteger(v)||Number(v)<1||Number(v)>=2147483647)throw new BadRequestException('Include the saved revision');
@@ -88,10 +98,11 @@ export class ContentPlan {
   return {...row,pages};
  }
  async matchSpec(specification:CreativeSpec|null,creative:any,video:any,carousel:any){
-  if(!specification)return;const dimensions=creativeDimensions(specification);
-  if(creative&&(creative.design?.width!==dimensions.width||creative.design?.height!==dimensions.height))throw new ConflictException('Choose artwork matching this post’s dimensions');
+  if(!specification)return;
+  // New portrait artwork is 4:5; portrait artwork saved before that (2:3) can still be attached.
+  if(creative&&!matchesCreativeDimensions(specification,creative.design))throw new ConflictException('Choose artwork matching this post’s dimensions');
   if(video&&canonicalJSON(video.creative_spec??null)!==canonicalJSON(specification))throw new ConflictException('Choose video generated for this placement and aspect');
-  if(carousel&&(carousel.pages.length!==specification.slide_count||carousel.pages.some((p:any)=>p.width!==dimensions.width||p.height!==dimensions.height)))throw new ConflictException('Choose a carousel with matching slide count and dimensions');
+  if(carousel&&(carousel.pages.length!==specification.slide_count||carousel.pages.some((p:any)=>!matchesCreativeDimensions(specification,p))))throw new ConflictException('Choose a carousel with matching slide count and dimensions');
  }
  async event(db:PoolClient,user:string,s:any,action:string,feedback='') {
   const snapshot={creative_spec:s.creative_spec??null,reference_ids:s.reference_ids??[],plan_id:s.plan_id,channel:s.channel,planned_at:s.planned_at,format:s.format,brief:s.brief,pillar:s.pillar,hook:s.hook,cta:s.cta,state:s.state,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,video_version_id:s.video_version_id,video_sha256:s.video_sha256,video_draft:s.video_draft,carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,...(s.storyline?{storyline:s.storyline}:{})};
@@ -313,6 +324,8 @@ export class ContentPlan {
    await this.matchSpec(specification,creative,video,carousel);
    const result=(await db.query(`UPDATE app.content_slots SET planned_at=$2,brief=$3,pillar=$4,hook=$5,cta=$6,creative_version_id=$7,creative_sha256=$8,state=$9,video_version_id=$10,video_sha256=$11,video_draft=$12,carousel_version_id=$13,carousel_sha256=$14,reference_ids=$15,creative_spec=$16,storyline=$17,revision=revision+1,approved_by=NULL,approved_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`,[slotId,when,'brief' in v?text(v.brief,4000):s.brief,'pillar' in v?text(v.pillar,140,true):s.pillar,'hook' in v?text(v.hook,500,true):s.hook,'cta' in v?text(v.cta,500,true):s.cta,creative?.id??null,creative?.sha256??null,creative||video||carousel?'draft_ready':'content_needed',video?.id??null,video?.sha256??null,videoDraft?JSON.stringify(videoDraft):null,carousel?.id??null,carousel?.sha256??null,referenceIds,specification?JSON.stringify(specification):null,storyline?JSON.stringify(storyline):null])).rows[0];
    await this.event(db,user,result,'edited');
+   const diff=topicDiff(s,result);
+   if(Object.keys(diff).length)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'edited',slot_id:slotId,diff,context:{format:result.format,channel:result.channel,pillar:result.pillar}});
    return result;
   });
  }
@@ -347,6 +360,10 @@ export class ContentPlan {
   }
   const result=(await db.query('UPDATE app.content_slots SET state=$2,revision=revision+1,approved_by=$3,approved_at=$4,updated_at=now() WHERE id=$1 RETURNING *',[slotId,decision==='reopen'?'pending_review':decision,decision==='approved'?user:null,decision==='approved'?new Date():null])).rows[0];
   await this.event(db,user,result,decision==='reopen'?'review_reopened':decision,feedback);
+  if(decision==='approved'||decision==='rejected'||decision==='changes_requested'){
+   const [version,kind]=s.format==='carousel'?[s.carousel_version_id,'carousel' as const]:s.format==='video'?[s.video_version_id,'video' as const]:[s.creative_version_id,'creative' as const];
+   await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:decision,slot_id:slotId,creative_version_id:version??null,version_kind:version?kind:null,reason:feedback,context:{format:s.format,channel:s.channel,pillar:s.pillar}});
+  }
   return result;
  }
  bulkSubmit(user:string,id:string,body:unknown) {

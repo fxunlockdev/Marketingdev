@@ -652,7 +652,12 @@ test('review feedback reaches the actual skill input and image editing uses the 
  version=(await canvas.project(alice,brand.id,linkedSlot.project_id)).versions.find(v=>v.id===s.creative_version_id);
  transport=async(url,init)=>{const path=new URL(url).pathname;if(path==='/v1/responses'){const payload=JSON.parse(init.body);sawFeedback=JSON.stringify(payload).includes('Use a calmer visual')&&JSON.stringify(payload).includes('Less clutter');}if(path==='/v1/images/edits')sawEdit=true;return standard(url,init);};
  try{
+  await assert.rejects(slotCreatives.generate(editor,brand.id,s.id,{revision:s.revision-1,feedback:'Stale request'},randomUUID()),/changed/);
   const j=await slotCreatives.generate(editor,brand.id,s.id,{revision:s.revision,feedback:'Less clutter'},randomUUID());
+  // One signal per customer action, carrying their own words rather than the generated prompt.
+  const signals=(await admin.query('SELECT kind,slot_id,creative_version_id,version_kind,reason,actor_id FROM app.creative_signals WHERE slot_id=$1 OR creative_version_id=$2 ORDER BY created_at,id',[s.id,s.creative_version_id])).rows;
+  assert.deepEqual(signals.map(r=>[r.kind,r.creative_version_id,r.reason,r.actor_id]),[['regenerated',null,'Keep it simple',alice],['changes_requested',s.creative_version_id,'Use a calmer visual',alice],['regenerated',s.creative_version_id,'Less clutter',editor]]);
+  assert.ok(signals.every(r=>r.slot_id===s.id));
   assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.ok(sawFeedback&&sawEdit);
  }finally{transport=undefined;}
  linkedSlot=(await slotCreatives.detail(alice,brand.id,s.id)).slot;assert.equal(linkedSlot.state,'draft_ready');assert.notEqual(linkedSlot.creative_version_id,s.creative_version_id);assert.equal(linkedSlot.approved_by,null);
@@ -1213,4 +1218,77 @@ test('stock-backed creative that is nearly a copy of its stock photo is regenera
   assert.equal(v.qa.verdict,'flag');
   assert.deepEqual(v.qa.stock_source.checks.map(c=>c.too_close),[true,true]);
  }finally{transport=undefined;await admin.query('DELETE FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);}
+});
+
+test('retrying failed campaign posts records one signal per post; a refused retry records none',async()=>{
+ await grant(100000000);transport=undefined;
+ const plan=await plans.create(alice,brand.id,{title:'TEST retry batch',objective:'Explain the offering',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',planned_at:'2026-11-03T08:00:00Z',format:'static',brief:'Our scheduling tool',pillar:'Education',hook:'A calmer day',cta:'Learn more'}]},randomUUID());
+ const [s]=(await plans.list(alice,brand.id,{start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:plan.id})).slots;
+ const quote=(await slotCreatives.batchStatus(alice,brand.id,plan.id)).quote,body={slots:[{id:s.id,revision:s.revision}],credit_cap:quote.slots.reduce((n,q)=>n+q.credits,0)};
+ const signals=async()=>(await admin.query('SELECT kind,slot_id,reason,context,actor_id FROM app.creative_signals WHERE slot_id=$1 ORDER BY created_at,id',[s.id])).rows;
+ const first=await slotCreatives.generateBatch(alice,brand.id,plan.id,body,randomUUID());
+ assert.deepEqual(await signals(),[],'a first generation is not feedback');
+ await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,retry_failed:true},randomUUID()),/Only posts whose last attempt failed/);
+ assert.deepEqual(await signals(),[]);
+ await admin.query("UPDATE app.jobs SET status='failed',error_code='CREATIVE_RETRIES_EXHAUSTED' WHERE id=$1",[first.jobs[0].id]);
+ const current=(await slotCreatives.detail(alice,brand.id,s.id)).slot;body.slots=[{id:s.id,revision:current.revision}];
+ const key=randomUUID(),retried=await slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,retry_failed:true},key);
+ await slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,retry_failed:true},key);
+ assert.deepEqual(await signals(),[{kind:'retried',slot_id:s.id,reason:'Retried after generation failed',context:{format:'static',channel:'linkedin',pillar:'Education'},actor_id:alice}]);
+ await canvas.cancel(alice,brand.id,retried.jobs[0].id);await handler.run(scope(retried.jobs[0]));
+});
+test('portrait feed posts are composed at 4:5; a 2:3 portrait made earlier stays editable at its own size',async()=>{
+ const portrait={placement:'feed',aspect:'portrait',slide_count:null};
+ transport=directedTransport({images:[await coloured(1024,1536,'#335577')]});
+ const j=await canvas.submit(alice,brand.id,thread.id,{...request('Create a portrait post'),size:'1024x1536',creative_spec:portrait},randomUUID());
+ assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));
+ const v=await versionOf(j);
+ assert.equal(v.width,1024);assert.equal(v.height,1280);assert.equal(v.design.width,1024);assert.equal(v.design.height,1280);
+ assert.deepEqual(v.skill_manifest.framing.crop,{left:0,top:128,width:1024,height:1280});
+ assert.match(transport.log.prompts[0],/1024x1280/);
+ // A legacy 2:3 portrait: the same stored image, recorded at the size portraits used to be.
+ const legacy=(await admin.query('SELECT v.id,v.media_id,v.project_id FROM app.creative_requests r JOIN app.creative_versions v ON v.id=r.output_version_id WHERE r.job_id=$1',[j.id])).rows[0];
+ const legacyBytes=await coloured(1024,1536,'#557733'),legacyKey=`creative/${org.id}/${brand.id}/${j.id}/${digest(legacyBytes)}`;
+ await store.persist(legacyKey,legacyBytes,'image/png',digest(legacyBytes));
+ await admin.query('UPDATE app.creative_media SET object_key=$2,sha256=$3,bytes=$4,height=1536 WHERE id=$1',[legacy.media_id,legacyKey,digest(legacyBytes),legacyBytes.length]);
+ await admin.query("UPDATE app.creative_versions SET design=jsonb_set(design,'{height}','1536') WHERE id=$1",[legacy.id]);
+ await assert.rejects(async()=>canvas.submit(alice,brand.id,thread.id,{...request('Wrong size edit'),size:'1024x1024',creative_spec:portrait,parent_version_id:legacy.id},randomUUID()),/source size/);
+ transport=directedTransport({images:[await coloured(1024,1536,'#775533')]});
+ const edit=await canvas.submit(alice,brand.id,thread.id,{...request('Make it brighter'),size:'1024x1536',creative_spec:portrait,parent_version_id:legacy.id},randomUUID());
+ assert.equal(await handler.run(scope(edit)),'succeeded',JSON.stringify(await row(edit)));
+ const child=await versionOf(edit);
+ assert.equal(child.width,1024);assert.equal(child.height,1536,'the legacy size is kept so saved layers still fit');assert.equal(child.design.height,1536);
+ assert.equal(child.skill_manifest.framing??null,null);
+ assert.ok(!transport.log.prompts[0].includes('is cropped from this canvas'),'no crop is described when nothing is cropped');
+});
+test('the worker storage check uses the same 30-day window as Canvas, so older work never blocks a business',async()=>{
+ await grant(100000000);transport=directedTransport({images:[await coloured(1024,1024,'#224466')]});
+ // 26 stored images of 20 MB each: more than the 512 MB allowance when they are recent.
+ const jobs=Array.from({length:26},()=>randomUUID());
+ try{
+  for(const job of jobs){
+   await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'plan.generate','succeeded')",[job,org.id,brand.id,alice]);
+   await admin.query("INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height,created_at) VALUES($1,$2,$3,$4,$5,$6,20971520,1024,1024,now()-interval '31 days')",[randomUUID(),org.id,brand.id,job,`STORAGE-FIXTURE-${job}`,'0'.repeat(64)]);
+  }
+  const old=await canvas.submit(alice,brand.id,thread.id,request('Old work does not count'),randomUUID());
+  assert.equal(await handler.run(scope(old)),'succeeded',JSON.stringify(await row(old)));
+  await admin.query('UPDATE app.creative_media SET created_at=now() WHERE job_id=ANY($1::uuid[])',[jobs]);
+  await assert.rejects(canvas.submit(alice,brand.id,thread.id,request('Recent work counts'),randomUUID()),/storage limit/);
+ }finally{
+  transport=undefined;
+  await admin.query('DELETE FROM app.creative_media WHERE job_id=ANY($1::uuid[])',[jobs]);await admin.query('DELETE FROM app.jobs WHERE id=ANY($1::uuid[])',[jobs]);
+ }
+});
+test('review reads expose bounded quality fields, never the raw checker report',async()=>{
+ const checked=(await admin.query("SELECT v.id,v.project_id,v.qa FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id AND p.latest_version_id=v.id JOIN app.creative_media m ON m.id=v.media_id WHERE v.brand_id=$1 AND v.qa->>'verdict' IN ('pass','flag') AND m.width=1024 AND m.height=1024 ORDER BY v.created_at DESC LIMIT 1",[brand.id])).rows[0];
+ assert.ok(checked,'an earlier test stored a checked creative');
+ const fields=['expected_text','found_text','message','notes','retried','text_matches','text_mode','verdict'];
+ const shown=(await canvas.project(alice,brand.id,checked.project_id)).versions.find(v=>v.id===checked.id).qa;
+ assert.deepEqual(Object.keys(shown).sort(),fields);assert.equal(shown.verdict,checked.qa.verdict);assert.match(shown.message,/^(Text checked|Checked|Needs a look)/);
+ assert.ok(!JSON.stringify(shown).includes(checked.qa.model),'the checker model and attempts stay on the server');
+ const s=await plannedSlot();
+ await plans.edit(alice,brand.id,s.id,{revision:s.revision,creative_version_id:checked.id});
+ const slot=(await slotCreatives.detail(alice,brand.id,s.id)).slot;
+ assert.deepEqual(slot.qa,shown);
+ assert.equal((await slotCreatives.detail(alice,brand.id,(await plannedSlot()).id)).slot.qa,null,'a post without a creative has no quality fields');
 });

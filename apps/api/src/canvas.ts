@@ -1,8 +1,11 @@
 import {generationTimingEstimate} from './generation-timing.js';
 import {parseCreateDraft} from './create-chat-draft.js';
-import {normalizeCreativeSpec,creativeSourceSize,creativeDimensions} from "./campaign-formats.js";
+import {normalizeCreativeSpec,creativeSourceSize,matchesCreativeDimensions} from "./campaign-formats.js";
 import {planningLearning} from './learning-context.js';
 import {recordSignal} from './learning-signals.js';
+import {GENERATION_LIMITS} from './creative-budget.js';
+import {creativeMediaUsed,creativeStorageFits} from './creative-storage.js';
+import {qaSummary} from './creative-qa-summary.js';
 import {editSignal,manifestContext} from './creative-edit-signal.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
@@ -199,7 +202,7 @@ export class Canvas {
     threadId: string,
     body: unknown,
     requestKey: unknown,
-    scoped?: { db: any; b: any; batchJobIds?: string[] },
+    scoped?: { db: any; b: any; batchJobIds?: string[]; recordSignal?: boolean },
   ) {
     threadId = uuid(threadId);
     const v = object(body, [
@@ -294,9 +297,11 @@ export class Canvas {
             "SELECT count(*)::int AS n FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND created_at>now()-interval '1 day'",
             [b.organization_id, id],
           )
-        ).rows[0].n >= 90
+        ).rows[0].n >= GENERATION_LIMITS.dailyImages
       )
         throw new ConflictException("Daily creative request limit reached");
+      // Refuse before queuing with the same window the worker applies, instead of failing later.
+      if(!creativeStorageFits(await creativeMediaUsed(db,b.organization_id,id)))throw new ConflictException(`Creative storage limit reached for the last ${GENERATION_LIMITS.windowDays} days. Archive creatives you no longer need, or try again later.`);
       const brain = (
         await db.query(
           "SELECT id FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1",
@@ -323,9 +328,9 @@ export class Canvas {
             "Open the latest version before requesting an image edit",
           );
         if(version.skill_manifest?.creative_spec&&!creativeSpec)throw new BadRequestException("Keep the saved post format when editing this image");
-        const target=creativeSpec?creativeDimensions(creativeSpec):null;
         if (creativeSpec && version.skill_manifest?.creative_spec && ['placement','aspect','slide_count'].some(k=>(version.skill_manifest.creative_spec as any)[k]!==(creativeSpec as any)[k]))throw new BadRequestException("Keep the current post placement when editing this image");
-        if (target?version.width!==target.width||version.height!==target.height:`${version.width}x${version.height}` !== v.size)
+        // A 2:3 portrait made before 4:5 stays editable at its own size.
+        if (creativeSpec?!matchesCreativeDimensions(creativeSpec,version):`${version.width}x${version.height}` !== v.size)
           throw new BadRequestException(
             "Keep the current dimensions when editing this image",
           );
@@ -376,7 +381,8 @@ export class Canvas {
         [randomUUID(), b.organization_id, id, threadId, job, prompt],
       );
       // A request to change an existing image says the previous one was not right yet.
-      if(parent)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'regenerated',creative_version_id:parent,version_kind:'creative',reason:prompt});
+      // Callers that know the customer's own words (a post's feedback) record the signal themselves.
+      if(parent&&scoped?.recordSignal!==false)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'regenerated',creative_version_id:parent,version_kind:'creative',reason:prompt});
       await db.query(
         "INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.generate')",
         [job, b.organization_id, id],
@@ -403,12 +409,13 @@ export class Canvas {
       if (!p) throw new NotFoundException("Creative not found");
       return {
         project: p,
+        // The stored quality report is reduced to bounded review fields; raw checker output stays here.
         versions: (
           await db.query(
-            "SELECT id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,status,review_revision,reviewed_at,created_at FROM app.creative_versions WHERE organization_id=$1 AND brand_id=$2 AND project_id=$3 ORDER BY created_at DESC,id",
+            "SELECT id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,status,review_revision,reviewed_at,created_at,qa FROM app.creative_versions WHERE organization_id=$1 AND brand_id=$2 AND project_id=$3 ORDER BY created_at DESC,id",
             [b.organization_id, id, projectId],
           )
-        ).rows,
+        ).rows.map(({qa,...version}:{qa:unknown}&Record<string,unknown>)=>({...version,qa:qaSummary(qa)})),
         reviews: (
           await db.query(
             "SELECT r.version_id,r.decision,r.feedback,r.created_at FROM app.creative_reviews r JOIN app.creative_versions v ON v.id=r.version_id WHERE v.project_id=$1 ORDER BY r.created_at",
@@ -566,7 +573,7 @@ export class Canvas {
           v.feedback,
         ],
       );
-      if(v.decision==='approved'||v.decision==='rejected')await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:v.decision,creative_version_id:versionId,version_kind:'creative',reason:String(v.feedback),context:manifestContext(version.skill_manifest)});
+      if(v.decision==='approved'||v.decision==='rejected'||v.decision==='changes_requested')await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:v.decision,creative_version_id:versionId,version_kind:'creative',reason:String(v.feedback),context:manifestContext(version.skill_manifest)});
       return {
         id: versionId,
         status: v.decision,

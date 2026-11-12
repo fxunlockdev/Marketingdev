@@ -49,5 +49,7 @@ test('the image prompt is told what the crop removes and where the story interfa
  assert.match(story,/No borders, bars, frames or blank bands/);assert.match(story,/top 14% and bottom 20%/);
  const portrait=frameDirection({placement:'feed',aspect:'portrait',slide_count:null},{width:1024,height:1280});
  assert.match(portrait,/1024x1280/);assert.match(portrait,/about 9% is cut from the top and from the bottom/);assert.ok(!portrait.includes('story'));
- for(const aspect of ['square','landscape','portrait'])assert.equal(frameDirection({placement:'feed',aspect,slide_count:null}),undefined);
+ for(const aspect of ['square','landscape'])assert.equal(frameDirection({placement:'feed',aspect,slide_count:null}),undefined);
+ // Portrait is 4:5 by default now, so the prompt always states the trimmed top and bottom.
+ assert.equal(frameDirection({placement:'feed',aspect:'portrait',slide_count:null}),portrait);
 });

@@ -6,6 +6,7 @@ import {Canvas} from './canvas.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {object,uuid} from './workspaces.js';
 import {GENERATION_LIMITS} from './creative-budget.js';
+import {recordSignal} from './learning-signals.js';
 type Page={creative_version_id:string;export_id:string;alt_text:string};
 const plain=(v:unknown,max:number)=>typeof v==='string'&&v.trim().length>0&&v.length<=max&&!/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(v);
 export const carouselFingerprint=(v:any,pages:any[])=>hash(canonicalJSON({title:v.title,caption:v.caption,channel:v.channel,pages:pages.map(p=>({creative_version_id:p.creative_version_id,export_id:p.export_id,alt_text:p.alt_text,source_sha256:p.source_sha256,sha256:p.sha256}))}));
@@ -84,7 +85,9 @@ export class Carousels {
    const pages=await this.pages(db,id);if(row.latest_version_id!==id||!this.current(pages)||carouselFingerprint(row,pages)!==row.sha256||v.sha256!==row.sha256||row.review_revision!==v.revision)throw new ConflictException('Refresh and review the current carousel');
    if(v.decision==='in_review'? !['draft','changes_requested','rejected'].includes(row.status):row.status!=='in_review')throw new ConflictException('Submit this carousel for review before deciding');
    const revision=Number(v.revision)+1;await db.query('UPDATE app.carousel_versions SET status=$2,review_revision=$3,reviewed_by=$4,reviewed_at=now() WHERE id=$1',[id,v.decision,revision,v.decision==='in_review'?null:user]);
-   await db.query('INSERT INTO app.carousel_reviews(id,organization_id,brand_id,version_id,actor_id,decision,feedback,revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[randomUUID(),b.organization_id,brand,id,user,v.decision,v.feedback,revision]);return {id,status:v.decision,review_revision:revision};
+   await db.query('INSERT INTO app.carousel_reviews(id,organization_id,brand_id,version_id,actor_id,decision,feedback,revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[randomUUID(),b.organization_id,brand,id,user,v.decision,v.feedback,revision]);
+   if(v.decision!=='in_review')await recordSignal(db,{organizationId:b.organization_id,brandId:brand,actorId:user},{kind:v.decision as 'approved'|'rejected'|'changes_requested',creative_version_id:id,version_kind:'carousel',reason:String(v.feedback),context:{format:'carousel',channel:String(row.channel)}});
+   return {id,status:v.decision,review_revision:revision};
   },v.decision!=='in_review');
  }
 }
