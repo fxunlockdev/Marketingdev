@@ -10,6 +10,7 @@ import {Notice,Loading} from './primitives';
 import {defaultMix} from './campaign-mix-picker';
 import {CAMPAIGN_STYLES,CAMPAIGN_FONTS,CAMPAIGN_CREATIVITY} from '../../api/src/campaign-design';
 import {localMinute,addDays,localCandidates} from '../../api/src/local-calendar';
+import {planHorizon} from '../../api/src/planning-schema';
 import './create-chat.css';
 import {DesvioDatePicker} from './desvio-date-picker';
 type Message={role:'assistant'|'user';text:string};
@@ -77,7 +78,7 @@ function GuidedCreateChat({business}:{business:{id:string;name:string;role:strin
    if(job&&['failed','rejected','unknown','canceled'].includes(job.status)){setJobFailed(true);setError(new Error('Planning needs attention. Your request is saved; open Campaigns to review its status.'));return;}
   }catch(e){if(active)setError(e);}if(active)timer=setTimeout(poll,2500);};void poll();return()=>{active=false;clearTimeout(timer);};
  },[draft.thread,draft.planId,root]);
- useEffect(()=>{if(!draft.planId)return;let active=true;void api(root+'/content-plans/'+draft.planId).then(async p=>{const q=new URLSearchParams({plan_id:p.id,start:p.starts_on+'T00:00:00Z',end:addDays(p.starts_on,p.duration_days+1)+'T00:00:00Z'});const result=await api(root+'/content-plan?'+q);if(active)setTopics(result.slots);}).catch(setError);return()=>{active=false;};},[draft.planId,root,topicRetry]);
+ useEffect(()=>{if(!draft.planId)return;let active=true;void api(root+'/content-plans/'+draft.planId).then(async p=>{const horizon=planHorizon(p.duration_days,p.starts_on,p.timezone);const q=new URLSearchParams({plan_id:p.id,start:horizon.start,end:horizon.end});const result=await api(root+'/content-plan?'+q);if(active)setTopics(result.slots);}).catch(setError);return()=>{active=false;};},[draft.planId,root,topicRetry]);
  useEffect(()=>{if(draft.mode!=='strategy')return;let active=true;void api(root+'/strategies').then(r=>{if(active)setStrategyQuote(r.quote);}).catch(setError);return()=>{active=false;};},[draft.mode,root,quoteRetry]);
  async function clearDraft(snapshot:Draft){
   saveEpoch.current++;if(saveTimer.current)clearTimeout(saveTimer.current);
