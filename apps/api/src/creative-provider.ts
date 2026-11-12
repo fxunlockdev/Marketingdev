@@ -12,6 +12,19 @@ import {
   type PlannerResponse,
 } from "./creative-contracts.js";
 import { digest } from "./object-store.js";
+/** A vision check: one system message, one user message with text and a single image, strict JSON out. */
+export type InspectionBody = {
+  model: string;
+  store: false;
+  max_output_tokens: number;
+  input: [
+    { role: "system"; content: string },
+    { role: "user"; content: [{ type: "input_text"; text: string }, { type: "input_image"; image_url: string; detail: "high" }] },
+  ];
+  reasoning?: { effort: "low" | "medium" | "high" };
+  text: { format: { type: "json_schema"; name: string; strict: true; schema: Record<string, unknown> } };
+};
+export type InspectionResponse = { content: string; response_id?: string; usage?: unknown };
 export class CreativeProvider {
   readonly sdk?: OpenAI;
   constructor(key?: string, sdk?: OpenAI) {
@@ -136,6 +149,29 @@ export class CreativeProvider {
       response_id: response.id,
       usage: response.usage,
     };
+  }
+  /** Send one image for inspection. No tools, nothing stored, never retried. */
+  async inspect(body: InspectionBody): Promise<InspectionResponse> {
+    if (!this.sdk) throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
+    const image = body.input[1]?.content[1];
+    if (
+      body.store !== false ||
+      body.input.length !== 2 ||
+      image?.type !== "input_image" ||
+      !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(image.image_url)
+    )
+      throw new CreativeError("CREATIVE_INSPECTION_INVALID");
+    const response = await this.sdk.responses.create(body, { timeout: 60000 });
+    if (
+      response.status !== "completed" ||
+      response.output.some(
+        (o: any) =>
+          o.type === "message" &&
+          o.content.some((c: any) => c.type === "refusal"),
+      )
+    )
+      throw new CreativeError("CREATIVE_INSPECTION_REJECTED");
+    return { content: response.output_text, response_id: response.id, usage: response.usage };
   }
   imageRequest(
     model: string,

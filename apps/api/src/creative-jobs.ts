@@ -4,6 +4,7 @@ import {StockError} from './vecteezy-client.js';
 import {imagePlanningRates} from './creative-planning.js';
 import {buildImagePrompt} from './image-prompt.js';
 import {resolveTextMode,inImageCopy} from './image-typography.js';
+import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,type QaAttempt,type QaExpectation,type QaReport} from './image-qa.js';
 import {frameCreative} from "./creative-framing.js";
 import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
 import {approvedBrandFont} from './brand-typography.js';
@@ -36,6 +37,12 @@ const terminal = new Set([
   "canceled",
   "unknown",
 ]);
+/** Why an optional step (quality check, its regeneration) could not run, or null when the job itself must stop.
+ * Losing access still stops the job; a spent budget or provider fault only costs the optional step. */
+function optionalFailure(error:unknown):string|null{
+  if(monthlyBudgetExceeded(error))return 'MONTHLY_GENERATION_BUDGET_EXHAUSTED';
+  return error instanceof CreativeError&&error.code!=='CREATIVE_ACCESS_REVOKED'?error.code:null;
+}
 export class CreativeJobs {
   constructor(
     readonly jobs: AssetJobs,
@@ -43,6 +50,8 @@ export class CreativeJobs {
     readonly provider: CreativeProvider,
     readonly gemini:GeminiPlanner=new GeminiPlanner(),
     readonly stock?:StockAssets,
+    /** Vision check after each image. Absent: images are stored unchecked, as before. */
+    readonly qa?:ImageQa,
   ) {}
   planner(provider:string){if(provider!=="openai"&&provider!=="gemini")throw new CreativeError("CREATIVE_CONFIG_CHANGED");return provider==="gemini"?this.gemini:this.provider;}
   async plannerGrant(db:any,j:any,provider:string){
@@ -73,14 +82,18 @@ export class CreativeJobs {
     cost: (grant: any) => number,
     action: () => Promise<any>,
     providerName="openai",
+    // Optional calls (quality check, its one regeneration) never leave a request uncertain:
+    // a failure is recorded as rejected and the caller carries on with what it has.
+    options:{optional?:boolean}={},
   ) {
+    const imageStep=step==='image'||step==='image:retry',qaStep=step.startsWith('qa:');
     const prepared = await this.jobs.transaction(scope, async (db, j) => {
       if (!(await this.jobs.permitted(db, j)))
         throw new CreativeError("CREATIVE_ACCESS_REVOKED");
       const memorySQL=j.kind==='carousel.generate'?'SELECT memory_context FROM app.carousel_requests WHERE job_id=$1':j.kind==='creative.video'?'SELECT memory_context FROM app.video_requests WHERE job_id=$1':'SELECT memory_context FROM app.creative_requests WHERE job_id=$1';
       await assertLearningCurrent(db,(await db.query(memorySQL,[j.id])).rows[0]?.memory_context);
       const carousel=(await db.query('SELECT r.canceled FROM app.carousel_children c JOIN app.carousel_requests r ON r.job_id=c.parent_job_id WHERE c.generation_job_id=$1',[j.id])).rows[0];if(carousel?.canceled)throw new CreativeError('CREATIVE_ACCESS_REVOKED');
-      if(step==='image'){if(providerName!=='openai')throw new CreativeError('CREATIVE_CONFIG_CHANGED');}
+      if(imageStep||qaStep){if(providerName!=='openai')throw new CreativeError('CREATIVE_CONFIG_CHANGED');}
       else {
         const sql=j.kind==='carousel.generate'?'SELECT text_provider,selected_text_model FROM app.carousel_requests WHERE job_id=$1':j.kind==='creative.video'?'SELECT text_provider,selected_text_model FROM app.video_requests WHERE job_id=$1':'SELECT text_provider,selected_text_model FROM app.creative_requests WHERE job_id=$1';
         const bound=(await db.query(sql,[j.id])).rows[0];
@@ -96,6 +109,14 @@ export class CreativeJobs {
         if (previous.provider!==providerName || previous.model !== model || previous.input_sha256 !== inputHash)
           return { blocked: "CREATIVE_REPLAY_MISMATCH" };
         if (previous.status === "succeeded") return { cached: previous.result };
+        if (options.optional) {
+          if (previous.status === "submitted")
+            await db.query(
+              "UPDATE app.creative_calls SET status='rejected' WHERE job_id=$1 AND step=$2",
+              [j.id, step],
+            );
+          return { blocked: QA_UNAVAILABLE };
+        }
         if (previous.status === "submitted")
           await db.query(
             "UPDATE app.creative_calls SET status='unknown' WHERE job_id=$1 AND step=$2",
@@ -112,7 +133,7 @@ export class CreativeJobs {
       if((await db.query('SELECT 1 FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id WHERE c.job_id=$1 AND r.revoked_at IS NOT NULL',[j.id])).rowCount)throw new CreativeError('CREATIVE_REFERENCE_REVOKED');
       const grant=await this.plannerGrant(db,j,providerName);
       if (!grant) throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
-      if (!(step!=="image" && ["creative.generate","carousel.generate"].includes(j.kind) && acceptsModel('brief',model)) && model !== (step === "image" ? grant.image_model : grant.text_model))
+      if (qaStep ? !acceptsModel('check',model) : !(!imageStep && ["creative.generate","carousel.generate"].includes(j.kind) && acceptsModel('brief',model)) && model !== (imageStep ? grant.image_model : grant.text_model))
         throw new CreativeError("CREATIVE_CONFIG_CHANGED");
       const reserved = Math.ceil(cost(grant)),
         used = Number(
@@ -136,7 +157,7 @@ export class CreativeJobs {
           // Do not pay for planning when the request cannot also afford its image.
           // Existing image reservations are already included in spent on replay.
           let remainingImage=0;
-          if(j.kind==='creative.generate'&&step!=='image'&&!(await db.query("SELECT 1 FROM app.creative_calls WHERE job_id=$1 AND step='image'",[j.id])).rowCount){
+          if(j.kind==='creative.generate'&&!imageStep&&!qaStep&&!(await db.query("SELECT 1 FROM app.creative_calls WHERE job_id=$1 AND step='image'",[j.id])).rowCount){
             const count=Number((await db.query('SELECT count(*)::int AS n FROM app.creative_references WHERE job_id=$1',[j.id])).rows[0].n);
             remainingImage=Number(grant.max_image_request_micros)*(1+count+(this.stock?1:0));
           }
@@ -164,7 +185,7 @@ export class CreativeJobs {
       await this.jobs.transaction(scope, async (db, j) => {
         await db.query(
           "UPDATE app.creative_calls SET status=$3 WHERE job_id=$1 AND step=$2",
-          [j.id, step, known ? "rejected" : "unknown"],
+          [j.id, step, known || options.optional ? "rejected" : "unknown"],
         );
       });
       throw new CreativeError(
@@ -184,6 +205,35 @@ export class CreativeJobs {
       );
     });
     return result;
+  }
+  /** One vision check of a stored image. Any failure of the check itself is 'unavailable', never a failed creative. */
+  private async qaAttempt(scope:JobScope,step:'qa:1'|'qa:2',media:{object_key:string;sha256:string},expectation:QaExpectation):Promise<QaAttempt>{
+    const qa=this.qa!;
+    try{
+      const bytes=await this.jobs.store.read(media.object_key);
+      if(digest(bytes)!==media.sha256)throw new CreativeError(QA_UNAVAILABLE);
+      const wire=qa.request(await qaPreview(bytes),expectation);
+      const finding=await this.call(scope,step,wire.model,wire.sha256,()=>qa.reservation(wire),()=>qa.check(wire),"openai",{optional:true});
+      return {step,media_sha256:media.sha256,status:'checked',finding};
+    }catch(error){
+      const reason=optionalFailure(error);
+      if(!reason)throw error;
+      return {step,media_sha256:media.sha256,status:'unavailable',reason};
+    }
+  }
+  /** Check the image; on 'retry' regenerate exactly once with the checker's notes. Never loops. */
+  private async inspected<M extends {object_key:string;sha256:string}>(scope:JobScope,first:M,expectation:QaExpectation,regenerate:(notes:string)=>Promise<M>):Promise<{image:M;qa:QaReport|null}>{
+    if(!this.qa?.configured)return {image:first,qa:null};
+    const model=this.qa.model,initial=await this.qaAttempt(scope,'qa:1',first,expectation);
+    if(initial.status!=='checked'||settleVerdict(initial.finding,expectation)!=='retry')return {image:first,qa:qaReport(model,expectation,[initial],false)};
+    let second:M;
+    try{second=await regenerate(qaRetryNotes(initial.finding,expectation));}
+    catch(error){
+      const reason=optionalFailure(error);
+      if(!reason)throw error;
+      return {image:first,qa:qaReport(model,expectation,[initial],false,reason)};
+    }
+    return {image:second,qa:qaReport(model,expectation,[initial,await this.qaAttempt(scope,'qa:2',second,expectation)],true)};
   }
   async run(scope: JobScope) {
     try {
@@ -354,7 +404,8 @@ export class CreativeJobs {
       );
       const artwork=request.creative_spec?.artwork;
       const textMode=resolveTextMode({brief:plan.brief,artwork,parent:parent?{hasOverlayText:parent.design.layers.some((l:any)=>String(l.text??'').trim()),textMode:parent.skill_manifest?.text_mode}:null});
-      const prompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork});
+      const basePrompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork});
+      const render=async(step:'image'|'image:retry',prompt:string)=>{
       const wire = this.provider.imageRequest(
         grant.image_model,
         prompt,
@@ -362,9 +413,9 @@ export class CreativeJobs {
         grant.quality,
         hash(`${scope.organizationId}:${prepared.actor}`),
       );
-      const image = await this.call(
+      return this.call(
         scope,
-        "image",
+        step,
         grant.image_model,
         hash(
           canonicalJSON({ wire, parent_sha256: parent?.media_sha256 ?? null,...(referenceManifest.length?{references:referenceManifest}:{}) }),
@@ -433,7 +484,12 @@ export class CreativeJobs {
           });
           return media;
         },
+        "openai",
+        {optional:step==='image:retry'},
       );
+      };
+      const first=await render('image',basePrompt);
+      const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity),notes=>render('image:retry',basePrompt+notes));
       return this.jobs.transaction(scope, async (db, j) => {
         if (terminal.has(j.status)) return j.status;
         if (!(await this.jobs.permitted(db, j)))
@@ -498,7 +554,7 @@ export class CreativeJobs {
           reserved_cost_micros: reserved,
         };
         await db.query(
-          "INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,parent_id,brain_id,job_id,media_id,design,caption,skill_manifest,sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)",
+          "INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,parent_id,brain_id,job_id,media_id,design,caption,skill_manifest,sha256,created_by,qa) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
           [
             version,
             j.organization_id,
@@ -513,6 +569,7 @@ export class CreativeJobs {
             JSON.stringify(manifest),
             sha,
             j.requested_by,
+            qa ? JSON.stringify(qa) : null,
           ],
         );
         await db.query(
