@@ -21,6 +21,21 @@ import {
 function withKnowledge<T extends {brand:object}>(input:T,knowledge?:PromptKnowledge):T{
   return knowledge?{...input,brand:{...input.brand,knowledge}}:input;
 }
+/** Brand Engine recipe files every fresh image or carousel brief must have loaded (preloaded by the sandbox). */
+export const BRAND_ENGINE_RECIPES=['/skills/brand-engine/references/design-recipes.md','/skills/brand-engine/references/asset-recipes.md'] as const;
+/** Sandbox wall clock (runtime.py RUN_SECONDS) plus container start-up, under the 6-minute planning activity. */
+export const SKILL_RUN_TIMEOUT_MS=340000;
+export type SkillTask='creative'|'carousel'|'content_plan'|'video'|'performance_analysis'|'strategy'|'blog';
+export function skillTask(input:unknown):SkillTask{
+  const task=(input as {task?:unknown})?.task;
+  return typeof task==='string'?task as SkillTask:'creative';
+}
+/** True unless an image task's fresh result lacks the Brand Engine recipes in its reads manifest. */
+export function hasBrandEngineRecipes(value:unknown,task:SkillTask):boolean{
+  if(task!=='creative'&&task!=='carousel')return true;
+  const reads=(value as {reads?:unknown})?.reads;
+  return Array.isArray(reads)&&BRAND_ENGINE_RECIPES.every(path=>reads.includes(path));
+}
 export class SkillRuntime {
   constructor(readonly image?: string) {}
   get configured() {
@@ -102,7 +117,7 @@ export class SkillRuntime {
         };
         const timer = setTimeout(
           () => done(new CreativeError("SKILL_RUNTIME_TIMEOUT")),
-          250000,
+          SKILL_RUN_TIMEOUT_MS,
         );
         child.on("error", () =>
           done(new CreativeError("SKILL_RUNTIME_UNAVAILABLE")),
@@ -153,7 +168,7 @@ export class SkillRuntime {
               if (pending || value.model_calls !== step)
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               try {
-                if (!hasCurrentProductionRules(value)) throw new CreativeError("SKILL_LOAD_INCOMPLETE");
+                if (!hasCurrentProductionRules(value)||!hasBrandEngineRecipes(value,skillTask(input))) throw new CreativeError("SKILL_LOAD_INCOMPLETE");
                 done(undefined, validate(value));
               } catch (error) {
                 done(error as Error);
