@@ -44,6 +44,8 @@ export type PlannerMessage = {
   tool_calls?: { id: string; name: string; args: Record<string, unknown> }[];
   tool_call_id?: string;
 };
+export type PlannerImage = { media_type: "image/jpeg"; data: string };
+export const PLANNER_MAX_IMAGES = 24;
 export type PlannerRequest = {
   video_plan?: {fact_ids:string[];duration_seconds:number}; // Trusted video runtime only.
   prompt_suggestion?: boolean; // Trusted composer refinement, no tools or creative actions.
@@ -51,6 +53,8 @@ export type PlannerRequest = {
   content_plan_schema?: Record<string,unknown>; // Trusted planner only.
   carousel_plan_schema?: Record<string,unknown>; // Trusted runtime only.
   creative_fact_ids?: string[]; // Added only by trusted static-creative runtime, never sandbox input.
+  /** Trusted stock ranking only: pictures the text refers to by position. Never sandbox input. */
+  images?: PlannerImage[];
   type: "model";
   step: number;
   messages: PlannerMessage[];

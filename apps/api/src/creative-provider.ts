@@ -7,6 +7,7 @@ import sharp from "sharp";
 import { canonicalJSON, hash } from "./brand-brain.js";
 import {
   CreativeError,
+  PLANNER_MAX_IMAGES,
   creativeBriefSchema,
   type PlannerRequest,
   type PlannerResponse,
@@ -25,7 +26,20 @@ export type InspectionBody = {
   text: { format: { type: "json_schema"; name: string; strict: true; schema: Record<string, unknown> } };
 };
 export type InspectionResponse = { content: string; response_id?: string; usage?: unknown };
+const BASE64=/^[A-Za-z0-9+/]+={0,2}$/;
+/** Request images as low-detail input parts. Anything but a bounded list of base64 JPEG bytes is refused. */
+function plannerImages(value: unknown): { type: "input_image"; image_url: string; detail: "low" }[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > PLANNER_MAX_IMAGES) throw new CreativeError("SKILL_BROKER_INVALID");
+  return value.map((image) => {
+    if (!image || typeof image !== "object" || Object.keys(image).sort().join(",") !== "data,media_type" || image.media_type !== "image/jpeg" || typeof image.data !== "string" || !BASE64.test(image.data))
+      throw new CreativeError("SKILL_BROKER_INVALID");
+    return { type: "input_image" as const, image_url: `data:image/jpeg;base64,${image.data}`, detail: "low" as const };
+  });
+}
 export class CreativeProvider {
+  /** The Responses transport sends request images to the model, so stock ranking may look at previews. */
+  readonly acceptsImages = true;
   readonly sdk?: OpenAI;
   constructor(key?: string, sdk?: OpenAI) {
     this.sdk =
@@ -79,6 +93,13 @@ export class CreativeProvider {
           });
         }
       }
+    }
+    const images = plannerImages(request.images);
+    if (images.length) {
+      // Pictures follow the text of the last user message, in the order that text numbers them.
+      const at = input.map((m) => m.role).lastIndexOf("user");
+      if (at < 0) throw new CreativeError("SKILL_BROKER_INVALID");
+      input[at] = { role: "user", content: [{ type: "input_text", text: input[at].content }, ...images] };
     }
     const body = {
       model,

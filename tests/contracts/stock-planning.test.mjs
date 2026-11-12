@@ -53,3 +53,30 @@ test('the image model is told whether the photo is the base or only inspiration'
  assert.match(stockReferenceLabel('inspiration'),/^Visual inspiration only/);
  for(const use of ['base','inspiration'])assert.match(stockReferenceLabel(use),/[Nn]ot the actual business product/);
 });
+
+test('the OpenAI planner sends stock previews as low-detail images in the hashed request; Gemini declines images',async()=>{
+ const {CreativeProvider}=await import('../../dist/creative-provider.js'),{GeminiPlanner}=await import('../../dist/gemini-planner.js');
+ const provider=new CreativeProvider();
+ assert.equal(provider.acceptsImages,true);
+ const previews=[{id:42,mediaType:'image/jpeg',data:'QUJD'},{id:43,mediaType:'image/jpeg',data:'REVG'}];
+ const request=stockVisionRequest({imagePrompt:'A quiet courtyard'},[...candidates,{id:43,title:'Garden',previewURL:null,aiGenerated:false}],previews);
+ const wire=provider.plannerRequest({...request,step:1},'MOCK-plan');
+ const user=wire.body.input.find(m=>m.role==='user');
+ assert.equal(user.content[0].type,'input_text');assert.equal(user.content[0].text,request.messages[1].content);
+ assert.deepEqual(user.content.slice(1),[{type:'input_image',image_url:'data:image/jpeg;base64,QUJD',detail:'low'},{type:'input_image',image_url:'data:image/jpeg;base64,REVG',detail:'low'}]);
+ // Different pictures, different request hash: a replay can never pair a recorded answer with other images.
+ const other=provider.plannerRequest({...request,step:1,images:[{media_type:'image/jpeg',data:'WFla'},request.images[1]]},'MOCK-plan');
+ assert.notEqual(other.sha256,wire.sha256);
+ // Without images the request is exactly as before.
+ const plain=provider.plannerRequest({...request,step:1,images:undefined},'MOCK-plan');
+ assert.equal(plain.body.input.find(m=>m.role==='user').content,request.messages[1].content);
+ assert.equal(provider.plannerRequest({...request,step:1,images:[]},'MOCK-plan').sha256,plain.sha256);
+ // Bounded and strictly shaped.
+ for(const images of [Array(25).fill({media_type:'image/jpeg',data:'QUJD'}),[{media_type:'image/png',data:'QUJD'}],[{media_type:'image/jpeg',data:'not base64!'}],[{media_type:'image/jpeg',data:'QUJD',url:'https://example.com/x.jpg'}],'QUJD'])
+  assert.throws(()=>provider.plannerRequest({...request,step:1,images},'MOCK-plan'),/SKILL_BROKER_INVALID/);
+ assert.throws(()=>provider.plannerRequest({...request,step:1,messages:[request.messages[0]]},'MOCK-plan'),/SKILL_BROKER_INVALID/);
+ assert.equal(provider.plannerRequest({...request,step:1,images:Array(24).fill({media_type:'image/jpeg',data:'QUJD'})},'MOCK-plan').body.input.find(m=>m.role==='user').content.length,25);
+ const gemini=new GeminiPlanner();
+ assert.equal(gemini.acceptsImages,false);
+ assert.throws(()=>gemini.plannerRequest({...request,step:1},'gemini-fixture'),/SKILL_BROKER_INVALID/);
+});

@@ -64,7 +64,8 @@ export class CreativeJobs {
     const provider=this.planner(request.text_provider),model=request.selected_text_model;
     if(!model)throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
     if(!provider.configured)throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
-    const providerMessage=message.step===4||message.step===5?{...message,step:1}:message;
+    // Steps 4 and 5 are trusted stock planning; images arriving on a sandbox step (1-3) are dropped.
+    const providerMessage=message.step===4||message.step===5?{...message,step:1}:{...message,images:undefined};
     const wire=provider.plannerRequest(providerMessage,model,maxOutputTokens);
     return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=acceptsModel('brief',model)?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(providerMessage,model,maxOutputTokens),request.text_provider);
   }
