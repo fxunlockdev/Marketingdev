@@ -3,6 +3,10 @@ import {websiteURL} from './safe-web.js';
 import {VideoProviderError} from './video-provider.js';
 export const RUNWAY_VIDEO_MODEL='runway/router'; // Entitlement, not a model sent to Runway.
 export const RUNWAY_API_VERSION='2024-11-06';
+/** promptText limits encoded from the audited router contract (ADR 0052): the 3-second short-clip profile
+ * takes 1000 characters, the quality router more. Longer prompts are refused by name, never shortened. */
+export const RUNWAY_PROMPT_MAX=26000;
+export const RUNWAY_SHORT_PROMPT_MAX=1000;
 export class RunwayError extends VideoProviderError {}
 export type RunwayIntent={kind:'image';model:typeof RUNWAY_VIDEO_MODEL;idempotencyKey:string;referenceURL:string;prompt:string;durationSeconds:number;sound:'off';aspectRatio:'9:16'|'16:9'|'1:1'|'3:4'|'4:3';maxCredits?:number;routingProfile?:'short-clip-v1'};
 export const validRunwaySecret=(v:unknown):v is string=>typeof v==='string'&&/^[\x21-\x7e]{1,2048}$/.test(v);
@@ -33,6 +37,7 @@ export class RunwayClient {
   return {...intent,maxCredits};
  }
  prepare(intent:RunwayIntent){
+  if(typeof intent?.prompt==='string'&&intent.prompt.length>(intent.routingProfile==='short-clip-v1'?RUNWAY_SHORT_PROMPT_MAX:RUNWAY_PROMPT_MAX))throw new RunwayError('RUNWAY_PROMPT_TOO_LONG');
   try{
    record(intent);id(intent.idempotencyKey);
    if(intent.kind!=='image'||intent.model!==RUNWAY_VIDEO_MODEL||intent.sound!=='off'||!this.#origins.has(url(intent.referenceURL).origin)||typeof intent.prompt!=='string'||!intent.prompt.trim()||intent.prompt.length>26000||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(intent.prompt)||!Number.isInteger(intent.durationSeconds)||intent.durationSeconds<3||intent.durationSeconds>15||!['9:16','16:9','1:1','3:4','4:3'].includes(intent.aspectRatio)||!Number.isInteger(intent.maxCredits)||intent.maxCredits!<1||intent.maxCredits!>10000)fail();
