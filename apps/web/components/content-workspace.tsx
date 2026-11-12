@@ -9,7 +9,7 @@ import {directedPrompt,type Creativity} from './creative-direction';
 import {BrandReferences} from "./brand-references";
 import {GeneratedReplacement} from './generated-replacement';
 import {StockPicker} from "./stock-picker";
-import {PostThumbnail} from "./post-thumbnail";
+import {PostCover} from "./media-image";
 import {CampaignImages} from "./campaign-images";
 import {SavedReferencePreviews} from "./brand-references";
 import {CalendarCarouselReview} from './carousels';
@@ -110,7 +110,7 @@ function DailyPosts({posts,businessId,onOpen,writable,onRefresh}:{posts:any[];bu
  const hasCreative=Boolean(post.creative_version_id||post.video_version_id||post.carousel_version_id);
  return <section className="daily-post-stage" aria-label="Posts for selected day"><div className="daily-post-pager"><button aria-label="Previous post" disabled={current===0} onClick={()=>setIndex(current-1)}>←</button><p role="status">Post {current+1} of {posts.length}</p><button aria-label="Next post" disabled={current>=posts.length-1} onClick={()=>setIndex(current+1)}>→</button></div>
  <article className={`daily-post ${hasCreative?'':'daily-post-unfinished'}`}><header><strong>{name(post.channel)} · {postFormatLabel(post)}</strong><time dateTime={post.planned_at}>{when(post)}</time></header>
- {hasCreative?<PostThumbnail key={post.id} businessId={businessId} post={post}/>:post.reference_ids?.length?<div className="daily-reference"><SavedReferencePreviews businessId={businessId} ids={post.reference_ids.slice(0,1)}/><span>Reference image · final design not generated yet</span></div>:null}
+ {hasCreative?<PostCover key={post.id} businessId={businessId} post={post} priority sizes="(max-width:760px) 100vw, 560px"/>:post.reference_ids?.length?<div className="daily-reference"><SavedReferencePreviews businessId={businessId} ids={post.reference_ids.slice(0,1)}/><span>Reference image · final design not generated yet</span></div>:null}
  <div className="daily-post-copy"><span className={`plan-state state-${post.state}`}>{hasCreative?labels[post.state]:'Topic ready'}</span><h2>{post.hook||post.brief}</h2>{hasCreative&&<p>{post.caption||post.brief}</p>}
  {!hasCreative&&post.format==='static'&&<CampaignImages key={post.id} businessId={businessId} planId={post.plan_id} slots={[post]} disabled={!writable} onRefresh={onRefresh} compact/>}
  <button className={hasCreative?'primary':''} onClick={()=>onOpen(post.id)}>{hasCreative?'Open post':post.format==='video'?'Review script & framing':post.format==='carousel'?'Review carousel topic':'Edit topic & image'}</button></div></article></section>;
@@ -623,7 +623,7 @@ export function ContentWorkspace({
                             aria-label={`Open ${name(s.channel)} post: ${s.hook || s.brief}`}
                           >
                             <span className="calendar-card-heading"><span>{postFormatLabel(s)}</span><time dateTime={s.planned_at}>{localMinute(s.planned_at,prefs.timezone).slice(11)}</time></span>
-                            <PostThumbnail businessId={business.id} post={s}/><strong>{s.hook || s.brief}</strong>
+                            <PostCover businessId={business.id} post={s} sizes="(max-width:760px) 120px, 420px"/><strong>{s.hook || s.brief}</strong>
                             <span className="calendar-card-channel">{name(s.channel)}</span>
                             <span className={`plan-state state-${s.state}`}>
                               {labels[s.state]}
@@ -663,7 +663,7 @@ export function ContentWorkspace({
                       >
                         <span className="list-post-meta">{name(s.channel)} · {when(s)} ({s.timezone})</span>
                         <span className="list-post-format">{postFormatLabel(s)}</span>
-                            <PostThumbnail businessId={business.id} post={s}/><strong>{s.hook || s.brief}</strong>
+                            <PostCover businessId={business.id} post={s} sizes="(max-width:760px) 120px, 420px"/><strong>{s.hook || s.brief}</strong>
                         <span className="list-post-caption">{s.caption || s.brief}</span>
                         <span className={`plan-state state-${s.state}`}>
                           {labels[s.state]}
