@@ -1,0 +1,11 @@
+.desvio-redesign .video-keyframe{display:grid;gap:12px;min-width:0}
+.desvio-redesign .video-keyframe-status{font-size:14px;color:var(--brand-muted)}
+.desvio-redesign .video-keyframe-frame{display:grid;gap:8px;margin:0;justify-items:start}
+.desvio-redesign .video-keyframe-frame img{display:block;max-width:min(100%,280px);height:auto;border-radius:14px;border:1px solid var(--brand-border);box-shadow:0 10px 30px rgb(0 0 0 / .12)}
+.desvio-redesign .video-keyframe-frame.aspect-landscape img{max-width:min(100%,420px)}
+.desvio-redesign .video-keyframe-frame figcaption{font-size:13px;line-height:1.5;color:var(--brand-muted)}
+.desvio-redesign .video-keyframe-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.desvio-redesign .chat-video-shots{display:flex;flex-wrap:wrap;gap:8px}
+.desvio-redesign .chat-video-shots button{padding:6px 12px;border-radius:999px;border:1px solid var(--brand-border);background:#fff;font:inherit;font-size:13px;color:var(--brand-ink)}
+.desvio-redesign .chat-video-shots button[aria-pressed="true"]{background:var(--brand-ink);color:#fff;border-color:var(--brand-ink)}
+.desvio-redesign .chat-video-shots button:focus-visible{outline:2px solid var(--brand-link);outline-offset:2px}

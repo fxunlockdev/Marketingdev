@@ -3,21 +3,13 @@ import type {ReelCaption,ReelEndCard,ReelStyle,VideoTarget} from './video-render
 import {VideoStateError} from './video-vault.js';
 import {RUNWAY_PROMPT_MAX} from './runway-client.js';
 
+import {REEL_MIN_SHOTS,REEL_MAX_SHOTS,storyShots} from './reel-story.js';
+export {REEL_MIN_SHOTS,REEL_MAX_SHOTS,storyShots,storylineShotCount} from './reel-story.js';
 /** A multi-shot reel: 2 to 5 Runway clips cut together, with captions and an end card. Pure planning only. */
-export const REEL_MIN_SHOTS=2;
-export const REEL_MAX_SHOTS=5;
 export const REEL_END_CARD_MS=2000;
 export type ReelShot={index:number;prompt:string;duration_seconds:number;start_ms:number;end_ms:number};
-type StoryShot={visual:string;camera:string;on_screen_text:string};
 
 const flat=(v:unknown):string=>String(v??'').replace(/[\u0000-\u001f\u007f\s]+/g,' ').trim();
-
-/** The reviewed storyline's shots, when the post has a video storyline. */
-export function storyShots(storyline:unknown):StoryShot[]{
- const s=storyline as {kind?:unknown;shots?:unknown}|null;
- if(s?.kind!=='video'||!Array.isArray(s.shots))return [];
- return (s.shots as StoryShot[]).filter(x=>x&&typeof x==='object').map(x=>({visual:flat(x.visual),camera:flat(x.camera),on_screen_text:flat(x.on_screen_text)}));
-}
 
 /** Seconds per shot so the cut reel lasts 15 s or more (before the end card) without exceeding 10 s a shot. */
 export function reelShotSeconds(planned:number,shots:number):number{
