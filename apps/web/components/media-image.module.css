@@ -1,16 +1,16 @@
 /* Skeleton and states for private media. Only transform and opacity animate. */
-.frame{position:relative;display:block;overflow:hidden;width:100%;background:var(--brand-field,#f2ede5);isolation:isolate}
+.frame{position:relative;display:block;overflow:hidden;width:100%;background:var(--brand-field);isolation:isolate}
 .frame>img{display:block;width:100%;height:100%;object-fit:contain;opacity:0;transition:opacity 180ms cubic-bezier(.16,1,.3,1)}
 .frame[data-state="ready"]>img{opacity:1}
 .frame[data-instant="true"]>img{transition:none}
-.skeleton{position:absolute;inset:0;z-index:-1;overflow:hidden;background:linear-gradient(135deg,#efe9df,#f6f2eb)}
+.skeleton{position:absolute;inset:0;z-index:-1;overflow:hidden;background:linear-gradient(135deg,var(--brand-sand),var(--brand-field))}
 .skeleton::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(100deg,transparent 30%,rgba(255,255,255,.65) 50%,transparent 70%);animation:media-sheen 1.4s ease-in-out infinite}
 .frame[data-state="ready"] .skeleton,.frame[data-state="empty"] .skeleton,.frame[data-state="failed"] .skeleton{display:none}
-.note{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center;font-size:12px;font-weight:500;line-height:1.3;color:#554b40}
-.frame[data-state="empty"]{background:repeating-linear-gradient(135deg,#f6f2eb 0 10px,#f1ebe1 10px 20px)}
-.frame[data-state="failed"]{background:#fbefec}
-.frame[data-state="failed"] .note{color:#8a2f1d}
-.mark{font-size:22px;line-height:1;color:#a65f32}
+.note{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center;font-size:12px;font-weight:500;line-height:1.3;color:var(--brand-muted)}
+.frame[data-state="empty"]{background:repeating-linear-gradient(135deg,var(--brand-field) 0 10px,var(--brand-sand) 10px 20px)}
+.frame[data-state="failed"]{background:var(--status-danger-wash)}
+.frame[data-state="failed"] .note{color:var(--status-danger)}
+.mark{font-size:22px;line-height:1;color:var(--status-caution)}
 .retry{border:1px solid currentColor;border-radius:999px;padding:3px 10px;background:transparent;color:inherit;font:inherit;cursor:pointer}
 .retry:hover{background:rgba(138,47,29,.08)}
 .retry:focus-visible{outline:2px solid currentColor;outline-offset:2px}
