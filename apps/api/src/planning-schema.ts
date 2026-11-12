@@ -80,3 +80,26 @@ export function storylineSchema(kind:Storyline['kind'],slideCount?:number):Recor
  if(kind==='story')return object({...head,frames:array(object({visual:text(LIMITS.visual),text:optional(LIMITS.text)}),1,4)});
  return object({...head,shots:array(object({visual:text(LIMITS.visual),camera:text(LIMITS.camera),on_screen_text:optional(LIMITS.text)}),2,6)});
 }
+
+type MixChannel=ContentMixItem['channel'];
+const share=(total:number,parts:number,index:number)=>Math.floor(total/parts)+(index<total%parts?1:0);
+/** Split a total across rows in proportion to their current counts (largest remainder, earlier rows first). */
+function proportional(rows:ContentMixItem[],total:number):ContentMixItem[]{
+ const sum=rows.reduce((n,row)=>n+row.count,0),exact=rows.map(row=>total*row.count/sum),counts=exact.map(Math.floor);
+ const order=exact.map((value,index)=>index).sort((a,b)=>(exact[b]-counts[b])-(exact[a]-counts[a])||a-b);
+ for(let left=total-counts.reduce((a,b)=>a+b,0),i=0;left>0;left--,i++)counts[order[i%order.length]]++;
+ return rows.map((row,index)=>({...row,count:counts[index]})).filter(row=>row.count>0);
+}
+/** Apply a monthly quantity of image and video posts to a mix without discarding the customer's
+ * choices: their formats, shapes and slide counts stay and share the new totals in proportion.
+ * Channels with nothing chosen for a class get the default feed image or vertical video. */
+export function monthlyContentMix(current:ContentMixItem[],channels:string[],images:number,videos:number):ContentMixItem[]{
+ return channels.flatMap((name,index)=>{
+  const channel=name as MixChannel,mine=current.filter(row=>row.channel===channel&&row.count>0);
+  const imageRows=mine.filter(row=>row.format!=='video'),videoRows=mine.filter(row=>row.format==='video');
+  const imageTotal=share(images,channels.length,index),videoTotal=share(videos,channels.length,index);
+  const defaults={image:{channel,format:'static' as const,creative_spec:{placement:'feed' as const,aspect:'square' as const,slide_count:null},count:1},
+   video:{channel,format:'video' as const,creative_spec:channel==='linkedin'?{placement:'feed' as const,aspect:'portrait' as const,slide_count:null}:{placement:'reel' as const,aspect:'vertical' as const,slide_count:null},count:1}};
+  return [...(imageTotal?proportional(imageRows.length?imageRows:[defaults.image],imageTotal):[]),...(videoTotal?proportional(videoRows.length?videoRows:[defaults.video],videoTotal):[])];
+ });
+}

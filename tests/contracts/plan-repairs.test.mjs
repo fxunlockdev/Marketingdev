@@ -92,3 +92,24 @@ test('local ranges absorb daylight-saving shifts and agree with slot validation'
   assert.throws(()=>planTime(minute(Date.parse(start)-60000),starts_on,timezone,horizon.duration_days));
  }
 });
+
+test('M4: the monthly mix keeps the formats the customer chose and only changes quantities',async()=>{
+ const {monthlyContentMix}=await import('../../dist/planning-schema.js');
+ const {normalizeContentMix,contentMixCounts}=await import('../../dist/generation-plan.js');
+ const row=(channel,format,placement,aspect,count,slide_count=null)=>({channel,format,creative_spec:{placement,aspect,slide_count},count});
+ // Untouched default mix: same result as before (one image a day, videos split across channels).
+ const fresh=monthlyContentMix([row('linkedin','static','feed','square',2),row('instagram','static','feed','square',1)],['linkedin','instagram'],29,5);
+ assert.deepEqual(fresh.map(r=>[r.channel,r.format,r.creative_spec.placement,r.count]),[['linkedin','static','feed',15],['linkedin','video','feed',3],['instagram','static','feed',14],['instagram','video','reel',2]]);
+ // A chosen mix of carousels, stories and portrait images survives, shapes and slide counts included.
+ const chosen=[row('instagram','carousel','feed','portrait',4,5),row('instagram','static','story','vertical',2),row('instagram','static','feed','portrait',6),row('instagram','video','story','vertical',1)];
+ const before=structuredClone(chosen),scaled=monthlyContentMix(chosen,['instagram'],30,5);
+ assert.deepEqual(chosen,before,'input is not mutated');
+ assert.deepEqual(scaled.map(r=>[r.format,r.creative_spec.placement,r.creative_spec.aspect,r.creative_spec.slide_count,r.count]),[['carousel','feed','portrait',5,10],['static','story','vertical',null,5],['static','feed','portrait',null,15],['video','story','vertical',null,5]]);
+ assert.deepEqual(contentMixCounts(normalizeContentMix(scaled)),{post_count:35,video_count:5});
+ // Zero videos removes video rows; a channel with no rows gets the default image row.
+ const none=monthlyContentMix(chosen,['instagram','facebook'],15,0);
+ assert.ok(none.every(r=>r.format!=='video'));assert.equal(none.filter(r=>r.channel==='facebook').length,1);
+ assert.deepEqual(contentMixCounts(none),{post_count:15,video_count:0});
+ for(const [images,videos] of [[31,8],[28,2],[1,0],[45,8]])assert.deepEqual(contentMixCounts(monthlyContentMix(chosen,['instagram','linkedin'],images,videos)),{post_count:images+videos,video_count:videos});
+ assert.deepEqual(monthlyContentMix(chosen,[],30,5),[]);
+});
