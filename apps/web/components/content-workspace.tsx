@@ -99,6 +99,9 @@ function requestKey(
     ref.current = { body: value, key: crypto.randomUUID() };
   return ref.current!.key;
 }
+type CalendarView='day'|'week'|'month'|'list';
+const CALENDAR_VIEWS:readonly string[]=['day','week','month','list'];
+const isCalendarView=(value:unknown):value is CalendarView=>typeof value==='string'&&CALENDAR_VIEWS.includes(value);
 function DateStrip({date,onSelect,counts}:{date:string;onSelect:(date:string)=>void;counts:Record<string,number>}) {
  const selected=useRef<HTMLButtonElement>(null);
  useEffect(()=>{selected.current?.scrollIntoView({block:'nearest',inline:'center',behavior:'instant'});},[date]);
@@ -129,7 +132,7 @@ export function ContentWorkspace({
   const [dateCounts,setDateCounts]=useState<Record<string,number>>({});
   const [prefs, setPrefs] = useState<any>(),
     [anchor, setAnchor] = useState(""),
-    [view, setView] = useState("week"),
+    [view, setViewState] = useState<CalendarView>("week"),
     [days, setDays] = useState("30"),
     [channel, setChannel] = useState(""),
     [campaign,setCampaign] = useState(""),
@@ -155,6 +158,14 @@ export function ContentWorkspace({
     [planningCreativity,setPlanningCreativity]=useState<Creativity>('normal'),[postCount,setPostCount]=useState(30),[videoCount,setVideoCount]=useState(0),
     [brief, setBrief] = useState(""),
     key = useRef<{ body: string; key: string } | null>(null);
+  useEffect(()=>{if(inbox)return;const requested=new URLSearchParams(location.search).get('view');if(isCalendarView(requested))setViewState(requested);},[business.id,inbox]);
+  /** The calendar view is part of the address, so a link or reload opens the same day, week, month or list. */
+  function setView(next:string){
+    if(!isCalendarView(next))return;
+    setViewState(next);
+    if(inbox)return;
+    const url=new URL(location.href);url.searchParams.set('view',next);history.replaceState(history.state,'',url);
+  }
   useEffect(()=>{const plan=new URLSearchParams(location.search).get('plan');setCampaign(plan&&/^[a-f0-9-]{36}$/i.test(plan)?plan:'');const requested=new URLSearchParams(location.search).get('slot');if(requested&&/^[a-f0-9-]{36}$/i.test(requested))setSelected(requested);},[business.id]);
   const canWrite = ['owner','admin','editor'].includes(business.role),
     canReview = ["owner", "admin", "reviewer"].includes(business.role);
