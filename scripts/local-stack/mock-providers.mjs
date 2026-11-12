@@ -6,6 +6,7 @@ import {createServer} from 'node:http';
 import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {generate} from './mock-schema.mjs';
+import {mockVideoBrief} from './mock-runway.mjs';
 
 const MAX_BODY=60*1024*1024;
 const PALETTE=['#1F4E5F','#F2A541','#F7F1E8'];
@@ -148,6 +149,12 @@ function plannerAnswer(body){
  if(!format)return 'Ready.';
  const schema=format.schema;
  if(format.name==='desvio_content_plan'&&schema.properties?.slots)return JSON.stringify(contentPlan(schema,task));
+ if(format.name==='desvio_video_brief')return JSON.stringify(mockVideoBrief(schema));
+ if(format.name==='desvio_chat'&&/Create an? (reel|video)\b/i.test(JSON.stringify(body.input??''))){
+  // Create's Reel and Video starts: answer with a video setup, as the real model does for these requests.
+  const reel=/Create a reel/i.test(JSON.stringify(body.input??''));
+  return JSON.stringify({reply:'Here is a video direction. Choose a starting image, review the prompt and generate.',action:'video',prompt:'Slow push-in across the counter at opening time; steam rises from fresh loaves, warm morning light.',channel:'instagram',size:'1024x1536',sources:[],starts_on:null,text_mode:'headline',slide_count:3,placement:reel?'reel':'feed',duration_seconds:5});
+ }
  if(format.name==='desvio_chat')return JSON.stringify({reply:'Here is an idea based on your brand.',action:'answer',prompt:'',channel:'instagram',size:'1024x1024',sources:[],starts_on:null,text_mode:'headline',slide_count:3,placement:'feed',duration_seconds:6});
  return JSON.stringify(generate(schema,schema,{key:'',index:0},{}));
 }

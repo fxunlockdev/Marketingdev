@@ -112,3 +112,15 @@ export async function grantMockVideo(pool,configure,databaseName){
  }
  return applied;
 }
+
+/** A valid video brief for the mock planner (format desvio_video_brief): contiguous beats over the requested
+ * duration (read from the schema's time bound), one short overlay, the first allowed fact. Labelled as mock. */
+export function mockVideoBrief(schema){
+ const duration=schema.properties.beats.items.properties.end_ms.maximum,facts=schema.properties.fact_ids.items.enum;
+ const short=duration<=3000,third=Math.floor(duration/3/100)*100;
+ const beats=[[0,third,'Hands lift a tray of fresh sourdough from the oven','Slow push in'],[third,third*2,'Loaves cool on wooden racks in warm window light','Gentle pan right'],[third*2,duration,'A customer takes a warm loaf at the counter','Static medium shot']]
+  .map(([start_ms,end_ms,action,camera])=>({start_ms,end_ms,action:short?String(action).slice(0,90):action,camera:short?String(camera).slice(0,36):camera}));
+ return {title:'Morning bake (local mock)',caption:'Fresh from the oven every morning. Local mock caption.',
+  video_prompt:short?'Warm bakery at opening time, steam over fresh loaves, soft morning light.':'Warm neighbourhood bakery at opening time. Steam rises from fresh sourdough; soft morning light through the window; natural, unhurried camera movement; true-to-life colour.',
+  fact_ids:[facts[0]],warnings:[],beats,overlays:[{text:'Baked this morning',start_ms:0,end_ms:Math.min(duration,2000),position:'top',foreground:'#ffffff',background:'#1f4e5f'}]};
+}
