@@ -1,6 +1,7 @@
 import {validStoredSkillSet} from './production-skill-pin.js';
 import type {LearningContext} from './learning-context.js';
 import { CREATIVE_SKILLS } from "./creative-skill-pins.js";
+import {artDirectionSchema,validArtDirection,type ArtDirection} from "./image-art-direction.js";
 export class CreativeError extends Error {
   constructor(readonly code: string) {
     super(code);
@@ -15,6 +16,8 @@ export type CreativeBrief = {
   palette: string[];
   fact_ids: string[];
   warnings: string[];
+  /** Absent on briefs saved before art direction existed; those keep overlay text. */
+  art_direction?: ArtDirection;
 };
 export type CreativeInput = {
   brand: {
@@ -81,7 +84,7 @@ export const selectedSkills = (format: CreativeInput["format"]) =>
 export function creativeBriefSchema(factIds:string[]){
   if(!Array.isArray(factIds)||!factIds.length||factIds.length>200||factIds.some(id=>typeof id!=='string'||!id||id.length>128))throw new CreativeError('CREATIVE_BRIEF_INVALID');
   const text=(maxLength:number,minLength=0)=>({type:'string',minLength,maxLength});
-  const properties={headline:text(140),body:text(500),cta:text(80),caption:text(3000,1),image_prompt:text(8000,1),palette:{type:'array',minItems:2,maxItems:2,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}},fact_ids:{type:'array',minItems:1,maxItems:20,items:{type:'string',enum:[...new Set(factIds)]}},warnings:{type:'array',maxItems:10,items:text(500)}};
+  const properties={headline:text(140),body:text(500),cta:text(80),caption:text(3000,1),image_prompt:text(8000,1),palette:{type:'array',minItems:2,maxItems:2,items:{type:'string',pattern:'^#[0-9a-fA-F]{6}$'}},fact_ids:{type:'array',minItems:1,maxItems:20,items:{type:'string',enum:[...new Set(factIds)]}},warnings:{type:'array',maxItems:10,items:text(500)},art_direction:artDirectionSchema()};
   return {type:'object',additionalProperties:false,properties,required:Object.keys(properties)};
 }
 export function validateBrief(
@@ -99,7 +102,7 @@ export function validateBrief(
   if (
     !b ||
     typeof b !== "object" ||
-    Object.keys(b).sort().join(",") !==
+    Object.keys(b).filter((key) => key !== "art_direction").sort().join(",") !==
       [
         "headline",
         "body",
@@ -111,7 +114,8 @@ export function validateBrief(
         "warnings",
       ]
         .sort()
-        .join(",")
+        .join(",") ||
+    ("art_direction" in b && !validArtDirection(b.art_direction))
   )
     throw new CreativeError("CREATIVE_BRIEF_INVALID");
   for (const [key, max] of Object.entries(limits))

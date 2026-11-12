@@ -1,4 +1,5 @@
 import type {PostArtwork} from './post-artwork.js';
+import type {TextMode} from './image-art-direction.js';
 import { CreativeError, type CreativeBrief } from "./creative-contracts.js";
 import {DESIGN_FONT_FAMILIES,designFontWeights,resolveBrandTypography,type BrandFontPreset,type BrandTypography,type DesignFontFamily,type FontWeight} from "./brand-typography.js";
 export type Design = {
@@ -33,6 +34,7 @@ export function createDesign(
   brief: CreativeBrief,
   font?: BrandFontPreset | BrandTypography,
   artwork?: PostArtwork,
+  textMode?: TextMode,
 ): Design {
   const typography=resolveBrandTypography(artwork?.typography??font);
   if(font!==undefined&&!typography)throw new CreativeError("CREATIVE_DESIGN_INVALID");
@@ -41,7 +43,8 @@ export function createDesign(
     width,
     height,
     background_media_id: mediaId,
-    layers: artwork?.text==='none'?[]:[
+    // Designed type already lives in the picture; an overlay would repeat the same copy.
+    layers: artwork?.text==='none'||textMode==='in_image'||textMode==='none'?[]:[
       {
         id: "headline",
         type: "text",
@@ -147,8 +150,11 @@ export function reviseDesign(
   brief: CreativeBrief,
   artwork?: PostArtwork,
   font?: BrandFontPreset | BrandTypography,
+  textMode?: TextMode,
 ): Design {
-  if (artwork?.text === 'none') return {...parent, background_media_id: mediaId, layers: []};
+  // Designed type is edited inside the picture. Layers a customer added by hand stay as they are.
+  if (textMode === 'in_image') return {...parent, background_media_id: mediaId};
+  if (artwork?.text === 'none' || textMode === 'none') return {...parent, background_media_id: mediaId, layers: []};
   if (artwork?.text === 'headline' && !parent.layers.some(layer => layer.text.trim())) {
     return createDesign(mediaId, parent.width, parent.height, brief, font, artwork);
   }

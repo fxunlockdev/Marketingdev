@@ -979,4 +979,177 @@ test('stock-backed creative still succeeds without stock when the photo cannot b
   await stockHandler.run(scope(uncertain));
   assert.deepEqual({downloads,images},{downloads:1,images:3});
  }finally{transport=undefined;await admin.query('DELETE FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);}
+
+// ---- Image engine: art direction, designed type, vision check, true aspect ratios, approved direction ----
+const artDirection={layout_archetype:'lifestyle_hero',text_mode:'in_image',headline_treatment:'Bold condensed sans, two lines, top left',hierarchy:'Headline, then the receptionist, then the call to action',composition:'Receptionist on the right third, calm wall on the left',lighting:'Soft morning window light',palette_roles:{dominant:'#f4efe6',headline:'#112233',accent:'#ff6b35'},product_placement:'Scheduling screen on the front desk',logo_placement:'bottom_right'};
+const qaPass={text_matches:true,found_text:['A CALMER SCHEDULE','Discover'],brief_fit:5,brand_fit:4,artefacts:[],verdict:'pass'};
+const coloured=(width,height,background)=>sharp({create:{width,height,channels:3,background}}).png().toBuffer();
+// Mock transport for art-directed runs: brief with art direction, scripted vision checks, scripted images.
+function directedTransport({art=artDirection,checks=[],images=[],log={prompts:[],checks:[]}}){
+ return Object.assign(async(url,init)=>{
+  const path=new URL(url).pathname;
+  if(path==='/v1/responses'){
+   const body=JSON.parse(init.body);
+   if(body.text?.format?.name==='desvio_image_qa'){
+    log.checks.push(body);const next=checks[log.checks.length-1];
+    if(next===undefined||next==='down')return Response.json({error:{message:'TEST FIXTURE: checker down'}},{status:500});
+    return response(next);
+   }
+   const message=body.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n'));
+   const value=JSON.parse(message.content.slice(message.content.indexOf('\n')+1));
+   assert.ok(body.text.format.schema.required.includes('art_direction'));
+   return response({...brief(value.brand.facts.find(f=>f.field==='offering').id),art_direction:art});
+  }
+  log.prompts.push(path==='/v1/images/edits'?init.body.get('prompt'):JSON.parse(init.body).prompt);
+  return Response.json({created:1,data:[{b64_json:images[log.prompts.length-1].toString('base64')}],usage:{input_tokens:50,output_tokens:100,total_tokens:150}});
+ },{log});
+}
+const versionOf=async j=>(await admin.query('SELECT v.design,v.skill_manifest,v.qa,m.sha256,m.width,m.height,m.object_key FROM app.creative_requests r JOIN app.creative_versions v ON v.id=r.output_version_id JOIN app.creative_media m ON m.id=v.media_id WHERE r.job_id=$1',[j.id])).rows[0];
+const callsOf=async j=>(await admin.query('SELECT step,status,model FROM app.creative_calls WHERE job_id=$1 ORDER BY created_at,step',[j.id])).rows;
+
+test('art-directed creative sets the exact headline in the image, is checked, regenerated once and keeps its quality report',async()=>{
+ const {ImageQa}=await import('../../dist/image-qa.js'),{MODEL_POLICY}=await import('../../dist/model-policy.js');
+ await grant(100000000);
+ // These image-engine cases add several statics; give the fixture account room beyond the default monthly 20.
+ await admin.query('INSERT INTO app.content_allowance_plans(organization_id,static_limit) VALUES($1,200) ON CONFLICT(organization_id) DO UPDATE SET static_limit=200',[org.id]);
+ const checked=new CreativeJobs(jobs,skills,provider,undefined,undefined,new ImageQa(provider));
+ const firstImage=await coloured(1024,1024,'#aa0000'),secondImage=await coloured(1024,1024,'#00aa00');
+ transport=directedTransport({checks:[{...qaPass,text_matches:false,found_text:['A CALMER SCEDULE'],artefacts:['Six fingers on the left hand'],verdict:'retry'},qaPass],images:[firstImage,secondImage]});
+ const {log}=transport;
+ const j=await canvas.submit(alice,brand.id,thread.id,{...request('Create an art-directed hero post'),creative_spec:{placement:'feed',aspect:'square',slide_count:null}},randomUUID());
+ assert.equal(await checked.run(scope(j)),'succeeded');
+ // Designed type: exact copy ordered in the prompt, art direction present, overlay instructions absent.
+ assert.equal(log.prompts.length,2);
+ assert.ok(log.prompts[0].includes('"A calmer schedule"'));assert.ok(log.prompts[0].includes('"Discover"'));
+ assert.match(log.prompts[0],/character for character/);
+ assert.ok(log.prompts[0].includes('Receptionist on the right third, calm wall on the left'));
+ assert.ok(log.prompts[0].includes('Use generous spacing and restrained typography.'));
+ assert.ok(!log.prompts[0].includes('without baked-in text'));
+ // One regeneration, carrying the checker's notes.
+ assert.ok(log.prompts[1].startsWith(log.prompts[0]));
+ assert.ok(log.prompts[1].includes('QUALITY REVIEW OF THE PREVIOUS ATTEMPT'));
+ assert.ok(log.prompts[1].includes('"A CALMER SCEDULE"'));assert.ok(log.prompts[1].includes('Six fingers on the left hand'));
+ // The check ran on the check model with the image and the expected copy.
+ assert.equal(log.checks.length,2);
+ assert.equal(log.checks[0].model,MODEL_POLICY.check.model);assert.equal(log.checks[0].store,false);
+ assert.ok(log.checks[0].input[1].content[0].text.includes('A calmer schedule'));
+ assert.ok(log.checks[0].input[1].content[1].image_url.startsWith('data:image/jpeg;base64,'));
+ const v=await versionOf(j);
+ assert.equal(v.sha256,digest(secondImage));
+ assert.deepEqual(v.design.layers,[]); // no overlay repeating the designed headline
+ assert.equal(v.skill_manifest.text_mode,'in_image');
+ assert.deepEqual(v.skill_manifest.in_image_text,{headline:'A calmer schedule',cta:'Discover'});
+ assert.deepEqual(v.skill_manifest.art_direction,artDirection);
+ assert.equal(v.qa.status,'checked');assert.equal(v.qa.verdict,'pass');assert.equal(v.qa.retried,true);
+ assert.deepEqual(v.qa.attempts.map(a=>[a.step,a.status,a.media_sha256]),[['qa:1','checked',digest(firstImage)],['qa:2','checked',digest(secondImage)]]);
+ assert.deepEqual(v.qa.expected_text,['A calmer schedule','Discover']);
+ // Every paid step is budgeted and recorded; both images are kept.
+ const calls=await callsOf(j);
+ assert.deepEqual(calls.filter(c=>!c.step.startsWith('plan:')).map(c=>[c.step,c.status]).sort(),[['image','succeeded'],['image:retry','succeeded'],['qa:1','succeeded'],['qa:2','succeeded']]);
+ assert.ok(calls.filter(c=>c.step.startsWith('qa:')).every(c=>c.model===MODEL_POLICY.check.model));
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.creative_media WHERE job_id=$1',[j.id])).rows[0].n,2);
+ // Replay makes no further provider call.
+ assert.equal(await checked.run(scope(j)),'finished');
+ assert.equal(log.prompts.length,2);assert.equal(log.checks.length,2);
+});
+
+test('a second failed check never loops: one regeneration, then the image is flagged for a person',async()=>{
+ const {ImageQa}=await import('../../dist/image-qa.js');
+ const checked=new CreativeJobs(jobs,skills,provider,undefined,undefined,new ImageQa(provider));
+ const bad={...qaPass,text_matches:false,found_text:['A CALMER SCEDULE'],verdict:'retry'};
+ transport=directedTransport({checks:[bad,bad,bad],images:[await coloured(1024,1024,'#aa00aa'),await coloured(1024,1024,'#00aaaa'),await coloured(1024,1024,'#aaaa00')]});
+ const {log}=transport;
+ const j=await canvas.submit(alice,brand.id,thread.id,request('Create another hero post'),randomUUID());
+ assert.equal(await checked.run(scope(j)),'succeeded');
+ assert.equal(log.prompts.length,2);assert.equal(log.checks.length,2);
+ const v=await versionOf(j);
+ assert.equal(v.qa.verdict,'flag');assert.equal(v.qa.retried,true);assert.equal(v.qa.attempts.length,2);
+});
+
+test('a failed quality check or failed regeneration never fails the creative',async()=>{
+ const {ImageQa}=await import('../../dist/image-qa.js');
+ const checked=new CreativeJobs(jobs,skills,provider,undefined,undefined,new ImageQa(provider));
+ // Checker outage: stored unchecked, recorded as unavailable, the request is not left uncertain.
+ const only=await coloured(1024,1024,'#0000aa');
+ transport=directedTransport({checks:['down'],images:[only]});
+ let j=await canvas.submit(alice,brand.id,thread.id,request('Create a post while the checker is down'),randomUUID());
+ assert.equal(await checked.run(scope(j)),'succeeded');
+ let v=await versionOf(j);
+ assert.equal(v.sha256,digest(only));
+ assert.equal(v.qa.status,'unavailable');assert.equal(v.qa.verdict,'unavailable');assert.equal(v.qa.retried,false);
+ assert.equal(v.qa.attempts[0].status,'unavailable');
+ assert.deepEqual((await callsOf(j)).filter(c=>c.step.startsWith('qa:')).map(c=>[c.step,c.status]),[['qa:1','rejected']]);
+ assert.equal((await row(j)).status,'succeeded');
+ assert.equal(await checked.run(scope(j)),'finished');assert.equal(transport.log.checks.length,1);
+ // Malformed checker output is also only an unavailable check.
+ transport=directedTransport({checks:[{...qaPass,verdict:'approve'}],images:[await coloured(1024,1024,'#00aa55')]});
+ j=await canvas.submit(alice,brand.id,thread.id,request('Create a post with a confused checker'),randomUUID());
+ assert.equal(await checked.run(scope(j)),'succeeded');
+ assert.equal((await versionOf(j)).qa.attempts[0].reason,'IMAGE_QA_INVALID');
+ // The regeneration fails at the provider: the first image is kept and flagged.
+ const kept=await coloured(1024,1024,'#5500aa');
+ const base=directedTransport({checks:[{...qaPass,text_matches:false,found_text:['Wrong'],verdict:'retry'}],images:[kept]});
+ transport=async(url,init)=>new URL(url).pathname.startsWith('/v1/images')&&base.log.prompts.length===1?Response.json({error:{message:'TEST FIXTURE: image provider down'}},{status:500}):base(url,init);
+ j=await canvas.submit(alice,brand.id,thread.id,request('Create a post whose regeneration fails'),randomUUID());
+ assert.equal(await checked.run(scope(j)),'succeeded');
+ v=await versionOf(j);
+ assert.equal(v.sha256,digest(kept));assert.equal(v.qa.verdict,'flag');assert.equal(v.qa.retried,false);assert.equal(v.qa.retry_error,'CREATIVE_SUBMISSION_UNKNOWN');
+ assert.deepEqual((await callsOf(j)).filter(c=>c.step==='image:retry').map(c=>c.status),['rejected']);
+ assert.equal((await row(j)).status,'succeeded');
+ // Without a checker configured nothing is inspected and nothing extra is spent.
+ transport=directedTransport({checks:[],images:[await coloured(1024,1024,'#333333')]});
+ j=await canvas.submit(alice,brand.id,thread.id,request('Create a post without a checker'),randomUUID());
+ assert.equal(await handler.run(scope(j)),'succeeded');
+ assert.equal((await versionOf(j)).qa,null);assert.equal(transport.log.checks.length,0);
+});
+
+test('overlay text mode keeps the editable headline layer and still orders no lettering in the image',async()=>{
+ transport=directedTransport({art:{...artDirection,layout_archetype:'offer',text_mode:'overlay'},images:[await coloured(1024,1024,'#777700')]});
+ const j=await canvas.submit(alice,brand.id,thread.id,request('Create an offer post'),randomUUID());
+ assert.equal(await handler.run(scope(j)),'succeeded');
+ const v=await versionOf(j);
+ assert.equal(v.skill_manifest.text_mode,'overlay');assert.equal(v.skill_manifest.in_image_text,undefined);
+ assert.equal(v.design.layers.find(l=>l.id==='headline').text,'A calmer schedule');
+ assert.ok(transport.log.prompts[0].includes('without baked-in text'));
+ assert.ok(!transport.log.prompts[0].includes('"A calmer schedule"'));
+ assert.ok(transport.log.prompts[0].includes('Soft morning window light'));
+});
+
+test('a story is composed at true 9:16 with no white padding, the prompt states the safe area, and the original is kept',async()=>{
+ const band=(width,height,background,left,top)=>coloured(width,height,background).then(input=>({input,left,top}));
+ const source=await sharp({create:{width:1024,height:1536,channels:3,background:'#ff0000'}}).composite([await band(60,1536,'#0000ff',0,0),await band(60,1536,'#0000ff',964,0)]).png().toBuffer();
+ transport=directedTransport({images:[source]});
+ const j=await canvas.submit(alice,brand.id,thread.id,{...request('Create a story'),channel:'instagram',size:'1024x1536',creative_spec:{placement:'story',aspect:'vertical',slide_count:null}},randomUUID());
+ assert.equal(await handler.run(scope(j)),'succeeded');
+ const v=await versionOf(j);
+ assert.equal(v.width,1080);assert.equal(v.height,1920);
+ const {data,info}=await sharp(await store.read(v.object_key)).raw().toBuffer({resolveWithObject:true});
+ const at=(x,y)=>[...data.subarray((y*info.width+x)*info.channels,(y*info.width+x)*info.channels+3)];
+ for(const [x,y] of [[0,0],[1079,0],[0,1919],[1079,1919],[540,0],[540,1919],[2,960],[1077,960]])assert.deepEqual(at(x,y),[255,0,0]);
+ assert.deepEqual(v.skill_manifest.framing,{mode:'cover',source_sha256:digest(source),source_width:1024,source_height:1536,width:1080,height:1920,crop:{left:80,top:0,width:864,height:1536}});
+ assert.equal(digest(await store.read(v.object_key.replace(v.sha256,digest(source)))),digest(source));
+ assert.match(transport.log.prompts[0],/central 80% of the width/);assert.match(transport.log.prompts[0],/top 14% and bottom 20%/);
+});
+
+test('the locked mood board reaches the image prompt of later requests only, through the worker role',async()=>{
+ const board={summary:'TEST FIXTURE: warm neighbourhood practice',rationale:'r',palette:[{role:'primary',hex:'#0f3d2e'},{role:'secondary',hex:'#f4efe6'},{role:'accent',hex:'#ff6b35'}],heading_font:'DM Sans',body_font:'DM Sans',voice:'Friendly',imagery:'TEST FIXTURE: candid reception desks in window light',pillars:['Care'],essential_questions:[],evidence_ids:[]};
+ transport=directedTransport({images:[await coloured(1024,1024,'#101010'),await coloured(1024,1024,'#202020')]});
+ const {log}=transport;
+ const before=await canvas.submit(alice,brand.id,thread.id,request('Create a post before the mood board is locked'),randomUUID());
+ assert.equal(await handler.run(scope(before)),'succeeded');
+ assert.ok(!log.prompts[0].includes('APPROVED CREATIVE DIRECTION'));
+ // Explicit fixture row: the linked preview jobs and versions are not needed to prove the read path.
+ const client=await admin.connect();
+ try{
+  await client.query('BEGIN');await client.query('SET LOCAL session_replication_role=replica');
+  await client.query(`INSERT INTO app.guided_moodboards(id,organization_id,brand_id,brief_revision,ordinal,direction,feedback,image_job_id,carousel_job_id,request_key,request_hash,created_by,approved_at,approved_by,image_version_id,carousel_version_id) VALUES($1,$2,$3,1,1,$4,'TEST FIXTURE: less orange',$5,$6,$7,'fixture',$8,now(),$8,$9,$10)`,[randomUUID(),org.id,brand.id,JSON.stringify(board),randomUUID(),randomUUID(),randomUUID(),alice,randomUUID(),randomUUID()]);
+  await client.query('COMMIT');
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+ const after=await canvas.submit(alice,brand.id,thread.id,request('Create a post after the mood board is locked'),randomUUID());
+ assert.equal(await handler.run(scope(after)),'succeeded');
+ assert.match(log.prompts[1],/APPROVED CREATIVE DIRECTION/);
+ assert.ok(log.prompts[1].includes('TEST FIXTURE: candid reception desks in window light'));
+ assert.ok(log.prompts[1].includes('TEST FIXTURE: less orange'));assert.ok(log.prompts[1].includes('#0f3d2e'));
+ assert.ok(log.prompts[1].includes('Use generous spacing and restrained typography.'));
+ await admin.query('DELETE FROM app.guided_moodboards WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
 });
