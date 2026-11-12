@@ -13,6 +13,8 @@ export const STRATEGY_SKILLS={
  'marketing-psychology':{skill_sha256:'573bbe4f6e300e7fb75299e314f56e26382d284782caa2ae0e0f33eb2e646548',tree_sha256:'915b151bdce1243b8cc5090cef2e75c915af8b8f0b3dc0438bb930f7dbb070cd'},
 } as const;
 export const STRATEGY_VERSION='deepagents-0.7.29/desvio-strategy-v1';
+/** About 10k tokens of strategy JSON plus room for the model's reasoning, which counts against the same limit. */
+export const STRATEGY_OUTPUT_TOKENS=32000;
 export const AWARENESS_LEVELS=['unaware','problem_aware','solution_aware','product_aware','most_aware'] as const;
 export const STRATEGY_FORMATS=['static','carousel','story','reel'] as const;
 /** Size limits shared by the strategy task and the planner inputs built from it. */

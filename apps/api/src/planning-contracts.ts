@@ -20,6 +20,16 @@ export const PLANNING_SKILLS = {
 export type PostIdeaPurpose={plan_id:string;format:string;channel:string};
 export type PlanningInput={post_ideas?:PostIdeaPurpose;content_mix?:ContentMixItem[];max_posts_per_day?:number;references?:PlanningReference[];campaign?:CampaignInput;storylines?:true;strategy?:StrategySnapshot;context_pack?:Record<string,unknown>;market_research?:string[];preferences_learned?:LearnedPreference[];task:'content_plan';brand:CreativeInput['brand'];preferences:{starts_on:string;timezone:string;goal:string;cadence:number;channels:('linkedin'|'instagram'|'facebook')[];must_avoid:string;business_stage?:string;growth_expectation?:string;creative_brief?:import('./creative-brief.js').CreativeBrief;revision:number};brief:string;post_count:number;duration_days?:number;video_count?:number;planning_mode?:'natural';reference_plan?:{id:string;sha256:string;title:string;duration_days:number;starts_on:string;timezone:string;slots:unknown[]}};
 export type GeneratedPlan={settings?:{duration_days:number;post_count:number;video_count:number};title:string;strategy:string;warnings:string[];slots:{channel:'linkedin'|'instagram'|'facebook';planned_at:string;format:'static'|'video'|'carousel';creative_spec?:CreativeSpec;video_draft?:VideoConcept;storyline?:Storyline;strategy_ref?:StrategyRef;brief:string;pillar:string;hook:string;cta:string;fact_ids:string[];reference_ids?:string[]}[]};
+export type PlanOutputTokens=512|4000|16000|32000|48000;
+/** Output-token limit for one planning call. Reasoning tokens count against it, so the limit is the
+ * expected JSON (about 450 tokens a post with its storyline; a plan is capped at 100 KB, about 28k
+ * tokens) plus headroom for reasoning: 16k up to 14 posts, 32k up to 30, 48k beyond or when the
+ * model chooses the size. The whole limit is reserved against the business's planning grant. */
+export function planOutputTokens(input:Pick<PlanningInput,'post_ideas'|'post_count'|'planning_mode'>):PlanOutputTokens {
+ if(input.post_ideas)return 4000;
+ if(input.planning_mode==='natural'||input.post_count>30)return 48000;
+ return input.post_count>14?32000:16000;
+}
 /** A soft constraint learned from approvals, rejections and edits. Never a fact or an instruction. */
 export type LearnedPreference={kind:'prefer'|'avoid';statement:string};
 export type StrategyRef={persona_id:string;pain_id:string;angle_id:string};

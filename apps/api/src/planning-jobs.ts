@@ -12,17 +12,21 @@ import {AssetJobs,type JobScope} from './jobs.js';
 import {SkillRuntime} from './skill-runtime.js';
 import {CreativeProvider} from './creative-provider.js';
 import {CreativeError,type PlannerRequest} from './creative-contracts.js';
-import {validatePlanningResult,resolvedPlanningInput,type PlanningInput,type PlanningResult} from './planning-contracts.js';
+import {validatePlanningResult,resolvedPlanningInput,planOutputTokens,type PlanningInput,type PlanningResult,type PlanOutputTokens} from './planning-contracts.js';
 import {canonicalJSON,hash} from './brand-brain.js';
-import {validateStrategyInput,validateStrategyResult,type StrategyResult} from './strategy-contracts.js';
+import {STRATEGY_OUTPUT_TOKENS,validateStrategyInput,validateStrategyResult,type StrategyResult} from './strategy-contracts.js';
 import {saveDraftStrategy} from './strategy-store.js';
+// The providers still type their limit as 512|4000|16000 and forward the number unchanged.
+// Remove this bridge once creative-provider.ts and gemini-planner.ts accept PlanOutputTokens.
+type ProviderLimit=Parameters<CreativeProvider['plannerRequest']>[2];
+const providerLimit=(tokens:PlanOutputTokens)=>tokens as ProviderLimit;
 const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class PlanningJobs {
  constructor(readonly jobs:AssetJobs,readonly runtime:SkillRuntime,readonly provider:CreativeProvider,readonly gemini:GeminiPlanner=new GeminiPlanner()){}
  finish(db:any,j:any,status:string,code:string|null=null){return db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]).then(()=>status);}
- async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:512|4000|16000=16000){
+ async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:PlanOutputTokens=16000){
   const provider=providerName==='gemini'?this.gemini:this.provider;
-  const wire=provider.plannerRequest(message,model,maxOutputTokens);
+  const wire=provider.plannerRequest(message,model,providerLimit(maxOutputTokens));
   const prepared=await this.jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='plan.generate')throw new Error('JOB_KIND_DENIED');
    if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
@@ -57,7 +61,7 @@ export class PlanningJobs {
   if('cached' in prepared)return prepared.cached;
   if('blocked' in prepared)throw new CreativeError(prepared.blocked!);
   let result;
-  try{result=await provider.plan(message,model,maxOutputTokens);}catch(error){
+  try{result=await provider.plan(message,model,providerLimit(maxOutputTokens));}catch(error){
    const known=error instanceof CreativeError||((error instanceof OpenAI.APIError||error instanceof GeminiAPIError)&&[400,401,403,404,422,429].includes(error.status??0));
    await this.jobs.transaction(scope,async(db,j)=>{await db.query('UPDATE app.planning_calls SET status=$3 WHERE job_id=$1 AND step=$2',[j.id,message.step,known?'rejected':'unknown']);});
    throw new CreativeError(known?(error instanceof CreativeError?error.code:'PLAN_PROVIDER_REJECTED'):'PLAN_SUBMISSION_UNKNOWN');
@@ -127,7 +131,7 @@ export class PlanningJobs {
     const strategyInput=validateStrategyInput(input);
     let strategy:StrategyResult=request.output;
     if(!strategy){
-     strategy=await this.runtime.strategy(strategyInput,message=>this.call(scope,message,model,request.provider,16000));
+     strategy=await this.runtime.strategy(strategyInput,message=>this.call(scope,message,model,request.provider,STRATEGY_OUTPUT_TOKENS));
      await this.jobs.transaction(scope,async(db,j)=>{
       if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
       await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(strategy)]);
@@ -144,7 +148,7 @@ export class PlanningJobs {
    }
    let result:PlanningResult=request.output;
    if(!result){
-    result=await this.runtime.contentPlan(input,message=>this.call(scope,message,model,request.provider,input.post_ideas?4000:16000));
+    result=await this.runtime.contentPlan(input,message=>this.call(scope,message,model,request.provider,planOutputTokens(input)));
     await this.jobs.transaction(scope,async(db,j)=>{
      if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(result)]);
