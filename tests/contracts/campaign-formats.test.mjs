@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeCreativeSpec,creativeDimensions,creativeSourceSize,acceptedCreativeDimensions,matchesCreativeDimensions,legacyCreativeDimensions} from '../../dist/campaign-formats.js';
+import {creativeMediaUsageSQL,creativeMediaUsed,creativeStorageFits} from '../../dist/creative-storage.js';
+import {GENERATION_LIMITS} from '../../dist/creative-budget.js';
 const spec=(placement='feed',aspect='square',slide_count=null)=>({placement,aspect,slide_count});
 test('campaign format matrix preserves feed video and requires genuine vertical story/reel targets',()=>{
  for(const channel of ['instagram','facebook','linkedin'])for(const format of ['static','ad','video','carousel'])for(const aspect of ['square','portrait','landscape'])assert.deepEqual(normalizeCreativeSpec(spec('feed',aspect,format==='carousel'?3:null),format,channel),spec('feed',aspect,format==='carousel'?3:null));
@@ -37,4 +39,13 @@ test('portrait feed posts are composed at 4:5 from the 2:3 provider size; 2:3 po
  for(const format of ['static','ad'])assert.deepEqual(creativeDimensions(normalizeCreativeSpec(portrait,format,'linkedin')),{width:1024,height:1280});
  assert.deepEqual(creativeDimensions(normalizeCreativeSpec(spec('feed','portrait',3),'carousel','instagram')),{width:1024,height:1280});
  assert.deepEqual(normalizeCreativeSpec(portrait,'video','linkedin'),portrait,'the stored spec is unchanged');
+});
+test('creative storage uses one rolling, archive-aware window for every path',async()=>{
+ assert.match(creativeMediaUsageSQL,new RegExp(`interval '${GENERATION_LIMITS.windowDays} days'`));assert.match(creativeMediaUsageSQL,/archived_at IS NOT NULL/);
+ const seen=[];const used=await creativeMediaUsed({query:async(sql,params)=>{seen.push([sql,params]);return {rows:[{n:'123'}]};}},'org','brand');
+ assert.equal(used,123);assert.deepEqual(seen,[[creativeMediaUsageSQL,['org','brand']]]);
+ assert.ok(creativeStorageFits(GENERATION_LIMITS.storageBytes-GENERATION_LIMITS.reserveBytes));
+ assert.ok(!creativeStorageFits(GENERATION_LIMITS.storageBytes-GENERATION_LIMITS.reserveBytes+1));
+ assert.ok(!creativeStorageFits(0,Math.floor(GENERATION_LIMITS.storageBytes/GENERATION_LIMITS.reserveBytes)+1));
+ assert.ok(!creativeStorageFits(Number.NaN));
 });

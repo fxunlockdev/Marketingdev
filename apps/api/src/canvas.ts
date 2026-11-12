@@ -3,6 +3,8 @@ import {parseCreateDraft} from './create-chat-draft.js';
 import {normalizeCreativeSpec,creativeSourceSize,matchesCreativeDimensions} from "./campaign-formats.js";
 import {planningLearning} from './learning-context.js';
 import {recordSignal} from './learning-signals.js';
+import {GENERATION_LIMITS} from './creative-budget.js';
+import {creativeMediaUsed,creativeStorageFits} from './creative-storage.js';
 import {editSignal,manifestContext} from './creative-edit-signal.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
@@ -294,9 +296,11 @@ export class Canvas {
             "SELECT count(*)::int AS n FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND created_at>now()-interval '1 day'",
             [b.organization_id, id],
           )
-        ).rows[0].n >= 90
+        ).rows[0].n >= GENERATION_LIMITS.dailyImages
       )
         throw new ConflictException("Daily creative request limit reached");
+      // Refuse before queuing with the same window the worker applies, instead of failing later.
+      if(!creativeStorageFits(await creativeMediaUsed(db,b.organization_id,id)))throw new ConflictException(`Creative storage limit reached for the last ${GENERATION_LIMITS.windowDays} days. Archive creatives you no longer need, or try again later.`);
       const brain = (
         await db.query(
           "SELECT id FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1",

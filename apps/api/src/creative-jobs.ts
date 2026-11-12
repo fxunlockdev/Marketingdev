@@ -12,6 +12,7 @@ import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,set
 import {frameCreative,frameDirection} from "./creative-framing.js";
 import {approvedDirection} from "./image-direction.js";
 import {normalizeCreativeSpec,creativeDimensions,legacyCreativeDimensions} from "./campaign-formats.js";
+import {creativeMediaUsed,creativeStorageFits} from "./creative-storage.js";
 import {approvedBrandFont} from './brand-typography.js';
 import {savedCampaignFont} from './campaign-design.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
@@ -337,15 +338,8 @@ export class CreativeJobs {
               )
             ).rows[0]
           : null;
-        const used = Number(
-          (
-            await db.query(
-              "SELECT COALESCE(sum(bytes),0) AS n FROM app.creative_media WHERE organization_id=$1 AND brand_id=$2",
-              [j.organization_id, j.brand_id],
-            )
-          ).rows[0].n,
-        );
-        if (used + 20 * 1024 * 1024 > 512 * 1024 * 1024)
+        // Same 30-day, archive-aware window as Canvas and carousels, so a request accepted there is not refused here.
+        if (!creativeStorageFits(await creativeMediaUsed(db, j.organization_id, j.brand_id)))
           throw new CreativeError("CREATIVE_STORAGE_LIMIT");
         await db.query(
           "UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",

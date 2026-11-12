@@ -1261,3 +1261,21 @@ test('portrait feed posts are composed at 4:5; a 2:3 portrait made earlier stays
  assert.equal(child.skill_manifest.framing??null,null);
  assert.ok(!transport.log.prompts[0].includes('is cropped from this canvas'),'no crop is described when nothing is cropped');
 });
+test('the worker storage check uses the same 30-day window as Canvas, so older work never blocks a business',async()=>{
+ await grant(100000000);transport=directedTransport({images:[await coloured(1024,1024,'#224466')]});
+ // 26 stored images of 20 MB each: more than the 512 MB allowance when they are recent.
+ const jobs=Array.from({length:26},()=>randomUUID());
+ try{
+  for(const job of jobs){
+   await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'plan.generate','succeeded')",[job,org.id,brand.id,alice]);
+   await admin.query("INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height,created_at) VALUES($1,$2,$3,$4,$5,$6,20971520,1024,1024,now()-interval '31 days')",[randomUUID(),org.id,brand.id,job,`STORAGE-FIXTURE-${job}`,'0'.repeat(64)]);
+  }
+  const old=await canvas.submit(alice,brand.id,thread.id,request('Old work does not count'),randomUUID());
+  assert.equal(await handler.run(scope(old)),'succeeded',JSON.stringify(await row(old)));
+  await admin.query('UPDATE app.creative_media SET created_at=now() WHERE job_id=ANY($1::uuid[])',[jobs]);
+  await assert.rejects(canvas.submit(alice,brand.id,thread.id,request('Recent work counts'),randomUUID()),/storage limit/);
+ }finally{
+  transport=undefined;
+  await admin.query('DELETE FROM app.creative_media WHERE job_id=ANY($1::uuid[])',[jobs]);await admin.query('DELETE FROM app.jobs WHERE id=ANY($1::uuid[])',[jobs]);
+ }
+});
