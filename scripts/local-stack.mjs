@@ -1,7 +1,7 @@
 // Runs the whole Desvio product on this machine for a browser at http://127.0.0.1:3000.
 //
 //   node scripts/local-stack.mjs start [--mock|--live --spend-cap-usd N] [--seed] [--web-port N] [--with-video] [--rebuild]
-//   node scripts/local-stack.mjs status | stop | mail | logs [name] | reset --yes
+//   node scripts/local-stack.mjs status | stop | seed | journey [--headed] | mail | logs [name] | reset --yes
 //
 // Development mode only, loopback only. Data persists under work/local-stack (git-ignored).
 // See docs/LOCAL_RUN.md.
@@ -19,7 +19,7 @@ const fail=message=>{process.stderr.write(`local-stack: ${message}\n`);process.e
 
 export function parseArgs(argv){
  const [command='start',...rest]=argv;
- const options={command,mode:'mock',seed:false,withVideo:false,rebuild:false,spendCapUsd:null,webPort:DEFAULT_PORTS.web,yes:false,names:[]};
+ const options={command,mode:'mock',seed:false,withVideo:false,rebuild:false,spendCapUsd:null,webPort:DEFAULT_PORTS.web,yes:false,headed:false,names:[]};
  for(let i=0;i<rest.length;i++){
   const arg=rest[i],next=()=>{const value=rest[++i];if(value===undefined)throw new Error(`${arg} needs a value`);return value;};
   if(arg==='--mock')options.mode='mock';
@@ -28,6 +28,7 @@ export function parseArgs(argv){
   else if(arg==='--with-video')options.withVideo=true;
   else if(arg==='--rebuild')options.rebuild=true;
   else if(arg==='--yes')options.yes=true;
+  else if(arg==='--headed')options.headed=true;
   else if(arg==='--spend-cap-usd'){const v=Number(next());if(!Number.isFinite(v)||v<=0||v>1000)throw new Error('--spend-cap-usd must be a number of dollars between 0 and 1000');options.spendCapUsd=v;}
   else if(arg==='--web-port'){const v=Number(next());if(!Number.isInteger(v)||v<1024||v>65535)throw new Error('--web-port must be a port from 1024 to 65535');options.webPort=v;}
   else if(!arg.startsWith('--'))options.names.push(arg);
@@ -71,7 +72,7 @@ function buildServer(force){
 function buildWeb(context,force){
  const env=webEnvironment(context);
  const git=args=>{try{return execFileSync('git',args,{cwd:ROOT,encoding:'utf8'});}catch{return '';}};
- const stamp=createHash('sha256').update(JSON.stringify([env.API_ORIGIN,env.S3_BROWSER_ORIGIN,git(['rev-parse','HEAD']),git(['status','--porcelain','apps/web','apps/api/src'])])).digest('hex');
+ const stamp=createHash('sha256').update(JSON.stringify([env.API_ORIGIN,env.S3_BROWSER_ORIGIN,git(['rev-parse','HEAD']),git(['status','--porcelain','apps/web','apps/api/src']).split('\n').filter(l=>!l.endsWith('next-env.d.ts')).join('\n')])).digest('hex');
  const previous=existsSync(PATHS.webBuild)?JSON.parse(readFileSync(PATHS.webBuild,'utf8')).stamp:null;
  if(!force&&previous===stamp&&existsSync(join(ROOT,'apps/web/.next/BUILD_ID')))return 'up to date';
  run('web-build',process.execPath,['node_modules/next/dist/bin/next','build','apps/web','--webpack'],env);
@@ -212,7 +213,14 @@ if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   else if(options.command==='mail')mail();
   else if(options.command==='logs')logs(options.names);
   else if(options.command==='reset')await reset(options);
+  else if(options.command==='journey'){
+   const state=readState();if(!supervisorAlive(state)||!state.ready)fail('start the stack first');
+   const {runJourney}=await import('./local-stack/journey.mjs');
+   const {results,shots}=await runJourney(state,{headed:options.headed});
+   out(`\n${results.filter(r=>r.ok).length}/${results.length} steps passed; screenshots in ${shots}`);
+   if(results.some(r=>!r.ok))process.exitCode=1;
+  }
   else if(options.command==='seed'){const state=readState();if(!supervisorAlive(state)||!state.ready)fail('start the stack first');await seed(state);}
-  else fail(`unknown command ${options.command}; use start, status, stop, seed, mail, logs or reset`);
+  else fail(`unknown command ${options.command}; use start, status, stop, seed, journey, mail, logs or reset`);
  }catch(error){fail(error instanceof Error?error.message:'unexpected error');}
 }

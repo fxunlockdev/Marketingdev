@@ -88,11 +88,23 @@ function quoteFrom(text){
  const trimmed=sentence.trim().slice(0,160).trim();
  return text.includes(trimmed)&&trimmed?trimmed:text.slice(0,80);
 }
+/** Answers the owner gave (the guided brief chunk) are quoted exactly; otherwise a website sentence. */
+function finding(field,chunks,i){
+ for(const c of chunks){
+  let answers;try{answers=JSON.parse(c.text);}catch{continue;}
+  const value=answers?.[field]??answers?.details?.[field]??(field==='brand_name'?answers?.details?.business_name:undefined);
+  if(typeof value==='string'&&value.trim()&&c.text.includes(JSON.stringify(value)))return {field,value,chunk_id:c.id,quote:value};
+ }
+ const prose=chunks.filter(c=>!c.text.trim().startsWith('{'));
+ if(!prose.length)return null;
+ const c=prose[i%prose.length],quote=quoteFrom(c.text);
+ return {field,value:quote.slice(0,200),chunk_id:c.id,quote};
+}
 function brandAnalysis(body){
  const schema=body.text.format.schema,{chunks,visuals}=evidenceOf(body);
  const ids=chunks.map(c=>c.id);
  const fields=schema.properties.findings.items.properties.field.enum;
- const findings=chunks.length?fields.slice(0,Math.min(fields.length,8)).map((field,i)=>{const c=chunks[i%chunks.length],quote=quoteFrom(c.text);return {field,value:quote.slice(0,200),chunk_id:c.id,quote};}):[];
+ const findings=chunks.length?fields.slice(0,Math.min(fields.length,8)).map((field,i)=>finding(field,chunks,i)).filter(Boolean):[];
  const value=generate(schema,schema,{key:'',index:0},{
   findings:()=>findings,missing:()=>[],
   chunk_ids:()=>ids.slice(0,1),chunk_id:()=>ids[0],evidence_ids:()=>ids.slice(0,Math.min(3,ids.length)),
@@ -144,7 +156,10 @@ function planner(body){
  return responseEnvelope(body,[message(text)],text);
 }
 function imageCheck(body){
- const text=JSON.stringify({text_matches:true,found_text:[],brief_fit:5,brand_fit:5,artefacts:[],verdict:'pass'});
+ // The mock reports exactly the lettering the specification asks for, so checks pass deterministically.
+ let expected=[];
+ for(const t of inputTexts(body.input)){const at=t.indexOf('{');if(t.startsWith('SPECIFICATION')&&at>=0){try{expected=JSON.parse(t.slice(at)).expected_text??[];}catch{/* none */}}}
+ const text=JSON.stringify({text_matches:true,found_text:expected.slice(0,30),brief_fit:5,brand_fit:5,artefacts:[],verdict:'pass'});
  return responseEnvelope(body,[message(text)],text);
 }
 
@@ -168,7 +183,7 @@ export async function placeholderImage(prompt,size){
  const [width,height]=size.split('x').map(Number);
  const colours=[...new Set(prompt.match(/#[0-9a-fA-F]{6}\b/g)??[])].slice(0,3);
  const [a,b,c]=[colours[0]??PALETTE[0],colours[1]??PALETTE[1],colours[2]??PALETTE[2]];
- const headline=escapeXml(headlineOf(prompt)),font=Math.round(width/14);
+ const raw=headlineOf(prompt),headline=escapeXml(raw),font=Math.round(Math.min(width/14,width*0.74/(raw.length*0.56)));
  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs>
  <rect width="100%" height="100%" fill="url(#g)"/>
