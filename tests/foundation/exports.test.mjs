@@ -329,11 +329,11 @@ test('multi-shot reel: approved export to original video shots in order, cut wit
   return Response.json({object:'response',id:'resp_mock_reel',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify({...brief,fact_ids:[input.brand.facts[0].id]}),annotations:[]}]}]});
  }}));
  // Every request the adapter sends to Runway is recorded exactly as serialized.
- const sent=[],references=new Map(),tasks=new Map();let failSubmit=-1,submits=0;
+ const sent=[],frames=[],references=new Map(),tasks=new Map();let failSubmit=-1,submits=0;
  const runway=new RunwayClient({mode:'test',secret:'fixture',referenceOrigins:['https://media.example.com']},async(url,init)=>{
   const u=new URL(url);sent.push({method:init.method,path:u.pathname,body:init.body?JSON.parse(init.body):null});
   if(u.pathname==='/v1/routers')return Response.json({data:[{slug:'desvio-video-quality-v1-10',settings:{optimizeFor:'quality',models:{mode:'allow_new_except',ids:[]},maxCreditsPerGeneration:{video:10}}}],hasMore:false});
-  if(u.pathname==='/v1/generate/video'){if(submits++===failSubmit)throw new TypeError('network lost after send');const id=randomUUID(),body=JSON.parse(init.body);tasks.set(id,body);return Response.json({id,dryRun:false,routing:{model:'gen4.5',provider:'runway',configId:body.configId,resolvedSettings:{optimizeFor:'quality',priceCeiling:10},estimatedCost:{credits:9}}});}
+  if(u.pathname==='/v1/generate/video'){const body=JSON.parse(init.body),frame=Buffer.from(await(await fetch(references.get(body.input.referenceImages[0].uri))).arrayBuffer());frames.push({sha256:digest(frame),...(({width,height,format})=>({width,height,format}))(await sharp(frame).metadata())});if(submits++===failSubmit)throw new TypeError('network lost after send');const id=randomUUID();tasks.set(id,body);return Response.json({id,dryRun:false,routing:{model:'gen4.5',provider:'runway',configId:body.configId,resolvedSettings:{optimizeFor:'quality',priceCeiling:10},estimatedCost:{credits:9}}});}
   const id=u.pathname.split('/').pop();return Response.json({id,status:'SUCCEEDED',progress:1,output:['https://video.example.org/'+id+'.mp4']});
  });
  const bind=runway.withBudget.bind(runway);
@@ -366,6 +366,10 @@ test('multi-shot reel: approved export to original video shots in order, cut wit
   assert.ok(post.body.input.promptText.startsWith(approved.video_prompt+'\n'));assert.ok(post.body.input.promptText.includes(approved.beats[i].action));
  }
  assert.equal(sent.filter(r=>r.method==='DELETE').length,0);
+ // The frame Runway fetched is the approved export itself, byte for byte at full size: no preview or re-encode.
+ const exported=await store.read((await admin.query('SELECT object_key FROM app.creative_exports WHERE id=$1',[e.id])).rows[0].object_key);
+ const full=await sharp(exported).metadata();assert.equal(frames.length,3);
+ for(const f of frames)assert.deepEqual(f,{sha256:e.sha256,width:full.width,height:full.height,format:'png'});
  const versionId=(await admin.query('SELECT output_version_id FROM app.video_requests WHERE job_id=$1',[j.id])).rows[0].output_version_id,version=await service.version(alice.id,brand.id,versionId);
  assert.equal(version.width,1080);assert.equal(version.height,1920);assert.equal(version.duration_ms,17000);assert.equal(version.shot_count,3);
  assert.equal(version.manifest.reel.shots.length,3);assert.deepEqual(version.manifest.reel.shots.map(s=>s.prompt),expected.map(s=>s.prompt));
@@ -378,13 +382,45 @@ test('multi-shot reel: approved export to original video shots in order, cut wit
  for(const local of references.values())assert.equal((await fetch(local)).status,404);
  assert.equal(await pipeline.step(scope(j)),'succeeded');assert.equal(submits,3);
 
+ // Vision QA on sampled frames: captions that do not read trigger one re-render (no regeneration), then pass.
+ let inspections=0;
+ const qaText=new CreativeProvider(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(url,init)=>{
+  const wire=JSON.parse(init.body);
+  if(wire.text.format.name==='desvio_image_qa'){inspections++;const spec=JSON.parse(wire.input[1].content[0].text.slice(wire.input[1].content[0].text.indexOf('\n')+1));assert.ok(spec.expected_text.includes('Render fixtures'));assert.match(wire.input[1].content[1].image_url,/^data:image\/jpeg;base64,/);
+   const finding=inspections===1?{text_matches:false,found_text:['Rendr fixtres'],brief_fit:4,brand_fit:4,artefacts:[],verdict:'retry'}:{text_matches:true,found_text:spec.expected_text,brief_fit:4,brand_fit:4,artefacts:[],verdict:'pass'};
+   return Response.json({object:'response',id:'resp_mock_qa',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(finding),annotations:[]}]}]});}
+  const message=wire.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n')),input=JSON.parse(message.content.slice(message.content.indexOf('\n')+1));
+  return Response.json({object:'response',id:'resp_mock_reel',status:'completed',output:[{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify({...brief,fact_ids:[input.brand.facts[0].id]}),annotations:[]}]}]});
+ }}));
+ const {ImageQa}=await import('../../dist/image-qa.js');
+ const checked=new VideoJobs(jobs,refs,new CreativeJobs(jobs,new SkillRuntime(skillImage),qaText,undefined,undefined,new ImageQa(qaText)),provider,downloader,new VideoRenderer(image));
+ const qaJob=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Checked reel'},randomUUID());
+ for(let i=0;i<3;i++)assert.equal(await checked.step(scope(qaJob)),'accepted');
+ assert.equal(await checked.step(scope(qaJob)),'succeeded');assert.equal(inspections,2);assert.equal(submits,6);
+ const checkedVersion=await service.version(alice.id,brand.id,(await admin.query('SELECT output_version_id FROM app.video_requests WHERE job_id=$1',[qaJob.id])).rows[0].output_version_id);
+ const report=checkedVersion.manifest.quality;
+ assert.equal(report.verdict,'pass');assert.equal(report.retried,true);assert.equal(report.rerendered,true);assert.equal(report.attempts.length,2);assert.equal(report.frames.length,1);
+ assert.equal(checkedVersion.manifest.style.caption_scale,130);assert.equal(checkedVersion.manifest.style.caption_opacity,100);
+ assert.deepEqual((await admin.query('SELECT step,status FROM app.creative_calls WHERE job_id=$1 AND step LIKE $2 ORDER BY step',[qaJob.id,'qa:%'])).rows,[{step:'qa:1',status:'succeeded'},{step:'qa:2',status:'succeeded'}]);
+ assert.equal(version.manifest.quality.verdict,'unavailable');
+
  // A lost paid response on shot two holds it unknown: shot three is never sent and nothing is resubmitted.
  failSubmit=submits+1;const lost=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Second reel'},randomUUID());
  assert.equal(await pipeline.step(scope(lost)),'accepted');assert.equal(await pipeline.step(scope(lost)),'unknown');
  for(let i=0;i<2;i++)assert.equal(await pipeline.step(scope(lost)),'unknown');
- assert.equal(submits,5);assert.equal((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[lost.id])).rows[0].status,'unknown');
+ assert.equal(submits,8);assert.equal((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[lost.id])).rows[0].status,'unknown');
  const lostShots=(await admin.query('SELECT j.status FROM app.reel_shots s JOIN app.jobs j ON j.id=s.job_id WHERE s.parent_job_id=$1 ORDER BY shot_index',[lost.id])).rows.map(r=>r.status);
  assert.deepEqual(lostShots,['succeeded','unknown','canceled']);
+ // The uncertain reel blocks the next video until the owner stops waiting; nothing is resubmitted.
+ await assert.rejects(service.submit(alice.id,brand.id,thread,{...body,prompt:'Third reel'},randomUUID()),/needs reconciliation/);
+ assert.equal((await api(path(`requests/${lost.id}/stop-waiting`),{method:'POST',body:{acknowledge_possible_charge:false}})).status,400);
+ assert.equal((await api(path(`requests/${lostShots.length&&(await admin.query('SELECT job_id FROM app.reel_shots WHERE parent_job_id=$1 AND shot_index=1',[lost.id])).rows[0].job_id}/stop-waiting`),{method:'POST',body:{acknowledge_possible_charge:true}})).status,404);
+ const stopped=await api(path(`requests/${lost.id}/stop-waiting`),{method:'POST',body:{acknowledge_possible_charge:true}});
+ assert.equal(stopped.status,201,JSON.stringify(stopped.body));assert.equal(stopped.body.status,'canceled');
+ assert.deepEqual((await admin.query('SELECT j.status FROM app.reel_shots s JOIN app.jobs j ON j.id=s.job_id WHERE s.parent_job_id=$1 ORDER BY shot_index',[lost.id])).rows.map(r=>r.status),['succeeded','canceled','canceled']);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.video_reservations r JOIN app.reel_shots s ON s.job_id=r.job_id WHERE s.parent_job_id=$1 AND r.state='held'",[lost.id])).rows[0].n,2);
+ assert.equal(await pipeline.step(scope(lost)),'canceled');assert.equal(submits,8);
+ const next=await service.submit(alice.id,brand.id,thread,{...body,prompt:'Third reel'},randomUUID());assert.ok(next.id);
 });
 
 test('carousel is one immutable ordered composition; scoped reviewers approve exact canonical slides and edits invalidate it',async()=>{

@@ -19,6 +19,8 @@ import {logActivityFailure} from './activity-log.js';
 import {ReelShots} from './reel-shots.js';
 import {reelShots,reelCaptions,reelOverlays,reelEndCard,reelStyle,reelSamples,videoTarget,brandPalette,brandFont,brandName,type ReelShot} from './reel-plan.js';
 import type {RunwayIntent} from './runway-client.js';
+import {ReelQuality,reelExpectation} from './reel-quality.js';
+import {REEL_END_CARD_MS} from './reel-plan.js';
 /** What a video plan was given beyond its request, stored once so a retry sends the same input. */
 export type VideoKnowledge={knowledge:StoredKnowledge;shot_list:string|null};
 const PROMPT_LIMIT=4000;
@@ -115,7 +117,15 @@ export class VideoJobs {
   const palette=brandPalette(context.facts),captions=reelCaptions(context.script,context.storyline,shots),overlays=reelOverlays(brief,request.duration_seconds,shots);
   const name=brandName(context.facts),endCard=name?reelEndCard(name,context.cta,palette.card):null;
   const render=(legible:boolean)=>this.renderer.renderReel({clips:clips.map(c=>({bytes:c.bytes,duration_seconds:c.duration_seconds})),target:request.creative_spec?videoDimensions(request.creative_spec,request.channel):videoTarget('vertical'),captions,overlays,end_card:endCard,style:reelStyle(brandFont(context.facts),palette.caption,legible),samples:reelSamples(shots,captions,!!endCard)});
-  const output=await render(false);
+  let output=await render(false);
+  // Vision QA on sampled frames: artefacts, brand fit and caption legibility. One re-render (never a
+  // re-generation) when captions do not read; otherwise the report flags the reel for the reviewer.
+  const quality=new ReelQuality(this.creative);let report:unknown={schema_version:1,status:'unavailable',verdict:'unavailable',reason:'QA_NOT_CONFIGURED'};
+  if(quality.configured&&output.frames.length){
+   const expectation=reelExpectation({frames:output.frames,captions,overlays,endCard,endCardAt:endCard?shots[shots.length-1]!.end_ms+REEL_END_CARD_MS/2:null,videoPrompt:brief.video_prompt,facts:context.facts});
+   const reviewed=await quality.review(scope,expectation,output.frames,async()=>{output=await render(true);return output.frames;});
+   report={...reviewed.report,rerendered:reviewed.rerendered,frames:output.frames.map(f=>({at_ms:f.at_ms,sha256:f.sha256}))};
+  }
   // The first shot's clean clip is the reel's base: text-only re-renders always start from clean shots.
   const first=clips[0]!,baseKey=`video/${scope.organizationId}/${scope.brandId}/${scope.jobId}/base/${first.sha256}`;
   await this.jobs.store.persist(baseKey,first.bytes,'video/mp4',first.sha256);
@@ -125,7 +135,7 @@ export class VideoJobs {
    await db.query('INSERT INTO app.video_bases(job_id,organization_id,brand_id,object_key,sha256,bytes,width,height,duration_ms,manifest) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(job_id) DO NOTHING',[j.id,j.organization_id,j.brand_id,baseKey,first.sha256,first.bytes.length,meta.width,meta.height,meta.duration_ms,JSON.stringify({...(first.manifest as object),reel_shot:0})]);
   });
   const reel={shots:shots.map((s,i)=>({index:i,prompt:s.prompt,duration_seconds:s.duration_seconds,clip_sha256:clips[i]!.sha256,provider:(clips[i]!.manifest as {video_provider?:unknown})?.video_provider??null,routing:(clips[i]!.manifest as {video_routing?:unknown})?.video_routing??null}))};
-  return this.saveVersion(scope,request,output,{reel});
+  return this.saveVersion(scope,request,output,{reel,quality:report});
  }
  /** Persist the rendered video and poster, then record the version (and attach it to its calendar post) in one transaction. */
  private async saveVersion(scope:JobScope,request:any,output:{video:Buffer;poster:Buffer;manifest:{video_sha256:string;poster_sha256:string}&Record<string,unknown>},extra:Record<string,unknown>):Promise<string>{
