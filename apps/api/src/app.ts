@@ -111,6 +111,9 @@ class ProjectArchiveController {
 class LearningController {
  constructor(@Inject(LearningReviews) private readonly service:LearningReviews){}
  @Get('review') review(@Req() r:AuthRequest,@Param('id') id:string,@Query('month') month:unknown){return this.service.review(r.actorId,id,month);}
+ @Post('review/accept') accept(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown){return this.service.accept(r.actorId,id,body);}
+ @Post('review/accepted/:change/withdraw') withdraw(@Req() r:AuthRequest,@Param('id') id:string,@Param('change') change:string){return this.service.withdraw(r.actorId,id,change);}
+ @Get('trends') trends(@Req() r:AuthRequest,@Param('id') id:string){return this.service.trends(r.actorId,id);}
 }
 
 @Controller('api/v1/businesses/:id/knowledge')
@@ -249,6 +252,11 @@ class PostformeController {
  @Get('publications/ready') ready(@Req() r:AuthRequest,@Param('id') id:string){return this.service.ready(r.actorId,id);}
  @Post('publications') submit(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown,@Headers('idempotency-key') key:string){return this.service.submit(r.actorId,id,b,key);}
  @Post('publications/:post/reconcile') reconcile(@Req() r:AuthRequest,@Param('id') id:string,@Param('post') post:string){return this.service.reconcile(r.actorId,id,post);}
+ @Get('publications/metrics') metrics(@Req() r:AuthRequest,@Param('id') id:string){return this.service.metrics(r.actorId,id);}
+ @Post('publications/bulk') bulk(@Req() r:AuthRequest,@Param('id') id:string,@Body() b:unknown,@Headers('idempotency-key') key:string){return this.service.scheduleAll(r.actorId,id,b,key);}
+ @Post('publications/:post/cancel') cancelPost(@Req() r:AuthRequest,@Param('id') id:string,@Param('post') post:string){return this.service.cancel(r.actorId,id,post);}
+ @Post('publications/:post/reschedule') reschedule(@Req() r:AuthRequest,@Param('id') id:string,@Param('post') post:string,@Body() b:unknown){return this.service.reschedule(r.actorId,id,post,b);}
+ @Get('slots/:slot') slot(@Req() r:AuthRequest,@Param('id') id:string,@Param('slot') slot:string){return this.service.slot(r.actorId,id,slot);}
 }
 
 
