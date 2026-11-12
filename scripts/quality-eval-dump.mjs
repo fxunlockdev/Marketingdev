@@ -23,6 +23,7 @@ import {stockSkipReason} from '../dist/stock-planning.js';
 import {normalizeCreativeSpec} from '../dist/campaign-formats.js';
 import {imageCallPlan, sceneReferences} from '../dist/image-render.js';
 import {isLogoLabel} from '../dist/image-logo.js';
+import {approvedDirection} from '../dist/image-direction.js';
 import {BUSINESSES, AUDIT_REQUESTS, business, carouselPlan} from '../tests/quality/fixtures/businesses.mjs';
 import {referenceSet, stockPhoto, moodboardImages} from '../tests/quality/fixtures/assets.mjs';
 
@@ -34,7 +35,7 @@ const OWN_SYSTEM_MARKERS = ["You are Desvio's creative planner", "You are Desvio
 
 /** Inputs exactly as CreativeJobs assembles them from the stored request, brain and knowledge pack. */
 export function creativeInput(b, prompt) {
-  return {brand: {learning: b.learning, knowledge: b.knowledge, id: b.brandId, sha256: b.sha256, facts: b.facts}, prompt, format: 'static', channel: b.channel, parent: null};
+  return {brand: {learning: b.learning, knowledge: b.knowledge, id: b.brandId, sha256: b.sha256, facts: b.facts, creative_direction: approvedDirection(b.moodboard, prompt)}, prompt, format: 'static', channel: b.channel, parent: null};
 }
 export function carouselInput(b, prompt, slides) {
   return {task: 'carousel', brand: {id: b.brandId, sha256: b.sha256, facts: b.facts, learning: b.learning}, prompt, channel: b.channel, slide_count: slides};
