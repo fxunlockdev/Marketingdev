@@ -144,8 +144,13 @@ Done (integration wave 1):
 3. **Insights** (`insight-jobs.ts`): pack of kind `insights`, stored in `insight_requests.knowledge_context`, sent as `brand.knowledge`; after success a `result` node and suggested `lesson` nodes with `learned_from` edges.
 4. **Owner review API** (`knowledge-review.ts`, `app.ts`): `GET /api/v1/businesses/:id/knowledge?status=&type=&cursor=&limit=` (≤100 nodes, ≤500 edges), `POST .../knowledge/nodes/:nodeId/review`, `POST .../knowledge/edges/:edgeId/review`, `POST .../knowledge/nodes/:nodeId/supersede`. Reviewer role enforced by row-level security (403).
 
-Still needed (files owned elsewhere):
+Done (wave 2):
 
-- Research and analysis extraction (`intake-jobs.ts`, `brand-analysis.ts`).
-- Planning packs (`planning-jobs.ts`, `planning.ts`), carousel parent planning (`carousel-jobs.ts`), video (`video-jobs.ts`).
-- The owner screen in the web app.
+5. **Planning** (`planning.ts`, `planning-knowledge.ts`, migration 126): the planner receives a `plan` pack, labelled market and competitor notes, prefer/avoid statements from customer feedback, and the approved brand strategy. `used_node_ids` is stored on the request; after a plan is saved, each slot becomes a post node with `used_in` edges from its persona, pain, angle, format and pillar.
+6. **Carousel and video** (`carousel-jobs.ts`, `video-jobs.ts`, migration 127): packs stored on the request so retries replay the same input; video posts are written back as post nodes.
+7. **Brand strategy** (`strategy-graph.ts`): approving a strategy writes personas, pains, angles, formats and pillars into the graph in the same transaction. Proven items are approved; unproven ones stay suggestions.
+
+Still needed:
+
+- Research and analysis extraction into the graph (in progress, wave 2).
+- A web screen over the owner review API. The routes exist; the Strategy screen covers strategy items, but there is no general "What Desvio knows" screen yet.
