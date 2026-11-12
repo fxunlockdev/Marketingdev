@@ -5,7 +5,7 @@ import {imagePlanningRates} from './creative-planning.js';
 import {buildImagePrompt} from './image-prompt.js';
 import {resolveTextMode,inImageCopy} from './image-typography.js';
 import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,type QaAttempt,type QaExpectation,type QaReport} from './image-qa.js';
-import {frameCreative} from "./creative-framing.js";
+import {frameCreative,frameDirection} from "./creative-framing.js";
 import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
 import {approvedBrandFont} from './brand-typography.js';
 import {savedCampaignFont} from './campaign-design.js';
@@ -404,7 +404,8 @@ export class CreativeJobs {
       );
       const artwork=request.creative_spec?.artwork;
       const textMode=resolveTextMode({brief:plan.brief,artwork,parent:parent?{hasOverlayText:parent.design.layers.some((l:any)=>String(l.text??'').trim()),textMode:parent.skill_manifest?.text_mode}:null});
-      const basePrompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork});
+      const frame=request.creative_spec?frameDirection(normalizeCreativeSpec(request.creative_spec,request.format,request.channel)):undefined;
+      const basePrompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork,frame});
       const render=async(step:'image'|'image:retry',prompt:string)=>{
       const wire = this.provider.imageRequest(
         grant.image_model,
@@ -440,7 +441,7 @@ export class CreativeJobs {
           if(request.creative_spec){
             const spec=normalizeCreativeSpec(request.creative_spec,request.format,request.channel),target=creativeDimensions(spec);
             if(output.width!==target.width||output.height!==target.height){
-              // Keep provider output for provenance; fit all pixels without cropping approved content.
+              // Keep provider output for provenance; fill the placement edge to edge (the prompt states the trimmed margin).
               const sourceKey=`creative/${scope.organizationId}/${scope.brandId}/${scope.jobId}/${output.sha256}`;
               await this.jobs.store.persist(sourceKey,output.bytes,"image/png",output.sha256);
               const framed=await frameCreative(output.bytes,spec);

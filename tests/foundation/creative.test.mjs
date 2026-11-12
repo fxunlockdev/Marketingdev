@@ -1076,3 +1076,19 @@ test('overlay text mode keeps the editable headline layer and still orders no le
  assert.ok(transport.log.prompts[0].includes('Soft morning window light'));
 });
 
+test('a story is composed at true 9:16 with no white padding, the prompt states the safe area, and the original is kept',async()=>{
+ const band=(width,height,background,left,top)=>coloured(width,height,background).then(input=>({input,left,top}));
+ const source=await sharp({create:{width:1024,height:1536,channels:3,background:'#ff0000'}}).composite([await band(60,1536,'#0000ff',0,0),await band(60,1536,'#0000ff',964,0)]).png().toBuffer();
+ transport=directedTransport({images:[source]});
+ const j=await canvas.submit(alice,brand.id,thread.id,{...request('Create a story'),channel:'instagram',size:'1024x1536',creative_spec:{placement:'story',aspect:'vertical',slide_count:null}},randomUUID());
+ assert.equal(await handler.run(scope(j)),'succeeded');
+ const v=await versionOf(j);
+ assert.equal(v.width,1080);assert.equal(v.height,1920);
+ const {data,info}=await sharp(await store.read(v.object_key)).raw().toBuffer({resolveWithObject:true});
+ const at=(x,y)=>[...data.subarray((y*info.width+x)*info.channels,(y*info.width+x)*info.channels+3)];
+ for(const [x,y] of [[0,0],[1079,0],[0,1919],[1079,1919],[540,0],[540,1919],[2,960],[1077,960]])assert.deepEqual(at(x,y),[255,0,0]);
+ assert.deepEqual(v.skill_manifest.framing,{mode:'cover',source_sha256:digest(source),source_width:1024,source_height:1536,width:1080,height:1920,crop:{left:80,top:0,width:864,height:1536}});
+ assert.equal(digest(await store.read(v.object_key.replace(v.sha256,digest(source)))),digest(source));
+ assert.match(transport.log.prompts[0],/central 80% of the width/);assert.match(transport.log.prompts[0],/top 14% and bottom 20%/);
+});
+
