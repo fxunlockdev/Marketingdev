@@ -32,6 +32,7 @@ import {SocialConnections} from './social-connections.js';
 import {CreativeExports} from './creative-exports.js';
 import {SlotCreatives} from './slot-creatives.js';
 import {Planning} from "./planning.js";
+import {BrandStrategies} from "./strategy-store.js";
 import {ContentPlan} from "./content-plan.js";
 import {Canvas} from "./canvas.js";
 import 'reflect-metadata';
@@ -122,6 +123,16 @@ class KnowledgeController {
  @Post('nodes/:nodeId/review') reviewNode(@Req() r:AuthRequest,@Param('id') id:string,@Param('nodeId') node:string,@Body() body:unknown){return this.service.reviewNode(r.actorId,id,node,body);}
  @Post('edges/:edgeId/review') reviewEdge(@Req() r:AuthRequest,@Param('id') id:string,@Param('edgeId') edge:string,@Body() body:unknown){return this.service.reviewEdge(r.actorId,id,edge,body);}
  @Post('nodes/:nodeId/supersede') supersede(@Req() r:AuthRequest,@Param('id') id:string,@Param('nodeId') node:string,@Body() body:unknown){return this.service.supersede(r.actorId,id,node,body);}
+}
+
+@Controller('api/v1/businesses/:id/brand-strategy')
+@UseGuards(SessionGuard)
+class BrandStrategyController {
+ private readonly service:BrandStrategies;
+ constructor(@Inject(ContentPlan) plans:ContentPlan){this.service=new BrandStrategies(plans);}
+ @Get() list(@Req() r:AuthRequest,@Param('id') id:string){return this.service.list(r.actorId,id);}
+ @Post() request(@Req() r:AuthRequest,@Param('id') id:string,@Body() body:unknown,@Headers('idempotency-key') key:unknown){return this.service.request(r.actorId,id,body,key);}
+ @Post(':strategyId/approve') approve(@Req() r:AuthRequest,@Param('id') id:string,@Param('strategyId') strategy:string,@Body() body:unknown){return this.service.approve(r.actorId,id,strategy,body);}
 }
 
 @Controller('api/v1/businesses/:id/strategies')
@@ -527,7 +538,7 @@ export async function createApplication(config: Config) {
     // Derived previews live in private storage next to their originals; a storage fault only costs the reuse.
     store.previews.persistTo(s3PreviewPersistence(store.client,config.storage.bucket),error=>logActivityFailure('PreviewStorage',{jobId:'api-previews'},error));
     // Registered first: it owns the cacheable preview routes (creative media, exports, video posters, carousel covers).
-    @Module({ controllers: [createMediaController(SessionGuard),KnowledgeController,LearningController,UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [createMediaController(SessionGuard),KnowledgeController,BrandStrategyController,LearningController,UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
  {provide:LearningReviews,useValue:new LearningReviews(new Businesses(database,workspaces))},
  {provide:KnowledgeReview,useValue:new KnowledgeReview(new Businesses(database,workspaces))},
  {provide:MediaLibrary,useValue:new MediaLibrary(new Canvas(new Businesses(database,workspaces),store))},

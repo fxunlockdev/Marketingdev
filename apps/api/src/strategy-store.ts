@@ -4,7 +4,9 @@ import type {PoolClient} from 'pg';
 import {canonicalJSON,hash} from './brand-brain.js';
 import type {ContentPlan} from './content-plan.js';
 import {CreativeError} from './creative-contracts.js';
-import {approvedLearning} from './learning-context.js';
+import {planningLearning} from './learning-context.js';
+import {packForJob,promptKnowledge} from './knowledge-production.js';
+import {marketNotes,researchEvidence,savedResearch} from './strategy-evidence.js';
 import {object,uuid} from './workspaces.js';
 import {strategySnapshot,validateStrategyInput,type StrategyInput,type StrategyResult,type StrategySnapshot} from './strategy-contracts.js';
 
@@ -32,6 +34,15 @@ export async function saveDraftStrategy(db:PoolClient,job:{id:string;organizatio
  return id;
 }
 
+/** What the client did not send is filled from the business's own saved research and knowledge graph, so a strategy
+ * is grounded without the browser carrying evidence. Client-supplied values are kept as they are. */
+export async function groundedStrategyContext(db:PoolClient,organization:string,brand:string,supplied:Record<string,unknown>):Promise<Record<string,unknown>>{
+ const research=await savedResearch(db,organization,brand),evidence=researchEvidence(research),notes=marketNotes(research,12);
+ const pack=supplied.context_pack===undefined?promptKnowledge(await packForJob(db,{organizationId:organization,brandId:brand},'plan','brand strategy personas pains angles pillars audience competitors offers')):undefined;
+ return {...(supplied.evidence===undefined&&evidence.length?{evidence}:{}),...(supplied.market_research===undefined&&notes.length?{market_research:notes}:{}),...(pack?{context_pack:pack}:{}),...supplied};
+}
+
+
 /** Customer side of the brand strategy: ask for one, read the versions, approve a draft. */
 export class BrandStrategies{
  constructor(readonly plans:ContentPlan){}
@@ -52,8 +63,9 @@ export class BrandStrategies{
    const prefs=(await db.query('SELECT goal,timezone,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
    if(!prefs||prefs.step!==3)throw new ConflictException('Finish your brand goals before building a strategy');
    const {step,...preferences}=prefs;
+   const grounded=await groundedStrategyContext(db,b.organization_id,id,v);
    let input:StrategyInput;
-   try{input=validateStrategyInput({task:'strategy',brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:{id:string;field:string;value:string})=>({id:f.id,field:f.field,value:f.value}))},preferences,...v});}
+   try{input=validateStrategyInput({task:'strategy',brand:{id:brain.id,sha256:brain.sha256,learning:await planningLearning(db),facts:brain.snapshot.facts.map((f:{id:string;field:string;value:string})=>({id:f.id,field:f.field,value:f.value}))},preferences,...grounded});}
    catch{throw new BadRequestException('Check the research evidence and context supplied for this strategy');}
    const grant=(await db.query("SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,id])).rows[0];
    // The worker compares scheduled_at with its own clock; use the API clock, as plan requests do, not the database's.
