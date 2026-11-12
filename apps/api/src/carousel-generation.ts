@@ -1,5 +1,6 @@
 import {requireMonthlyPlanApproval,approvedDirection,directionPromptContext,type ApprovedDirection} from './monthly-plan-approval.js';
 import {GENERATION_LIMITS} from './creative-budget.js';
+import {creativeMediaUsed,creativeStorageFits} from './creative-storage.js';
 import {campaignCreativeContext,campaignDesignDirection} from './campaign-design.js';
 import type {PoolClient} from 'pg';
 import {normalizeCreativeSpec,creativeSourceSize,type CreativeSpec} from './campaign-formats.js';
@@ -46,7 +47,7 @@ export class CarouselGeneration {
    // windows that skip archived work, so older months never block a business for good.
    const count=Number(v.slide_count),L=GENERATION_LIMITS,scopeArgs=[b.organization_id,brand],window=`interval '${L.windowDays} days'`;
    if((await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.generate' AND created_at>now()-interval '1 day'",scopeArgs)).rows[0].n+count>L.dailyImages)throw new ConflictException('Daily creative request limit reached');
-   const media=Number((await db.query(`SELECT COALESCE(sum(m.bytes),0) AS n FROM app.creative_media m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.created_at>now()-${window} AND NOT EXISTS(SELECT 1 FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id WHERE v.media_id=m.id AND p.archived_at IS NOT NULL)`,scopeArgs)).rows[0].n);if(media+count*L.reserveBytes>L.storageBytes)throw new ConflictException(`Creative storage limit reached for the last ${L.windowDays} days. Archive creatives you no longer need, or try again later.`);
+   if(!creativeStorageFits(await creativeMediaUsed(db,b.organization_id,brand),count))throw new ConflictException(`Creative storage limit reached for the last ${L.windowDays} days. Archive creatives you no longer need, or try again later.`);
    const exported=Number((await db.query(`SELECT COALESCE((SELECT sum(bytes) FROM app.creative_exports WHERE organization_id=$1 AND brand_id=$2 AND created_at>now()-${window}),0)+(SELECT count(*)*${L.reserveBytes} FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.export' AND status IN ('queued','running','retrying')) AS n`,scopeArgs)).rows[0].n);if(exported+count*L.reserveBytes>L.storageBytes)throw new ConflictException(`Export storage limit reached for the last ${L.windowDays} days. Try again later.`);
    if((await db.query("SELECT count(*)::int AS n FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind='creative.export' AND created_at>now()-interval '1 day'",scopeArgs)).rows[0].n+count>L.dailyExports)throw new ConflictException('Daily export limit reached');
    if((await db.query(`SELECT count(*)::int AS n FROM app.carousel_projects WHERE organization_id=$1 AND brand_id=$2 AND archived_at IS NULL AND created_at>now()-${window}`,scopeArgs)).rows[0].n>=L.carouselProjects)throw new ConflictException(`Carousel limit reached for the last ${L.windowDays} days. Archive carousels you no longer need, or try again later.`);
