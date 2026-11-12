@@ -19,6 +19,8 @@ export type QaExpectation={
  creative_task:string;
  art_direction:CreativeBrief['art_direction']|null;
  brand:{field:string;value:string}[];
+ /** What this customer rejected before. Present only when non-empty, so older checks replay unchanged. */
+ must_avoid?:string[];
 };
 export type QaWire={model:string;body:InspectionBody;sha256:string;maxInputTokens:number;maxOutputTokens:number;expectation:QaExpectation};
 export type QaAttempt=
@@ -71,6 +73,7 @@ text_matches: true only when every string in expected_text appears exactly once,
 brief_fit (1-5): how well the picture delivers creative_task and art_direction: subject, composition, lighting, hierarchy, colour roles, product placement.
 brand_fit (1-5): how well it suits the approved brand data: audience, offering, visual direction, colours. Generic stock or AI-gloss styling scores low.
 artefacts: concrete visible defects, such as malformed hands or faces, duplicated or melted objects, garbled or cropped lettering, watermarks, an invented logo, or empty bars at the edges. Use an empty list when there are none.
+must_avoid, when present, lists things this customer has rejected before. If any of them is visible, add an artefacts entry that starts exactly "Avoided element visible:" and names it, and choose "retry".
 verdict: "pass" when text_matches is true, both scores are 4 or 5 and there is no serious artefact. "retry" when regenerating would probably fix it: wrong, missing, extra or garbled lettering, a serious artefact, or a score of 1 or 2. "flag" otherwise, for a person to decide.`;
 
 const list=(value:unknown,maxItems:number,maxLength:number):value is string[]=>
@@ -96,14 +99,19 @@ export function expectedTextFound(expected:string[],found:string[]):boolean{
 }
 
 /** The checker's verdict, tightened by rules that do not depend on its judgement. */
+export const AVOIDED_PREFIX='Avoided element visible:';
+/** True when the checker saw something this customer asked to avoid. */
+export function avoidedElementSeen(finding:QaFinding,expectation:QaExpectation):boolean{
+ return !!expectation.must_avoid?.length&&finding.artefacts.some(a=>a.trim().toLowerCase().startsWith(AVOIDED_PREFIX.toLowerCase()));
+}
 export function settleVerdict(finding:QaFinding,expectation:QaExpectation):QaVerdict{
  const spelled=finding.text_matches&&expectedTextFound(expectation.expected_text,finding.found_text);
- if(!spelled)return 'retry';
+ if(!spelled||avoidedElementSeen(finding,expectation))return 'retry';
  if(finding.verdict==='pass'&&(finding.brief_fit<3||finding.brand_fit<3))return 'flag';
  return finding.verdict;
 }
 
-export function qaExpectation(brief:CreativeBrief,textMode:TextMode,identity:{field:string;value:string}[]):QaExpectation{
+export function qaExpectation(brief:CreativeBrief,textMode:TextMode,identity:{field:string;value:string}[],mustAvoid:readonly string[]=[]):QaExpectation{
  const copy=textMode==='in_image'?inImageCopy(brief):{headline:'',cta:''};
  const brandName=identity.find(f=>f.field==='brand_name')?.value.trim().slice(0,80)??'';
  return {
@@ -113,6 +121,7 @@ export function qaExpectation(brief:CreativeBrief,textMode:TextMode,identity:{fi
   creative_task:brief.image_prompt.slice(0,3000),
   art_direction:brief.art_direction??null,
   brand:identity.map(f=>({field:f.field,value:f.value.slice(0,600)})),
+  ...(mustAvoid.length?{must_avoid:mustAvoid.slice(0,8).map(item=>item.slice(0,200))}:{}),
  };
 }
 
@@ -125,6 +134,7 @@ export function qaRetryNotes(finding:QaFinding|null,expectation:QaExpectation,ne
   lines.push(`- The lettering was wrong. It read ${canonicalJSON(finding.found_text.slice(0,8).map(t=>t.slice(0,120)))}. It must read exactly ${expectation.expected_text.map(t=>JSON.stringify(t)).join(' and ')}, each once, with no other lettering.`);
  else if(!expectation.expected_text.length&&!finding.text_matches)
   lines.push(`- The image contained lettering ${canonicalJSON(finding.found_text.slice(0,8).map(t=>t.slice(0,120)))}. It must contain no words, letters or numbers.`);
+ if(avoidedElementSeen(finding,expectation))lines.push(`- It showed something this customer has rejected before. Leave out entirely: ${canonicalJSON(expectation.must_avoid??[])}.`);
  if(finding.artefacts.length)lines.push(`- Visible defects to remove: ${canonicalJSON(finding.artefacts.slice(0,5).map(t=>t.slice(0,200)))}.`);
  if(finding.brief_fit<4)lines.push('- It did not follow the creative task and art direction closely enough. Match the composition, lighting, hierarchy and product placement as written.');
  if(finding.brand_fit<4)lines.push('- It did not suit the brand. Follow the approved brand data and visual direction; avoid generic stock styling.');

@@ -2,16 +2,14 @@ import {acceptsModel} from './model-policy.js';
 import {pregeneratePreviews} from './preview-pregeneration.js';
 import {packForJob,promptKnowledge,recordPost,type StoredKnowledge} from './knowledge-production.js';
 import {logActivityFailure} from './activity-log.js';
-import {StockAssets,tooCloseToStock,STOCK_TOO_CLOSE_DISTANCE} from './stock-assets.js';
-import {stockReferenceLabel} from './stock-planning.js';
+import {StockAssets,tooCloseToStock,STOCK_TOO_CLOSE_DISTANCE,type StockReference} from './stock-assets.js';
 import {StockError} from './vecteezy-client.js';
 import {imagePlanningRates} from './creative-planning.js';
-import {buildImagePrompt} from './image-prompt.js';
-import {resolveTextMode,inImageCopy} from './image-typography.js';
+import {inImageCopy} from './image-typography.js';
+import {imageCallPlan,sceneReferences,type BrandReference,type LogoInput,type MoodboardInput} from './image-render.js';
+import {isLogoLabel} from './image-logo.js';
 import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,nearStockCopy,type QaAttempt,type QaExpectation,type QaReport,type StockSourceCheck,type StockSourceReport} from './image-qa.js';
-import {frameCreative,frameDirection} from "./creative-framing.js";
-import {approvedDirection} from "./image-direction.js";
-import {normalizeCreativeSpec,creativeDimensions,legacyCreativeDimensions} from "./campaign-formats.js";
+import {normalizeCreativeSpec} from "./campaign-formats.js";
 import {creativeMediaUsed,creativeStorageFits} from "./creative-storage.js";
 import {approvedBrandFont} from './brand-typography.js';
 import {savedCampaignFont} from './campaign-design.js';
@@ -21,7 +19,6 @@ import {assertLearningCurrent} from './learning-context.js';
 import {GeminiPlanner} from "./gemini-planner.js";
 import {ApiError as GeminiAPIError} from "@google/genai";
 import type {PlannerRequest} from "./creative-contracts.js";
-import sharp from 'sharp';
 import {referenceColumns,referenceJoins} from './brand-references.js';
 import { randomUUID } from "node:crypto";
 import OpenAI from "openai";
@@ -36,6 +33,7 @@ import {
 import { canonicalJSON, hash } from "./brand-brain.js";
 import { digest } from "./object-store.js";
 import { createDesign, reviseDesign } from "./creative-design.js";
+import {approvedDirection} from './image-direction.js';
 const terminal = new Set([
   "succeeded",
   "failed",
@@ -275,6 +273,33 @@ export class CreativeJobs {
       await this.jobs.transaction(scope,db=>recordPost(db,scope,{key:`creative ${versionId}`,label,jobId:scope.jobId,properties:{creative_version_id:versionId}},knowledge.used_node_ids));
     }catch(error){logActivityFailure('KnowledgeRecord',scope,error);}
   }
+  /** The locked mood board's own image and carousel cover, oldest first. Read under the worker role. */
+  private async moodboardMedia(db:any,board:{image_version_id:string|null;carousel_version_id:string|null}):Promise<{label:string;object_key:string;sha256:string;bytes:string|number}[]>{
+    const media='SELECT m.object_key,m.sha256,m.bytes FROM app.creative_versions v JOIN app.creative_media m ON m.id=v.media_id WHERE v.id=$1';
+    const image=board.image_version_id?(await db.query(media,[board.image_version_id])).rows[0]:null;
+    const cover=board.carousel_version_id?(await db.query(`SELECT m.object_key,m.sha256,m.bytes FROM app.carousel_pages p JOIN app.creative_versions v ON v.id=p.creative_version_id JOIN app.creative_media m ON m.id=v.media_id WHERE p.carousel_version_id=$1 AND p.position=0`,[board.carousel_version_id])).rows[0]:null;
+    return [...(image?[{label:'mood board image',...image}]:[]),...(cover?[{label:'mood board carousel cover',...cover}]:[])];
+  }
+  /** The logo file: an attached reference labelled as the logo, else the business's approved logo reference. */
+  private async logoFile(attached:BrandReference[],approved:any):Promise<LogoInput|null>{
+    const own=attached.find(r=>isLogoLabel(r.label));
+    if(own)return {bytes:own.bytes,source:'attached',...(own.id?{reference_id:own.id}:{})};
+    if(!approved?.object_key)return null;
+    const bytes=await this.jobs.store.read(approved.object_key,6*1024*1024);
+    if(bytes.length!==Number(approved.bytes)||digest(bytes)!==approved.sha256)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
+    return {bytes,source:'approved',reference_id:approved.id};
+  }
+  /** How many mood board style images the request's cost ceiling still allows. Counts only reservations
+   * made before the image step, so a replay computes the same number. */
+  private async styleRoom(scope:JobScope,grant:any,sent:number):Promise<number>{
+    return this.jobs.transaction(scope,async(db,j)=>{
+      const limit=(await db.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=$1',[j.id])).rows[0]?.max_cost_micros;
+      if(limit===null||limit===undefined)return 2;
+      const spent=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE job_id=$1 AND step NOT LIKE 'image%' AND step NOT LIKE 'qa:%'",[j.id])).rows[0].n);
+      const perImage=Number(grant.max_image_request_micros);
+      return Math.max(0,Math.min(2,Math.floor((Number(limit)-spent)/perImage)-1-sent));
+    });
+  }
   async run(scope: JobScope) {
     try {
       const prepared = await this.jobs.transaction(scope, async (db, j) => {
@@ -380,24 +405,29 @@ export class CreativeJobs {
         };
         const references=(await db.query(`SELECT ${referenceColumns},c.position FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id ${referenceJoins} WHERE c.job_id=$1 ORDER BY c.position`,[j.id])).rows;
         // Only a mood board locked before this request was made: the prompt must be identical on replay.
-        const moodboard=(await db.query('SELECT m.direction,m.feedback FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0]??null;
-        return { request, grant, parent, input, references, moodboard, knowledge, actor: j.requested_by };
+        const moodboard=(await db.query('SELECT m.direction,m.feedback,m.image_version_id,m.carousel_version_id FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0]??null;
+        const moodboardMedia=moodboard?await this.moodboardMedia(db,moodboard):[];
+        // The approved logo is composited, never redrawn: the one attached, else the business's approved logo.
+        const logo=references.some((r:any)=>isLogoLabel(String(r.label)))?null:(await db.query(`SELECT ${referenceColumns} FROM app.brand_references r ${referenceJoins} WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.revoked_at IS NULL AND r.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) AND r.label ~* '(\\mlogo|\\mwordmark)' ORDER BY r.approved_at DESC,r.id LIMIT 1`,[j.organization_id,j.brand_id,j.id])).rows[0]??null;
+        // The planner sees the approved mood board too: it is the creative direction for the brief.
+        const direction=moodboard?approvedDirection(moodboard,request.prompt):null;
+        return { request, grant, parent, input:direction?{...input,brand:{...input.brand,creative_direction:direction}}:input, references, moodboard:moodboard?{direction:moodboard.direction,feedback:moodboard.feedback}:null, moodboardMedia, logo, knowledge, actor: j.requested_by };
       });
       if (!prepared) return "finished";
-      const { request, grant, input, parent, references, moodboard, knowledge } = prepared;
-      const referenceImages:Buffer[]=[],referenceManifest:any[]=[];
+      const { request, grant, input, parent, references, moodboard, moodboardMedia, logo, knowledge } = prepared;
+      const brandReferences:BrandReference[]=[];
       for(const r of references){
         if(!r.object_key||!r.sha256)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
         const bytes=await this.jobs.store.read(r.object_key,6*1024*1024);
         if(bytes.length!==r.bytes||digest(bytes)!==r.sha256)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
-        let canonical:Buffer;
-        try{
-          const decoder=sharp(bytes,{limitInputPixels:24_000_000}),metadata=await decoder.metadata();
-          if(metadata.format!=='jpeg'||metadata.width!==r.width||metadata.height!==r.height)throw new Error('Invalid source');
-          canonical=await (r.crop?decoder.extract(r.crop):decoder).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
-        }catch{throw new CreativeError('CREATIVE_REFERENCE_INVALID');}
-        referenceImages.push(canonical);
-        referenceManifest.push({id:r.id,visual_id:r.visual_id,kind:r.kind,label:r.label,crop:r.crop??null,source_sha256:r.sha256,input_sha256:digest(canonical)});
+        brandReferences.push({id:r.id,visual_id:r.visual_id,kind:r.kind,label:r.label,crop:r.crop??null,source_sha256:r.sha256,bytes,width:r.width,height:r.height});
+      }
+      const logoFile=await this.logoFile(brandReferences,logo);
+      const moodboardImages:MoodboardInput['images']=[];
+      for(const m of moodboardMedia){
+        const bytes=await this.jobs.store.read(m.object_key,24*1024*1024);
+        if(bytes.length!==Number(m.bytes)||digest(bytes)!==m.sha256)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
+        moodboardImages.push({label:m.label,bytes});
       }
       const carousel=await this.jobs.transaction(scope,async(db,j)=>(await db.query('SELECT r.job_id,r.input,r.input_sha256,r.plan,r.canceled,c.position FROM app.carousel_children c JOIN app.carousel_requests r ON r.job_id=c.parent_job_id WHERE c.generation_job_id=$1',[j.id])).rows[0]);
       let plan = request.plan;
@@ -419,18 +449,13 @@ export class CreativeJobs {
         });
       }
       if(!carousel)plan = validateSkillResult(plan, input);
-      let stockPhoto:Buffer|undefined;
+      let stockPhoto:Buffer|undefined,stockChoice:StockReference|null=null;
       if(this.stock){
         const dimensions=String(request.size).split('x').map(Number);
         const orientation=dimensions[0]===dimensions[1]?'square':dimensions[0]>dimensions[1]?'horizontal':'vertical';
         // Stock is optional: a skipped or failed stock step is recorded and the creative goes ahead without it.
-        const stock=await this.stock.reference(scope,input,{imagePrompt:plan.brief.image_prompt,orientation,edit:!!parent,brandReferences:references.length,layoutArchetype:(plan.brief as {art_direction?:{layout_archetype?:unknown}}).art_direction?.layout_archetype,artDirection:(plan.brief as {art_direction?:unknown}).art_direction,carouselPosition:carousel?.position??null,vision:(this.planner(request.text_provider) as {acceptsImages?:boolean}).acceptsImages===true},message=>this.planCall(scope,message,request));
-        if(stock){
-          const stockPng=await sharp(stock.photo,{limitInputPixels:24_000_000}).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
-          stockPhoto=stock.photo;
-          referenceImages.push(stockPng);
-          referenceManifest.push({kind:`stock_${stock.use}`,label:stockReferenceLabel(stock.use),input_sha256:digest(stockPng)});
-        }
+        const stock=await this.stock.reference(scope,input,{imagePrompt:plan.brief.image_prompt,orientation,edit:!!parent,brandReferences:sceneReferences(references),layoutArchetype:(plan.brief as {art_direction?:{layout_archetype?:unknown}}).art_direction?.layout_archetype,artDirection:(plan.brief as {art_direction?:unknown}).art_direction,carouselPosition:carousel?.position??null,vision:(this.planner(request.text_provider) as {acceptsImages?:boolean}).acceptsImages===true},message=>this.planCall(scope,message,request));
+        if(stock){stockPhoto=stock.photo;stockChoice=stock;}
       }
       let reference: Buffer | undefined;
       if (parent) {
@@ -441,21 +466,19 @@ export class CreativeJobs {
         )
           throw new CreativeError("CREATIVE_REFERENCE_INVALID");
       }
-      const identity = input.brand.facts.filter((f) =>
-        ["brand_name", "offering", "audience", "voice", "colors", "prohibited_claims"].includes(f.field) || f.field.startsWith("visual_direction_"),
-      );
       const artwork=request.creative_spec?.artwork;
-      const textMode=resolveTextMode({brief:plan.brief,artwork,parent:parent?{hasOverlayText:parent.design.layers.some((l:any)=>String(l.text??'').trim()),textMode:parent.skill_manifest?.text_mode}:null});
       // The placement's true size. An edit of a 2:3 portrait made before 4:5 keeps its size, so its saved layers still fit.
       const placement=request.creative_spec?normalizeCreativeSpec(request.creative_spec,request.format,request.channel):null;
-      const target=placement?(parent&&legacyCreativeDimensions(placement,parent.design)?{width:Number(parent.design.width),height:Number(parent.design.height)}:creativeDimensions(placement)):null;
-      const frame=placement&&target?frameDirection(placement,target):undefined;
-      const basePrompt=buildImagePrompt({brief:plan.brief,identity,references:referenceManifest,hasParent:!!parent,textMode,artwork,frame,approvedDirection:approvedDirection(moodboard,request.prompt)});
+      const styleLimit=await this.styleRoom(scope,grant,sceneReferences(brandReferences)+(stockChoice?1:0));
+      const call=await imageCallPlan({brief:plan.brief,facts:input.brand.facts,prompt:request.prompt,references:brandReferences,stock:stockChoice,moodboard:moodboard?{...moodboard,images:moodboardImages}:null,placement,requestSize:request.size,model:grant.image_model,quality:grant.quality,artwork,
+        learning:request.memory_context,logo:logoFile,styleLimit,
+        parent:parent&&reference?{bytes:reference,design:parent.design,text:{hasOverlayText:parent.design.layers.some((l:any)=>String(l.text??'').trim()),textMode:parent.skill_manifest?.text_mode}}:null});
+      const {identity,textMode,manifest:referenceManifest,references:referenceImages,prompt:basePrompt}=call;
       const render=async(step:'image'|'image:retry',prompt:string)=>{
       const wire = this.provider.imageRequest(
         grant.image_model,
         prompt,
-        request.size,
+        call.size,
         grant.quality,
         hash(`${scope.organizationId}:${prepared.actor}`),
       );
@@ -464,7 +487,7 @@ export class CreativeJobs {
         step,
         grant.image_model,
         hash(
-          canonicalJSON({ wire, parent_sha256: parent?.media_sha256 ?? null,...(referenceManifest.length?{references:referenceManifest}:{}) }),
+          canonicalJSON({ wire, parent_sha256: parent?.media_sha256 ?? null,...(referenceManifest.length?{references:referenceManifest}:{}),...(call.fallbackSize?{fallback_size:call.fallbackSize}:{}),...(call.logo?{logo:call.logo}:{}) }),
         ),
         (g) => {
           if (g.quality !== grant.quality)
@@ -473,26 +496,10 @@ export class CreativeJobs {
         },
         async () => {
           if(this.stock&&referenceManifest.some(r=>String(r.kind).startsWith('stock_')))await this.stock.authorize(scope);
-          let output = await this.provider.image(
-            grant.image_model,
-            prompt,
-            request.size,
-            grant.quality,
-            wire.safety_identifier,
-            reference,
-            referenceImages,
-          );
-          let framing:unknown=null;
-          if(placement&&target){
-            if(output.width!==target.width||output.height!==target.height){
-              // Keep provider output for provenance; fill the placement edge to edge (the prompt states the trimmed margin).
-              const sourceKey=`creative/${scope.organizationId}/${scope.brandId}/${scope.jobId}/${output.sha256}`;
-              await this.jobs.store.persist(sourceKey,output.bytes,"image/png",output.sha256);
-              const framed=await frameCreative(output.bytes,placement,'cover',target);
-              framing=framed.framing;
-              output={...output,bytes:Buffer.from(framed.bytes),sha256:framed.sha256,width:framed.width,height:framed.height};
-            }
-          }
+          const output=await call.render(this.provider,wire.safety_identifier,prompt);
+          // Keep provider output for provenance; the stored creative fills the placement edge to edge.
+          if(output.source)await this.jobs.store.persist(`creative/${scope.organizationId}/${scope.brandId}/${scope.jobId}/${output.source.sha256}`,output.source.bytes,"image/png",output.source.sha256);
+          const framing=output.framing;
           const objectKey = `creative/${scope.organizationId}/${scope.brandId}/${scope.jobId}/${output.sha256}`;
           await this.jobs.store.persist(
             objectKey,
@@ -511,6 +518,8 @@ export class CreativeJobs {
             usage: output.usage,
             created: output.created,
             framing,
+            ...(output.master?{master:output.master}:{}),
+            ...(output.logo?{logo:output.logo}:{}),
           };
           await this.jobs.transaction(scope, async (db, j) => {
             await db.query(
@@ -535,7 +544,7 @@ export class CreativeJobs {
       );
       };
       const first=await render('image',basePrompt);
-      const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity),notes=>render('image:retry',basePrompt+notes),stockPhoto);
+      const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity,call.mustAvoid),notes=>render('image:retry',basePrompt+notes),stockPhoto);
       let savedVersion:string|undefined;
       const status=await this.jobs.transaction(scope, async (db, j) => {
         if (terminal.has(j.status)) return j.status;
@@ -587,6 +596,9 @@ export class CreativeJobs {
           ...(request.creative_spec?{creative_spec:request.creative_spec,framing:image.framing??null}:{}),
           ...(carousel?{carousel:{job_id:carousel.job_id,position:carousel.position,plan_sha256:hash(canonicalJSON(carousel.plan))}}:{}),
           ...(referenceManifest.length?{references:referenceManifest}:{}),
+          ...((image as {master?:unknown}).master?{master:(image as {master?:unknown}).master}:{}),
+          ...((image as {logo?:unknown}).logo&&call.logo?{logo:{...call.logo,lockup:(image as {logo?:unknown}).logo}}:{}),
+          ...(call.feedback.avoid.length||call.feedback.prefer.length?{customer_feedback:{avoid:call.feedback.avoid.map(a=>a.key),prefer:call.feedback.prefer}}:{}),
           ...(plan.brief.art_direction?{art_direction:plan.brief.art_direction,text_mode:textMode,...(textMode==='in_image'?{in_image_text:inImageCopy(plan.brief)}:{})}:{}),
           skills: plan.skills,
           reads: plan.reads,

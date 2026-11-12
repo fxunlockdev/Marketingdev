@@ -1,5 +1,5 @@
 import type {PlanOutputTokens} from './planning-contracts.js';
-import {reasoningEffort} from './model-policy.js';
+import {reasoningEffort,MASTER_2K_SIZES} from './model-policy.js';
 import {videoBriefSchema} from './video-planning.js';
 import {chatSchema} from './chat-contracts.js';
 import {CREATIVE_PLANNER_LIMITS} from './creative-budget.js';
@@ -28,6 +28,17 @@ export type InspectionBody = {
 };
 export type InspectionResponse = { content: string; response_id?: string; usage?: unknown };
 const BASE64=/^[A-Za-z0-9+/]+={0,2}$/;
+/** Provider sizes this adapter sends: the 1024-class sizes and the 2K masters of the model policy. */
+export const IMAGE_SIZES:readonly string[]=['1024x1024','1536x1024','1024x1536',...new Set(Object.values(MASTER_2K_SIZES))];
+/** Images the model may receive in one call: up to three brand references and one stock photo; mood board
+ * style images fill whatever room is left (image-render.ts). */
+export const MAX_IMAGE_REFERENCES=4;
+/** Decoded pixel cap for references and outputs: a 2K master is 4.2 MP. */
+const IMAGE_PIXELS=24_000_000;
+/** A provider that refuses the requested size gets the 1024-class size instead; nothing is charged for a 400. */
+function sizeRefused(error:unknown):boolean{
+  return error instanceof OpenAI.APIError&&error.status===400&&/size|resolution|dimension/i.test(`${error.message} ${String((error as {param?:unknown}).param??'')}`);
+}
 /** Request images as low-detail input parts. Anything but a bounded list of base64 JPEG bytes is refused. */
 function plannerImages(value: unknown): { type: "input_image"; image_url: string; detail: "low" }[] {
   if (value === undefined) return [];
@@ -204,7 +215,7 @@ export class CreativeProvider {
   ) {
     if (
       !/^gpt-image-[a-z0-9.-]{1,70}$/.test(model) ||
-      !["1024x1024", "1536x1024", "1024x1536"].includes(size) ||
+      !IMAGE_SIZES.includes(size) ||
       !["low", "medium", "high"].includes(quality) ||
       !prompt.trim() ||
       prompt.length > 20000 ||
@@ -229,6 +240,7 @@ export class CreativeProvider {
     safetyIdentifier: string,
     parent?: Buffer,
     references: Buffer[] = [],
+    fallbackSize?: string,
   ) {
     if (!this.sdk) throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
     const body = this.imageRequest(
@@ -238,21 +250,27 @@ export class CreativeProvider {
       quality,
       safetyIdentifier,
     );
-    // Three customer references plus one internally selected stock reference.
-    if(references.length>4)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
+    if(fallbackSize!==undefined)this.imageRequest(model,prompt,fallbackSize,quality,safetyIdentifier);
+    if(references.length>MAX_IMAGE_REFERENCES)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
     const images=[...(parent?[parent]:[]),...references];
     for(const bytes of images){
       if(!Buffer.isBuffer(bytes)||bytes.length>20*1024*1024)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
-      const m=await sharp(bytes,{limitInputPixels:4_000_000}).metadata();
+      const m=await sharp(bytes,{limitInputPixels:IMAGE_PIXELS}).metadata();
       if(m.format!=='png')throw new CreativeError('CREATIVE_REFERENCE_INVALID');
-      await sharp(bytes,{limitInputPixels:4_000_000}).raw().toBuffer();
+      await sharp(bytes,{limitInputPixels:IMAGE_PIXELS}).raw().toBuffer();
     }
-    const response = images.length
-      ? await this.sdk.images.edit({
-          ...body,
+    const send=async(request:typeof body)=>images.length
+      ? await this.sdk!.images.edit({
+          ...request,
           image: references.length ? await Promise.all(images.map((bytes,i)=>toFile(bytes,`reference-${i+1}.png`,{type:'image/png'}))) : await toFile(parent!, 'previous-version.png', {type:'image/png'}),
         })
-      : await this.sdk.images.generate(body);
+      : await this.sdk!.images.generate(request);
+    let used=size,response;
+    try{response=await send(body);}
+    catch(error){
+      if(fallbackSize===undefined||!sizeRefused(error))throw error;
+      used=fallbackSize;response=await send({...body,size:fallbackSize});
+    }
     const base64 = response.data?.[0]?.b64_json;
     if (
       response.data?.length !== 1 ||
@@ -262,10 +280,10 @@ export class CreativeProvider {
     )
       throw new CreativeError("CREATIVE_IMAGE_INVALID");
     const bytes = Buffer.from(base64, "base64"),
-      [width, height] = size.split("x").map(Number);
+      [width, height] = used.split("x").map(Number);
     let metadata;
     try {
-      metadata = await sharp(bytes, { limitInputPixels: 4_000_000 }).metadata();
+      metadata = await sharp(bytes, { limitInputPixels: IMAGE_PIXELS }).metadata();
     } catch {
       throw new CreativeError("CREATIVE_IMAGE_INVALID");
     }
@@ -276,7 +294,7 @@ export class CreativeProvider {
     )
       throw new CreativeError("CREATIVE_IMAGE_INVALID");
     // Decode and re-encode the provider output before storing it as product media.
-    const image = await sharp(bytes, { limitInputPixels: 4_000_000 })
+    const image = await sharp(bytes, { limitInputPixels: IMAGE_PIXELS })
       .png()
       .toBuffer();
     return {
@@ -284,6 +302,7 @@ export class CreativeProvider {
       sha256: digest(image),
       width,
       height,
+      size: used,
       usage: response.usage ?? null,
       created: response.created,
     };
