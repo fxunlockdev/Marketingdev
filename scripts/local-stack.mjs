@@ -202,11 +202,18 @@ async function reset(options){
  out('Local stack data removed. The next start creates a fresh database and new secrets.');
 }
 
+/** Mock mode: the development-only Post for Me mock on the port after the provider mock, alive as long as the supervisor. */
+async function startPostformeMock(){
+ const state=readState();if(state?.mode!=='mock')return;
+ const {startMockPostforme}=await import('./local-stack/mock-postforme.mjs');
+ const log=line=>process.stdout.write(`[${new Date().toISOString()}] ${line}\n`);
+ await startMockPostforme(state.ports.mock+1,{appOrigin:`http://127.0.0.1:${state.ports.web}`,log});log(`post-for-me mock ready on 127.0.0.1:${state.ports.mock+1}`);
+}
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  let options;
  try{options=parseArgs(process.argv.slice(2));}catch(error){fail(error.message);}
  try{
-  if(options.command==='__supervise'){const {supervise}=await import('./local-stack/supervisor.mjs');await supervise();}
+  if(options.command==='__supervise'){await startPostformeMock();const {supervise}=await import('./local-stack/supervisor.mjs');await supervise();}
   else if(options.command==='start')await start(options);
   else if(options.command==='status')await status();
   else if(options.command==='stop')await stop();

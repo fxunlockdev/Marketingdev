@@ -74,8 +74,10 @@ export function providerEnvironment({mode,ports,liveKeys},service){
  if(mode==='mock'){
   const mock=`http://127.0.0.1:${ports.mock}`;
   // The OpenAI SDK honours OPENAI_BASE_URL; no product change is needed to reach the mock.
-  // Vecteezy and Post for Me are not mocked: see docs/LOCAL_RUN.md ("What is mocked").
-  return service==='worker'?{OPENAI_API_KEY:'local-mock-openai-key',OPENAI_BASE_URL:`${mock}/v1`}:{};
+  // Post for Me: a development-only mock on the next port (mock-postforme.mjs); the product accepts
+  // POSTFORME_BASE_URL only in development/test and only on loopback. Vecteezy is not mocked.
+  const postforme={POSTFORME_ENABLED:'true',POSTFORME_API_KEY:'local-mock-postforme-key',POSTFORME_BASE_URL:`http://127.0.0.1:${ports.mock+1}`};
+  return service==='worker'?{OPENAI_API_KEY:'local-mock-openai-key',OPENAI_BASE_URL:`${mock}/v1`,...postforme}:{...postforme,POSTFORME_PUBLISHING_ENABLED:'true'};
  }
  const env={};
  const pick=(...keys)=>{for(const key of keys)if(liveKeys[key])env[key]=liveKeys[key];};
