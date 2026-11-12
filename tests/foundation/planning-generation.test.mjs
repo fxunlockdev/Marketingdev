@@ -18,14 +18,18 @@ import {AssetJobs} from '../../dist/jobs.js';
 import {SkillRuntime} from '../../dist/skill-runtime.js';
 import {CreativeProvider} from '../../dist/creative-provider.js';
 import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
+import {generatedStrategy} from '../fixtures/strategy.mjs';
+import {BrandStrategies} from '../../dist/strategy-store.js';
+import {planOutputTokens} from '../../dist/planning-contracts.js';
+import {MODEL_POLICY} from '../../dist/model-policy.js';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),worker=new Pool({connectionString:config.jobs.workerDatabaseUrl});
 let app,base,alice,cookie,org,ws,businesses,brain,plans,planning,transport,calls=0,inputs=[];
 const bob=randomUUID(),viewer=randomUUID(),skills=new SkillRuntime(process.env.SKILL_RUNTIME_IMAGE);
 const jobs=new AssetJobs(worker,null,null);
 function inputFrom(body){const message=body.input.find(m=>m.role==='user'&&m.content.startsWith('UNTRUSTED BUSINESS DATA AND REQUEST:\n'));return JSON.parse(message.content.slice(message.content.indexOf('\n')+1));}
 async function standard(url,init){
- calls++;assert.equal(new URL(url).pathname,'/v1/responses');const body=JSON.parse(init.body);assert.equal(body.store,false);assert.equal(body.max_output_tokens,16000);assert.ok(body.tools.every(t=>t.name==='read_file'));
- const input=inputFrom(body);inputs.push(input);assert.equal(input.task,'content_plan');assert.ok(body.input.some(m=>m.content?.includes('marketing-plan')));
+ calls++;assert.equal(new URL(url).pathname,'/v1/responses');const body=JSON.parse(init.body);assert.equal(body.store,false);assert.ok(body.tools.every(t=>t.name==='read_file'));
+ const input=inputFrom(body);assert.equal(body.max_output_tokens,planOutputTokens(input));assert.equal(input.storylines,true);inputs.push(input);assert.equal(input.task,'content_plan');assert.ok(body.input.some(m=>m.content?.includes('marketing-plan')));
  assert.ok(!JSON.stringify(body).includes(config.storage.secretAccessKey));return modelResponse(generatedPlan(input));
 }
 const provider=new CreativeProvider(undefined,new OpenAI({apiKey:'LOCAL MOCK ONLY',maxRetries:0,fetch:(url,init)=>(transport??standard)(url,init)}));
@@ -484,4 +488,54 @@ test('AI chat follow-up targets the visible newest project even after an older i
  const submitted=await chat.submit(alice,b.id,body,key);
  const frozen=(await admin.query("SELECT input->'chat'->'current_image' AS image FROM app.planning_requests WHERE job_id=$1",[submitted.id])).rows[0].image;
  assert.equal(frozen.project_id,displayed.id);assert.equal(frozen.id,displayed.latest_version_id);
+});
+
+test('brand strategy on a gpt-6-astra grant: draft, owner approval, then a plan with storylines that names persona, pain and angle',async()=>{
+ const b=await fresh(),strategies=new BrandStrategies(plans),wires=[];
+ await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'gpt-6-astra',now()+interval '1 hour',900000000,12.5,50,'LOCAL TEST ONLY')",[org.id,b.id]);
+ transport=async(url,init)=>{calls++;const wire=JSON.parse(init.body),input=inputFrom(wire);wires.push({wire,input});return modelResponse(input.task==='strategy'?generatedStrategy(input):generatedPlan(input));};
+ try{
+  const evidence=[{id:'ev_1',kind:'review',summary:'Owners say booking by phone eats their mornings.'}],key=randomUUID();
+  await assert.rejects(strategies.request(viewer,b.id,{evidence},randomUUID()),/cannot|read-only/);
+  await assert.rejects(strategies.request(alice,b.id,{evidence:[{id:'x'}]},randomUUID()),/Check the research evidence/);
+  const job=await strategies.request(alice,b.id,{evidence,market_research:['Local clinics compete on wait time.']},key);
+  assert.equal((await strategies.request(alice,b.id,{evidence,market_research:['Local clinics compete on wait time.']},key)).id,job.id);
+  await assert.rejects(strategies.request(alice,b.id,{},randomUUID()),/already being prepared/);
+  assert.equal(await handler.run(scope(b,job)),'succeeded');
+  const call=wires.at(-1);assert.equal(call.input.task,'strategy');assert.equal(call.wire.model,'gpt-6-astra');assert.deepEqual(call.wire.reasoning,{effort:MODEL_POLICY.strategy.effort});assert.equal(call.wire.max_output_tokens,32000);assert.equal(call.wire.text.format.strict,true);
+  assert.ok(call.wire.input.some(m=>m.role==='system'&&m.content.includes('5-Pillar Strategy System')),'pillars method is preloaded');
+  assert.ok(call.wire.input.some(m=>m.content?.includes('customer-research')));
+  const before=calls;assert.equal(await handler.run(scope(b,job)),'finished');assert.equal(calls,before);
+  assert.equal((await planning.jobs(alice,b.id)).jobs.length,0,'strategy runs are not calendar plans');
+  let state=await strategies.list(alice,b.id);assert.equal(state.strategies.length,1);const draft=state.strategies[0];
+  assert.equal(draft.status,'draft');assert.equal(draft.version,1);assert.equal(draft.strategy.personas.length,3);assert.equal(state.jobs[0].status,'succeeded');
+  const manifest=(await admin.query('SELECT skill_manifest FROM app.brand_strategies WHERE id=$1',[draft.id])).rows[0].skill_manifest;
+  assert.deepEqual(manifest.skills.map(s=>s.name).sort(),['brand-engine','content-strategy','customer-research','desvio-production','marketing-psychology','product-marketing']);assert.equal(manifest.model,'gpt-6-astra');
+  const outsider=randomUUID();await admin.query('INSERT INTO auth."user"(id,name,email,"emailVerified") VALUES($1,$2,$3,true)',[outsider,'Outsider',`${outsider}@example.test`]);await assert.rejects(strategies.list(outsider,b.id),/not found/i);
+  // A draft is not used by the planner.
+  const unplanned=await submit(b);assert.equal(await handler.run(scope(b,unplanned)),'succeeded');assert.equal(wires.at(-1).input.strategy,undefined);
+  await assert.rejects(strategies.approve(viewer,b.id,draft.id,{sha256:draft.sha256}),/cannot|read-only|owner or admin/);
+  await assert.rejects(strategies.approve(alice,b.id,draft.id,{sha256:'0'.repeat(64)}),/changed/);
+  assert.equal((await strategies.approve(alice,b.id,draft.id,{sha256:draft.sha256})).status,'approved');
+  assert.equal((await strategies.approve(alice,b.id,draft.id,{sha256:draft.sha256})).status,'approved');
+  await assert.rejects(app.database.transaction(alice,org.id,true,db=>db.query("UPDATE app.brand_strategies SET strategy='{}'"),b.id),e=>e.code==='42501');
+  await jobs.transaction(scope(b,job),async db=>{assert.equal((await db.query("UPDATE app.brand_strategies SET status='approved'").catch(e=>({rowCount:e.code}))).rowCount,'42501');});
+  // The approved strategy, graph context and learned preferences reach the planner.
+  const grounded=new Planning(plans,async(_db,where)=>{assert.equal(where.brand_id,b.id);return {context_pack:{nodes:[{id:'n1',label:'Morning phone queue'}]},preferences_learned:[{kind:'avoid',statement:'Stock-photo handshakes were rejected twice.'}]};});
+  const j=await grounded.submit(alice,b.id,{starts_on:'2026-11-01',brief:'A month for clinic owners'},randomUUID());
+  assert.equal(await handler.run(scope(b,j)),'succeeded');
+  const sent=wires.at(-1);assert.equal(sent.wire.model,'gpt-6-astra');assert.equal(sent.wire.max_output_tokens,32000);assert.deepEqual(sent.wire.reasoning,{effort:MODEL_POLICY.strategy.effort});
+  assert.equal(sent.input.strategy.id,draft.id);assert.equal(sent.input.strategy.sha256,draft.sha256);assert.equal(sent.input.context_pack.nodes[0].id,'n1');assert.equal(sent.input.preferences_learned[0].kind,'avoid');
+  assert.ok(sent.wire.input.some(m=>m.role==='system'&&m.content.includes('strategy_ref')&&m.content.includes('preferences_learned')));
+  assert.ok(sent.wire.text.format.schema.properties.slots.items.anyOf[0].required.includes('storyline'));
+  const planId=(await grounded.jobs(alice,b.id)).jobs.find(row=>row.id===j.id).output_plan_id,detail=await grounded.detail(alice,b.id,planId);
+  assert.equal(detail.slots.length,30);assert.equal(detail.skill_manifest.strategy.id,draft.id);assert.equal(detail.horizon.ends_on,'2026-11-30');
+  assert.ok(detail.slots.every(s=>s.storyline.kind==='static'&&s.storyline.on_image_copy.headline&&detail.strategy_labels.angles[s.strategy_ref.angle_id]&&detail.strategy_labels.personas[s.strategy_ref.persona_id]));
+  // The customer edits a storyline before approving; a storyline that does not fit the format is refused.
+  const slot=detail.slots[0],edited={...slot.storyline,concept:'Owner-edited concept',layout_archetype:'quote'};
+  const saved=await plans.edit(alice,b.id,slot.id,{revision:slot.revision,storyline:edited});assert.deepEqual(saved.storyline,edited);assert.equal(saved.revision,slot.revision+1);
+  await assert.rejects(plans.edit(alice,b.id,slot.id,{revision:saved.revision,storyline:{kind:'carousel',concept:'x',slides:[]}}),/storyline fields/);
+  await assert.rejects(plans.edit(alice,b.id,slot.id,{revision:saved.revision,storyline:{...edited,layout_archetype:'collage'}}),/storyline fields/);
+  assert.deepEqual((await plans.history(alice,b.id,slot.id)).events.at(-1).snapshot.storyline,edited);
+ }finally{transport=undefined;}
 });
