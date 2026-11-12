@@ -699,7 +699,7 @@ export function CreativeProject({
       await load(v.id);
       onSaved?.(v.id);
       setSaveState("saved");
-      setNotice(moved ? "Saved as a new version. Your calendar post now uses it and needs approval again." : "Saved as a new draft version.");
+      setNotice(moved ? "Saved as a new version. Your calendar post now uses it and needs approval again." : (data?.slots ?? []).some((slot) => slot.state === "approved") ? "Saved as a new draft version. Your approved calendar post keeps its approved version until you choose to use this one." : "Saved as a new draft version.");
     } catch (e) {
       setSaveState("");
       setError(e);

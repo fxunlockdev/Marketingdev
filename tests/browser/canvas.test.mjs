@@ -263,12 +263,13 @@ before(async () => {
         if (failImages) throw new TypeError("MOCK lost response");
         if (new URL(url).pathname === "/v1/images/edits") {
           const references=init.body.getAll('image[]');
-          if(references.length){assert.equal(references.length,1);assert.deepEqual(await sharp(Buffer.from(await references[0].arrayBuffer())).raw().toBuffer(),await sharp(referenceBytes).raw().toBuffer());referenceUploads++;}
+          // The image engine may add mood-board style references and the logo; the owner's selected photo must be one of them, byte-exact in pixels.
+          if(references.length){const expected=await sharp(referenceBytes).raw().toBuffer(),sent=await Promise.all(references.map(async r=>sharp(Buffer.from(await r.arrayBuffer())).raw().toBuffer()));assert.ok(sent.some(b=>b.equals(expected)),'selected reference photo is sent');referenceUploads++;}
           else assert.equal(init.body.get("image").type, "image/png");
         }
         else assert.equal(new URL(url).pathname, "/v1/images/generations");
         const requestedSize=new URL(url).pathname==='/v1/images/edits'?init.body.get('size'):JSON.parse(init.body).size;
-        assert.ok(['1024x1024','1024x1536','1536x1024'].includes(requestedSize));
+        assert.ok(['1024x1024','1024x1536','1536x1024','1024x1280','1080x1920'].includes(requestedSize),`unexpected size ${requestedSize}`);
         const [width,height]=requestedSize.split('x').map(Number);
         const output=width===1024&&height===1024?png:await sharp({create:{width,height,channels:3,background:'#e6d5bb'}}).png().toBuffer();
         return Response.json({
@@ -611,6 +612,16 @@ test("Canvas displays an uncertain provider result in the Create chat and holds 
   await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeDisabled();
   assert.equal(generated,before+1);
   assert.equal((await admin.query("SELECT status FROM app.jobs WHERE brand_id=$1 AND kind='creative.generate' ORDER BY created_at DESC LIMIT 1",[brand])).rows[0].status,'unknown');
+  // The customer releases the hold the way the product offers: stop waiting, acknowledging a possible charge.
+  // Generation for this business is then available again, and the uncertain request is never resent.
+  await page.getByRole('button',{name:'Stop waiting',exact:true}).click();
+  await page.getByRole('button',{name:'Stop waiting for this request',exact:true}).click();
+  await expect(page.getByRole('group',{name:'Confirm stop waiting'})).toHaveCount(0,{timeout:30000});
+  await expect(page.getByRole('button',{name:'Stop waiting',exact:true})).toHaveCount(0);
+  assert.notEqual((await admin.query("SELECT status FROM app.jobs WHERE brand_id=$1 AND kind='creative.generate' ORDER BY created_at DESC LIMIT 1",[brand])).rows[0].status,'unknown');
+  await createComposer().fill('TEST FIXTURE: another image');
+  await expect(page.getByRole('button',{name:'Send message',exact:true})).toBeEnabled();
+  assert.equal(generated,before+1,'stopping never resends the uncertain request');
 });
 
 test('calendar generates a saved 30-day plan and a linked creative through real jobs; channel inbox persists feedback and bulk approval (MOCK OpenAI)',async()=>{
@@ -677,7 +688,7 @@ test('calendar generates a saved 30-day plan and a linked creative through real 
  await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();
  await page.getByRole('button',{name:'Send selected drafts for review',exact:true}).click();
  await expect(page.getByText('1 post sent for review. Nothing has been scheduled or published.',{exact:true})).toBeVisible();
- await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');
+ await page.goto(`${base}/b/${brand}/review`);await page.getByText('Review options',{exact:true}).click();await page.getByLabel('Review from').fill('2026-11-01');
  await page.locator('.calendar-filters > summary').click();
  await page.getByRole('button',{name:'Instagram',exact:true}).click();await expect(page.getByText('Nothing waiting here',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'LinkedIn',exact:true}).click();await page.getByLabel('Select LinkedIn post: TEST FIXTURE hook 1').check();
@@ -709,14 +720,14 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  const project=(await admin.query('SELECT project_id FROM app.creative_versions WHERE id=$1',[before.creative_version_id])).rows[0].project_id;
  await page.goto(`${base}/b/${brand}/campaign-post?project=${project}`);
  await page.getByLabel('Post caption').fill('TEST FIXTURE: Manual revision from review');
- await page.getByRole('button',{name:'Save new version',exact:true}).click();await expect(page.getByText('Saved as a new draft version.',{exact:true})).toBeVisible();
- await page.goto(`${base}/b/${brand}/review`);await page.getByLabel('Review from').fill('2026-11-01');
+ await page.getByRole('button',{name:'Save new version',exact:true}).click();await expect(page.getByText('Saved as a new draft version. Your approved calendar post keeps its approved version until you choose to use this one.',{exact:true})).toBeVisible();
+ await page.goto(`${base}/b/${brand}/review`);await page.getByText('Review options',{exact:true}).click();await page.getByLabel('Review from').fill('2026-11-01');
  await page.locator('.calendar-filters > summary').click();await page.getByRole('button').filter({hasText:'TEST FIXTURE hook 1'}).click();
  await expect(page.getByRole('button',{name:'Attach latest creative version',exact:true})).toBeDisabled();
  await expect(page.locator('.slot-caption')).not.toContainText('Manual revision from review');
  await page.getByText('Edit topic & schedule',{exact:true}).click();
  await page.getByLabel('I understand that changing this post resets approval and requires a new review.').check();
- await page.getByRole('button',{name:'Attach latest creative version',exact:true}).click();await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Attach latest creative version',exact:true}).click();await expect(page.getByText('Latest creative version attached as an unapproved draft.',{exact:true})).toBeVisible();
  await expect(page.locator('.slot-caption')).toHaveText('TEST FIXTURE: Manual revision from review');
  const after=(await admin.query('SELECT * FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.notEqual(after.creative_version_id,before.creative_version_id);
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.content_slot_events WHERE slot_id=$1 AND action='approved'",[before.id])).rows[0].n,2);
@@ -750,7 +761,7 @@ test('Canvas manual edits require explicit approved-post reset; other businesses
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),true);
  await page.setViewportSize({width:1440,height:1000});
  const other=(await admin.query("SELECT id FROM app.brands WHERE organization_id=$1 AND name='OTHER BUSINESS'",[org])).rows[0].id;
- await page.goto(`${base}/b/${other}/content-plan`);await page.getByLabel('Calendar date').fill('2026-11-01');await expect(page.getByText('Space for your next ideas',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Post details',exact:true})).toHaveCount(0);
+ await page.goto(`${base}/b/${other}/content-plan?start=2026-11-01`);await expect(page.getByText('Space for your next ideas',{exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Post details',exact:true})).toHaveCount(0);
  const denied=await page.request.get(`${base}/api/v1/businesses/${other}/content-slots/${before.id}`);assert.equal(denied.status(),404);assert.deepEqual(errors,[]);
 });
 
@@ -1341,7 +1352,7 @@ test('Generated replacement confirms credits, survives reload and preserves sche
  replacementReady=true;await expect(page.getByRole('button',{name:'Attach latest creative version',exact:true})).toBeVisible({timeout:90000});assert.equal(replacementSubmits,1);
  const unchanged=(await admin.query('SELECT creative_version_id,state,approved_by FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.equal(unchanged.creative_version_id,before.creative_version_id);assert.equal(unchanged.state,'approved');assert.equal(unchanged.approved_by,actor);
  await expect(page.getByRole('button',{name:'Attach latest creative version',exact:true})).toBeDisabled();await page.getByRole('checkbox',{name:/I understand that changing this post/}).check();await page.getByRole('button',{name:'Attach latest creative version',exact:true}).click();
- await expect(page.getByText('Latest Canvas version attached as an unapproved draft.',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Saved caption',exact:true})).toBeVisible();
+ await expect(page.getByText('Latest creative version attached as an unapproved draft.',{exact:true})).toBeVisible();await page.reload();await expect(page.getByRole('heading',{name:'Saved caption',exact:true})).toBeVisible();
  const after=(await admin.query('SELECT creative_version_id,state,approved_by FROM app.content_slots WHERE id=$1',[before.id])).rows[0];assert.notEqual(after.creative_version_id,before.creative_version_id);assert.equal(after.state,'draft_ready');assert.equal(after.approved_by,null);assert.equal(replacementSubmits,1);
  await expect.poll(()=>page.locator('.creative-artboard canvas.lower-canvas').evaluate(canvas=>Array.from(canvas.getContext('2d').getImageData(10,10,1,1).data).slice(0,3))).toEqual([179,217,232]);
  await page.screenshot({path:'work/browser/generated-calendar-replacement.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);

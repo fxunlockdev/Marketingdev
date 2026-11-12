@@ -42,8 +42,10 @@ const slotItem=(slot:CreativeSlot)=>({id:slot.id,revision:slot.revision,creative
 
 /** After a new saved version, calendar posts that held an earlier version of this creative move to it.
  * An approved post needs approval again; nothing is published. Returns the number of posts updated. */
-export async function syncCalendarPosts(businessId:string,slots:readonly CreativeSlot[],versionId:string):Promise<number>{
- const stale=slots.filter(slot=>slot.creative_version_id!==versionId&&!['cancelled'].includes(slot.state));
+/** Moves calendar posts onto a new creative version. Saving moves only posts that are not yet approved; an approved
+ * post keeps its approved version until the owner explicitly moves it (`resetApproval`), which sends it back to review. */
+export async function syncCalendarPosts(businessId:string,slots:readonly CreativeSlot[],versionId:string,{resetApproval=false}:{resetApproval?:boolean}={}):Promise<number>{
+ const stale=slots.filter(slot=>slot.creative_version_id!==versionId&&slot.state!=='cancelled'&&(resetApproval||slot.state!=='approved'));
  for(const slot of stale)await api(`/api/v1/businesses/${businessId}/content-slots/${slot.id}`,{revision:slot.revision,creative_version_id:versionId,...(slot.state==='approved'?{reset_approval:true}:{})},'PATCH');
  return stale.length;
 }
@@ -95,7 +97,7 @@ export function CanvasPostActions({business,projectId,threadId,version,latest,sl
 }
 
 function MoveToVersion({businessId,slots,versionId,disabled,onDone,onError}:{businessId:string;slots:CreativeSlot[];versionId:string;disabled:boolean;onDone:()=>void;onError:(e:unknown)=>void}){
- return <div className="canvas-post-panel"><p>Your calendar post uses an earlier version of this image. Moving it to this version needs a new approval.</p><Button size="sm" variant="primary" disabled={disabled} onClick={()=>void syncCalendarPosts(businessId,slots,versionId).then(onDone,onError)} label="Use this version on the calendar"/></div>;
+ return <div className="canvas-post-panel"><p>Your calendar post uses an earlier version of this image. Moving it to this version needs a new approval.</p><Button size="sm" variant="primary" disabled={disabled} onClick={()=>void syncCalendarPosts(businessId,slots,versionId,{resetApproval:true}).then(onDone,onError)} label="Use this version on the calendar"/></div>;
 }
 
 /** Date, time and channel in the business time zone. Uses a plan that covers the day, else starts one. */
