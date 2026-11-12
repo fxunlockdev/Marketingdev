@@ -10,6 +10,7 @@ import {ContentPlan} from './content-plan.js';
 import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import type {PlanningInput,PostIdeaPurpose} from './planning-contracts.js';
+import {planHorizon} from './planning-schema.js';
 export class Planning {
  constructor(readonly plans:ContentPlan){}
  submit(user:string,id:string,body:unknown,key:unknown,scoped?:{db:PoolClient;b:{organization_id:string};budgetMicros:number;weeklyIncrease:number;single?:boolean},ideas?:PostIdeaPurpose){
@@ -48,7 +49,7 @@ export class Planning {
    if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
    const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
    if(!prefs||prefs.step!==3||!prefs.channels.length)throw new ConflictException('Finish your brand goals and choose content channels before planning');
-   const input:PlanningInput={...(ideas?{post_ideas:ideas}:{}),...(scoped?{max_posts_per_day:2}:{}),task:'content_plan',references:await planningReferences(db,b.organization_id,id),brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:ideas?[ideas.channel as 'instagram'|'facebook'|'linkedin']:mix?[...new Set(mix.map(r=>r.channel))]:campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(mix||v.video_count!==undefined?{video_count:Number(videos)}:{}),...(mix?{content_mix:mix}:{})};
+   const input:PlanningInput={...(ideas?{post_ideas:ideas}:{storylines:true as const}),...(scoped?{max_posts_per_day:2}:{}),task:'content_plan',references:await planningReferences(db,b.organization_id,id),brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:ideas?[ideas.channel as 'instagram'|'facebook'|'linkedin']:mix?[...new Set(mix.map(r=>r.channel))]:campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(mix||v.video_count!==undefined?{video_count:Number(videos)}:{}),...(mix?{content_mix:mix}:{})};
    if(campaign)input.campaign=campaign;
    if(v.planning_mode==='natural')input.planning_mode='natural';
    if(referenceId){
@@ -102,6 +103,9 @@ export class Planning {
  });}
  detail(user:string,id:string,planId:string){planId=uuid(planId);return this.plans.scope(user,id,false,async(db,b)=>{
   const p=(await db.query('SELECT id,title,objective,starts_on::text,timezone,duration_days,origin,brain_id,strategy,skill_manifest,created_by,created_at FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,planId])).rows[0];
-  if(!p)throw new NotFoundException('Content plan not found');return p;
+  if(!p)throw new NotFoundException('Content plan not found');
+  // The review screen reads each post's storyline here, before anything is generated.
+  const slots=(await db.query('SELECT id,revision,state,channel,planned_at,format,brief,pillar,hook,cta,video_draft,storyline,strategy_ref,creative_spec FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND plan_id=$3 ORDER BY planned_at,id LIMIT 120',[b.organization_id,id,planId])).rows;
+  return {...p,slots,horizon:planHorizon(p.duration_days,p.starts_on,p.timezone)};
  });}
 }

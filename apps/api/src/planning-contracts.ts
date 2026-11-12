@@ -9,6 +9,7 @@ import { CreativeError, type CreativeInput, type SkillResult } from './creative-
 import { CREATIVE_SKILLS } from './creative-skill-pins.js';
 import {addDays,dayStart,localCandidates,localMinute} from './local-calendar.js';
 import { planTime } from './content-plan.js';
+import {validateStoryline,type Storyline} from './planning-schema.js';
 export const PLANNING_SKILLS = {
  "desvio-production": PRODUCTION_SKILL,
  "brand-engine":CREATIVE_SKILLS["brand-engine"],
@@ -16,8 +17,8 @@ export const PLANNING_SKILLS = {
  'product-marketing':CREATIVE_SKILLS['product-marketing'], social:CREATIVE_SKILLS.social,
 };
 export type PostIdeaPurpose={plan_id:string;format:string;channel:string};
-export type PlanningInput={post_ideas?:PostIdeaPurpose;content_mix?:ContentMixItem[];max_posts_per_day?:number;references?:PlanningReference[];campaign?:CampaignInput;task:'content_plan';brand:CreativeInput['brand'];preferences:{starts_on:string;timezone:string;goal:string;cadence:number;channels:('linkedin'|'instagram'|'facebook')[];must_avoid:string;business_stage?:string;growth_expectation?:string;creative_brief?:import('./creative-brief.js').CreativeBrief;revision:number};brief:string;post_count:number;duration_days?:number;video_count?:number;planning_mode?:'natural';reference_plan?:{id:string;sha256:string;title:string;duration_days:number;starts_on:string;timezone:string;slots:unknown[]}};
-export type GeneratedPlan={settings?:{duration_days:number;post_count:number;video_count:number};title:string;strategy:string;warnings:string[];slots:{channel:'linkedin'|'instagram'|'facebook';planned_at:string;format:'static'|'video'|'carousel';creative_spec?:CreativeSpec;video_draft?:VideoConcept;brief:string;pillar:string;hook:string;cta:string;fact_ids:string[];reference_ids?:string[]}[]};
+export type PlanningInput={post_ideas?:PostIdeaPurpose;content_mix?:ContentMixItem[];max_posts_per_day?:number;references?:PlanningReference[];campaign?:CampaignInput;storylines?:true;task:'content_plan';brand:CreativeInput['brand'];preferences:{starts_on:string;timezone:string;goal:string;cadence:number;channels:('linkedin'|'instagram'|'facebook')[];must_avoid:string;business_stage?:string;growth_expectation?:string;creative_brief?:import('./creative-brief.js').CreativeBrief;revision:number};brief:string;post_count:number;duration_days?:number;video_count?:number;planning_mode?:'natural';reference_plan?:{id:string;sha256:string;title:string;duration_days:number;starts_on:string;timezone:string;slots:unknown[]}};
+export type GeneratedPlan={settings?:{duration_days:number;post_count:number;video_count:number};title:string;strategy:string;warnings:string[];slots:{channel:'linkedin'|'instagram'|'facebook';planned_at:string;format:'static'|'video'|'carousel';creative_spec?:CreativeSpec;video_draft?:VideoConcept;storyline?:Storyline;brief:string;pillar:string;hook:string;cta:string;fact_ids:string[];reference_ids?:string[]}[]};
 export type PlanningResult=Omit<SkillResult,'brief'> & {plan:GeneratedPlan};
 function fields(value:any,keys:string[]) {return value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).sort().join(',')===keys.sort().join(',');}
 function plain(v:any,max:number,empty=false) {return typeof v==='string'&&(empty||v.trim().length>0)&&v.length<=max&&!/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(v);}
@@ -31,6 +32,7 @@ export function validateGeneratedPlan(value:any,input:PlanningInput):GeneratedPl
  const fail=()=>{throw new CreativeError('PLAN_OUTPUT_INVALID');};
  const natural=input.planning_mode==='natural';input=resolvedPlanningInput(input,value);
  const days=input.duration_days??30,videos=input.video_count??0;
+ if(input.storylines!==undefined&&input.storylines!==true)fail();
  if(!Number.isInteger(videos)||videos<0||videos>Math.min(input.post_count,30))fail();
  if(!Number.isInteger(days)||days<1||days>90||!Number.isInteger(input.post_count)||input.post_count<1||input.post_count>90)fail();
  if(!fields(value,['title','strategy','warnings','slots',...(natural?['settings']:[])])||!plain(value.title,140)||!plain(value.strategy,4000)||!Array.isArray(value.warnings)||value.warnings.length>10||value.warnings.some((v:any)=>!plain(v,500))||!Array.isArray(value.slots)||value.slots.length!==input.post_count)fail();
@@ -40,10 +42,11 @@ export function validateGeneratedPlan(value:any,input:PlanningInput):GeneratedPl
  const seen=new Set(),channels=new Set(),weeks=new Set(),daily=new Map<string,number>();
  for(const s of value.slots){
   if(!s||typeof s!=='object'||Array.isArray(s))fail();
-  if(!fields(s,['channel','planned_at','format','brief','pillar','hook','cta','fact_ids',...(s.reference_ids!==undefined?['reference_ids']:[]),...(s.format==='video'?['video_draft']:[]),...(expectedMix?['creative_spec']:[])])||!input.preferences.channels.includes(s.channel)||!(expectedMix?['static','video','carousel']:['static','video']).includes(s.format)||!plain(s.brief,1000)||!plain(s.pillar,140)||!plain(s.hook,200)||!plain(s.cta,120)||!Array.isArray(s.fact_ids)||!s.fact_ids.length||s.fact_ids.length>10||new Set(s.fact_ids).size!==s.fact_ids.length||s.fact_ids.some((id:any)=>!input.brand.facts.some(f=>f.id===id)))fail();
+  if(!fields(s,['channel','planned_at','format','brief','pillar','hook','cta','fact_ids',...(s.reference_ids!==undefined?['reference_ids']:[]),...(s.format==='video'?['video_draft']:[]),...(expectedMix?['creative_spec']:[]),...(input.storylines?['storyline']:[])])||!input.preferences.channels.includes(s.channel)||!(expectedMix?['static','video','carousel']:['static','video']).includes(s.format)||!plain(s.brief,1000)||!plain(s.pillar,140)||!plain(s.hook,200)||!plain(s.cta,120)||!Array.isArray(s.fact_ids)||!s.fact_ids.length||s.fact_ids.length>10||new Set(s.fact_ids).size!==s.fact_ids.length||s.fact_ids.some((id:any)=>!input.brand.facts.some(f=>f.id===id)))fail();
   if(s.reference_ids!==undefined&&(!Array.isArray(s.reference_ids)||s.reference_ids.length>3||(s.format==='video'&&s.reference_ids.length>0)||new Set(s.reference_ids).size!==s.reference_ids.length||s.reference_ids.some((id:any)=>!(input.references??[]).some(r=>r.id===id))))fail();
   if(expectedMix){try{const spec=normalizeCreativeSpec(s.creative_spec,s.format,s.channel),key=JSON.stringify([s.channel,s.format,spec]);actualMix.set(key,(actualMix.get(key)??0)+1);}catch{fail();}}
   if(s.format==='video')try{validateVideoConcept(s.video_draft);}catch{fail();}
+  if(input.storylines)try{validateStoryline(s.storyline,s.format,s.creative_spec);}catch{fail();}
   try{
    planTime(s.planned_at,input.preferences.starts_on,input.preferences.timezone,days);
    const parts=new Intl.DateTimeFormat('en',{timeZone:input.preferences.timezone,year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date(s.planned_at));

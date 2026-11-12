@@ -2,6 +2,7 @@ import {normalizeCreativeSpec,creativeDimensions,type CreativeSpec} from './camp
 import {carouselPages,currentCarousel,carouselFingerprint} from './carousels.js';
 import {calendarExport} from './calendar-export.js';
 import {validateVideoConcept} from './video-concept.js';
+import {validateStoryline} from './planning-schema.js';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { PoolClient } from 'pg';
@@ -93,7 +94,7 @@ export class ContentPlan {
   if(carousel&&(carousel.pages.length!==specification.slide_count||carousel.pages.some((p:any)=>p.width!==dimensions.width||p.height!==dimensions.height)))throw new ConflictException('Choose a carousel with matching slide count and dimensions');
  }
  async event(db:PoolClient,user:string,s:any,action:string,feedback='') {
-  const snapshot={creative_spec:s.creative_spec??null,reference_ids:s.reference_ids??[],plan_id:s.plan_id,channel:s.channel,planned_at:s.planned_at,format:s.format,brief:s.brief,pillar:s.pillar,hook:s.hook,cta:s.cta,state:s.state,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,video_version_id:s.video_version_id,video_sha256:s.video_sha256,video_draft:s.video_draft,carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256};
+  const snapshot={creative_spec:s.creative_spec??null,reference_ids:s.reference_ids??[],plan_id:s.plan_id,channel:s.channel,planned_at:s.planned_at,format:s.format,brief:s.brief,pillar:s.pillar,hook:s.hook,cta:s.cta,state:s.state,creative_version_id:s.creative_version_id,creative_sha256:s.creative_sha256,video_version_id:s.video_version_id,video_sha256:s.video_sha256,video_draft:s.video_draft,carousel_version_id:s.carousel_version_id,carousel_sha256:s.carousel_sha256,...(s.storyline?{storyline:s.storyline}:{})};
   await db.query(`INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,creative_version_id,creative_sha256,feedback,snapshot,video_version_id,video_sha256,carousel_version_id,carousel_sha256)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,[randomUUID(),s.organization_id,s.brand_id,s.id,s.revision,action,user,s.creative_version_id,s.creative_sha256,feedback,JSON.stringify(snapshot),s.video_version_id??null,s.video_sha256??null,s.carousel_version_id??null,s.carousel_sha256??null]);
  }
@@ -275,9 +276,9 @@ export class ContentPlan {
  }
  edit(user:string,id:string,slotId:string,body:unknown) {
   slotId=uuid(slotId);
-  const v=object(body,['revision','planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id','carousel_version_id','video_draft','reset_approval','reference_ids','creative_spec']);
+  const v=object(body,['revision','planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id','carousel_version_id','video_draft','reset_approval','reference_ids','creative_spec','storyline']);
   const rev=revision(v.revision);
-  if(!['planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id','carousel_version_id','video_draft','reference_ids','creative_spec'].some(k=>k in v))throw new BadRequestException('Include a content change');
+  if(!['planned_at','brief','pillar','hook','cta','creative_version_id','video_version_id','carousel_version_id','video_draft','reference_ids','creative_spec','storyline'].some(k=>k in v))throw new BadRequestException('Include a content change');
   if(v.reset_approval!==undefined&&typeof v.reset_approval!=='boolean')throw new BadRequestException('Invalid approval confirmation');
   return this.scope(user,id,true,async(db,b)=>{
    const s=(await db.query('SELECT s.*,p.starts_on::text,p.timezone,p.duration_days FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.organization_id=$1 AND s.brand_id=$2 AND s.id=$3',[b.organization_id,id,slotId])).rows[0];
@@ -299,6 +300,10 @@ export class ContentPlan {
    }
    let videoDraft=s.video_draft;
    if('video_draft' in v){if(s.format!=='video')throw new BadRequestException('Only video posts have scripts');try{videoDraft=validateVideoConcept(v.video_draft);}catch{throw new BadRequestException('Use a storyline, script, prompt and duration from 3 to 15 seconds');}}
+   // A storyline is checked against the slot's final format; one that no longer fits a changed format is dropped.
+   let storyline=s.storyline??null;
+   if('storyline' in v){try{storyline=v.storyline===null?null:validateStoryline(v.storyline,s.format,specification);}catch{throw new BadRequestException('Check the storyline fields for this post format');}}
+   else if(storyline&&specChanged){try{validateStoryline(storyline,s.format,specification);}catch{storyline=null;}}
    const when='planned_at' in v?planTime(v.planned_at,s.starts_on,s.timezone,s.duration_days):s.planned_at;
    const creative='creative_version_id' in v?(v.creative_version_id===null?null:await this.creative(db,b.organization_id,id,v.creative_version_id,s.format)):s.creative_version_id?await this.creative(db,b.organization_id,id,s.creative_version_id,s.format):null;
    const videoId='video_version_id' in v?v.video_version_id:s.video_version_id;
@@ -306,7 +311,7 @@ export class ContentPlan {
    const carouselId='carousel_version_id' in v?v.carousel_version_id:s.carousel_version_id;
    const carousel=carouselId?await this.carousel(db,b.organization_id,id,carouselId,s.channel):null;
    await this.matchSpec(specification,creative,video,carousel);
-   const result=(await db.query(`UPDATE app.content_slots SET planned_at=$2,brief=$3,pillar=$4,hook=$5,cta=$6,creative_version_id=$7,creative_sha256=$8,state=$9,video_version_id=$10,video_sha256=$11,video_draft=$12,carousel_version_id=$13,carousel_sha256=$14,reference_ids=$15,creative_spec=$16,revision=revision+1,approved_by=NULL,approved_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`,[slotId,when,'brief' in v?text(v.brief,4000):s.brief,'pillar' in v?text(v.pillar,140,true):s.pillar,'hook' in v?text(v.hook,500,true):s.hook,'cta' in v?text(v.cta,500,true):s.cta,creative?.id??null,creative?.sha256??null,creative||video||carousel?'draft_ready':'content_needed',video?.id??null,video?.sha256??null,videoDraft?JSON.stringify(videoDraft):null,carousel?.id??null,carousel?.sha256??null,referenceIds,specification?JSON.stringify(specification):null])).rows[0];
+   const result=(await db.query(`UPDATE app.content_slots SET planned_at=$2,brief=$3,pillar=$4,hook=$5,cta=$6,creative_version_id=$7,creative_sha256=$8,state=$9,video_version_id=$10,video_sha256=$11,video_draft=$12,carousel_version_id=$13,carousel_sha256=$14,reference_ids=$15,creative_spec=$16,storyline=$17,revision=revision+1,approved_by=NULL,approved_at=NULL,updated_at=now() WHERE id=$1 RETURNING *`,[slotId,when,'brief' in v?text(v.brief,4000):s.brief,'pillar' in v?text(v.pillar,140,true):s.pillar,'hook' in v?text(v.hook,500,true):s.hook,'cta' in v?text(v.cta,500,true):s.cta,creative?.id??null,creative?.sha256??null,creative||video||carousel?'draft_ready':'content_needed',video?.id??null,video?.sha256??null,videoDraft?JSON.stringify(videoDraft):null,carousel?.id??null,carousel?.sha256??null,referenceIds,specification?JSON.stringify(specification):null,storyline?JSON.stringify(storyline):null])).rows[0];
    await this.event(db,user,result,'edited');
    return result;
   });

@@ -15,3 +15,20 @@
   .concept { padding: 16px; gap: 12px; }
   .actions > button { width: 100%; white-space: normal; }
 }
+.story { display: grid; gap: 10px; padding: 14px 16px; border-radius: 12px; background: var(--brand-surface, #f5f4f8); }
+.concept_line { font-weight: 500; }
+.facts { display: grid; gap: 6px; margin: 0; font-size: 14px; }
+.facts > div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+.facts dt { color: var(--brand-muted); }
+.facts dd { margin: 0; }
+.sequence { display: grid; gap: 8px; list-style: none; margin: 0; padding: 0; font-size: 14px; }
+.sequence li { display: grid; grid-template-columns: 110px 1fr; gap: 12px; }
+.sequence small { display: block; color: var(--brand-muted); }
+.step { color: var(--brand-muted); font-variant-numeric: tabular-nums; }
+.editor fieldset { display: grid; gap: 8px; border: 0; margin: 0; padding: 0; min-width: 0; }
+.editor label { font-size: 14px; font-weight: 500; margin-top: 4px; }
+.editor textarea { min-height: 72px; }
+.row { display: grid; grid-template-columns: 70px repeat(auto-fit, minmax(140px, 1fr)); align-items: center; gap: 8px; }
+@media (max-width: 600px) {
+  .facts > div, .sequence li, .row { grid-template-columns: 1fr; gap: 2px; }
+}
