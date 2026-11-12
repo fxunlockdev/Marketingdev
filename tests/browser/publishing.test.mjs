@@ -63,7 +63,12 @@ before(async()=>{
  alice=await signup();bob=await signup();editor=await signup();viewer=await signup();org=await ws.create(alice.id,{name:'Export fixtures'});brand=await ws.createBrand(alice.id,org.id,{name:'Northstar Coffee'},randomUUID());sibling=await ws.createBrand(alice.id,org.id,{name:'Other private brand'},randomUUID());
  for(const [u,role] of [[editor,'editor'],[viewer,'viewer']])await admin.query('INSERT INTO app.memberships(organization_id,user_id,role) VALUES($1,$2,$3)',[org.id,u.id,role]);
  for(const [field,value] of [['brand_name','Northstar Coffee'],['offering','Creative workflow tools'],['audience','Business owners']])await brain.manual(alice.id,org.id,brand.id,{field,value},randomUUID());
- let state=await brain.read(alice.id,org.id,brand.id);for(const f of state.findings)await brain.review(alice.id,org.id,brand.id,f.id,{decision:'correct',revision:f.revision});state=await brain.read(alice.id,org.id,brand.id);await brain.approve(alice.id,org.id,brand.id,{revision:state.revision});brainId=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1',[brand.id])).rows[0].id;current=await fixture();project=current.project_id;await setupProvider();await setupBrowser();
+ let state=await brain.read(alice.id,org.id,brand.id);for(const f of state.findings)await brain.review(alice.id,org.id,brand.id,f.id,{decision:'correct',revision:f.revision});state=await brain.read(alice.id,org.id,brand.id);await brain.approve(alice.id,org.id,brand.id,{revision:state.revision});brainId=(await admin.query('SELECT id FROM app.brand_brain_versions WHERE brand_id=$1',[brand.id])).rows[0].id;current=await fixture();project=current.project_id;
+ current=await approvedPost('Launch announcement');
+ await admin.query("INSERT INTO app.postforme_bindings(organization_id,brand_id,platform) VALUES($1,$2,'linkedin') ON CONFLICT DO NOTHING",[org.id,brand.id]);
+ account=(await admin.query("INSERT INTO app.postforme_accounts(organization_id,brand_id,platform,remote_id,username,status) VALUES($1,$2,'linkedin',$3,'Northstar LinkedIn','connected') RETURNING id",[org.id,brand.id,`mock-${randomUUID()}`])).rows[0];
+ browser=await chromium.launch();page=await(await browser.newContext({viewport:{width:1440,height:1100}})).newPage();page.on('pageerror',e=>pageErrors.push(e.message));
+ await mockProvider(page);await login(page,alice);
 });
 
 const provider=[];
@@ -78,12 +83,6 @@ async function mockProvider(p){
   return route.continue();
  });
 }
-before(async()=>{
- current=await approvedPost('Launch announcement');
- account=(await admin.query("INSERT INTO app.postforme_accounts(organization_id,brand_id,platform,remote_id,username,status) VALUES($1,$2,'linkedin',$3,'Northstar LinkedIn','connected') RETURNING id",[org.id,brand.id,`mock-${randomUUID()}`])).rows[0];
- browser=await chromium.launch();page=await(await browser.newContext({viewport:{width:1440,height:1100}})).newPage();page.on('pageerror',e=>pageErrors.push(e.message));
- await mockProvider(page);await login(page,alice);
-});
 after(async()=>{await browser?.close();for(const child of children.reverse()){if(child.exitCode===null&&child.signalCode===null){const done=once(child,'exit');child.kill('SIGTERM');await Promise.race([done,delay(3000)]);if(child.exitCode===null&&child.signalCode===null){child.kill('SIGKILL');await done;}}}store.close();await app?.close();await Promise.all([admin.end(),workerPool.end()]);});
 
 test('publishing shows Post for Me only: an approved post is scheduled with exact consent to a Post for Me account',async()=>{
