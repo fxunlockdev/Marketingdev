@@ -1,0 +1,17 @@
+.screen { display: grid; gap: var(--spacing-6); min-width: 0; }
+.heading { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: var(--spacing-4); }
+.heading h1 { margin: 0; font-family: var(--font-family-heading); font-size: var(--type-3xl); line-height: var(--leading-tight); text-wrap: balance; }
+.eyebrow { margin: 0 0 var(--spacing-2); color: var(--color-text-secondary); font-size: var(--type-sm); }
+.lede { margin: var(--spacing-3) 0 0; max-width: 64ch; color: var(--color-text-secondary); line-height: var(--leading-body); text-wrap: pretty; }
+.filters { display: flex; flex-wrap: wrap; gap: var(--spacing-2); }
+.groups { display: grid; gap: var(--spacing-8); }
+.groupTitle { display: flex; align-items: baseline; gap: var(--spacing-2); margin: 0 0 var(--spacing-4); font-family: var(--font-family-heading); font-size: var(--type-xl); line-height: var(--leading-snug); }
+.count { color: var(--color-text-secondary); font-family: var(--font-family-body); font-size: var(--type-sm); font-weight: 400; }
+.items { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: var(--spacing-4); margin: 0; padding: 0; list-style: none; }
+.item { display: grid; gap: var(--spacing-3); height: 100%; align-content: start; min-width: 0; overflow-wrap: anywhere; }
+.itemHead { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacing-3); }
+.label { margin: 0; font-size: var(--type-base); font-weight: 600; line-height: var(--leading-snug); }
+.meta { margin: 0; color: var(--color-text-secondary); font-size: var(--type-sm); line-height: var(--leading-body); }
+.links { display: grid; gap: var(--spacing-1); margin: 0; padding: 0 0 0 var(--spacing-3); border-left: 2px solid var(--color-border); list-style: none; color: var(--color-text-secondary); font-size: var(--type-sm); line-height: var(--leading-body); }
+.actions { display: flex; flex-wrap: wrap; gap: var(--spacing-2); margin-top: auto; }
+.note { margin: 0; color: var(--color-text-secondary); font-size: var(--type-sm); }

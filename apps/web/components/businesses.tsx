@@ -22,6 +22,7 @@ import { Wordmark, Loading, Notice, Field } from "./primitives";
 import { BrandFiles } from "./uploads";
 import { BrandIntake } from "./intake";
 import {BrandStrategy} from "./brand-strategy";
+import {KnowledgeView} from "./knowledge-view";
 const ContentWorkspace=dynamic(()=>import('./content-workspace').then(module=>module.ContentWorkspace),{loading:()=> <Loading/>});
 const PublishingScreen=dynamic(()=>import('./publishing').then(module=>module.PublishingScreen),{loading:()=> <Loading/>});
 const CampaignsScreen=dynamic(()=>import('./campaigns').then(module=>module.CampaignsScreen),{loading:()=> <Loading/>});
@@ -51,6 +52,7 @@ const sections = [
   ["review", "Approvals", "approval"],
   ["brand-kit", "Brand Kit", "orbit"],
   ["brand-strategy", "Strategy", "layers"],
+  ["knowledge", "What Desvio knows", "memory"],
   ["content-preferences", "Content Preferences", "sliders"],
   ["connections", "Integrations", "bolt"],
   ["memory", "Learnings", "memory"],
@@ -339,6 +341,8 @@ export function BusinessApp({ pathname }: { pathname: string }) {
             <BrandKit key={business.id} business={business}/>
           ) : section === "brand-strategy" ? (
             <BrandStrategy key={business.id} business={business}/>
+          ) : section === "knowledge" ? (
+            <KnowledgeView key={business.id} business={business}/>
           ) : section === "content-preferences" ? (
             <ContentPreferences key={business.id} business={business}/>
           ) : section === "monthly-planning" ? (
