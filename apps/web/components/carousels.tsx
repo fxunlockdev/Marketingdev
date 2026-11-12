@@ -1,4 +1,5 @@
 "use client";
+import {CreativeQuality,type QaSummary} from './creative-quality';
 import {ActionButton} from "./design-system";
 import {DesvioSelect} from './desvio-select';
 import {ProjectArchiveControl} from './project-archive-control';
@@ -9,7 +10,7 @@ import {api} from './api';
 import {Field,Notice} from './primitives';
 import {useUnsavedChanges} from './unsaved';
 type Page={creative_version_id:string;export_id:string;alt_text:string};
-type SavedPage=Page&{sha256:string;project_id:string;thread_id:string};
+type SavedPage=Page&{sha256:string;project_id:string;thread_id:string;qa?:QaSummary|null};
 type Version={id:string;title:string;caption:string;channel:string;sha256:string;status:string;review_revision:number;current:boolean;pages:SavedPage[]};
 type Catalog={can_edit:boolean;can_review:boolean;carousels:{id:string;version_id:string;title:string;status:string}[];candidates:(SavedPage&{title:string})[]};
 type Detail={project:{id:string;latest_version_id:string;archived_at?:string|null;archive_revision:number};versions:Version[];reviews:{version_id:string;decision:string;feedback:string;revision:number;created_at:string}[]};
@@ -54,7 +55,7 @@ export function CarouselReview({businessId,version:v,canEdit,canReview,disabled,
   const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='desvio-carousel.zip';link.click();setTimeout(()=>URL.revokeObjectURL(url),60000);
  }catch(e){setError(e);}finally{setBusy(false);}}
  async function review(decision:string){setBusy(true);setError(undefined);try{const body={revision:v.review_revision,sha256:v.sha256,decision,feedback,confirmed};if(onDecision)await onDecision(body);else await api(`/api/v1/businesses/${businessId}/carousels/${v.id}/review`,body);await onSaved();}catch(e){setError(e);}finally{setBusy(false);}}
- return <section className="creative-review" aria-label="Review carousel"><h3>Review complete carousel</h3><p>{v.current?(reviewState??v.status):'Outdated composition — update the slides and save a new draft.'}</p><p>{v.caption}</p><ActionButton disabled={disabled||busy} onClick={()=>void download()} label="Download carousel ZIP" /><p className="hint">Saved slides, caption and alt text. Downloading does not approve or publish this version.</p><ol>{v.pages.map((p,i)=><li key={p.export_id}><h4>Slide {i+1}</h4><CarouselImage businessId={businessId} page={p} onReady={ready}/><p>Alt text: {p.alt_text}</p>{canEdit&&<button disabled={disabled||busy} onClick={()=>onOpenSlide(p.thread_id,p.project_id)}>Edit slide {i+1} in Canvas</button>}</li>)}</ol><Notice error={error}/>
+ return <section className="creative-review" aria-label="Review carousel"><h3>Review complete carousel</h3><p>{v.current?(reviewState??v.status):'Outdated composition — update the slides and save a new draft.'}</p><p>{v.caption}</p><ActionButton disabled={disabled||busy} onClick={()=>void download()} label="Download carousel ZIP" /><p className="hint">Saved slides, caption and alt text. Downloading does not approve or publish this version.</p><ol>{v.pages.map((p,i)=><li key={p.export_id}><h4>Slide {i+1}</h4><CarouselImage businessId={businessId} page={p} onReady={ready}/><CreativeQuality qa={p.qa}/><p>Alt text: {p.alt_text}</p>{canEdit&&<button disabled={disabled||busy} onClick={()=>onOpenSlide(p.thread_id,p.project_id)}>Edit slide {i+1} in Canvas</button>}</li>)}</ol><Notice error={error}/>
  {(canEdit||canReview)&&<fieldset disabled={disabled||busy||!v.current}><Field label="Carousel review feedback">{id=><textarea id={id} maxLength={2000} value={feedback} onChange={e=>setFeedback(e.target.value)}/>}</Field><label className="learning-consent"><input type="checkbox" disabled={loaded.length!==v.pages.length} checked={confirmed} onChange={e=>setConfirmed(e.target.checked)}/>I reviewed every saved slide, their order, alt text and the shared caption.</label><p className="hint">All saved previews must load before confirming. Save any composition edits first.</p><div className="publication-record-actions">{canEdit&&['draft','rejected','changes_requested'].includes(reviewState??v.status)&&<ActionButton disabled={!confirmed} onClick={()=>void review('in_review')} label="Send carousel for review" />}{canReview&&(reviewState??v.status)==='in_review'&&<><ActionButton disabled={!confirmed} onClick={()=>void review('approved')} label="Approve carousel" /><ActionButton disabled={!confirmed||!feedback.trim()} onClick={()=>void review('changes_requested')} label="Request carousel changes" /><ActionButton disabled={!confirmed||!feedback.trim()} onClick={()=>void review('rejected')} label="Reject carousel" /></>}</div></fieldset>}
  </section>;
 }
