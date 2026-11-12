@@ -28,6 +28,7 @@ import {ImageQa} from './image-qa.js';
 import {PostformeClient} from './postforme-client.js';
 import {learningSyncTick,LEARNING_SYNC_INTERVAL_MS} from './learning-schedule.js';
 import {SkillRuntime} from './skill-runtime.js';
+import {BlogJobs} from './blog-jobs.js';
 import {Worker,NativeConnection} from '@temporalio/worker';
 import {Connection,Client} from '@temporalio/client';
 import {Context,ApplicationFailure} from '@temporalio/activity';
@@ -61,6 +62,8 @@ const creativeProvider=new CreativeProvider(process.env.OPENAI_API_KEY);
 // The vision check shares the creative provider; it is optional per image and never fails a creative.
 const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),creativeProvider,new GeminiPlanner(process.env.GEMINI_API_KEY),process.env.VECTEEZY_API_KEY?new StockAssets(jobs,new VecteezyClient(process.env.VECTEEZY_API_KEY,Number(process.env.VECTEEZY_ACCOUNT_ID))):undefined,new ImageQa(creativeProvider));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
+// Blog articles run here, through the skills harness; the API only enqueues them and holds no model key.
+const blogs=new BlogJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY));
 const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled,config.videoRenderImage);
 const social=new SocialJobs(jobs,config.social);
@@ -83,6 +86,8 @@ const worker=await Worker.create({connection,namespace:config.jobs.namespace,tas
     failVideo:async(scope:JobScope)=>{if(!video)throw ApplicationFailure.retryable('Video recovery awaits configured worker','VideoUnavailable');return video.exhausted(scope);},
     generateInsights:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await insights.run(scope);}catch(e){logActivityFailure('InsightsUnavailable',scope,e);throw ApplicationFailure.retryable('Analysis temporarily unavailable','InsightsUnavailable');}finally{clearInterval(heartbeat);}},
     failInsights:async(scope:JobScope)=>insights.fail(scope),
+    generateBlog:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await blogs.run(scope);}catch(e){logActivityFailure('BlogUnavailable',scope,e);throw ApplicationFailure.retryable('Article writing temporarily unavailable','BlogUnavailable');}finally{clearInterval(heartbeat);}},
+    failBlog:async(scope:JobScope)=>blogs.fail(scope),
     publishSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.run(scope);}catch(e){logActivityFailure('PublicationUnavailable',scope,e);throw ApplicationFailure.create({message:'Publication processing unavailable',type:'PublicationUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     reconcileSocial:async(scope:JobScope)=>{const context=Context.current(),heartbeat=setInterval(()=>context.heartbeat(),1000);try{return await publication.reconcile(scope);}catch(e){logActivityFailure('PublicationCheckUnavailable',scope,e);throw ApplicationFailure.create({message:'Publication check unavailable',type:'PublicationCheckUnavailable',nextRetryDelay:e instanceof SocialReadRetry?e.delaySeconds*1000:30000});}finally{clearInterval(heartbeat);}},
     failPublication:async(scope:JobScope)=>publication.fail(scope),

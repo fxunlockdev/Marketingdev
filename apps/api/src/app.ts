@@ -8,7 +8,6 @@ import {Put} from '@nestjs/common';
 import {resolveIngressAddress} from './auth-ingress.js';
 import {CampaignIdeas} from './campaign-ideas.js';
 import {CampaignBlogs} from './campaign-blogs.js';
-import {CreativeProvider} from './creative-provider.js';
 import {Postforme} from './postforme.js';
 import {UncertainRequests} from './uncertain-requests.js';
 import {HiggsfieldReplacements} from './higgsfield-replacements.js';
@@ -532,7 +531,7 @@ export async function createApplication(config: Config) {
  {provide:KnowledgeReview,useValue:new KnowledgeReview(new Businesses(database,workspaces))},
  {provide:MediaLibrary,useValue:new MediaLibrary(new Canvas(new Businesses(database,workspaces),store))},
  {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning,carousels:CarouselGeneration)=>new ChatConversations(canvas,planning,carousels),inject:[Canvas,Planning,CarouselGeneration]},
- {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},
+ {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage))},
  {provide:Strategies,useValue:new Strategies(new Planning(new ContentPlan(new Businesses(database,workspaces),config.renderImage)),new SlotCreatives(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new Canvas(new Businesses(database,workspaces),store),new CarouselGeneration(new Canvas(new Businesses(database,workspaces),store),config.renderImage)))},
  {provide:HiggsfieldReplacements,useFactory:(canvas:Canvas)=>new HiggsfieldReplacements(canvas,config.higgsfieldImagesEnabled),inject:[Canvas]},
  {provide:UncertainRequests,useValue:new UncertainRequests(new Businesses(database,workspaces))},
