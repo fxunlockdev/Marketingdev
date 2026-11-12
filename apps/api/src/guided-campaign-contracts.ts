@@ -8,6 +8,20 @@ export type GuidedBrief = {
   offering:string; audience:string; market:string; goal:'awareness'|'traffic'|'leads'|'sales';
   visual_direction:string; must_follow:string; details?:OnboardingDetails;
 };
+/** Options offered in the questionnaire. They come from saved research results and are
+ * never applied automatically: the customer picks one or ignores them. */
+export type ResearchSuggestions={audience:string[];competitors:{name:string;url:string}[]};
+/** Saved worker output is still untrusted when it is read back for display. */
+export function researchSuggestions(audience:unknown,competitors:unknown):ResearchSuggestions {
+  const clean=(value:unknown,max:number)=>typeof value==='string'&&value.trim().length>0&&value.length<=max&&!controls.test(value)?value.trim():null;
+  const site=(value:unknown)=>{try{const u=new URL(String(clean(value,2048)));return ['http:','https:'].includes(u.protocol)&&!u.username&&!u.password?u.href:null;}catch{return null;}};
+  const audiences=(Array.isArray(audience)?audience:[]).map(a=>clean(a,200)).filter((a):a is string=>a!==null);
+  const found=(Array.isArray(competitors)?competitors:[]).flatMap(c=>{
+    const name=clean(c?.name,100),url=site(c?.url);
+    return name&&url?[{name,url}]:[];
+  });
+  return {audience:[...new Set(audiences)].slice(0,3),competitors:found.filter((c,i)=>found.findIndex(x=>x.url===c.url)===i).slice(0,3)};
+}
 export type GuidedStage = 'brief'|'research'|'direction_generating'|'direction_review'|'direction_locked'|'planning'|'generating'|'review';
 const controls=/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
 function text(value:unknown,max:number,required=false):string {

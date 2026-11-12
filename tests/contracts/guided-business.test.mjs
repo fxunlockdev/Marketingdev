@@ -61,13 +61,15 @@ test('new questionnaires reuse only unambiguous approved facts within field limi
 test('reading saved questionnaire never replaces intentionally cleared answers',async()=>{
  const {GuidedBusiness}=await import('../../dist/guided-business.js');
  const saved={revision:3,step:2,brief:{...brief,offering:'',audience:''}};
- let queries=0;
+ const queries=[];
  const service=new GuidedBusiness({resolve:async()=>({organization_id:'org'}),database:{transaction:async(user,org,write,fn,brand)=>{
   assert.equal(user,'user');assert.equal(org,'org');assert.equal(brand,'brand');assert.equal(write,false);
-  return fn({query:async()=>{queries++;return {rows:[saved]};}});
+  return fn({query:async(sql)=>{queries.push(sql);return {rows:sql.includes('guided_business_briefs')?[saved]:[]};}});
  }}},null);
- assert.deepEqual(await service.read('user','brand'),{...saved,onboarding:{social_profile_limit:1,channels:[]}});
- assert.equal(queries,1,'Existing drafts do not read or merge approved defaults');
+ // Researched suggestions are offered beside the answers; they never fill or change them.
+ assert.deepEqual(await service.read('user','brand'),{...saved,suggestions:{audience:[],competitors:[]},onboarding:{social_profile_limit:1,channels:[]}});
+ assert.equal(queries.filter(sql=>sql.includes('guided_business_briefs')).length,1);
+ assert.ok(!queries.some(sql=>sql.includes('brand_brain_versions')),'Existing drafts do not read or merge approved defaults');
 });
 
 
@@ -98,4 +100,47 @@ test('monthly plan rejects multiple platforms before planning or generation',asy
  const {GuidedCampaigns}=await import('../../dist/guided-campaigns.js');
  const service=new GuidedCampaigns(null,null,['instagram','facebook']);
  assert.throws(()=>service.create('user','brand',{moodboard_id:'11111111-1111-4111-8111-111111111111',starts_on:'2026-12-01',duration:'month',channels:['instagram','facebook'],static_count:2,carousel_count:0,video_count:0,timezone:'UTC'},'profile-plan-test'),/Choose one available platform/);
+});
+
+// ---- Research feeds the direction: audience suggestions and competitor gaps ----
+test('the direction asks for evidence-grounded audience suggestions and competitor gaps',()=>{
+ const schema=analysisRequest(input,'configured-model').body.text.format.schema.properties.business_direction;
+ assert.equal(schema.properties.audience_suggestions.type,'array');assert.equal(schema.properties.competitor_gaps.type,'array');
+ assert.ok(schema.required.includes('audience_suggestions')&&schema.required.includes('competitor_gaps'));
+ assert.match(analysisRequest(input,'configured-model').body.instructions,/audience_suggestions/);
+});
+test('new direction fields are bounded while saved legacy directions stay valid',()=>{
+ const full={...direction,audience_suggestions:['Parents near Bandra who want a relaxed weekend brunch','Remote workers looking for a calm table before noon','Families planning small birthday meals'],competitor_gaps:['No nearby cafe shows how its food is prepared']};
+ assert.deepEqual(validateAnalysis({...result,business_direction:full},input).business_direction,full);
+ // Results saved before this change have neither field.
+ assert.deepEqual(validateAnalysis(result,input).business_direction,direction);
+ assert.deepEqual(validateAnalysis({...result,business_direction:{...full,competitor_gaps:[]}},input).business_direction.competitor_gaps,[]);
+ for(const patch of [{audience_suggestions:['a','b','c','d']},{audience_suggestions:['same','same']},{audience_suggestions:['x'.repeat(201)]},{audience_suggestions:'People'},{audience_suggestions:['']},{competitor_gaps:Array(6).fill(0).map((_,i)=>`gap ${i}`)},{competitor_gaps:['x'.repeat(301)]},{competitor_gaps:[7]}])
+  assert.throws(()=>validateAnalysis({...result,business_direction:{...full,...patch}},input),/AI_OUTPUT_INVALID/,JSON.stringify(patch).slice(0,60));
+});
+test('market evidence informs the direction but can never become a brand fact suggestion',()=>{
+ const market={id:'market1',source_id:'market-source',text:'AI market research note:\nCompetitor positioning · Rival\nRival calls itself the fastest cafe in Mumbai.',page:1,website_url:'https://rival.test/',origin:'market'};
+ const mixed={...input,chunks:[...input.chunks,market]};
+ const request=analysisRequest(mixed,'configured-model');
+ assert.match(request.body.instructions,/origin "market"/);assert.doesNotMatch(analysisRequest(input,'configured-model').body.instructions,/origin "market"/);
+ assert.equal(JSON.parse(request.body.input).chunks[1].origin,'market');
+ const stolen={field:'positioning',value:'The fastest cafe in Mumbai',chunk_id:'market1',quote:'the fastest cafe in Mumbai'};
+ assert.throws(()=>validateAnalysis({...result,findings:[stolen]},mixed),/AI_OUTPUT_INVALID/);
+ // Recovery keeps the direction, drops the competitor claim and says so.
+ const recovered=recoverAnalysis({...result,findings:[stolen]},mixed);assert.deepEqual(recovered.findings,[]);assert.equal(recovered.missing.length,1);
+ // A proposal may still cite what the market research showed.
+ const grounded={...direction,evidence_ids:['source1','market1'],competitor_gaps:['Rivals compete on speed; nobody talks about the family welcome']};
+ assert.deepEqual(validateAnalysis({...result,business_direction:grounded},mixed).business_direction,grounded);
+ // The business's own evidence is still accepted for facts.
+ const own={field:'offering',value:'A family cafe',chunk_id:'source1',quote:'A family cafe in Mumbai'};
+ assert.equal(validateAnalysis({...result,findings:[own]},mixed).findings.length,1);
+});
+test('questionnaire suggestions are read back as bounded, untrusted display data',async()=>{
+ const {researchSuggestions}=await import('../../dist/guided-campaign-contracts.js');
+ assert.deepEqual(researchSuggestions(undefined,undefined),{audience:[],competitors:[]});
+ assert.deepEqual(researchSuggestions('People',{name:'x'}),{audience:[],competitors:[]});
+ const result=researchSuggestions([' Parents near Bandra ','Parents near Bandra',7,'','x'.repeat(201),'bad\u0000text','Remote workers','Families','A fourth'],
+  [{name:'Third Chair',url:'https://third-chair.test/'},{name:'Third Chair again',url:'https://third-chair.test/'},{name:'Script',url:'javascript:alert(1)'},{name:'Creds',url:'https://user:pass@x.test/'},{name:'',url:'https://y.test/'},null,{name:'B',url:'https://b.test/'},{name:'C',url:'https://c.test/'},{name:'D',url:'https://d.test/'}]);
+ assert.deepEqual(result.audience,['Parents near Bandra','Remote workers','Families']);
+ assert.deepEqual(result.competitors,[{name:'Third Chair',url:'https://third-chair.test/'},{name:'B',url:'https://b.test/'},{name:'C',url:'https://c.test/'}]);
 });

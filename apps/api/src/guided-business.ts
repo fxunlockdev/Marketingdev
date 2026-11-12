@@ -4,7 +4,7 @@ import {Businesses} from './businesses.js';
 import {Intake} from './intake.js';
 import {object} from './workspaces.js';
 import {hash,canonicalJSON,lockReview,bumpReview} from './brand-brain.js';
-import {guidedBrief,requireGuidedRevision,BUSINESS_RESEARCH_AGENT_VERSION} from './guided-campaign-contracts.js';
+import {guidedBrief,requireGuidedRevision,researchSuggestions,BUSINESS_RESEARCH_AGENT_VERSION} from './guided-campaign-contracts.js';
 /** A saved brief and its research share one transaction. Worker results remain unapproved. */
 export class GuidedBusiness {
  constructor(readonly businesses:Businesses,readonly intake:Intake,readonly channels:readonly string[]=[]){}
@@ -22,9 +22,14 @@ export class GuidedBusiness {
     WHERE g.organization_id=$1 AND g.brand_id=$2`,[b.organization_id,id])).rows[0];
    // Saved answers win, including intentional empty fields. Only a new brief
    // may borrow facts from this business's immutable approved profile.
-   if(row)return {...row,onboarding:this.profilePolicy()};
+   // Suggestions come from the latest finished research for this business, even after an
+   // edited answer has detached the brief from that job, so choosing one does not erase them.
+   const latest=async(kind:string,path:string[])=>(await db.query(`SELECT r.result#>$4::text[] AS value FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id
+    WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind=$3 AND j.status='succeeded' AND jsonb_typeof(r.result#>$4::text[])='array' ORDER BY j.updated_at DESC,j.id LIMIT 1`,[b.organization_id,id,kind,path])).rows[0]?.value;
+   const suggestions=researchSuggestions(await latest('brand.analyze',['business_direction','audience_suggestions']),await latest('website.extract',['market','discovered_competitors']));
+   if(row)return {...row,suggestions,onboarding:this.profilePolicy()};
    const approved=(await db.query('SELECT snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY review_revision DESC LIMIT 1',[b.organization_id,id])).rows[0];
-   return {onboarding:this.profilePolicy(),revision:0,step:0,brief:initialGuidedBrief(approved?.snapshot),research_job_id:null};
+   return {suggestions,onboarding:this.profilePolicy(),revision:0,step:0,brief:initialGuidedBrief(approved?.snapshot),research_job_id:null};
   },id);
  }
  async save(user:string,id:string,body:unknown){

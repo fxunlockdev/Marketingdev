@@ -419,3 +419,31 @@ test('one-profile onboarding persists across reads, rejects disabled platforms a
  await disabled.save(alice,target.id,{revision:2,brief:{...brief,details:{...details,social_profile:{platform:'help',handle:''}}}});
  assert.equal((await disabled.read(alice,target.id)).brief.details.social_profile.platform,'help');
 });
+
+test('researched audience and competitor suggestions reach the questionnaire and survive an edited answer (MOCK OpenAI)',async()=>{
+ const account=await workspaces.create(alice,{name:'Suggestions account'});
+ const target=await workspaces.createBrand(alice,account.id,{name:'Suggestion cafe'},randomUUID());
+ const empty=await guided.read(alice,target.id);assert.deepEqual(empty.suggestions,{audience:[],competitors:[]});
+ await guided.save(alice,target.id,{revision:0,brief});
+ const job=await guided.research(alice,target.id,{revision:1},randomUUID());
+ await admin.query("INSERT INTO app.analysis_grants(organization_id,brand_id,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by,enabled) VALUES($1,$2,'MOCK-model',now()+interval '1 hour',1000000,1,1,'LOCAL TEST ONLY',true)",[account.id,target.id]);
+ const audiences=['Parents near Bandra planning a relaxed weekend brunch','Remote workers who want a calm table before noon','Families booking small birthday meals'];
+ const analyzer=new BrandAnalyzer(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
+  const context=JSON.parse(JSON.parse(init.body).input);
+  const direction={summary:'A family cafe in Mumbai',rationale:'Proposed friendly creative direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food in natural light',pillars:['Local stories','Everyday rituals'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Three scenes: arrival, a coffee close-up, and a shared table.'}],essential_questions:[],evidence_ids:[context.chunks[0].id],audience_suggestions:audiences,competitor_gaps:[]};
+  return Response.json({object:'response',id:'resp_mock',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({findings:[],recommendation:null,missing:[],business_direction:direction}),annotations:[]}]}],usage:{input_tokens:100,output_tokens:100,total_tokens:200}});
+ }}));
+ assert.equal(await new IntakeJobs(new AssetJobs(worker,null,null),analyzer).run({organizationId:account.id,brandId:target.id,jobId:job.id}),'succeeded');
+ // A finished capture with market research, as the worker saves it. Stored output is
+ // display data only, so anything malformed is dropped when read.
+ const capture=randomUUID();
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'website.extract','succeeded')",[capture,account.id,target.id,alice]);
+ await admin.query('INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,website_url,result) VALUES($1,$2,$3,$4,$5,$6,$7)',[capture,account.id,target.id,randomUUID(),'a'.repeat(64),'https://example.org/',JSON.stringify({market:{status:'completed',discovered_competitors:[{name:'Third Table',url:'https://third-table.test/'},{name:'Bad link',url:'javascript:alert(1)'}]}})]);
+ const researched=await guided.read(alice,target.id);
+ assert.deepEqual(researched.suggestions,{audience:audiences,competitors:[{name:'Third Table',url:'https://third-table.test/'}]});
+ // Choosing a suggestion changes the brief, which detaches it from the finished research.
+ const edited=await guided.save(alice,target.id,{revision:1,brief:{...brief,audience:audiences[0]}});assert.equal(edited.brief.audience,audiences[0]);
+ const after=await guided.read(alice,target.id);
+ assert.equal(after.research_job_id,null);assert.equal(after.result,null);assert.deepEqual(after.suggestions,researched.suggestions);
+ await assert.rejects(guided.read(bob,target.id));
+});
