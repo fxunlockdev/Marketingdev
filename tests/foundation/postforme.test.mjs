@@ -86,6 +86,8 @@ test('monthly review: owners accept recommendations for next month, planners rec
  await assert.rejects(reviews.withdraw(viewer,brand.id,after.accepted[0].id),e=>e.getStatus?.()===403);
  await reviews.withdraw(alice,brand.id,after.accepted[0].id);
  assert.equal(learningSections(await database.transaction(alice,org.id,false,db=>planningLearning(db),brand.id)).accepted.length,1);
+ const again=await reviews.accept(alice,brand.id,{month,changes:[review.proposed_changes.findIndex(c=>c.text===after.accepted[0].text)],confirmed:true});
+ assert.equal(again.accepted.length,2,'a withdrawn recommendation can be accepted again');
  const foreignOrg=(await admin.query('SELECT organization_id FROM app.brands WHERE id=$1',[foreign.id])).rows[0].organization_id;
  assert.deepEqual(learningSections(await database.transaction(bob,foreignOrg,false,db=>planningLearning(db),foreign.id)).accepted,[]);
  const trends=await reviews.trends(alice,brand.id);

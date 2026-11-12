@@ -8,11 +8,11 @@ CREATE TABLE app.learning_accepted_changes(
  sample_size integer NOT NULL CHECK(sample_size>=0),label text NOT NULL CHECK(length(label) BETWEEN 1 AND 60),
  accepted_by uuid NOT NULL REFERENCES auth."user"(id),accepted_at timestamptz NOT NULL DEFAULT now(),
  withdrawn_by uuid REFERENCES auth."user"(id),withdrawn_at timestamptz,
- UNIQUE(organization_id,brand_id,month,text),
  CHECK((withdrawn_at IS NULL)=(withdrawn_by IS NULL)),
  FOREIGN KEY(organization_id,brand_id) REFERENCES app.brands(organization_id,id)
 );
-CREATE INDEX learning_accepted_changes_active ON app.learning_accepted_changes(organization_id,brand_id,month) WHERE withdrawn_at IS NULL;
+-- One active copy of a recommendation per month; a withdrawn one can be accepted again.
+CREATE UNIQUE INDEX learning_accepted_changes_active ON app.learning_accepted_changes(organization_id,brand_id,month,text) WHERE withdrawn_at IS NULL;
 ALTER TABLE app.learning_accepted_changes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE app.learning_accepted_changes FORCE ROW LEVEL SECURITY;
 GRANT SELECT,INSERT ON app.learning_accepted_changes TO desvio_app;

@@ -53,3 +53,12 @@ test('publishing times are wall-clock times in the business time zone',()=>{
  const now=Date.parse('2027-01-01T00:00:00Z');
  assert.equal(inPublishWindow(now+30000,now),false);assert.equal(inPublishWindow(now+120000,now),true);assert.equal(inPublishWindow(now+32*86400000,now),false);
 });
+test('a remote post that is gone is reported as gone, never as published or failed',async()=>{
+ const gone={call:async path=>{if(path.startsWith('/v1/social-posts/'))throw new PostformeError('POSTFORME_NOT_FOUND');if(path.startsWith('/v1/social-posts?'))return {data:[]};return {data:[]};}};
+ assert.deepEqual(await observePublication(gone,{...op,remote_id:'sp_1'}),{kind:'gone'});
+ const moved={call:async path=>{if(path.startsWith('/v1/social-posts/'))throw new PostformeError('POSTFORME_NOT_FOUND');return {data:[post({id:'sp_9'})]};}};
+ assert.deepEqual(await observePublication(moved,{...op,remote_id:'sp_1'}),{kind:'unconfirmed'},'a different remote post for our id is never adopted silently');
+});
+test('a worker reading never overwrites a time changed after it was read',()=>{
+ assert.match(statusObservedSQL,/scheduled_at=\$8/);
+});

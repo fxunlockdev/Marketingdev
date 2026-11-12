@@ -6,7 +6,7 @@ export type StatusClient={call(path:string,method?:string,body?:unknown):Promise
 export type ObservedState='scheduled'|'processing'|'published'|'failed';
 export type LocalPublication={id:string;caption:string;scheduled_at:string|Date;remote_account:string;remote_id:string|null};
 export type StatusOutcome=
- {kind:'unconfirmed'}|
+ {kind:'unconfirmed'}|{kind:'gone'}|
  {kind:'observed';remote_id:string;state:ObservedState;release_url:string|null;failure_reason:string|null;scheduled_at:string};
 type RemotePost={id:string;external_id:string;caption:string;scheduled_at:string;status:string;social_accounts:{id:string}[]};
 
@@ -25,16 +25,21 @@ export function failureReason(value:unknown):string|null{
 }
 /** Identify the post: by its remote id once known (it may have been rescheduled), otherwise by our external id plus
  * the exact caption, time and single account we submitted. Anything else stays unconfirmed. */
-async function findPost(client:StatusClient,op:LocalPublication):Promise<RemotePost|null>{
+async function findPost(client:StatusClient,op:LocalPublication):Promise<RemotePost|null|'gone'>{
  const ours=(p:RemotePost|null):p is RemotePost=>!!p&&p.external_id===op.id&&p.caption===op.caption&&p.social_accounts.length===1&&p.social_accounts[0].id===op.remote_account;
- if(op.remote_id){const p=remotePost(await client.call(`/v1/social-posts/${encodeURIComponent(op.remote_id)}`));return ours(p)&&p.id===op.remote_id?p:null;}
+ if(op.remote_id){
+  let raw:unknown;try{raw=await client.call(`/v1/social-posts/${encodeURIComponent(op.remote_id)}`);}
+  catch(error){if(!(error instanceof PostformeError)||error.code!=='POSTFORME_NOT_FOUND')throw error;
+   // Gone only when nothing else carries our id either; otherwise leave it for a person to check.
+   const listed=record(await client.call(`/v1/social-posts?external_id=${encodeURIComponent(op.id)}&limit=100`));return Array.isArray(listed?.data)&&!listed.data.length?'gone':null;}
+  const p=remotePost(raw);return ours(p)&&p.id===op.remote_id?p:null;}
  const found=record(await client.call(`/v1/social-posts?external_id=${encodeURIComponent(op.id)}&limit=100`));
  if(!Array.isArray(found?.data))throw new PostformeError('POSTFORME_INVALID_RESPONSE');
  const matches=found.data.map(remotePost).filter(ours).filter(p=>Date.parse(p.scheduled_at)===time(op.scheduled_at));
  return matches.length===1?matches[0]:null;
 }
 export async function observePublication(client:StatusClient,op:LocalPublication):Promise<StatusOutcome>{
- const post=await findPost(client,op);if(!post)return {kind:'unconfirmed'};
+ const post=await findPost(client,op);if(post==='gone')return {kind:'gone'};if(!post)return {kind:'unconfirmed'};
  const results=record(await client.call(`/v1/social-post-results?post_id=${encodeURIComponent(post.id)}&social_account_id=${encodeURIComponent(op.remote_account)}&limit=100`));
  const mine=(Array.isArray(results?.data)?results.data:[]).map(record).filter((r):r is Record<string,unknown>=>!!r&&r.post_id===post.id&&r.social_account_id===op.remote_account);
  const success=mine.find(r=>r.success===true),failure=mine.find(r=>r.success===false);
@@ -48,7 +53,9 @@ export const statusCandidatesSQL=`SELECT p.id,p.caption,p.scheduled_at,p.remote_
  WHERE p.phase IN ('accepted','unknown') AND p.observed_state IN ('unconfirmed','scheduled','processing') AND (p.observed_state='unconfirmed' OR p.scheduled_at<=$1::timestamptz+interval '10 minutes')
  AND (p.last_checked_at IS NULL OR p.last_checked_at<$1::timestamptz-interval '10 minutes') ORDER BY p.last_checked_at NULLS FIRST,p.scheduled_at,p.id LIMIT ${STATUS_RUN_LIMIT}`;
 /** An uncertain submission becomes accepted only when exactly our post is found; nothing is ever resubmitted here. */
-export const statusObservedSQL="UPDATE app.postforme_publications SET phase='accepted',remote_id=$2,observed_state=$3,release_url=$4,failure_reason=$5,scheduled_at=$6,error_code=NULL,last_checked_at=$7 WHERE id=$1 AND phase IN ('accepted','unknown')";
+export const statusObservedSQL="UPDATE app.postforme_publications SET phase='accepted',remote_id=$2,observed_state=$3,release_url=$4,failure_reason=$5,scheduled_at=$6,error_code=NULL,last_checked_at=$7 WHERE id=$1 AND phase IN ('accepted','unknown') AND scheduled_at=$8";
+/** The remote post no longer exists (for example a cancellation whose answer was lost). Flag it; only the owner's cancel marks it canceled. */
+export const statusGoneSQL="UPDATE app.postforme_publications SET error_code='POSTFORME_POST_MISSING',last_checked_at=$2 WHERE id=$1";
 export const statusUnconfirmedSQL="UPDATE app.postforme_publications SET error_code='POSTFORME_OUTCOME_UNCONFIRMED',last_checked_at=$2 WHERE id=$1";
 export type StatusRun={checked:number;changed:number;unconfirmed:number;failed:number;rate_limited:boolean};
 export async function checkStatuses(deps:{pool:Queryable;client:StatusClient;now?:Date}):Promise<StatusRun>{
@@ -60,7 +67,8 @@ export async function checkStatuses(deps:{pool:Queryable;client:StatusClient;now
   catch(error){if(error instanceof PostformeError&&error.code==='POSTFORME_RATE_LIMITED'){run.rate_limited=true;break;}if(!(error instanceof PostformeError))throw error;run.failed++;continue;}
   run.checked++;
   if(outcome.kind==='unconfirmed'){run.unconfirmed++;await deps.pool.query(statusUnconfirmedSQL,[op.id,now.toISOString()]);continue;}
-  run.changed++;await deps.pool.query(statusObservedSQL,[op.id,outcome.remote_id,outcome.state,outcome.release_url,outcome.failure_reason,outcome.scheduled_at,now.toISOString()]);
+  if(outcome.kind==='gone'){run.unconfirmed++;await deps.pool.query(statusGoneSQL,[op.id,now.toISOString()]);continue;}
+  run.changed++;await deps.pool.query(statusObservedSQL,[op.id,outcome.remote_id,outcome.state,outcome.release_url,outcome.failure_reason,outcome.scheduled_at,now.toISOString(),new Date(op.scheduled_at).toISOString()]);
  }
  return run;
 }

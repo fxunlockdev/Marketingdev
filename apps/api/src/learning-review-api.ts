@@ -43,7 +43,7 @@ export class LearningReviews{
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`learning-review:${id}`]);
    const review=await monthlyReview(db,{timezone:await timezone(db,id)},month);
    for(const c of chosenChanges(v.changes,review.proposed_changes))
-    await db.query('INSERT INTO app.learning_accepted_changes(id,organization_id,brand_id,month,action,text,basis,sample_size,label,accepted_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(organization_id,brand_id,month,text) DO NOTHING',[randomUUID(),org,id,month,c.action,c.text.slice(0,400),c.basis.slice(0,400),c.sample_size,c.label.slice(0,60),user]);
+    await db.query('INSERT INTO app.learning_accepted_changes(id,organization_id,brand_id,month,action,text,basis,sample_size,label,accepted_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(organization_id,brand_id,month,text) WHERE withdrawn_at IS NULL DO NOTHING',[randomUUID(),org,id,month,c.action,c.text.slice(0,400),c.basis.slice(0,400),c.sample_size,c.label.slice(0,60),user]);
   });
   return this.review(user,id,month);
  }

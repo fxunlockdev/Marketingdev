@@ -111,7 +111,7 @@ test('Post for Me lifecycle on the deterministic mock: schedule a whole plan, pu
  await assert.rejects(service.scheduleAll(viewer.id,brand.id,{plan_id:a.slot.plan_id,confirmed:true},'bulk-'+randomUUID()),e=>e.getStatus?.()===403);
  const key='bulk-'+randomUUID().slice(0,20),bulk=await service.scheduleAll(alice.id,brand.id,{plan_id:a.slot.plan_id,confirmed:true},key);
  assert.deepEqual(bulk.results.map(r=>r.outcome).sort(),['accepted','accepted','accepted']);assert.equal(mock.state.posts.size,3);
- const posts=[...mock.state.posts.values()];assert.ok(posts.every(p=>p.media.length===1&&p.scheduled_at===new Date(a.slot.planned_at).toISOString()),'each post is scheduled at its planned time with its approved media');
+ const posts=[...mock.state.posts.values()];assert.ok(posts.every(p=>p.media.length===1&&[a,b,c].some(x=>new Date(x.slot.planned_at).toISOString()===p.scheduled_at)),'each post is scheduled at its planned time with its approved media');
  assert.deepEqual((await service.scheduleAll(alice.id,brand.id,{plan_id:a.slot.plan_id,confirmed:true},key)).results,[],'repeating the request schedules nothing twice');assert.equal(mock.state.posts.size,3);
  const rows=Object.fromEntries((await admin.query('SELECT slot_id,id FROM app.postforme_publications WHERE slot_id=ANY($1::uuid[])',[[a.slot.id,b.slot.id,c.slot.id]])).rows.map(r=>[r.slot_id,r.id]));
  // Reschedule B to a later wall-clock time in the business zone (UTC here); the same remote post moves.
@@ -132,13 +132,16 @@ test('Post for Me lifecycle on the deterministic mock: schedule a whole plan, pu
   const run=await checkStatuses({pool:dispatch,client:service.client,now:new Date(clock)});assert.equal(run.changed>=2,true);
   await assert.rejects(dispatch.query('SELECT proof FROM app.postforme_publications'),e=>e.code==='42501');
   assert.equal((await dispatch.query("UPDATE app.postforme_publications SET observed_state='scheduled' WHERE observed_state='failed'")).rowCount,0,'a settled outcome cannot be rewritten by the worker');
+  await assert.rejects(dispatch.query("UPDATE app.postforme_publications SET observed_state='failed' WHERE id=$1",[rows[b.slot.id]]),e=>e.code==='23514','the worker cannot free a post by inventing a failure');
+  await assert.rejects(dispatch.query("UPDATE app.postforme_publications SET remote_id='someone-else' WHERE id=$1",[rows[b.slot.id]]),e=>e.code==='23514','a known remote post is never swapped');
  }finally{await dispatch.end();}
  const list=(await service.list(alice.id,brand.id)).publications,failed=list.find(p=>p.id===rows[a.slot.id]);
  assert.equal(failed.observed_state,'failed');assert.match(failed.failure_reason,/aspect ratio/);assert.equal(failed.retryable,true);
  assert.equal(list.find(p=>p.id===rows[b.slot.id]).observed_state,'scheduled');
  // Retry once, at a new time; a second retry of the same failure is refused, and nothing can double-post a held post.
  const when=new Date(Date.now()+86400000).toISOString().slice(0,16),retry={...a.body,channel_id:connected.accounts[0].id,scheduled_at:when,retry_of:rows[a.slot.id]};
- const again=await service.submit(alice.id,brand.id,retry,'retry-'+randomUUID());assert.equal(again.phase,'accepted');
+ const {retry_of:_omitted,...plain}=retry,again=await service.submit(alice.id,brand.id,plain,'retry-'+randomUUID());assert.equal(again.phase,'accepted');
+ assert.equal((await admin.query('SELECT retry_of FROM app.postforme_publications WHERE id=$1',[again.id])).rows[0].retry_of,rows[a.slot.id],'a new attempt after a confirmed failure is always that failure\'s one retry');
  await assert.rejects(service.submit(alice.id,brand.id,retry,'retry-'+randomUUID()),/already has a publication|only a failed post/i);
  assert.equal((await service.list(alice.id,brand.id)).publications.find(p=>p.id===rows[a.slot.id]).retryable,false);
  await assert.rejects(service.submit(alice.id,brand.id,{...b.body,channel_id:connected.accounts[0].id},'dup-'+randomUUID()),/already has a publication/);

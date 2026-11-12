@@ -34,3 +34,7 @@ test('the production client never accepts a plain-http upload target',async()=>{
  const client=new PostformeClient('key',async()=>Response.json({upload_url:'http://127.0.0.1:54011/upload',media_url:'http://127.0.0.1:54011/m'}));
  await assert.rejects(client.upload(Buffer.from('png'),'image/png'),e=>e.code==='POSTFORME_INVALID_UPLOAD');
 });
+test('a 404 from Post for Me is distinguishable and never ambiguous',async()=>{
+ const client=new PostformeClient('key',async()=>new Response('{}',{status:404}),'http://127.0.0.1:54011');
+ await assert.rejects(client.call('/v1/social-posts/sp_1','DELETE'),e=>e.code==='POSTFORME_NOT_FOUND'&&e.ambiguous===false);
+});

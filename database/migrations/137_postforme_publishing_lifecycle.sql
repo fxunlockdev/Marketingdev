@@ -7,7 +7,7 @@ ALTER TABLE app.postforme_publications
 -- A failure the provider confirmed frees the post for one retry; every other outcome (including an
 -- uncertain submission) still holds it, so a post is never submitted twice.
 DROP INDEX app.postforme_active_slot;
-CREATE UNIQUE INDEX postforme_active_slot ON app.postforme_publications(brand_id,slot_id,account_id)
+CREATE UNIQUE INDEX postforme_active_slot ON app.postforme_publications(brand_id,slot_id)
  WHERE phase NOT IN ('rejected','canceled') AND observed_state<>'failed';
 CREATE UNIQUE INDEX postforme_one_retry ON app.postforme_publications(retry_of) WHERE retry_of IS NOT NULL;
 CREATE OR REPLACE FUNCTION app.slot_has_publication(target uuid) RETURNS boolean LANGUAGE sql STABLE SET search_path=pg_catalog AS $$
@@ -23,3 +23,15 @@ CREATE POLICY status_sync_read ON app.postforme_publications FOR SELECT TO desvi
 CREATE POLICY status_sync_update ON app.postforme_publications FOR UPDATE TO desvio_dispatcher
  USING(phase IN ('accepted','unknown') AND observed_state IN ('unconfirmed','scheduled','processing') AND app.business_active(organization_id,brand_id))
  WITH CHECK(phase IN ('accepted','unknown'));
+-- Posts on an account that was later disconnected still need their outcome observed.
+CREATE POLICY status_sync_account ON app.postforme_accounts FOR SELECT TO desvio_dispatcher USING(app.business_active(organization_id,brand_id));
+-- The worker can only record what the provider reported: a remote id, once known, never changes, and a failure carries its reason.
+CREATE FUNCTION app.guard_status_sync() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN
+ IF current_user='desvio_dispatcher' AND ((OLD.remote_id IS NOT NULL AND NEW.remote_id IS DISTINCT FROM OLD.remote_id)
+  OR (NEW.observed_state='failed' AND NEW.failure_reason IS NULL) OR (NEW.observed_state IN ('published','failed') AND NEW.remote_id IS NULL)) THEN
+  RAISE EXCEPTION 'Status checks record only provider-confirmed outcomes' USING ERRCODE='23514';
+ END IF;
+ RETURN NEW;
+END $$;
+REVOKE ALL ON FUNCTION app.guard_status_sync() FROM PUBLIC;
+CREATE TRIGGER guard_status_sync BEFORE UPDATE ON app.postforme_publications FOR EACH ROW EXECUTE FUNCTION app.guard_status_sync();
