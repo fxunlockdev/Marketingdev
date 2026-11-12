@@ -156,6 +156,105 @@ class MediaTests(unittest.TestCase):
         with self.assertRaisesRegex(media.Invalid,'VIDEO_OVERLAY_INVALID'):media.validate_overlays([good,good],3)
         with self.assertRaisesRegex(media.Invalid,'VIDEO_OVERLAY_INVALID'):media.validate_overlays([good]*4,3)
 
+    def ssim(self, output, source):
+        stats = self.root/f'ssim-{output.name}.log'
+        media.command('ffmpeg',['-v','error','-nostdin','-i',str(output),'-i',str(source),'-lavfi',f'[0:v][1:v]ssim=stats_file={stats}','-f','null','-'],timeout=60)
+        values=[float(line.split('All:')[1].split()[0]) for line in stats.read_text().splitlines() if 'All:' in line]
+        return sum(values)/len(values), min(values)
+
+    def stream(self, path):
+        info=json.loads(media.command('ffprobe',['-v','error','-show_streams','-show_format','-of','json',str(path)],capture=True))
+        video=[s for s in info['streams'] if s['codec_type']=='video'][0]
+        n,d=video['r_frame_rate'].split('/')
+        return video, float(n)/float(d), int(info['format']['bit_rate'])
+
+    def test_render_keeps_source_resolution_frame_rate_and_visual_quality(self):
+        source = self.root/'detail.mp4'
+        media.command('ffmpeg',['-v','error','-nostdin','-f','lavfi','-i','testsrc2=size=640x360:rate=25:duration=3','-c:v','libx264','-threads','2','-preset','veryfast','-crf','12','-pix_fmt','yuv420p',str(source)],timeout=60)
+        result = media.run(self.request(source.read_bytes()))
+        output = self.root/'detail-out.mp4';output.write_bytes(base64.b64decode(result['video']['base64']))
+        video, fps, bitrate = self.stream(output)
+        self.assertEqual((video['width'],video['height']),(640,360))
+        self.assertAlmostEqual(fps,25,places=2)
+        self.assertGreater(bitrate,1_000_000)
+        average, worst = self.ssim(output, source)
+        self.assertGreater(average,0.98)
+        self.assertGreater(worst,0.96)
+
+    def test_portrait_4_5_targets_render_at_exact_size(self):
+        for width,height in [(1024,1280),(1080,1350)]:
+            value=self.request();value['overlays']=[];value['target']={'width':width,'height':height}
+            result=media.run(value)
+            self.assertEqual((result['metadata']['width'],result['metadata']['height']),(width,height))
+        value=self.request();value['overlays']=[];value['target']={'width':1000,'height':1250}
+        with self.assertRaisesRegex(media.Invalid,'VIDEO_TARGET_INVALID'):media.run(value)
+
+    def shot(self, name, color, seconds=3, size='720x1280', fps='24'):
+        path=self.root/name
+        media.command('ffmpeg',['-v','error','-nostdin','-f','lavfi','-i',f'color={color}:size={size}:rate={fps}:duration={seconds}','-c:v','libx264','-threads','2','-preset','ultrafast','-pix_fmt','yuv420p',str(path)],timeout=30)
+        data=path.read_bytes()
+        return {'input_base64':base64.b64encode(data).decode(),'input_sha256':hashlib.sha256(data).hexdigest(),'duration_seconds':seconds}
+
+    def reel(self, **change):
+        value={'version':2,'mode':'reel','clips':[self.shot('r.mp4','red'),self.shot('g.mp4','green'),self.shot('b.mp4','blue')],
+               'target':{'width':1080,'height':1920},
+               'captions':[{'text':'Fresh bread every morning','start_ms':0,'end_ms':3000},{'text':'Baked in small batches','start_ms':3000,'end_ms':6000}],
+               'overlays':[{'text':'Groomday','start_ms':0,'end_ms':2000,'position':'top','foreground':'#ffffff','background':'#000000'}],
+               'end_card':{'headline':'Groomday Bakery','cta':'Order today','foreground':'#ffffff','background':'#203040','duration_ms':2000},
+               'style':{'font':'sans','caption_scale':100,'caption_foreground':'#ffffff','caption_background':'#000000','caption_opacity':70},
+               'audio':{'bed':'silence'},'samples':[1500,4500,10000]}
+        value.update(change)
+        return value
+
+    def pixel(self, clip, at, x, y):
+        raw=self.root/'pixel.rgb'
+        media.command('ffmpeg',['-y','-v','error','-ss',str(at),'-i',str(clip),'-frames:v','1','-vf',f'crop=8:8:{x}:{y}','-pix_fmt','rgb24','-f','rawvideo',str(raw)])
+        data=raw.read_bytes();return tuple(data[i] for i in range(3))
+
+    def test_reel_joins_shots_with_cuts_captions_end_card_and_silent_bed(self):
+        result=media.run_reel(self.reel())
+        self.assertEqual(result['metadata'],{'width':1080,'height':1920,'duration_ms':11000,'audio':True,'codec':'h264'})
+        self.assertAlmostEqual(result['fps'],24,places=2)
+        clip=self.root/'reel.mp4';clip.write_bytes(base64.b64decode(result['video']['base64']))
+        video,fps,_=self.stream(clip)
+        self.assertAlmostEqual(fps,24,places=2)
+        for at,channel in [(1.5,0),(4.5,1),(7.5,2)]:
+            rgb=self.pixel(clip,at,536,600)
+            self.assertGreater(rgb[channel],100,(at,rgb));self.assertTrue(all(rgb[c]<90 for c in range(3) if c!=channel),(at,rgb))
+        card=self.pixel(clip,10,40,600)
+        self.assertTrue(all(abs(a-b)<24 for a,b in zip(card,(0x20,0x30,0x40))),card)
+        # Captions are drawn in the lower third only while their beat is on screen.
+        def bright(at):
+            raw=self.root/'band.rgb'
+            media.command('ffmpeg',['-y','-v','error','-ss',str(at),'-i',str(clip),'-frames:v','1','-vf','crop=1080:200:0:1282','-pix_fmt','rgb24','-f','rawvideo',str(raw)])
+            data=raw.read_bytes();return sum(1 for i in range(0,len(data),3) if data[i]>200 and data[i+1]>200 and data[i+2]>200)
+        self.assertGreater(bright(1.0),500);self.assertGreater(bright(4.0),500);self.assertEqual(bright(7.5),0)
+        self.assertEqual([s['at_ms'] for s in result['samples']],[1500,4500,10000])
+        for sample in result['samples']:
+            data=base64.b64decode(sample['base64']);self.assertTrue(data.startswith(b'\x89PNG'));self.assertEqual(hashlib.sha256(data).hexdigest(),sample['sha256'])
+        larger=media.run_reel(self.reel(style={'font':'serif','caption_scale':130,'caption_foreground':'#ffffff','caption_background':'#000000','caption_opacity':100}))
+        self.assertNotEqual(larger['video']['sha256'],result['video']['sha256'])
+
+    def test_reel_keeps_quality_of_each_shot(self):
+        path=self.root/'detail-shot.mp4'
+        media.command('ffmpeg',['-v','error','-nostdin','-f','lavfi','-i','testsrc2=size=1080x1920:rate=30:duration=3','-c:v','libx264','-threads','2','-preset','veryfast','-crf','12','-pix_fmt','yuv420p',str(path)],timeout=90)
+        data=path.read_bytes();clip={'input_base64':base64.b64encode(data).decode(),'input_sha256':hashlib.sha256(data).hexdigest(),'duration_seconds':3}
+        result=media.run_reel(self.reel(clips=[clip],captions=[],overlays=[],end_card=None,samples=[]))
+        out=self.root/'detail-reel.mp4';out.write_bytes(base64.b64decode(result['video']['base64']))
+        video,fps,bitrate=self.stream(out)
+        self.assertEqual((video['width'],video['height']),(1080,1920));self.assertAlmostEqual(fps,30,places=2)
+        average,worst=self.ssim(out,path)
+        self.assertGreater(average,0.97);self.assertGreater(worst,0.95)
+
+    def test_reel_fields_are_bounded(self):
+        for change,code in [({'audio':{'bed':'https://music.invalid/a.mp3'}},'AUDIO'),({'captions':[{'text':'a','start_ms':0,'end_ms':500}]},'CAPTION'),
+                            ({'captions':[{'text':'x','start_ms':0,'end_ms':2000},{'text':'y','start_ms':1000,'end_ms':3000}]},'CAPTION'),
+                            ({'style':{'font':'/etc/passwd','caption_scale':100,'caption_foreground':'#ffffff','caption_background':'#000000','caption_opacity':70}},'STYLE'),
+                            ({'end_card':{'headline':'x','cta':'','foreground':'#fff','background':'#000000','duration_ms':2000}},'END_CARD'),
+                            ({'target':{'width':720,'height':1280}},'TARGET'),({'clips':[]},'REEL'),({'samples':[99999]},'REEL')]:
+            with self.subTest(change=change),self.assertRaisesRegex(media.Invalid,'VIDEO_'+code):
+                media.run_reel(self.reel(**change))
+
     def test_decoder_timeout_fails_closed(self):
         with self.assertRaisesRegex(media.Invalid,'VIDEO_MEDIA_TIMEOUT'):
             media.command('ffmpeg',['-f','lavfi','-i','testsrc2=size=320x180:rate=30:duration=100','-f','null','-'],timeout=0.001)

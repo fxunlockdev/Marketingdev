@@ -30,3 +30,19 @@ test('explicit reel framing returns a real vertical clip and matching poster',as
  assert.ok(Math.abs(meta.width/meta.height-9/16)<0.01);
  await assert.rejects(new VideoRenderer(image).render(source,3,[],{width:99999,height:1920}),/VIDEO_TARGET_INVALID/);
 });
+
+test('portrait 4:5 targets render at 1024x1280 and the 1080x1350 export size',async()=>{
+ for(const target of [{width:1024,height:1280},{width:1080,height:1350}]){const r=await new VideoRenderer(image).render(source,3,[],target);assert.equal(r.metadata.width,target.width);assert.equal(r.metadata.height,target.height);}
+});
+test('reel joins shot clips at the output size with captions, end card, silent bed and sampled frames',async()=>{
+ const request={clips:[{bytes:source,duration_seconds:3},{bytes:source,duration_seconds:3}],target:{width:1080,height:1350},
+  captions:[{text:'Made fresh each morning',start_ms:0,end_ms:3000},{text:'Order for pickup',start_ms:3000,end_ms:6000}],overlays:[],
+  end_card:{headline:'Fixture Bakery',cta:'Order today',foreground:'#ffffff',background:'#202020',duration_ms:2000},
+  style:{font:'sans',caption_scale:100,caption_foreground:'#ffffff',caption_background:'#000000',caption_opacity:70},samples:[1000,4000,7000]};
+ const r=await new VideoRenderer(image).renderReel(request);
+ assert.equal(r.metadata.width,1080);assert.equal(r.metadata.height,1350);assert.equal(r.metadata.duration_ms,8000);assert.equal(r.metadata.audio,true);assert.equal(r.metadata.fps,24);
+ assert.equal(r.manifest.video_sha256,digest(r.video));assert.deepEqual(r.manifest.inputs,[digest(source),digest(source)]);assert.deepEqual(r.manifest.audio,{bed:'silence',voiceover:null});
+ assert.deepEqual(r.frames.map(f=>f.at_ms),[1000,4000,7000]);for(const f of r.frames)assert.equal(digest(f.bytes),f.sha256);
+ await assert.rejects(new VideoRenderer(image).renderReel({...request,captions:[{text:'x',start_ms:0,end_ms:7500}]}),/VIDEO_CAPTION_INVALID/);
+ await assert.rejects(new VideoRenderer(image).renderReel({...request,target:{width:720,height:1280}}),/VIDEO_REEL_INVALID/);
+});
