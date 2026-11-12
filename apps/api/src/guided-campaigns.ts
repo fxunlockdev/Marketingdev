@@ -1,5 +1,5 @@
 import {GuidedVideos} from './guided-videos.js';
-import {uploadedVideoProofSQL} from './video-references.js';
+import {currentGeneratedFrame,generatedVideoProofSQL,uploadedVideoProofSQL} from './video-references.js';
 import {directionArtwork} from './business-research-direction.js';
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
@@ -85,9 +85,7 @@ export class GuidedCampaigns {
     if(videoReferences.some(item=>item.id===slotId))throw new BadRequestException('Choose each video once');
     const slot=(await db.query("SELECT id,revision FROM app.content_slots WHERE plan_id=$1 AND id=$2 AND format='video'",[row.output_plan_id,slotId])).rows[0];
     if(!slot)throw new BadRequestException('Choose a video from this calendar');
-    const ref=object(selected.reference,['brand_reference_id','source_sha256','confirmed']);
-    const proof=(await db.query(uploadedVideoProofSQL,[uuid(String(ref.brand_reference_id))])).rows[0];
-    if(ref.confirmed!==true||!proof||proof.revoked_at||proof.crop||proof.width<64||proof.height<64||proof.sha256!==ref.source_sha256)throw new ConflictException('Choose a current approved, uncropped starting image for your video');
+    const ref=await this.startingFrame(db,b,brand,selected.reference);
     if(!(await db.query('SELECT app.creative_reviewer($1,$2) AS allowed',[b.organization_id,brand])).rows[0].allowed)throw new ConflictException('A business owner or admin must approve video generation');
     videoReferences.push({...slot,reference:ref});
    }
@@ -97,6 +95,24 @@ export class GuidedCampaigns {
    if(!row.plan_approved_at)await recordSignal(db,{organizationId:b.organization_id,brandId:brand,actorId:user},{kind:'approved',subject_kind:'plan',subject_id:id});
    return {id};
   });
+ }
+ /** A video's starting image: an approved uploaded photo, or a frame the image engine made ("Create a starting
+  * frame") whose exact approved export is current. Either is refused unless confirmed, owned by this business and
+  * still approved; the video request rechecks the same proof before anything is sent to the provider. */
+ private async startingFrame(db:any,b:{organization_id:string},brand:string,raw:unknown):Promise<Record<string,unknown>>{
+  const refuse=()=>new ConflictException('Choose a current approved, uncropped starting image for your video');
+  if(raw&&typeof raw==='object'&&'export_id' in raw){
+   const ref=object(raw,['export_id','approval_id','source_sha256','export_sha256','confirmed']);
+   const image=this.videos?.videos.references.image;
+   if(ref.confirmed!==true||!image||![ref.source_sha256,ref.export_sha256].every(s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s)))throw refuse();
+   const proof=(await db.query(generatedVideoProofSQL,[uuid(String(ref.export_id)),uuid(String(ref.approval_id))])).rows[0];
+   if(!proof||proof.organization_id!==b.organization_id||proof.brand_id!==brand||!currentGeneratedFrame(proof,image)||proof.sha256!==ref.export_sha256||proof.source_sha256!==ref.source_sha256)throw refuse();
+   return ref;
+  }
+  const ref=object(raw,['brand_reference_id','source_sha256','confirmed']);
+  const proof=(await db.query(uploadedVideoProofSQL,[uuid(String(ref.brand_reference_id))])).rows[0];
+  if(ref.confirmed!==true||!proof||proof.revoked_at||proof.crop||proof.width<64||proof.height<64||proof.organization_id!==b.organization_id||proof.brand_id!==brand||proof.sha256!==ref.source_sha256)throw refuse();
+  return ref;
  }
  async runOnce(){
   if(this.running)return;this.running=true;

@@ -4,9 +4,15 @@ import {keyframeRequest,keyframeAspect,keyframeReference} from '../../dist/reel-
 import {normalizeCreativeSpec,creativeDimensions} from '../../dist/campaign-formats.js';
 test('a starting frame is an image-engine request at the video aspect, with no lettering',()=>{
  const vertical=keyframeRequest({prompt:'Baker lifts a tray of bread',channel:'instagram',aspect:'vertical'});
- assert.equal(vertical.size,'1024x1536');assert.equal(vertical.creative_spec,undefined,'Exportable 2:3 frame, not a story image the export cannot render');
+ assert.equal(vertical.size,'1024x1536');assert.deepEqual(vertical.creative_spec,{placement:'story',aspect:'vertical',slide_count:null});
+ assert.deepEqual(creativeDimensions(normalizeCreativeSpec(vertical.creative_spec,'static','instagram')),{width:1080,height:1920},'A 9:16 video starts from a true 9:16 frame');
+ const portrait=keyframeRequest({prompt:'x',channel:'facebook',aspect:'portrait'});
+ assert.deepEqual(creativeDimensions(normalizeCreativeSpec(portrait.creative_spec,'static','facebook')),{width:1024,height:1280},'A 4:5 video starts from a true 4:5 frame');
+ const linkedinPortrait=keyframeRequest({prompt:'x',channel:'linkedin',aspect:'portrait'});
+ assert.deepEqual(creativeDimensions(normalizeCreativeSpec(linkedinPortrait.creative_spec,'static','linkedin')),{width:1024,height:1280});
+ const linkedinVertical=keyframeRequest({prompt:'x',channel:'linkedin',aspect:'vertical'});
+ assert.equal(linkedinVertical.size,'1024x1536');assert.equal(linkedinVertical.creative_spec,undefined,'LinkedIn has no story placement; its tall frame stays 2:3');
  assert.match(vertical.prompt,/no words, letters, numbers or captions/);assert.match(vertical.prompt,/Video brief: Baker lifts a tray of bread$/);
- assert.equal(keyframeRequest({prompt:'x',channel:'linkedin',aspect:'portrait'}).size,'1024x1536');
  const landscape=keyframeRequest({prompt:'x',channel:'linkedin',aspect:'landscape'});assert.deepEqual(creativeDimensions(normalizeCreativeSpec(landscape.creative_spec,'static','linkedin')),{width:1536,height:1024});
  assert.equal(keyframeRequest({prompt:'x',channel:'instagram',aspect:'square'}).size,'1024x1024');
  assert.throws(()=>keyframeRequest({prompt:'  ',channel:'instagram',aspect:'square'}),/Describe/);

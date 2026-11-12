@@ -666,7 +666,7 @@ test('uploaded product photo video consent is scoped, hash-bound, replay-safe an
  await assert.rejects(refs.bind(alice.id,brand.id,videoJob,{...input,source_sha256:'0'.repeat(64)}));
  await refs.bind(alice.id,brand.id,videoJob,input);await refs.bind(alice.id,brand.id,videoJob,input);
  const proof=await refs.verify(scope({id:videoJob}));assert.equal(proof.brand_reference_id,approved.id);assert.equal(proof.sha256,upload.sha256);
- const lease=await refs.prepare(scope({id:videoJob}));assert.equal(digest(Buffer.from(await(await fetch(lease.url)).arrayBuffer())),upload.sha256);
+ const lease=await refs.prepare(scope({id:videoJob}));const served=await fetch(lease.url);assert.equal(served.headers.get('content-type'),'image/jpeg','A JPEG product photo is labelled as JPEG for the video provider');assert.match(served.headers.get('content-disposition'),/desvio-reference\.jpg/);assert.equal(digest(Buffer.from(await served.arrayBuffer())),upload.sha256);
  await canvas.revokeReference(alice.id,brand.id,approved.id);
  await assert.rejects(refs.verify(scope({id:videoJob})),/REFERENCE_APPROVAL_CHANGED/);
  await assert.rejects(refs.prepare(scope({id:videoJob})),/REFERENCE_APPROVAL_CHANGED/);
@@ -727,4 +727,27 @@ test('monthly video allowance counts five items, prevents a sixth, and releases 
  assert.equal((await quota()).items.video.remaining,1);
  await service.submit(alice.id,brand.id,thread,body,randomUUID());
  assert.equal((await quota()).items.video.used,5);
+});
+
+test('stories and 4:5 posts export at their true size, as a PNG and as the Instagram rendition',async()=>{
+ for(const [width,height,instagramHeight] of [[1080,1920,1920],[1024,1280,1350]]){
+  const source=await sharp({create:{width,height,channels:3,background:'#d9c7aa'}}).png().toBuffer();
+  const thread=await canvas.createThread(alice.id,brand.id,{title:'TEST FIXTURE true size'},randomUUID()),p=randomUUID(),job=randomUUID(),media=randomUUID(),id=randomUUID();
+  const key=`creative/${org.id}/${brand.id}/${job}/${digest(source)}`;await store.persist(key,source,'image/png',digest(source));
+  const design={schema_version:1,width,height,background_media_id:media,layers:[{id:'headline',type:'text',text:'TEST FIXTURE: true size',x:80,y:120,width:800,fontSize:56,fontFamily:'Arial',fill:'#112233',align:'left'}]};
+  const caption='TEST FIXTURE: true-size export',sha=hash(canonicalJSON({design,caption,brain_id:brainId}));
+  await admin.query('INSERT INTO app.creative_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[p,org.id,brand.id,thread.id,'TEST FIXTURE',alice.id]);
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'creative.generate','succeeded')",[job,org.id,brand.id,alice.id]);
+  await admin.query('INSERT INTO app.creative_media(id,organization_id,brand_id,job_id,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[media,org.id,brand.id,job,key,digest(source),source.length,width,height]);
+  await admin.query('INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,brain_id,job_id,media_id,design,caption,skill_manifest,sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[id,org.id,brand.id,p,brainId,job,media,JSON.stringify(design),caption,'{}',sha,alice.id]);
+  await admin.query('UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1',[p,id]);
+  const saved=await render({id,sha256:sha});
+  assert.deepEqual([saved.width,saved.height],[width,height],`A ${width}x${height} design exports at exactly that size`);
+  const jpeg=await exports.submit(alice.id,brand.id,id,{source_sha256:sha,format:'instagram-jpeg'},randomUUID());
+  assert.equal(await handler.run(scope(jpeg)),'succeeded');
+  const rendition=(await exports.list(alice.id,brand.id,id)).exports.find(e=>e.format==='instagram-jpeg');
+  assert.deepEqual([rendition.width,rendition.height],[1080,instagramHeight]);
+ }
+ const anyExport=(await admin.query("SELECT * FROM app.creative_exports WHERE format='png' LIMIT 1")).rows[0];
+ for(const [width,height] of [[1080,1536],[1920,1080]])await assert.rejects(admin.query('UPDATE app.creative_exports SET width=$2,height=$3 WHERE id=$1',[anyExport.id,width,height]),/check/i,'Other sizes stay refused');
 });
