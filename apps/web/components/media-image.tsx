@@ -118,7 +118,8 @@ export const PostCover=memo(function PostCover({businessId,post,priority=false,s
  const source=found?.kind==='poster'?null:found;
  const media=useMediaImage({businessId,source,intrinsicWidth:design?.width,fallback:coverFallback(root,found,post),resetKey:found?`${found.kind}:${found.id}`:''});
  const layered=found?.kind==='creative'&&!!design;
- const host=useRef<HTMLSpanElement>(null),[variant,setVariant]=useState<PreviewWidth|null>(priority||!layered?640:null);
+ // A layered cover waits for its measured width, so a priority card asks for one preview size, not 640 then 320.
+ const host=useRef<HTMLSpanElement>(null),[variant,setVariant]=useState<PreviewWidth|null>(layered?null:640);
  useEffect(()=>{
   if(!layered||!host.current)return;
   const node=host.current,choose=()=>setVariant(pickPreviewWidth(node.clientWidth,window.devicePixelRatio));
