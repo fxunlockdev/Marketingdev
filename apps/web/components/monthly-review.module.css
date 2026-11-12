@@ -1,0 +1,19 @@
+.review{display:grid;gap:24px}
+.monthBar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.monthBar h2{margin:0;min-width:10ch}
+.columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+.list{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.item{display:grid;gap:4px;padding:12px;border-radius:var(--radius-inner);background:var(--color-background-muted)}
+.item p{margin:0}
+.worked{border-left:4px solid var(--status-positive)}
+.didnt{border-left:4px solid var(--status-danger)}
+.meta{color:var(--color-text-secondary);font-size:.85rem}
+.table{width:100%;border-collapse:collapse;font-size:.875rem}
+.table th,.table td{text-align:left;padding:8px;border-bottom:1px solid var(--color-border);vertical-align:top}
+.caption{max-width:40ch;overflow-wrap:anywhere}
+.choice{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:start;padding:12px;border:1px solid var(--color-border);border-radius:var(--radius-inner)}
+.choice input{margin-top:4px;width:20px;height:20px}
+.choice:has(input:checked){border-color:var(--color-border-emphasized);background:var(--color-accent-muted)}
+.actions{display:flex;gap:12px;flex-wrap:wrap;align-items:center}
+.accepted{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+@media (max-width:640px){.table thead{display:none}.table tr{display:grid;padding:8px 0;border-bottom:1px solid var(--color-border)}.table td{border:0;padding:2px 0}}

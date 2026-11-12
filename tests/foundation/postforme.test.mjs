@@ -33,7 +33,7 @@ test('learning loop: scheduled collection snapshots published posts idempotently
   await assert.rejects(dispatch.query(syncSnapshotSQL,[pub.id,foreignOrg,foreign.id,account.id,'24h','missing','{}',null,now.toISOString()]),e=>['42501','23503'].includes(e.code));
   await assert.rejects(dispatch.query('SELECT proof FROM app.postforme_publications'),e=>e.code==='42501');
   await assert.rejects(dispatch.query('SELECT username FROM app.postforme_accounts'),e=>e.code==='42501');
-  assert.equal((await dispatch.query("SELECT count(*)::int n FROM app.postforme_publications WHERE observed_state<>'published'")).rows[0].n,0);
+  assert.equal((await dispatch.query("SELECT count(*)::int n FROM app.postforme_publications WHERE phase NOT IN ('accepted','unknown')")).rows[0].n,0);
   await assert.rejects(database.transaction(alice,org.id,true,db=>db.query(syncSnapshotSQL,[pub.id,org.id,brand.id,account.id,'24h','missing','{}',null,now.toISOString()]),brand.id),e=>e.code==='42501');
   const seen=await database.transaction(alice,org.id,false,db=>readPostformeObservations(db),brand.id);
   assert.equal(seen.published,1);assert.equal(seen.observations.length,1);const [o]=seen.observations;
@@ -62,6 +62,41 @@ test('learning loop: customer signals are append-only, actor-bound and private t
  await assert.rejects(database.transaction(bob,foreignOrg,true,db=>recordSignal(db,{organizationId:org.id,brandId:brand.id,actorId:bob},{kind:'approved',slot_id:slot}),foreign.id));
  for(const sql of ["UPDATE app.creative_signals SET reason='rewritten'",'DELETE FROM app.creative_signals'])await assert.rejects(database.transaction(alice,org.id,true,db=>db.query(sql),brand.id),e=>e.code==='42501');
  assert.equal((await admin.query('SELECT count(*)::int n FROM app.creative_signals WHERE brand_id=$1',[brand.id])).rows[0].n,3);
+});
+
+test('monthly review: owners accept recommendations for next month, planners receive them, members and other businesses cannot',async()=>{
+ const {LearningReviews}=await import('../../dist/learning-review-api.js'),{planningLearning,learningSections}=await import('../../dist/learning-context.js');
+ const reviews=new LearningReviews(businesses);
+ const pub=(await admin.query("SELECT id,slot_id,scheduled_at FROM app.postforme_publications WHERE brand_id=$1 AND observed_state='published'",[brand.id])).rows[0];
+ const month=pub.scheduled_at.toISOString().slice(0,7),review=await reviews.review(alice,brand.id,month);
+ assert.ok(review.published.some(p=>p.publication_id===pub.id));assert.ok(review.proposed_changes.length>=3);assert.equal(review.can_accept,true);assert.deepEqual(review.accepted,[]);
+ assert.ok(review.proposed_changes.every(c=>c.label&&Number.isInteger(c.sample_size)),'every recommendation carries its sample size and label');
+ assert.equal((await reviews.review(viewer,brand.id,month)).can_accept,false);
+ await assert.rejects(reviews.accept(viewer,brand.id,{month,changes:[0],confirmed:true}),e=>e.getStatus?.()===403);
+ await assert.rejects(reviews.accept(alice,brand.id,{month,changes:[99],confirmed:true}),e=>e.getStatus?.()===400);
+ await assert.rejects(reviews.accept(alice,brand.id,{month,changes:[0]}),e=>e.getStatus?.()===400);
+ await assert.rejects(reviews.accept(bob,brand.id,{month,changes:[0],confirmed:true}));
+ const after=await reviews.accept(alice,brand.id,{month,changes:[0,1],confirmed:true});
+ const chosen=[review.proposed_changes[0].text,review.proposed_changes[1].text].sort();
+ assert.deepEqual(after.accepted.map(a=>a.text).sort(),chosen);
+ assert.equal((await reviews.accept(alice,brand.id,{month,changes:[0],confirmed:true})).accepted.length,2,'accepting the same recommendation again is a no-op');
+ const context=await database.transaction(alice,org.id,false,db=>planningLearning(db),brand.id);
+ assert.deepEqual(learningSections(context).accepted.map(a=>a.text).sort(),chosen,'the next planning request carries what the owner accepted');
+ await assert.rejects(database.transaction(alice,org.id,true,db=>db.query("UPDATE app.learning_accepted_changes SET text='rewritten'"),brand.id),e=>e.code==='42501');
+ await assert.rejects(reviews.withdraw(viewer,brand.id,after.accepted[0].id),e=>e.getStatus?.()===403);
+ await reviews.withdraw(alice,brand.id,after.accepted[0].id);
+ assert.equal(learningSections(await database.transaction(alice,org.id,false,db=>planningLearning(db),brand.id)).accepted.length,1);
+ const again=await reviews.accept(alice,brand.id,{month,changes:[review.proposed_changes.findIndex(c=>c.text===after.accepted[0].text)],confirmed:true});
+ assert.equal(again.accepted.length,2,'a withdrawn recommendation can be accepted again');
+ const foreignOrg=(await admin.query('SELECT organization_id FROM app.brands WHERE id=$1',[foreign.id])).rows[0].organization_id;
+ assert.deepEqual(learningSections(await database.transaction(bob,foreignOrg,false,db=>planningLearning(db),foreign.id)).accepted,[]);
+ const trends=await reviews.trends(alice,brand.id);
+ assert.ok(trends.published>=1&&trends.measured>=1);assert.ok(trends.groups.some(g=>g.dimension==='format'&&g.value==='static'&&g.measured>=1));assert.match(trends.label,/^unproven/);assert.ok(trends.as_of);
+ const drawer=await service.slot(viewer,brand.id,pub.slot_id);
+ assert.equal(drawer.publications[0].id,pub.id);assert.deepEqual(drawer.metrics.metrics,{likes:7,views:120});assert.equal(drawer.metrics.semantics,'lifetime');assert.ok(drawer.metrics.as_of);
+ const unpublished=(await admin.query("SELECT slot_id FROM app.postforme_publications WHERE brand_id=$1 AND observed_state<>'published' LIMIT 1",[brand.id])).rows[0];
+ if(unpublished)assert.equal((await service.slot(alice,brand.id,unpublished.slot_id)).metrics,null,'no reading means no metrics, never zeros');
+ await assert.rejects(service.slot(bob,brand.id,pub.slot_id));
 });
 
 test('disabled platforms cannot initiate OAuth and existing records remain accessible',async()=>{
@@ -151,6 +186,11 @@ test('Home counts are scoped to one business and agree with the upcoming list be
  const listed=after.upcoming_posts.map(p=>p.id);
  assert.ok(!listed.includes(slots[0]),'a published post is counted as published, not listed as upcoming');
  assert.ok(listed.includes(slots[1])&&listed.includes(slots[2]));
+ // A failed post needs attention until it is retried; the retry itself is then what is tracked.
+ const failed=randomUUID();await admin.query("INSERT INTO app.postforme_publications(id,organization_id,brand_id,account_id,slot_id,revision,request_key,request_hash,proof,caption,scheduled_at,phase,observed_state,failure_reason) VALUES($1,$2,$3,$4,$5,1,$6,$7,'{}','Home fixture',now()-interval '1 hour','accepted','failed','Rejected by the network')",[failed,org.id,home.id,account.id,slots[2],randomUUID(),'f'.repeat(64)]);
+ assert.equal((await overview.read(alice,home.id)).counts.publication_attention-before.publication_attention,1);
+ await admin.query("INSERT INTO app.postforme_publications(id,organization_id,brand_id,account_id,slot_id,revision,request_key,request_hash,proof,caption,scheduled_at,phase,retry_of) VALUES($1,$2,$3,$4,$5,1,$6,$7,'{}','Home fixture',now()+interval '1 day','accepted',$8)",[randomUUID(),org.id,home.id,account.id,slots[2],randomUUID(),'r'.repeat(64),failed]);
+ assert.equal((await overview.read(alice,home.id)).counts.publication_attention,before.publication_attention,'a retried failure no longer needs attention');
  const siblingView=await overview.read(alice,sibling.id);
  assert.equal(siblingView.counts.active_jobs,1);assert.equal(siblingView.upcoming_posts.length,1);assert.equal(siblingView.counts.published_posts,0);
 });

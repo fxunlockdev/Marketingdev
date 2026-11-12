@@ -27,7 +27,9 @@ test('mock mode never forwards keys from the operator shell, and live mode forwa
  assert.equal(mock.OPENAI_API_KEY,'local-mock-openai-key');
  assert.equal(mock.OPENAI_BASE_URL,`http://127.0.0.1:${DEFAULT_PORTS.mock}/v1`);
  assert.ok(!JSON.stringify(mock).includes('sk-live-fixture'));
- assert.deepEqual(providerEnvironment({mode:'mock',ports:DEFAULT_PORTS,liveKeys},'api'),{});
+ const mockPostforme={POSTFORME_ENABLED:'true',POSTFORME_API_KEY:'local-mock-postforme-key',POSTFORME_BASE_URL:`http://127.0.0.1:${DEFAULT_PORTS.mock+1}`};
+ assert.deepEqual(providerEnvironment({mode:'mock',ports:DEFAULT_PORTS,liveKeys},'api'),{...mockPostforme,POSTFORME_PUBLISHING_ENABLED:'true'},'the API reaches only the loopback Post for Me mock with a placeholder key');
+ assert.equal(mock.POSTFORME_BASE_URL,mockPostforme.POSTFORME_BASE_URL);assert.ok(!JSON.stringify(mock).includes('"p"'));
  const worker=providerEnvironment({mode:'live',ports:DEFAULT_PORTS,liveKeys},'worker');
  assert.equal(worker.OPENAI_API_KEY,'sk-live-fixture');assert.equal(worker.OPENAI_BASE_URL,undefined);assert.equal(worker.UNRELATED,undefined);
  const api=providerEnvironment({mode:'live',ports:DEFAULT_PORTS,liveKeys},'api');

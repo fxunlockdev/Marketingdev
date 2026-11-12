@@ -39,7 +39,7 @@ test('saved v1 contexts stay valid and v2 entries are strictly shaped and bounde
  for(const bad of [[hypothesis(1),hypothesis(1)],[{...hypothesis(1),extra:1}],[{...preference,count:6}],[{...preference,statement:''}],[{...preference,note:'x'}],[{...pattern,label:'proven'}],[{...pattern,dimension:'mood'}],[{...pattern,sample_size:1}],[{kind:'other'}],[null],'x',
   Array.from({length:11},(_,i)=>hypothesis(i)),Array.from({length:LEARNING_LIMITS.preferences+1},()=>preference),Array.from({length:LEARNING_LIMITS.patterns+1},()=>pattern)])
   assert.equal(validLearning(bad),false,JSON.stringify(bad).slice(0,80));
- assert.deepEqual(Object.values(learningSections([hypothesis(1),preference,pattern])).map(s=>s.length),[1,1,1]);
+ assert.deepEqual(Object.values(learningSections([hypothesis(1),preference,pattern])).map(s=>s.length),[1,1,1,0]);
 });
 const lesson=n=>({id:uuid(n),revision:2,content:{hypothesis:'Unproven: carousels may help.',next_test:'Compare formats.'},applicability:'Instagram only'});
 const lessonDb=rows=>({query:async(sql,params)=>({rows:sql.includes('ANY($1')?rows.filter(r=>params[0].includes(r.id)):rows})});
@@ -67,4 +67,20 @@ test('planners receive hypotheses, the preference summary and labelled patterns,
  const refreshed=await refreshLearning(lessonDb([lesson(1),lesson(2)]),[hypothesis(1),...preferences,...patterns]);
  assert.equal(learningSections(refreshed).hypotheses.length,2);assert.deepEqual(learningSections(refreshed).patterns,patterns);
  await assert.rejects(refreshLearning(lessonDb([]),[{kind:'x'}]),e=>e.code==='MEMORY_CONTEXT_INVALID');
+});
+
+const accepted=(n,over={})=>({kind:'accepted_change',id:uuid(n),month:'2026-10',action:'do_more',text:'Plan more posts with format "carousel" and test it against the current mix.',basis:'2 above and 0 below this business\'s own median likes, of 2 compared posts',sample_size:2,label:UNPROVEN_SMALL,...over});
+test('changes the owner accepted from a monthly review are a strictly shaped learning entry',()=>{
+ assert.ok(validLearning([hypothesis(1),accepted(1),preference,pattern]));
+ for(const bad of [[accepted(1),accepted(1)],[accepted(1,{action:'invent'})],[accepted(1,{month:'2026-13'})],[accepted(1,{text:''})],[accepted(1,{extra:1})],[accepted(1,{sample_size:-1})],Array.from({length:LEARNING_LIMITS.accepted+1},(_,i)=>accepted(i+1))])
+  assert.equal(validLearning(bad),false,JSON.stringify(bad).slice(0,80));
+ assert.deepEqual(learningSections([accepted(1)]).accepted,[accepted(1)]);
+});
+test('planners receive accepted review changes first, and a worker re-reading a saved request keeps them',async()=>{
+ const rows=[{id:uuid(5),month:'2026-10',action:'do_less',text:'Plan fewer posts with pillar "Offers", or change one element and compare.',basis:'0 above and 2 below',sample_size:2,label:UNPROVEN_SMALL}];
+ const db={query:async sql=>({rows:sql.includes('learning_accepted_changes')?rows:[]})};
+ const context=await planningLearning(db,new Date('2026-11-12T12:00:00.000Z'));
+ assert.ok(validLearning(context));assert.deepEqual(learningSections(context).accepted,[{kind:'accepted_change',...rows[0]}]);
+ const refreshed=await refreshLearning(lessonDb([]),context);assert.deepEqual(learningSections(refreshed).accepted,learningSections(context).accepted);
+ await assertLearningCurrent({query:async()=>{throw new Error('no query needed');}},context);
 });

@@ -19,7 +19,7 @@ export class BusinessOverview {
    (SELECT count(*)::int FROM app.publication_requests WHERE organization_id=$1 AND brand_id=$2 AND phase='unknown')
     +(SELECT count(*)::int FROM app.postforme_publications WHERE organization_id=$1 AND brand_id=$2 AND phase='unknown') AS uncertain_publications,
    (SELECT count(*)::int FROM app.publication_requests WHERE organization_id=$1 AND brand_id=$2 AND phase='accepted' AND (observed_state IN ('missing','unknown','failed') OR check_error IS NOT NULL))
-    +(SELECT count(*)::int FROM app.postforme_publications WHERE organization_id=$1 AND brand_id=$2 AND phase='accepted' AND observed_state='failed') AS publication_attention,
+    +(SELECT count(*)::int FROM app.postforme_publications f WHERE organization_id=$1 AND brand_id=$2 AND phase='accepted' AND observed_state='failed' AND NOT EXISTS(SELECT 1 FROM app.postforme_publications r WHERE r.retry_of=f.id)) AS publication_attention,
    (SELECT count(*)::int FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND status IN ('failed','rejected') AND updated_at>now()-interval '7 days') AS failed_jobs_last_week`,scope)).rows[0];
   const activity=(await db.query('SELECT id,kind,status,updated_at FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 ORDER BY updated_at DESC,id LIMIT 8',scope)).rows;
   const results=(await db.query(`SELECT r.job_id AS publication_id,left(r.caption,200) AS caption,c.provider,c.name AS account_name,r.scheduled_at,

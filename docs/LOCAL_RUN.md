@@ -85,6 +85,7 @@ shell are not passed to any process in mock mode.
 | Skills-sandbox planner: creative brief, carousel plan, strategy, monthly plan with storylines, chat | Generated from the request's strict JSON schema, varied per slide and per post; the plan follows the requested content mix |
 | Image check (vision QA) | Pass, reporting exactly the expected lettering |
 | Images generate / edit | Real PNGs at the requested size: brand colours from the prompt, the headline and a "Local mock image" label |
+| Post for Me (connect, publish, status, results) | `scripts/local-stack/mock-postforme.mjs` on `127.0.0.1:54011`: a local consent page connects a deterministic mock profile; uploads, scheduled posts, reschedule/cancel, publishing at the scheduled time (a caption containing `[mock-fail]` fails with a reason) and deterministic lifetime metrics. The API and worker reach it through `POSTFORME_BASE_URL`, which the product accepts only with `APP_MODE` development/test and a loopback URL. Dev controls: `curl -X POST 127.0.0.1:54011/__mock/publish-due -d '{"all":true}'` publishes every scheduled post now; `curl -X POST 127.0.0.1:54011/__mock/age -d '{"hours":96}'` backdates published posts so results count as settled (72 h); `GET /__mock/state`. |
 
 Everything a mock answers is labelled as such on the image itself. Mock mode proves the
 wiring, the jobs, the storage, the sandboxes and the screens; it proves nothing about
@@ -95,9 +96,6 @@ model output quality.
 - **Vecteezy stock.** Previews and downloads go through `SafeWeb`, which only fetches public
   HTTPS hosts. Pointing it at a local mock would mean weakening the SSRF guard, so stock is
   off in mock mode (it is optional; generation continues without it).
-- **Post for Me (publishing, analytics).** Uploads are checked to go to a public HTTPS host
-  and connecting an account needs Post for Me's OAuth pages, so publishing and the analytics
-  sync are off in mock mode. Use live mode with a Post for Me key to try them.
 - **Runway video** and Gemini.
 - The website itself: research renders the real public site you enter (for example
   `https://example.com`), through the normal website renderer sandbox.
