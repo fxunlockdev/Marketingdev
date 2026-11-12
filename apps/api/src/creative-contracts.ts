@@ -27,6 +27,8 @@ export type CreativeInput = {
     learning?:LearningContext;
     /** Bounded knowledge-graph context pack (notice, ranked items, recent-use ledger). Untrusted data. */
     knowledge?:unknown;
+    /** The locked mood board and campaign style (image-direction.ts). Untrusted data. */
+    creative_direction?:unknown;
   };
   prompt: string;
   format: "static" | "ad";

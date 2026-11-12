@@ -21,7 +21,8 @@ import {MODEL_POLICY, recommendedGrants} from '../dist/model-policy.js';
 import {carouselSlideBrief,carouselPlanSchema} from '../dist/carousel-planning.js';
 import {stockSkipReason} from '../dist/stock-planning.js';
 import {normalizeCreativeSpec} from '../dist/campaign-formats.js';
-import {imageCallPlan} from '../dist/image-render.js';
+import {imageCallPlan, sceneReferences} from '../dist/image-render.js';
+import {isLogoLabel} from '../dist/image-logo.js';
 import {BUSINESSES, AUDIT_REQUESTS, business, carouselPlan} from '../tests/quality/fixtures/businesses.mjs';
 import {referenceSet, stockPhoto, moodboardImages} from '../tests/quality/fixtures/assets.mjs';
 
@@ -99,9 +100,6 @@ function capturingProvider(log) {
   }}));
 }
 
-/** References that count as scene content when deciding whether stock is needed (creative-jobs rule). */
-const sceneReferences = references => references.length;
-
 async function imageAudit(request, b, provider, log) {
   const brief = request.kind === 'carousel' ? carouselSlideBrief(carouselPlan(b), 0) : b.static.brief;
   const references = await referenceSet(b, request.references);
@@ -109,12 +107,13 @@ async function imageAudit(request, b, provider, log) {
   const stock = request.stock && !skip ? {photo: await stockPhoto(), use: request.stock} : null;
   const moodboard = {...b.moodboard, ...(await moodboardImages(b))};
   const placement = normalizeCreativeSpec(request.spec, request.kind === 'carousel' ? 'carousel' : 'static', b.channel);
-  const quality = recommendedGrants().creative.quality ?? 'medium';
-  const plan = await imageCallPlan({brief, facts: b.facts, learning: b.learning, prompt: b.static.prompt, references, stock, moodboard, placement, model: MODEL_POLICY.image.model, quality, parent: null, carouselPosition: request.kind === 'carousel' ? 0 : null});
+  const quality = recommendedGrants().creative.quality;
+  const own = references.find(r => isLogoLabel(r.label));
+  const plan = await imageCallPlan({brief, facts: b.facts, learning: b.learning, prompt: b.static.prompt, references, stock, moodboard: {...b.moodboard, images: [{label: 'mood board image', bytes: moodboard.image}, {label: 'mood board carousel cover', bytes: moodboard.cover}]}, placement, model: MODEL_POLICY.image.model, quality, parent: null, logo: own ? {bytes: own.bytes, source: 'attached'} : null});
   log.length = 0;
   const output = await plan.render(provider, 'a'.repeat(64));
   const sent = log.at(-1);
-  return {model: sent.fields.model, size: sent.fields.size, quality: sent.fields.quality, output_format: sent.fields.output_format, endpoint: sent.path, prompt: sent.fields.prompt, images: sent.images.map((image, i) => ({...image, role: plan.manifest[i]?.kind ?? 'unknown', label: plan.manifest[i]?.label ?? null})), stock: stock ? request.stock : (request.stock ? `skipped: ${skip}` : 'not requested'), stored: {width: output.width, height: output.height, master: output.master ?? null, logo: output.logo ?? null}, manifest: plan.manifest};
+  return {model: sent.fields.model, size: sent.fields.size, quality: sent.fields.quality, output_format: sent.fields.output_format, endpoint: sent.path, prompt: sent.fields.prompt, images: sent.images.map((image, i) => ({...image, role: plan.manifest[i]?.kind ?? 'unknown', label: plan.manifest[i]?.label ?? null})), stock: stock ? request.stock : (request.stock ? `skipped: ${skip}` : 'not requested'), stored: {width: output.width, height: output.height, master: output.master ?? null, logo: output.logo ?? null}, fallback_size: plan.fallbackSize ?? null, must_avoid: plan.mustAvoid, logo: plan.logo, manifest: plan.manifest};
 }
 
 function markdown(results) {
@@ -136,6 +135,7 @@ function markdown(results) {
       `- Endpoint \`${r.image.endpoint}\`, model \`${r.image.model}\`, size \`${r.image.size}\`, quality \`${r.image.quality}\`, output_format \`${r.image.output_format}\``,
       `- Stock: ${r.image.stock}`,
       `- Stored creative: ${r.image.stored.width}x${r.image.stored.height}${r.image.stored.master ? `; master ${r.image.stored.master.width}x${r.image.stored.master.height}` : ''}${r.image.stored.logo ? `; logo composited at ${r.image.stored.logo.placement}` : ''}`,
+      `- Fallback size if the provider refuses the master: ${r.image.fallback_size ?? 'none'}; vision check must_avoid: ${JSON.stringify(r.image.must_avoid ?? [])}`,
       `- Reference images (${r.image.images.length}):`, ...r.image.images.map((im, i) => `  ${i + 1}. ${im.role} — "${im.label}" — ${im.width}x${im.height} ${im.type}, ${im.bytes} bytes`), '',
       '<details><summary>Full image prompt</summary>', '', '```text', r.image.prompt, '```', '</details>', '');
   }
