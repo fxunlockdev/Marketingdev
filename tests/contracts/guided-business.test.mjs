@@ -144,3 +144,20 @@ test('questionnaire suggestions are read back as bounded, untrusted display data
  assert.deepEqual(result.audience,['Parents near Bandra','Remote workers','Families']);
  assert.deepEqual(result.competitors,[{name:'Third Chair',url:'https://third-chair.test/'},{name:'B',url:'https://b.test/'},{name:'C',url:'https://c.test/'}]);
 });
+test('only competitors early research did not cover are researched again',async()=>{
+ const {uncoveredCompetitors,competitorKey}=await import('../../dist/guided-campaign-contracts.js');
+ assert.equal(competitorKey(' https://www.Rival.test/ '),'rival.test');assert.equal(competitorKey('Rival One '),'rival one');
+ assert.deepEqual(uncoveredCompetitors(['Rival One','https://www.rival-two.test/','New Place'],['rival one','http://rival-two.test']),['New Place']);
+ assert.deepEqual(uncoveredCompetitors(['Rival One'],['Rival One']),[]);
+ assert.deepEqual(uncoveredCompetitors(['A','a',' ','B'],[]),['A','B']);
+ assert.deepEqual(uncoveredCompetitors(undefined,['x']),[]);
+});
+test('early research starts only for a saved website and offering',async()=>{
+ const {earlyResearchWebsite}=await import('../../dist/guided-campaign-contracts.js');
+ const details={business_name:'Cafe',website:'https://example.org/',business_type:'services',industry:'food',cta:'',differentiator:'',timing:'',competitors:[],priority_offers:'',folder_url:'',guidelines:'',references:[]};
+ assert.equal(earlyResearchWebsite({...brief,details}),'https://example.org/');
+ assert.equal(earlyResearchWebsite({...brief,offering:' ',details}),null);
+ assert.equal(earlyResearchWebsite({...brief,details:{...details,website:''}}),null);
+ assert.equal(earlyResearchWebsite(brief),null);
+ assert.equal(earlyResearchWebsite({...brief,details:{...details,website:'http://127.0.0.1/'}}),null);
+});

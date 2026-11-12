@@ -11,6 +11,8 @@ import { ObjectStore } from "./object-store.js";
 import { object, uuid } from "./workspaces.js";
 import { canonicalJSON, hash } from "./brand-brain.js";
 import { websiteURL, IntakeError } from "./safe-web.js";
+/** Competitors named after early research ran, researched inside the final analysis. */
+export type MarketFollowup={website:string;competitors:string[]};
 export class Intake {
   constructor(
     readonly businesses: Businesses,
@@ -86,7 +88,7 @@ export class Intake {
       id,
     );
   }
-  async submit(user: string, id: string, input: unknown, key: unknown, scoped?: {db:PoolClient;b:{organization_id:string;website?:string|null};researchContext:GuidedBrief}) {
+  async submit(user: string, id: string, input: unknown, key: unknown, scoped?: {db:PoolClient;b:{organization_id:string;website?:string|null};researchContext:GuidedBrief;after?:string;marketFollowup?:MarketFollowup}) {
     const b = scoped?.b ?? await this.businesses.resolve(user, id),
       v = object(input, ["kind", "autoAnalyze", "recoverJobId"]);
     if (!["website.extract", "brand.analyze"].includes(String(v.kind)))
@@ -96,6 +98,8 @@ export class Intake {
     if (v.autoAnalyze !== undefined && (typeof v.autoAnalyze !== "boolean" || v.kind !== "website.extract"))
       throw new BadRequestException("Automatic analysis is only available for website capture");
     const automatic = v.autoAnalyze === true;
+    if ((scoped?.after || scoped?.marketFollowup) && v.kind !== "brand.analyze")
+      throw new BadRequestException("Only an analysis can wait on early research");
     const recovery=v.recoverJobId===undefined?null:uuid(String(v.recoverJobId));
     if(recovery&&automatic)throw new BadRequestException("Capture recovery does not start paid AI analysis; prepare the brand after recovery");
     if(recovery&&v.kind!=="website.extract")throw new BadRequestException("Only website captures can be recovered");
@@ -111,7 +115,7 @@ export class Intake {
         );
       }
     }
-    const requestHash = hash(canonicalJSON({ kind: v.kind, url, ...(automatic ? { autoAnalyze: true } : {}),...(recovery?{recoverJobId:recovery}:{}),...(scoped?{researchContext:scoped.researchContext}:{}) }));
+    const requestHash = hash(canonicalJSON({ kind: v.kind, url, ...(automatic ? { autoAnalyze: true } : {}),...(recovery?{recoverJobId:recovery}:{}),...(scoped?{researchContext:scoped.researchContext}:{}),...(scoped?.after?{after:scoped.after}:{}),...(scoped?.marketFollowup?{marketFollowup:scoped.marketFollowup}:{}) }));
     const execute = async (db:PoolClient) => {
         await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))", [
           `intake:${id}`,
@@ -145,8 +149,8 @@ export class Intake {
         }
         const active = (
           await db.query(
-            "SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('website.extract','brand.analyze') AND status IN ('queued','running','retrying') LIMIT 1",
-            [b.organization_id, id],
+            "SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('website.extract','brand.analyze') AND status IN ('queued','running','retrying') AND id IS DISTINCT FROM $3 LIMIT 1",
+            [b.organization_id, id, scoped?.after ?? null],
           )
         ).rows[0];
         if (active)
@@ -190,9 +194,13 @@ export class Intake {
           [job, b.organization_id, id, user, v.kind],
         );
         await db.query(
-          "INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,website_url,research_context) VALUES($1,$2,$3,$4,$5,$6,$7)",
-          [job, b.organization_id, id, key, requestHash, url, scoped ? JSON.stringify(scoped.researchContext) : null],
+          "INSERT INTO app.intake_requests(job_id,organization_id,brand_id,request_key,request_hash,website_url,research_context,market_followup) VALUES($1,$2,$3,$4,$5,$6,$7,$8)",
+          [job, b.organization_id, id, key, requestHash, url, scoped ? JSON.stringify(scoped.researchContext) : null, scoped?.marketFollowup ? JSON.stringify(scoped.marketFollowup) : null],
         );
+        // The analysis waits durably for an early capture that is still running, exactly
+        // as an automatic analysis waits for its own capture.
+        if (scoped?.after)
+          await db.query("INSERT INTO app.intake_dependencies(organization_id,brand_id,analysis_job_id,capture_job_id) VALUES($1,$2,$3,$4)", [b.organization_id, id, job, scoped.after]);
         if(sourceId)await db.query("INSERT INTO app.intake_recoveries(job_id,organization_id,brand_id,source_job_id) VALUES($1,$2,$3,$4)",[job,b.organization_id,id,sourceId]);
         await db.query(
           "INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,$4)",
