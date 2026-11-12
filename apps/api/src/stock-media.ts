@@ -9,6 +9,9 @@ import {Businesses} from './businesses.js';
 import {Assets} from './assets.js';
 import {StockProvider} from './stock-provider.js';
 import {object,uuid} from './workspaces.js';
+import {pregeneratePreviews} from './preview-pregeneration.js';
+import {recordSignal} from './learning-signals.js';
+import {manifestContext} from './creative-edit-signal.js';
 export class StockMedia{
  constructor(readonly businesses:Businesses,readonly assets:Assets,readonly provider:StockProvider){}
  private async scope<T>(user:string,id:string,write:boolean,fn:(db:any,b:any)=>Promise<T>){const b=await this.businesses.resolve(user,id);return this.businesses.database.transaction(user,b.organization_id,write,db=>fn(db,b),id);}
@@ -37,7 +40,9 @@ export class StockMedia{
  }
  async replace(user:string,id:string,projectId:string,input:unknown){
   projectId=uuid(projectId);const v=object(input,['parent_id','reference_id']),parent=uuid(String(v.parent_id)),reference=uuid(String(v.reference_id));
-  return this.scope(user,id,true,async(db,b)=>{
+  // Previews are made after the transaction commits, never while it holds the canvas lock.
+  let created:{key:string;sha:string;bytes:Buffer;organizationId:string}|undefined;
+  const result=await this.scope(user,id,true,async(db,b)=>{
    await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`canvas:${id.toLowerCase()}`]);
    const p=(await db.query(`SELECT v.*,p.latest_version_id,p.archived_at,m.width,m.height FROM app.creative_versions v JOIN app.creative_projects p ON p.id=v.project_id JOIN app.creative_media m ON m.id=v.media_id WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.project_id=$3 AND v.id=$4`,[b.organization_id,id,projectId,parent])).rows[0];
    if(!p)throw new NotFoundException('Creative not found');if(p.archived_at)throw new ConflictException('Restore this creative before replacing its photo');
@@ -54,12 +59,17 @@ export class StockMedia{
     if(Number((await db.query('SELECT COALESCE(sum(bytes),0) AS bytes FROM app.creative_media WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0].bytes)+bytes.length>512*1024*1024)throw new ConflictException('Creative storage limit reached');
     const objectKey=`creative-stock/${b.organization_id}/${id}/${source.id}/${p.width}x${p.height}/${sha}`;
     await this.assets.store.persist(objectKey,bytes,'image/png',sha);
+    created={key:objectKey,sha,bytes,organizationId:b.organization_id};
     await db.query('INSERT INTO app.creative_media(id,organization_id,brand_id,source_uploaded_visual_id,object_key,sha256,bytes,width,height) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[mediaId,b.organization_id,id,source.id,objectKey,sha,bytes.length,p.width,p.height]);
    }
    const version=randomUUID();await db.query('INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[version,b.organization_id,id,projectId,parent,p.brain_id,mediaId,JSON.stringify(design),p.caption,JSON.stringify(p.skill_manifest),versionHash,user]);
    await db.query('UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1',[projectId,version]);
-   await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'creative.stock_photo_replaced',$4)",[b.organization_id,id,user,version]);return {id:version};
+   await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'creative.stock_photo_replaced',$4)",[b.organization_id,id,user,version]);
+   await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'stock_swapped',creative_version_id:version,version_kind:'creative',reason:'Replaced the photo with an approved stock photo',context:{...manifestContext(p.skill_manifest),stock_used:true}});
+   return {id:version};
   });
+  if(created)await pregeneratePreviews(this.assets.store.previews,{jobId:`stock-replace:${result.id}`,organizationId:created.organizationId,brandId:id},created.key,created.sha,created.bytes);
+  return result;
  }
 
 }

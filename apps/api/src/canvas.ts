@@ -1,7 +1,9 @@
 import {generationTimingEstimate} from './generation-timing.js';
 import {parseCreateDraft} from './create-chat-draft.js';
 import {normalizeCreativeSpec,creativeSourceSize,creativeDimensions} from "./campaign-formats.js";
-import {approvedLearning} from './learning-context.js';
+import {planningLearning} from './learning-context.js';
+import {recordSignal} from './learning-signals.js';
+import {editSignal,manifestContext} from './creative-edit-signal.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {approveReference,referenceColumns,referenceJoins} from './brand-references.js';
 import {
@@ -365,7 +367,7 @@ export class Canvas {
           v.size,
           k,
           sha,
-          textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),v.max_cost_micros??null,creativeSpec?JSON.stringify(creativeSpec):null,
+          textProvider,selectedTextModel,JSON.stringify(await planningLearning(db)),v.max_cost_micros??null,creativeSpec?JSON.stringify(creativeSpec):null,
         ],
       );
       for(const [position,referenceId] of referenceIds.entries())await db.query('INSERT INTO app.creative_references(organization_id,brand_id,job_id,reference_id,position) VALUES($1,$2,$3,$4,$5)',[b.organization_id,id,job,referenceId,position]);
@@ -373,6 +375,8 @@ export class Canvas {
         "INSERT INTO app.canvas_messages(id,organization_id,brand_id,thread_id,job_id,role,content) VALUES($1,$2,$3,$4,$5,'user',$6)",
         [randomUUID(), b.organization_id, id, threadId, job, prompt],
       );
+      // A request to change an existing image says the previous one was not right yet.
+      if(parent)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'regenerated',creative_version_id:parent,version_kind:'creative',reason:prompt});
       await db.query(
         "INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.generate')",
         [job, b.organization_id, id],
@@ -484,6 +488,9 @@ export class Canvas {
         [projectId, version],
       );
       await db.query("UPDATE app.chat_conversations SET updated_at=now() WHERE id=(SELECT thread_id FROM app.creative_projects WHERE id=$1)",[projectId]);
+      // Owner feedback from the Create canvas editor: what changed, as a preference signal.
+      const change=editSignal({design:p.design,caption:p.caption},{design,caption:v.caption});
+      if(change.changed)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'edited',creative_version_id:version,version_kind:'creative',diff:change.diff,reason:change.reason,context:manifestContext(p.skill_manifest)});
       return { id: version };
     });
   }
@@ -559,6 +566,7 @@ export class Canvas {
           v.feedback,
         ],
       );
+      if(v.decision==='approved'||v.decision==='rejected')await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:v.decision,creative_version_id:versionId,version_kind:'creative',reason:String(v.feedback),context:manifestContext(version.skill_manifest)});
       return {
         id: versionId,
         status: v.decision,

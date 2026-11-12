@@ -196,3 +196,82 @@ test('an approved brand profile becomes a graph and feeds task context packs wit
  assert.deepEqual([foreign.items,foreign.ledger,foreign.used_node_ids],[[],[],[]]);
  await assert.rejects(a.as(a.owner,false,db=>buildContextPack(db,a.scope,{kind:'plan',input:'x',ledgerDays:0})),/KNOWLEDGE_CONTEXT_INVALID/);
 });
+
+// ---- Wiring: back-fill, job context packs, production records, owner review ----
+const brainSnapshot={schema_version:1,missing_fields:[],facts:[
+ {field:'brand_name',value:'Harbour & Pine',extraction_type:'manual',status:'correct'},
+ {field:'offering',value:'Mobile dog grooming at the door',extraction_type:'manual',status:'correct'},
+ {field:'audience',value:'Busy apartment owners with small breeds',extraction_type:'manual',status:'correct'},
+ {field:'prohibited_claims',value:'Never promise veterinary outcomes',extraction_type:'manual',status:'correct'}]};
+
+test('operator back-fill is a dry run by default, then applies approved knowledge once',async()=>{
+ const {backfillKnowledge}=await import('../../scripts/backfill-knowledge.mjs');
+ const a=await fixture();
+ await admin.query('INSERT INTO app.brand_brain_versions(id,organization_id,brand_id,review_revision,snapshot,sha256,approved_by) VALUES($1,$2,$3,1,$4,$5,$6)',[randomUUID(),a.org,a.brand,JSON.stringify(brainSnapshot),'ab'.repeat(32),a.owner]);
+ const count=async()=>(await admin.query('SELECT count(*)::int AS n FROM app.knowledge_nodes WHERE brand_id=$1',[a.brand])).rows[0].n;
+ const dry=await backfillKnowledge(admin,{brandId:a.brand});
+ assert.equal(dry.length,1);assert.equal(dry[0].applied,false);assert.ok(dry[0].new_nodes>=4);assert.equal(await count(),0);
+ const applied=await backfillKnowledge(admin,{apply:true,brandId:a.brand});
+ assert.equal(applied[0].new_nodes,dry[0].new_nodes);assert.equal(await count(),dry[0].new_nodes);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.knowledge_nodes WHERE brand_id=$1 AND status='approved' AND reviewed_by=$2",[a.brand,a.owner])).rows[0].n,dry[0].new_nodes);
+ const again=await backfillKnowledge(admin,{apply:true,brandId:a.brand});
+ assert.deepEqual([again[0].new_nodes,again[0].new_edges],[0,0]);assert.equal(await count(),dry[0].new_nodes);
+});
+
+test('a creative job builds its pack under the worker role, and records a post with used_in edges from production knowledge only',async()=>{
+ const {packForJob,recordPost,insightMutations}=await import('../../dist/knowledge-production.js');
+ const a=await fixture(),approved={status:'approved',origin:'owner',confidence:1};
+ await a.as(a.owner,true,db=>applyMutations(db,a.scope,{nodes:[suggestion('rule','no-vet','Never promise veterinary outcomes',approved),suggestion('angle','door','The salon comes to your door',approved),suggestion('format','reel','Short reel',approved)],edges:[]},{actor:a.owner}));
+ const creative=await a.job('creative.generate');
+ const stored=await jobs.transaction(creative,db=>packForJob(db,creative,'creative','A reel about the salon at your door'));
+ assert.equal(stored.status,'ready');assert.equal(stored.prompt.items.length,3);assert.ok(stored.bytes<=6000);
+ assert.ok(!('used_node_ids' in stored.prompt));
+ // A job of another business sees nothing, and a pack fault never aborts the job transaction.
+ const other=await fixture(),theirs=await other.job('creative.generate');
+ assert.deepEqual((await jobs.transaction(theirs,db=>packForJob(db,a.scope,'creative','x'))).prompt.items,[]);
+ const failed=await jobs.transaction(creative,async db=>{const r=await packForJob(db,creative,'nonsense','x');await db.query('SELECT 1');return r;});
+ assert.deepEqual(failed,{status:'unavailable',reason:'KNOWLEDGE_CONTEXT_INVALID'});
+ const written=await jobs.transaction(creative,db=>recordPost(db,creative,{key:`creative ${creative.jobId}`,label:'Door reel',jobId:creative.jobId},stored.used_node_ids));
+ assert.equal(written.nodes[0].outcome,'inserted');
+ const edges=(await admin.query("SELECT n.type,e.status FROM app.knowledge_edges e JOIN app.knowledge_nodes n ON n.id=e.from_node WHERE e.brand_id=$1 AND e.relation='used_in' ORDER BY n.type",[a.brand])).rows;
+ assert.deepEqual(edges,[{type:'angle',status:'suggested'},{type:'format',status:'suggested'}]);
+ const post=(await admin.query("SELECT status,origin FROM app.knowledge_nodes WHERE brand_id=$1 AND type='post'",[a.brand])).rows;
+ assert.deepEqual(post,[{status:'suggested',origin:'extracted'}]);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.knowledge_evidence WHERE brand_id=$1 AND job_id=$2',[a.brand,creative.jobId])).rows[0].n,1);
+ // The next pack's ledger shows what that post used.
+ const next=await jobs.transaction(creative,db=>packForJob(db,creative,'creative','Another reel'));
+ assert.deepEqual(next.prompt.ledger.map(l=>l.type).sort(),['angle','format']);
+ // Insights: a result node and suggested lessons learned from it.
+ const insight=await a.job('insight.generate');
+ const lessons=await jobs.transaction(insight,db=>applyMutations(db,insight,insightMutations({jobId:insight.jobId,label:'Performance review'},[{title:'Door reels beat stills',detail:'Two of three reels led reach'}])));
+ assert.deepEqual(lessons.nodes.map(n=>n.ref.type),['result','lesson']);assert.equal(lessons.edges[0].outcome,'inserted');
+});
+
+test('owners list and review knowledge through the API service; editors cannot review; other tenants see nothing',async()=>{
+ const {KnowledgeReview}=await import('../../dist/knowledge-review.js'),{Businesses}=await import('../../dist/businesses.js'),{Workspaces}=await import('../../dist/workspaces.js');
+ const service=new KnowledgeReview(new Businesses(tenants,new Workspaces(tenants)));
+ const a=await fixture(),editor=await member(a.org,'editor'),stranger=await fixture();
+ await a.as(a.owner,true,db=>applyMutations(db,a.scope,{nodes:[suggestion('angle','door','The salon comes to your door'),suggestion('pain','no-car','No car'),suggestion('angle','vans','Vans')],edges:[link(ref('angle','door'),'solves',ref('pain','no-car'))]},{actor:a.owner}));
+ const first=await service.list(a.owner,a.brand,{limit:'2'});
+ assert.equal(first.nodes.length,2);assert.ok(first.next_cursor);
+ const second=await service.list(a.owner,a.brand,{limit:'2',cursor:first.next_cursor});
+ assert.equal(second.nodes.length,1);assert.equal(second.next_cursor,null);
+ assert.equal([...first.edges,...second.edges].length>=1,true);
+ assert.equal((await service.list(a.owner,a.brand,{type:'pain'})).nodes.length,1);
+ await assert.rejects(service.list(a.owner,a.brand,{status:'maybe'}),/Unknown knowledge status/);
+ await assert.rejects(service.list(a.owner,a.brand,{limit:'1000'}),/page size/);
+ await assert.rejects(service.list(stranger.owner,a.brand,{}),/not found/i);
+ const door=(await service.list(a.owner,a.brand,{type:'angle'})).nodes.find(n=>n.key==='door');
+ assert.equal(door.evidence_count,0);
+ await assert.rejects(service.reviewNode(editor,a.brand,door.id,{decision:'approve'}),e=>e.getStatus?.()===403);
+ await assert.rejects(service.reviewNode(a.owner,a.brand,door.id,{decision:'maybe'}),/approve or reject/);
+ await assert.rejects(service.reviewNode(a.owner,a.brand,randomUUID(),{decision:'approve'}),e=>e.getStatus?.()===404);
+ const approved=await service.reviewNode(a.owner,a.brand,door.id,{decision:'approve',label:'Grooming at your door'});
+ assert.deepEqual([approved.status,approved.label,approved.origin],['approved','Grooming at your door','owner']);
+ const edge=(await service.list(a.owner,a.brand,{})).edges[0];
+ assert.equal((await service.reviewEdge(a.owner,a.brand,edge.id,{decision:'reject'})).status,'rejected');
+ const vans=(await service.list(a.owner,a.brand,{type:'angle'})).nodes.find(n=>n.key==='vans');
+ const replaced=await service.supersede(a.owner,a.brand,vans.id,{replacement_id:door.id});
+ assert.equal(replaced.superseded_by,door.id);
+ await assert.rejects(service.supersede(a.owner,a.brand,vans.id,{replacement:door.id}),/replacement/);
+});

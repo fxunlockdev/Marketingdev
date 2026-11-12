@@ -43,7 +43,7 @@ export function BusinessOverviewPanel({business,name}:{name?:string;business:{id
    </Card>
    <Card role="region" aria-labelledby="upcoming-heading" className={styles.upcoming}><div className={styles.sectionHeader}><div><h2 id="upcoming-heading">Upcoming posts</h2>{upcoming.length>0&&<p className={styles.sectionNote}>{upcoming.length===1?'Your next post':`Your next ${upcoming.length} posts`}, in date order</p>}</div><AppLink className={styles.sectionLink} href={link('content-plan')}>View calendar</AppLink></div>
     {upcoming.length?<ul className={styles.postList}>{upcoming.map((post,index)=>{const status=postStatus(post);return <li key={post.id}><AppLink className={styles.postRow} href={postLink(post)}>
-     <div className={styles.thumbnail}>{hasPreview(post)?<PostThumbnail businessId={business.id} post={post} priority={index<3}/>:<FormatMark format={post.format}/>}</div>
+     <div className={styles.thumbnail}>{hasPreview(post)?<PostThumbnail businessId={business.id} post={post} priority={index<3} sizes="72px"/>:<FormatMark format={post.format}/>}</div>
      <div className={styles.postCopy}><h3>{postTitle(post)}</h3><p>{formatName(post)} · {channelName(post.channel)}</p><StatusBadge status={status.status} label={status.label}/></div>
      <time dateTime={post.planned_at}>{postDate(post)}</time>
     </AppLink></li>;})}</ul>:<EmptyState compact title="A little planning goes a long way" description="Plan a month and your posts will line up here in date order." action={planIsPrimary?undefined:<Button href={link('monthly-planning')}>Plan my content</Button>}/>}

@@ -212,3 +212,19 @@ test('HTTP: immutable private caching and 304s on success, never on errors; prev
  const calls=seen.length;const invalid=await fetch(`${base}/creative-media/${row}/preview?w=320&w=640`,{headers});
  assert.equal(invalid.status,400);assert.equal(invalid.headers.get('cache-control'),'no-store');assert.equal(seen.length,calls,'a malformed width is rejected before any lookup');await invalid.arrayBuffer();
 });
+
+test('producers pre-generate after persisting an original; a failure is logged and never thrown',async()=>{
+ const {pregeneratePreviews}=await import('../../dist/preview-pregeneration.js');
+ const storage=memoryStore(),previews=new ImagePreviews(async()=>portrait);previews.persistTo(storage);
+ const lines=[];
+ assert.deepEqual(await pregeneratePreviews(previews,{jobId:row,organizationId:org,brandId:brand},portraitKey,portraitHash,portrait,line=>lines.push(line)),[320,640,1280]);
+ assert.equal(storage.objects.size,3);assert.deepEqual(lines,[]);
+ // Wrong bytes for the hash: nothing stored, one redacted diagnostic line, no exception.
+ assert.deepEqual(await pregeneratePreviews(previews,{jobId:row},`creative/${org}/${brand}/${row}/${'0'.repeat(64)}`,'0'.repeat(64),portrait,line=>lines.push(line)),[]);
+ assert.equal(lines.length,1);const entry=JSON.parse(lines[0]);
+ assert.equal(entry.activity,'PreviewPregeneration');assert.equal(entry.job_id??entry.jobId,row);
+ // Storage down: still no exception.
+ const down=new ImagePreviews(async()=>portrait);down.persistTo({async read(){return null;},async write(){throw new Error('storage down');}});
+ assert.deepEqual(await pregeneratePreviews(down,{jobId:row},portraitKey,portraitHash,portrait,line=>lines.push(line)),[]);
+ assert.equal(lines.length,2);
+});

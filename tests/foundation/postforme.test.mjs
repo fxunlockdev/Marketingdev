@@ -126,3 +126,31 @@ test('one-profile plan serializes platform attempts and rejects excess provider 
  assert.equal((await subject.read(user,business.id)).accounts.filter(a=>a.status==='connected').length,1);
  await assert.rejects(subject.refresh(bob,business.id));
 });
+
+test('Home counts are scoped to one business and agree with the upcoming list beside them',async()=>{
+ const {BusinessOverview}=await import('../../dist/business-overview.js'),{ContentPlan}=await import('../../dist/content-plan.js');
+ const overview=new BusinessOverview(businesses),plans=new ContentPlan(businesses);
+ // Fresh businesses: earlier cases remove the shared fixture brand.
+ const home=await workspaces.createBrand(alice,org.id,{name:'Home brand'},randomUUID()),sibling=await workspaces.createBrand(alice,org.id,{name:'Sibling brand'},randomUUID());
+ await admin.query("INSERT INTO app.postforme_bindings(organization_id,brand_id,platform) VALUES($1,$2,'instagram')",[org.id,home.id]);
+ const account=(await admin.query("INSERT INTO app.postforme_accounts(organization_id,brand_id,platform,remote_id,username,status) VALUES($1,$2,'instagram',$3,'home','connected') RETURNING id",[org.id,home.id,`home-${randomUUID()}`])).rows[0];
+ const before=(await overview.read(alice,home.id)).counts;
+ const day=n=>new Date(Date.now()+n*86400000).toISOString().slice(0,10);
+ const plan=await plans.create(alice,home.id,{title:'Home counts',objective:'Counts match the list',starts_on:day(1),timezone:'UTC',slots:[1,2,3].map(n=>({channel:'instagram',format:'static',brief:`Home slot ${n}`,planned_at:`${day(n)}T09:00:00Z`}))},randomUUID());
+ const slots=(await admin.query('SELECT id FROM app.content_slots WHERE plan_id=$1 ORDER BY planned_at',[plan.id])).rows.map(r=>r.id);
+ const publish=(slot,observed)=>admin.query("INSERT INTO app.postforme_publications(id,organization_id,brand_id,account_id,slot_id,revision,request_key,request_hash,proof,caption,scheduled_at,phase,observed_state) VALUES($1,$2,$3,$4,$5,1,$6,$7,'{}','Home fixture',now()+interval '1 day','accepted',$8)",[randomUUID(),org.id,home.id,account.id,slot,randomUUID(),'c'.repeat(64),observed]);
+ await publish(slots[0],'published');await publish(slots[1],'scheduled');
+ // Work in a sibling business of the same account must not show up here.
+ await plans.create(alice,sibling.id,{title:'Sibling',objective:'Not this business',starts_on:day(1),timezone:'UTC',slots:[{channel:'instagram',format:'static',brief:'Sibling slot',planned_at:`${day(2)}T09:00:00Z`}]},randomUUID());
+ await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'insight.generate','running')",[randomUUID(),org.id,sibling.id,alice]);
+ const after=await overview.read(alice,home.id);
+ assert.equal(after.counts.published_posts-before.published_posts,1);
+ assert.equal(after.counts.scheduled_posts-before.scheduled_posts,1);
+ assert.equal(after.counts.awaiting_review,before.awaiting_review);
+ assert.equal(after.counts.active_jobs,before.active_jobs);
+ const listed=after.upcoming_posts.map(p=>p.id);
+ assert.ok(!listed.includes(slots[0]),'a published post is counted as published, not listed as upcoming');
+ assert.ok(listed.includes(slots[1])&&listed.includes(slots[2]));
+ const siblingView=await overview.read(alice,sibling.id);
+ assert.equal(siblingView.counts.active_jobs,1);assert.equal(siblingView.upcoming_posts.length,1);assert.equal(siblingView.counts.published_posts,0);
+});

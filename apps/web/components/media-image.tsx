@@ -91,7 +91,7 @@ export const MediaImage=memo(function MediaImage({businessId,source,width,height
 
 interface CoverLayer {id:string;x:number;y:number;width:number;text:string;fontFamily:string;fontSize:number;fontWeight?:number;fill:string;align:CSSProperties['textAlign'];backing?:{padding:number;fill:string;opacity:number}}
 interface CoverDesign {width:number;height:number;background_media_id?:string;layers?:CoverLayer[]}
-export interface CoverPost {format?:string;generation_status?:string;design?:CoverDesign|null;creative_spec?:unknown;export_id?:string|null;slides?:{export_id?:string|null}[]|null;video_version_id?:string|null;carousel_version_id?:string|null;project_id?:string|null}
+export interface CoverPost {format?:string;generation_status?:string|null;design?:CoverDesign|null;creative_spec?:unknown;export_id?:string|null;slides?:{export_id?:string|null}[]|null;video_version_id?:string|null;carousel_version_id?:string|null;project_id?:string|null}
 
 function coverFallback(root:string,source:MediaSource|null,post:CoverPost):MediaFallback|undefined{
  const blob=(endpoint:string,limit?:number):MediaFallback=>async signal=>{const url=URL.createObjectURL(await loadPrivateImage(endpoint,signal,limit));return {url,release:()=>URL.revokeObjectURL(url)};};

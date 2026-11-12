@@ -24,6 +24,9 @@ import {StaticRenderer} from './static-renderer.js';
 import {PlanningJobs} from "./planning-jobs.js";
 import {CreativeJobs} from './creative-jobs.js';
 import {CreativeProvider} from './creative-provider.js';
+import {ImageQa} from './image-qa.js';
+import {PostformeClient} from './postforme-client.js';
+import {learningSyncTick,LEARNING_SYNC_INTERVAL_MS} from './learning-schedule.js';
 import {SkillRuntime} from './skill-runtime.js';
 import {Worker,NativeConnection} from '@temporalio/worker';
 import {Connection,Client} from '@temporalio/client';
@@ -39,8 +42,10 @@ import {BrandAnalyzer} from './brand-analysis.js';
 import {DocumentJobs} from './document-jobs.js';
 import {DocumentParser} from './document-parser.js';
 import {ObjectStore} from './object-store.js';
+import {s3PreviewPersistence} from './media-storage.js';
 import {MalwareScanner} from './file-validation.js';
 const config=workerConfigFromEnv(),store=new ObjectStore(config.storage);
+store.previews.persistTo(s3PreviewPersistence(store.client,config.storage.bucket),error=>logActivityFailure('PreviewStorage',{jobId:'worker-previews'},error));
 const pool=new Pool({connectionString:config.jobs.workerDatabaseUrl,max:4,connectionTimeoutMillis:5000,options:'-c statement_timeout=10000 -c idle_in_transaction_session_timeout=15000'});
 const dispatchPool=new Pool({connectionString:config.jobs.dispatcherDatabaseUrl,max:2,connectionTimeoutMillis:5000});
 pool.on('error',()=>{});dispatchPool.on('error',()=>{});
@@ -50,7 +55,9 @@ const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)));
 const imageReplacements=config.higgsfieldImages?new HiggsfieldReplacementJobs(jobs,new HiggsfieldImageClient(config.higgsfieldImages),new ImageReplacementVault(config.higgsfieldImages.encryptionKey)):undefined;
-const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY),process.env.VECTEEZY_API_KEY?new StockAssets(jobs,new VecteezyClient(process.env.VECTEEZY_API_KEY,Number(process.env.VECTEEZY_ACCOUNT_ID))):undefined);
+const creativeProvider=new CreativeProvider(process.env.OPENAI_API_KEY);
+// The vision check shares the creative provider; it is optional per image and never fails a creative.
+const creative=new CreativeJobs(jobs,new SkillRuntime(config.skillImage),creativeProvider,new GeminiPlanner(process.env.GEMINI_API_KEY),process.env.VECTEEZY_API_KEY?new StockAssets(jobs,new VecteezyClient(process.env.VECTEEZY_API_KEY,Number(process.env.VECTEEZY_ACCOUNT_ID))):undefined,new ImageQa(creativeProvider));
 const planning=new PlanningJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const insights=new InsightJobs(jobs,new SkillRuntime(config.skillImage),new CreativeProvider(process.env.OPENAI_API_KEY),new GeminiPlanner(process.env.GEMINI_API_KEY));
 const publication=new PublicationJobs(jobs,config.social,config.renderImage,config.publishingEnabled,config.videoRenderImage);
@@ -96,4 +103,8 @@ const worker=await Worker.create({connection,namespace:config.jobs.namespace,tas
   }});
 let dispatching=false,lastDispatchLog=0;
 const timer=setInterval(async()=>{if(dispatching)return;dispatching=true;try{await dispatcher.runOnce();}catch(e){const now=Date.now();if(now-lastDispatchLog>60000){lastDispatchLog=now;logActivityFailure('JobDispatcher',{jobId:'dispatcher'},e);}}finally{dispatching=false;}},300);
-try{await worker.run();}finally{clearInterval(timer);await connection.close();await clientConnection.close();store.close();await Promise.all([pool.end(),dispatchPool.end()]);}
+// Post for Me metrics for published posts, on the dispatcher role (the collector policies of migration 115).
+const learningSync=process.env.POSTFORME_ENABLED==='true'&&process.env.POSTFORME_API_KEY?.trim()
+ ?learningSyncTick({pool:dispatchPool,client:new PostformeClient(process.env.POSTFORME_API_KEY.trim()),onError:e=>logActivityFailure('LearningSync',{jobId:'learning-sync'},e)}):undefined;
+const learningTimer=learningSync?setInterval(()=>{void learningSync();},LEARNING_SYNC_INTERVAL_MS):undefined;
+try{await worker.run();}finally{clearInterval(timer);if(learningTimer)clearInterval(learningTimer);await connection.close();await clientConnection.close();store.close();await Promise.all([pool.end(),dispatchPool.end()]);}

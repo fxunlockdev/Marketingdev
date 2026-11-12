@@ -66,6 +66,15 @@ const groups: Record<string, string> = {
   archive: "Library",
   brands: "Workspace",
 };
+/** A group heading is shown only above a group that has at least one link, so no empty heading is rendered. */
+const groupKeys = sections.map(([key]) => key).filter((key) => groups[key]);
+function groupLabel(key: string): string | undefined {
+  const label = groups[key];
+  if (!label) return undefined;
+  const start = sections.findIndex(([k]) => k === key), next = groupKeys.find((k) => sections.findIndex(([s]) => s === k) > start);
+  const end = next ? sections.findIndex(([s]) => s === next) : sections.length;
+  return end > start ? label : undefined;
+}
 function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     home: "M3 10 12 3l9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2ZM8 17h8",
@@ -249,7 +258,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
         <nav id="business-nav" aria-label="Main navigation">
           {sections.map(([key, title, icon]) => (
             <div key={key}>
-              {groups[key] && <p className="nav-group">{groups[key]}</p>}
+              {groupLabel(key) && <p className="nav-group">{groupLabel(key)}</p>}
               <AppLink
                 href={href(key)}
                 aria-current={
@@ -289,13 +298,10 @@ export function BusinessApp({ pathname }: { pathname: string }) {
       </aside>
       <div className="v5-body">
         <header className="v5-topbar">
-          <span className="workspace-page-title">{business&&<><span className="workspace-breadcrumb">{business.name}</span><span className="workspace-separator" aria-hidden="true">/</span></>}{label}</span>
+          <span className="workspace-page-title">{business&&businesses.length!==1&&<><span className="workspace-breadcrumb">{business.name}</span><span className="workspace-separator" aria-hidden="true">/</span></>}{label}</span>
           <div className="header-actions">
             {business&&<GenerationBalance key={business.organization_id} organizationId={business.organization_id}/>}
             {business&&["owner","admin","editor"].includes(business.role)&&<AppLink className="button header-create" href={`/b/${business.id}/create`}><span aria-hidden="true">✳</span> Create</AppLink>}
-            <AppLink className="profile-link workspace-avatar" href="/profile" aria-label="Profile" title="Your profile">
-              {session.user.name.slice(0,1)}
-            </AppLink>
           </div>
         </header>
         <main id="main" className="v5-main" key={pathname}>

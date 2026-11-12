@@ -1,11 +1,14 @@
 import {acceptsModel} from './model-policy.js';
-import {StockAssets} from './stock-assets.js';
+import {pregeneratePreviews} from './preview-pregeneration.js';
+import {packForJob,promptKnowledge,recordPost,type StoredKnowledge} from './knowledge-production.js';
+import {logActivityFailure} from './activity-log.js';
+import {StockAssets,tooCloseToStock,STOCK_TOO_CLOSE_DISTANCE} from './stock-assets.js';
 import {stockReferenceLabel} from './stock-planning.js';
 import {StockError} from './vecteezy-client.js';
 import {imagePlanningRates} from './creative-planning.js';
 import {buildImagePrompt} from './image-prompt.js';
 import {resolveTextMode,inImageCopy} from './image-typography.js';
-import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,type QaAttempt,type QaExpectation,type QaReport} from './image-qa.js';
+import {ImageQa,QA_UNAVAILABLE,qaExpectation,qaPreview,qaReport,qaRetryNotes,settleVerdict,nearStockCopy,type QaAttempt,type QaExpectation,type QaReport,type StockSourceCheck,type StockSourceReport} from './image-qa.js';
 import {frameCreative,frameDirection} from "./creative-framing.js";
 import {approvedDirection} from "./image-direction.js";
 import {normalizeCreativeSpec,creativeDimensions} from "./campaign-formats.js";
@@ -64,7 +67,8 @@ export class CreativeJobs {
     const provider=this.planner(request.text_provider),model=request.selected_text_model;
     if(!model)throw new CreativeError("CREATIVE_STAGING_APPROVAL_REQUIRED");
     if(!provider.configured)throw new CreativeError("CREATIVE_PROVIDER_NOT_CONFIGURED");
-    const providerMessage=message.step===4||message.step===5?{...message,step:1}:message;
+    // Steps 4 and 5 are trusted stock planning; images arriving on a sandbox step (1-3) are dropped.
+    const providerMessage=message.step===4||message.step===5?{...message,step:1}:{...message,images:undefined};
     const wire=provider.plannerRequest(providerMessage,model,maxOutputTokens);
     return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=acceptsModel('brief',model)?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(providerMessage,model,maxOutputTokens),request.text_provider);
   }
@@ -223,19 +227,52 @@ export class CreativeJobs {
       return {step,media_sha256:media.sha256,status:'unavailable',reason};
     }
   }
-  /** Check the image; on 'retry' regenerate exactly once with the checker's notes. Never loops. */
-  private async inspected<M extends {object_key:string;sha256:string}>(scope:JobScope,first:M,expectation:QaExpectation,regenerate:(notes:string)=>Promise<M>):Promise<{image:M;qa:QaReport|null}>{
+  /** Local comparison of a stored output with its stock photo. A read or decode failure is recorded, never fatal. */
+  private async stockCheck(step:'qa:1'|'qa:2',media:{object_key:string;sha256:string},stock:Buffer):Promise<StockSourceCheck>{
+    try{
+      const bytes=await this.jobs.store.read(media.object_key);
+      if(digest(bytes)!==media.sha256)return {step,media_sha256:media.sha256,status:'unavailable'};
+      const {distance,tooClose}=await tooCloseToStock(stock,bytes);
+      return {step,media_sha256:media.sha256,status:'checked',distance,too_close:tooClose};
+    }catch{
+      return {step,media_sha256:media.sha256,status:'unavailable'};
+    }
+  }
+  /** Check the image; on 'retry', or when it is a near copy of its stock photo, regenerate exactly once
+   * with the notes. Never loops: a second failure is flagged for a person. */
+  private async inspected<M extends {object_key:string;sha256:string}>(scope:JobScope,first:M,expectation:QaExpectation,regenerate:(notes:string)=>Promise<M>,stockPhoto?:Buffer):Promise<{image:M;qa:QaReport|null}>{
     if(!this.qa?.configured)return {image:first,qa:null};
     const model=this.qa.model,initial=await this.qaAttempt(scope,'qa:1',first,expectation);
-    if(initial.status!=='checked'||settleVerdict(initial.finding,expectation)!=='retry')return {image:first,qa:qaReport(model,expectation,[initial],false)};
+    const firstStock:StockSourceReport|undefined=stockPhoto?{threshold:STOCK_TOO_CLOSE_DISTANCE,checks:[await this.stockCheck('qa:1',first,stockPhoto)]}:undefined;
+    const visionRetry=initial.status==='checked'&&settleVerdict(initial.finding,expectation)==='retry',copied=nearStockCopy(firstStock);
+    if(!visionRetry&&!copied)return {image:first,qa:qaReport(model,expectation,[initial],false,undefined,firstStock)};
     let second:M;
-    try{second=await regenerate(qaRetryNotes(initial.finding,expectation));}
+    try{second=await regenerate(qaRetryNotes(visionRetry&&initial.status==='checked'?initial.finding:null,expectation,copied));}
     catch(error){
       const reason=optionalFailure(error);
       if(!reason)throw error;
-      return {image:first,qa:qaReport(model,expectation,[initial],false,reason)};
+      return {image:first,qa:qaReport(model,expectation,[initial],false,reason,firstStock)};
     }
-    return {image:second,qa:qaReport(model,expectation,[initial,await this.qaAttempt(scope,'qa:2',second,expectation)],true)};
+    const retried=await this.qaAttempt(scope,'qa:2',second,expectation);
+    const secondStock=stockPhoto&&firstStock?{...firstStock,checks:[...firstStock.checks,await this.stockCheck('qa:2',second,stockPhoto)]}:undefined;
+    return {image:second,qa:qaReport(model,expectation,[initial,retried],true,undefined,secondStock)};
+  }
+  /** The stored pack, or a new one saved before any planner call. A job that already called a model before
+   * packs existed keeps its original input, so its recorded calls still match. */
+  private async knowledgeContext(db:any,j:any,request:any):Promise<StoredKnowledge>{
+    if(request.knowledge_context)return request.knowledge_context as StoredKnowledge;
+    const started=(await db.query("SELECT 1 FROM app.creative_calls WHERE job_id=$1 LIMIT 1",[j.id])).rowCount;
+    const slide=(await db.query('SELECT 1 FROM app.carousel_children WHERE generation_job_id=$1',[j.id])).rowCount;
+    const stored:StoredKnowledge=started?{status:'skipped',reason:'KNOWLEDGE_JOB_ALREADY_STARTED'}:await packForJob(db,{organizationId:j.organization_id,brandId:j.brand_id},slide?'carousel':'creative',request.prompt);
+    await db.query('UPDATE app.creative_requests SET knowledge_context=$2 WHERE job_id=$1',[j.id,JSON.stringify(stored)]);
+    return stored;
+  }
+  /** Production record for the graph: a post node and used_in edges. Optional, never fails the creative. */
+  private async recordKnowledge(scope:JobScope,versionId:string,label:string,knowledge:StoredKnowledge):Promise<void>{
+    if(knowledge.status!=='ready')return;
+    try{
+      await this.jobs.transaction(scope,db=>recordPost(db,scope,{key:`creative ${versionId}`,label,jobId:scope.jobId,properties:{creative_version_id:versionId}},knowledge.used_node_ids));
+    }catch(error){logActivityFailure('KnowledgeRecord',scope,error);}
   }
   async run(scope: JobScope) {
     try {
@@ -314,9 +351,11 @@ export class CreativeJobs {
           "UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",
           [j.id],
         );
+        const knowledge=await this.knowledgeContext(db,j,request);
         const input: CreativeInput = {
           brand: {
             learning:request.memory_context,
+            ...(promptKnowledge(knowledge)?{knowledge:promptKnowledge(knowledge)}:{}),
             id: brain.id,
             sha256: brain.sha256,
             facts: brain.snapshot.facts.map((f: any) => ({
@@ -348,10 +387,10 @@ export class CreativeJobs {
         const references=(await db.query(`SELECT ${referenceColumns},c.position FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id ${referenceJoins} WHERE c.job_id=$1 ORDER BY c.position`,[j.id])).rows;
         // Only a mood board locked before this request was made: the prompt must be identical on replay.
         const moodboard=(await db.query('SELECT m.direction,m.feedback FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0]??null;
-        return { request, grant, parent, input, references, moodboard, actor: j.requested_by };
+        return { request, grant, parent, input, references, moodboard, knowledge, actor: j.requested_by };
       });
       if (!prepared) return "finished";
-      const { request, grant, input, parent, references, moodboard } = prepared;
+      const { request, grant, input, parent, references, moodboard, knowledge } = prepared;
       const referenceImages:Buffer[]=[],referenceManifest:any[]=[];
       for(const r of references){
         if(!r.object_key||!r.sha256)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
@@ -386,6 +425,7 @@ export class CreativeJobs {
         });
       }
       if(!carousel)plan = validateSkillResult(plan, input);
+      let stockPhoto:Buffer|undefined;
       if(this.stock){
         const dimensions=String(request.size).split('x').map(Number);
         const orientation=dimensions[0]===dimensions[1]?'square':dimensions[0]>dimensions[1]?'horizontal':'vertical';
@@ -393,6 +433,7 @@ export class CreativeJobs {
         const stock=await this.stock.reference(scope,input,{imagePrompt:plan.brief.image_prompt,orientation,edit:!!parent,brandReferences:references.length,layoutArchetype:(plan.brief as {art_direction?:{layout_archetype?:unknown}}).art_direction?.layout_archetype,artDirection:(plan.brief as {art_direction?:unknown}).art_direction,carouselPosition:carousel?.position??null,vision:(this.planner(request.text_provider) as {acceptsImages?:boolean}).acceptsImages===true},message=>this.planCall(scope,message,request));
         if(stock){
           const stockPng=await sharp(stock.photo,{limitInputPixels:24_000_000}).resize({width:1536,height:1536,fit:'inside',withoutEnlargement:true}).png().toBuffer();
+          stockPhoto=stock.photo;
           referenceImages.push(stockPng);
           referenceManifest.push({kind:`stock_${stock.use}`,label:stockReferenceLabel(stock.use),input_sha256:digest(stockPng)});
         }
@@ -463,6 +504,7 @@ export class CreativeJobs {
             "image/png",
             output.sha256,
           );
+          await pregeneratePreviews(this.jobs.store.previews,scope,objectKey,output.sha256,output.bytes);
           const media = {
             id: randomUUID(),
             object_key: objectKey,
@@ -497,8 +539,9 @@ export class CreativeJobs {
       );
       };
       const first=await render('image',basePrompt);
-      const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity),notes=>render('image:retry',basePrompt+notes));
-      return this.jobs.transaction(scope, async (db, j) => {
+      const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity),notes=>render('image:retry',basePrompt+notes),stockPhoto);
+      let savedVersion:string|undefined;
+      const status=await this.jobs.transaction(scope, async (db, j) => {
         if (terminal.has(j.status)) return j.status;
         if (!(await this.jobs.permitted(db, j)))
           return this.finish(db, j, "canceled", "CREATIVE_ACCESS_REVOKED");
@@ -558,6 +601,7 @@ export class CreativeJobs {
           text_provider:request.text_provider,
           text_model: request.selected_text_model,
           learning:request.memory_context,
+          knowledge:knowledge.status==='ready'?{used_node_ids:knowledge.used_node_ids,used_edge_ids:knowledge.used_edge_ids,bytes:knowledge.bytes,truncated:knowledge.prompt.truncated}:{status:knowledge.status,reason:knowledge.reason},
           image_model: grant.image_model,
           reserved_cost_micros: reserved,
         };
@@ -654,8 +698,11 @@ export class CreativeJobs {
             ],
           );
         }
+        savedVersion=version;
         return this.finish(db, j, "succeeded");
       });
+      if(status==='succeeded'&&savedVersion)await this.recordKnowledge(scope,savedVersion,plan.brief.headline||plan.brief.caption,knowledge);
+      return status;
     } catch (error) {
       if(error instanceof StockError)error=new CreativeError(error.code);
       if(monthlyBudgetExceeded(error))error=new CreativeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');
