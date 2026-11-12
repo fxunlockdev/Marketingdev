@@ -979,6 +979,7 @@ test('stock-backed creative still succeeds without stock when the photo cannot b
   await stockHandler.run(scope(uncertain));
   assert.deepEqual({downloads,images},{downloads:1,images:3});
  }finally{transport=undefined;await admin.query('DELETE FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);}
+});
 
 // ---- Image engine: art direction, designed type, vision check, true aspect ratios, approved direction ----
 const artDirection={layout_archetype:'lifestyle_hero',text_mode:'in_image',headline_treatment:'Bold condensed sans, two lines, top left',hierarchy:'Headline, then the receptionist, then the call to action',composition:'Receptionist on the right third, calm wall on the left',lighting:'Soft morning window light',palette_roles:{dominant:'#f4efe6',headline:'#112233',accent:'#ff6b35'},product_placement:'Scheduling screen on the front desk',logo_placement:'bottom_right'};
