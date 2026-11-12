@@ -727,19 +727,8 @@ function Unavailable({
   business: Business;
   title: string;
 }) {
-  const details: Record<string, string> = {
-    "content-plan":
-      "Create and revise a 30-day content calendar for this business. Planning and scheduling are still being implemented.",
-    review:
-      "Review posts by social channel, approve exact versions, or revise a campaign creative. The review workflow is still being implemented.",
-    canvas:
-      "Create images and videos, then revise them in conversation. Generation, editable projects and saved conversations are still being implemented.",
-    publishing:
-      "Schedule approved posts and understand their actual performance. Publishing and analytics are still being implemented.",
-    connections:
-      "Connect authorized social accounts to this business. The OAuth connection flow is still being implemented.",
-    team: "Invite people to specific businesses and control what they can view, edit or approve. Business-scoped invitations and the full role set are still being implemented.",
-  };
+  const details: Record<string, string> = {};
+
   return (
     <>
       <PageTitle eyebrow={business.name} title={title}>
@@ -783,13 +772,13 @@ function Unavailable({
       ) : (
         <section className="v5-panel feature-unavailable">
           <Icon name={sections.find((s) => s[0] === section)?.[2] ?? "brand"} />
-          <h2>This workflow is not available yet.</h2>
+          <h2>We couldn’t find that page.</h2>
           <p>
-            Your business and approved brand information stay saved while this
-            part of Desvio is being built.
+            Choose a section from the menu. Your business and brand information
+            are saved.
           </p>
-          <AppLink className="button" href={`/b/${business.id}/onboarding`}>
-            Continue brand setup
+          <AppLink className="button" href={`/b/${business.id}/overview`}>
+            Go to Home
           </AppLink>
         </section>
       )}
