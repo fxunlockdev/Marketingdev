@@ -66,7 +66,7 @@ async function signin(page, address = email, pass = password) {
   await page.getByLabel("Email address").fill(address);
   await page.getByLabel("Password", { exact: true }).fill(pass);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /^(Add your first business|Choose a business|Your content, at a glance\.)$/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /^(Add your first business|Choose a business|Hello, .+|Your dashboard)$/ })).toBeVisible();
 }
 async function signup(page, address, name) {
   await page.goto(base + "/sign-up");
@@ -265,7 +265,10 @@ test("V5 signup and real email verification lead to zero businesses and exact na
   await expect(
     alice.getByRole("link", { name: "Add business", exact: true }),
   ).toBeVisible();
-  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Create','Approvals','Brand Kit','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);  await alice.goto(base + "/brands");
+  assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Create','Approvals','Brand Kit','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);
+  // Every group heading sits above at least one link; the topbar has no second profile link.
+  assert.deepEqual(await alice.locator('#business-nav .nav-group').allTextContents(),['Plan & create','Brand','Results','Library','Workspace']);
+  await expect(alice.locator('.v5-topbar a[href="/profile"]')).toHaveCount(0);  await alice.goto(base + "/brands");
   await expect(
     alice.getByText("0 of 3 owned businesses", { exact: false }),
   ).toBeVisible();
@@ -1084,6 +1087,7 @@ test('Profile authenticator setup → gated sign-in → recovery code → replac
 });
 
 test('Studio overview keeps real counts, working routes, narrow layouts and reduced-motion support',async()=>{
+ // Home: "Needs your attention" and "Upcoming posts" regions, status badges, counts from the same business.
  const day=new Date(Date.now()+86400000).toISOString().slice(0,10);
  const planResponse=await alice.request.post(`${base}/api/v1/businesses/${firstBusiness}/content-plans`,{headers:{origin:base,'idempotency-key':randomUUID()},data:{title:'TEST upcoming collection',objective:'Review a visual plan',starts_on:day,timezone:'UTC',slots:[{channel:'instagram',format:'static',planned_at:day+'T12:00:00Z',brief:'TEST upcoming botanical story'},{channel:'linkedin',format:'video',planned_at:day+'T14:00:00Z',brief:'TEST upcoming product video'}]}});
  assert.equal(planResponse.status(),201,await planResponse.text());
@@ -1093,15 +1097,21 @@ test('Studio overview keeps real counts, working routes, narrow layouts and redu
  await expect(upcoming).toBeVisible();
  await expect(upcoming.getByRole('link',{name:'View calendar',exact:true})).toHaveAttribute('href',`/b/${firstBusiness}/content-plan`);
  await expect(upcoming.getByRole('heading',{name:'TEST upcoming botanical story'})).toBeVisible();
- await expect(upcoming.locator('.upcoming-post')).toHaveCount(2);
- await expect(upcoming.getByText('Ready to create',{exact:true})).toHaveCount(2);
+ await expect(upcoming.getByRole('listitem')).toHaveCount(2);
+ await expect(upcoming.getByText('Not generated yet',{exact:true})).toHaveCount(2);
+ const attention=alice.getByRole('region',{name:'Needs your attention',exact:true});
+ await expect(attention).toBeVisible();
  const snapshot=await(await alice.request.get(base+`/api/v1/businesses/${firstBusiness}/overview`)).json();
  const campaignId=(await planResponse.json()).id;
  assert.equal(snapshot.campaigns.find(c=>c.id===campaignId).post_count,2);
- const campaigns=alice.getByRole('region',{name:'Your campaigns',exact:true});
- await expect(campaigns.getByRole('link',{name:'See all campaigns'})).toHaveAttribute('href',`/b/${firstBusiness}/campaigns`);
- await expect(campaigns.getByRole('link',{name:/TEST upcoming collection/})).toHaveAttribute('href',`/b/${firstBusiness}/campaign-review?plan=${campaignId}`);
- await expect(alice.locator('.overview-metric').filter({hasText:'Awaiting review'}).locator('strong')).toHaveText(String(snapshot.counts.awaiting_review));
+ const campaigns=alice.getByRole('region',{name:'Your content plans',exact:true});
+ await expect(campaigns.getByRole('link',{name:/TEST upcoming collection/})).toHaveAttribute('href',`/b/${firstBusiness}/content-plan?plan=${campaignId}`);
+ // The attention badge counts the rows it lists; the metric strip shows the same business's counts.
+ const rows=await attention.getByRole('listitem').count();
+ if(rows)await expect(attention.getByLabel(`${rows} ${rows===1?'item':'items'}`,{exact:true})).toHaveText(String(rows));
+ else await expect(attention.getByText('You’re up to date',{exact:true})).toBeVisible();
+ if(snapshot.counts.awaiting_review+snapshot.counts.scheduled_posts+snapshot.counts.published_posts>0)
+  await expect(alice.getByRole('link',{name:/^Waiting for approval/}).locator('strong')).toHaveText(String(snapshot.counts.awaiting_review));
  await expect(alice.getByRole('heading',{name:'Recent activity',exact:true})).toBeHidden();
  await alice.locator('.overview-details > summary').click();
  await expect(alice.getByRole('heading',{name:'Recent activity',exact:true})).toBeVisible();
@@ -1114,7 +1124,7 @@ test('Studio overview keeps real counts, working routes, narrow layouts and redu
  }
  await alice.screenshot({path:'work/browser/studio-overview-mobile.png',fullPage:true});
  await alice.emulateMedia({reducedMotion:'reduce'});
- assert.equal(await upcoming.locator('.upcoming-post').first().evaluate(e=>getComputedStyle(e).animationName),'none');
+ assert.equal(await upcoming.getByRole('listitem').first().evaluate(e=>getComputedStyle(e).animationName),'none');
  await upcoming.getByRole('link',{name:'View calendar',exact:true}).focus();
  assert.equal(await alice.evaluate(()=>document.activeElement?.getAttribute('href')),`/b/${firstBusiness}/content-plan`);
  await alice.emulateMedia({reducedMotion:'no-preference'});

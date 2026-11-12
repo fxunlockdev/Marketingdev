@@ -265,8 +265,6 @@ body.desvio-redesign.desvio-polished .workspace-business strong {
   font-size: var(--type-sm); line-height: 1.3; overflow-wrap: anywhere;
   display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
 }
-/* With one business the sidebar already names it; the topbar shows the page only. */
-body.desvio-redesign.desvio-polished .v5-sidebar:has(.workspace-business strong) ~ .v5-body :is(.workspace-breadcrumb, .workspace-separator) { display: none; }
 /* Account block: name and account link read as one entry; sign out is quiet. */
 body.desvio-redesign.desvio-polished .v5-account > div { min-width: 0; flex: 1; }
 body.desvio-redesign.desvio-polished .v5-account strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

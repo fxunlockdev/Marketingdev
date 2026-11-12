@@ -27,7 +27,7 @@
 .desvio-redesign .v5-sidebar nav svg{width:20px;height:20px;flex-shrink:0;stroke-width:1.65}
 .desvio-redesign .nav-group{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--brand-muted);margin:22px 14px 8px}
 .desvio-redesign .v5-account{padding:14px 4px 0;gap:8px;border-top:1px solid var(--line);font-size:12px}
-.desvio-redesign .v5-account .avatar,.desvio-redesign .workspace-avatar{background:var(--brand-wash);color:var(--brand-link);border:0;border-radius:50%;width:36px;height:36px;font-size:13px}
+.desvio-redesign .v5-account .avatar{background:var(--brand-wash);color:var(--brand-link);border:0;border-radius:50%;width:36px;height:36px;font-size:13px}
 .desvio-redesign .v5-account .quiet{font-size:11px;padding:6px;min-height:36px}
 .desvio-redesign .v5-body{min-width:0;background:transparent}
 .desvio-redesign .v5-topbar{min-height:72px;height:auto;padding:14px 24px;background:white;border:0;border-radius:24px;gap:16px}
