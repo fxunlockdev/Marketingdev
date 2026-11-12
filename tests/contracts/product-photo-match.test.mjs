@@ -17,7 +17,8 @@ test('never a logo, never more than one, never over the planner, and not for typ
  assert.equal(productPhotoFor(slot({format:'video'}),refs,'soap'),null);
  assert.equal(productPhotoFor(slot({reference_ids:['candle']}),refs,'soap'),null,'the planner choice stands');
  assert.equal(productPhotoFor(slot({brief:'Meet the team',hook:'Hello'}),[ref('shop','Shopfront','website')],''),null,'an unrelated website image is not forced in');
- assert.equal(productPhotoFor(slot({brief:'Meet the team',hook:'Hello'}),[ref('logo','Logo'),ref('only','Hero bottle')],''),'only','an uploaded product photo is used when nothing matches better');
+ assert.equal(productPhotoFor(slot({brief:'Meet the team',hook:'Hello'}),[ref('logo','Logo'),ref('only','Hero bottle')],''),null,'an unrelated product photo is not pasted onto every post');
+ assert.equal(productPhotoFor(slot({brief:'Meet the team',hook:'Hello'}),[ref('only','Hero bottle')],'Glass bottles of oil'),'only','a match through the offer is enough');
  assert.equal(productPhotoFor(slot(),[],'soap'),null);
 });
 test('a plan gains photos only where it chose none, leaving every other slot unchanged',()=>{

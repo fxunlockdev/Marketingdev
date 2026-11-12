@@ -16,9 +16,9 @@ function typeLed(storyline:unknown):boolean{
 }
 
 /** The one approved product photo to attach to a static post whose planner chose no reference, or null.
- * Ranked by label words shared with the post's brief, hook and the business's offer. Never a logo, never more
- * than one, never for type-led art direction. An uploaded product photo is used even without shared words,
- * so products appear in ads; website or document images must match. Pure. */
+ * Ranked by label words shared with the post's brief, hook and the business's offer; a photo that shares no
+ * word is never attached, so one photo is not pasted onto every post. Never a logo, never more than one, never
+ * for type-led art direction. Pure. */
 export function productPhotoFor(slot:SlotLike,references:readonly PlanningReference[],offer:string):string|null{
  if(slot.format!=='static'||(slot.reference_ids?.length??0)>0||typeLed(slot.storyline))return null;
  const wanted=words(`${slot.brief??''} ${slot.hook??''} ${offer}`);
@@ -26,7 +26,7 @@ export function productPhotoFor(slot:SlotLike,references:readonly PlanningRefere
  for(const reference of references){
   if(LOGO_LABEL.test(reference.label))continue;
   const score=[...words(reference.label)].filter(w=>wanted.has(w)).length;
-  if(score===0&&reference.kind!=='upload')continue;
+  if(score===0)continue;
   if(!best||score>best.score)best={id:reference.id,score};
  }
  return best?.id??null;
