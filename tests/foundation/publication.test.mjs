@@ -95,3 +95,52 @@ test('a leftover queued Postiz job is closed in the queue and never starts a wor
   assert.ok(row.dispatched_at);assert.equal(row.last_error,'POSTIZ_RETIRED');assert.equal(started.some(([,id])=>id===job),false);
  }finally{await dispatchPool.end();}
 });
+
+test('Post for Me lifecycle on the deterministic mock: schedule a whole plan, publish, fail with a reason, retry once, reschedule and cancel',async()=>{
+ const {Postforme}=await import('../../dist/postforme.js'),{PostformeClient}=await import('../../dist/postforme-client.js'),{checkStatuses}=await import('../../dist/publication-status.js');
+ const {createMockPostforme}=await import('../../scripts/local-stack/mock-postforme.mjs');
+ let clock=Date.now();const mock=createMockPostforme({origin:'http://127.0.0.1:54011',now:()=>clock}),connections=new SocialConnections(businesses,true);
+ const service=new Postforme(connections,new Publication(connections,exports,true),'local-mock-postforme-key',true,['instagram','linkedin','facebook']);
+ service.client=new PostformeClient('local-mock-postforme-key',mock.fetch,mock.origin);
+ const sid=randomUUID(),start=await service.authorize(alice.id,sid,brand.id,{platform:'linkedin'});
+ assert.ok(start.url.startsWith(mock.origin+'/oauth/authorize'),'the consent link is accepted only because the mock origin is in use');
+ await mock.fetch(new Request(mock.origin+'/oauth/approve',{method:'POST',body:new URLSearchParams({attempt:new URL(start.url).searchParams.get('attempt')})}));
+ const connected=await service.finish(alice.id,sid,brand.id,{attempt_id:start.attempt_id});assert.equal(connected.accounts.filter(a=>a.status==='connected').length,1);
+ const [a,b,c]=[await approvedPost(),await approvedPost(),await approvedPost()];
+ await admin.query('UPDATE app.content_slots SET plan_id=$1 WHERE id=ANY($2::uuid[])',[a.slot.plan_id,[b.slot.id,c.slot.id]]);
+ await assert.rejects(service.scheduleAll(viewer.id,brand.id,{plan_id:a.slot.plan_id,confirmed:true},'bulk-'+randomUUID()),e=>e.getStatus?.()===403);
+ const key='bulk-'+randomUUID().slice(0,20),bulk=await service.scheduleAll(alice.id,brand.id,{plan_id:a.slot.plan_id,confirmed:true},key);
+ assert.deepEqual(bulk.results.map(r=>r.outcome).sort(),['accepted','accepted','accepted']);assert.equal(mock.state.posts.size,3);
+ const posts=[...mock.state.posts.values()];assert.ok(posts.every(p=>p.media.length===1&&p.scheduled_at===new Date(a.slot.planned_at).toISOString()),'each post is scheduled at its planned time with its approved media');
+ assert.deepEqual((await service.scheduleAll(alice.id,brand.id,{plan_id:a.slot.plan_id,confirmed:true},key)).results,[],'repeating the request schedules nothing twice');assert.equal(mock.state.posts.size,3);
+ const rows=Object.fromEntries((await admin.query('SELECT slot_id,id FROM app.postforme_publications WHERE slot_id=ANY($1::uuid[])',[[a.slot.id,b.slot.id,c.slot.id]])).rows.map(r=>[r.slot_id,r.id]));
+ // Reschedule B to a later wall-clock time in the business zone (UTC here); the same remote post moves.
+ const later=new Date(Date.parse(a.slot.planned_at)+86400000).toISOString().slice(0,16);
+ await assert.rejects(service.reschedule(alice.id,brand.id,rows[b.slot.id],{scheduled_at:'2020-01-01T09:00',confirmed:true}),/between one minute and 31 days/);
+ const moved=await service.reschedule(alice.id,brand.id,rows[b.slot.id],{scheduled_at:later,confirmed:true});
+ assert.equal(moved.scheduled_at,later+':00.000Z');assert.equal([...mock.state.posts.values()].find(p=>p.external_id===rows[b.slot.id]).scheduled_at,moved.scheduled_at);assert.equal(mock.state.posts.size,3);
+ // Cancel C: deleted remotely first, then freed locally and offered again.
+ await assert.rejects(service.cancel(viewer.id,brand.id,rows[c.slot.id]),e=>e.getStatus?.()===403);
+ assert.equal((await service.cancel(alice.id,brand.id,rows[c.slot.id])).phase,'canceled');assert.equal(mock.state.posts.size,2);
+ assert.ok((await service.ready(alice.id,brand.id)).posts.some(p=>p.slot_id===c.slot.id));
+ await assert.rejects(service.cancel(alice.id,brand.id,rows[c.slot.id]),/Only a scheduled post/);
+ // Time passes: A fails at the network (deterministically), the status check on the dispatcher role records the reason.
+ [...mock.state.posts.values()].find(p=>p.external_id===rows[a.slot.id]).fails=true;
+ clock=Date.parse(a.slot.planned_at)+3600000;
+ const dispatch=new Pool({connectionString:config.jobs.dispatcherDatabaseUrl});
+ try{
+  const run=await checkStatuses({pool:dispatch,client:service.client,now:new Date(clock)});assert.equal(run.changed>=2,true);
+  await assert.rejects(dispatch.query('SELECT proof FROM app.postforme_publications'),e=>e.code==='42501');
+  assert.equal((await dispatch.query("UPDATE app.postforme_publications SET observed_state='scheduled' WHERE observed_state='failed'")).rowCount,0,'a settled outcome cannot be rewritten by the worker');
+ }finally{await dispatch.end();}
+ const list=(await service.list(alice.id,brand.id)).publications,failed=list.find(p=>p.id===rows[a.slot.id]);
+ assert.equal(failed.observed_state,'failed');assert.match(failed.failure_reason,/aspect ratio/);assert.equal(failed.retryable,true);
+ assert.equal(list.find(p=>p.id===rows[b.slot.id]).observed_state,'scheduled');
+ // Retry once, at a new time; a second retry of the same failure is refused, and nothing can double-post a held post.
+ const when=new Date(Date.now()+86400000).toISOString().slice(0,16),retry={...a.body,channel_id:connected.accounts[0].id,scheduled_at:when,retry_of:rows[a.slot.id]};
+ const again=await service.submit(alice.id,brand.id,retry,'retry-'+randomUUID());assert.equal(again.phase,'accepted');
+ await assert.rejects(service.submit(alice.id,brand.id,retry,'retry-'+randomUUID()),/already has a publication|only a failed post/i);
+ assert.equal((await service.list(alice.id,brand.id)).publications.find(p=>p.id===rows[a.slot.id]).retryable,false);
+ await assert.rejects(service.submit(alice.id,brand.id,{...b.body,channel_id:connected.accounts[0].id},'dup-'+randomUUID()),/already has a publication/);
+ assert.equal(mock.state.posts.size,3,'only the retry was added');
+});

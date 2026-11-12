@@ -33,7 +33,7 @@ test('learning loop: scheduled collection snapshots published posts idempotently
   await assert.rejects(dispatch.query(syncSnapshotSQL,[pub.id,foreignOrg,foreign.id,account.id,'24h','missing','{}',null,now.toISOString()]),e=>['42501','23503'].includes(e.code));
   await assert.rejects(dispatch.query('SELECT proof FROM app.postforme_publications'),e=>e.code==='42501');
   await assert.rejects(dispatch.query('SELECT username FROM app.postforme_accounts'),e=>e.code==='42501');
-  assert.equal((await dispatch.query("SELECT count(*)::int n FROM app.postforme_publications WHERE observed_state<>'published'")).rows[0].n,0);
+  assert.equal((await dispatch.query("SELECT count(*)::int n FROM app.postforme_publications WHERE phase NOT IN ('accepted','unknown')")).rows[0].n,0);
   await assert.rejects(database.transaction(alice,org.id,true,db=>db.query(syncSnapshotSQL,[pub.id,org.id,brand.id,account.id,'24h','missing','{}',null,now.toISOString()]),brand.id),e=>e.code==='42501');
   const seen=await database.transaction(alice,org.id,false,db=>readPostformeObservations(db),brand.id);
   assert.equal(seen.published,1);assert.equal(seen.observations.length,1);const [o]=seen.observations;

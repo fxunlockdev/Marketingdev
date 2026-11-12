@@ -12,4 +12,5 @@ export function validReel(row:any){
   &&bytes*8000/m.duration_ms<=25000000;
 }
 
-export function validInstagramImage(row:any){return row?.format==='instagram-jpeg'&&row.width===1080&&row.height===1080&&Number.isSafeInteger(row.bytes)&&row.bytes>0&&row.bytes<=8*1024*1024&&row.manifest?.rendition?.format==='instagram-jpeg'&&row.manifest.rendition.fit==='contain';}
+/** Square, 4:5 and 9:16 (story) renditions at Instagram's 1080px width. */
+export function validInstagramImage(row:any){return row?.format==='instagram-jpeg'&&row.width===1080&&[1080,1350,1920].includes(row.height)&&Number.isSafeInteger(row.bytes)&&row.bytes>0&&row.bytes<=8*1024*1024&&row.manifest?.rendition?.format==='instagram-jpeg'&&row.manifest.rendition.fit==='contain';}
