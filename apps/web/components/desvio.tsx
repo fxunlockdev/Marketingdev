@@ -1,9 +1,9 @@
 "use client";
 import {DesvioSelect} from './desvio-select';
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { api, type Workspace } from "./api";
-import { Wordmark, Loading, Notice, Field } from "./primitives";
+import { Wordmark, Loading, Notice, Field, SessionPending } from "./primitives";
 import {SocialCallbackResult} from "./connections";
 import {PostformeReturn} from "./postforme-return";
 import { BusinessApp } from "./businesses";
@@ -29,7 +29,34 @@ export function Desvio() {
     return <AuthScreen key={mode} mode={mode} />;
   if(pathname.startsWith("/clients"))return <LegacyBusinessLink pathname={pathname}/>;
   if(pathname==="/accept-invitation")return <Session key={pathname} pathname={pathname} />;
-  return <BusinessApp pathname={pathname} />;
+  return <SignedIn><BusinessApp pathname={pathname} /></SignedIn>;
+}
+/**
+ * Holds the app shell back until the session is known. Without it an
+ * unauthenticated visitor saw the sidebar and navigation for the length of
+ * the session request before being sent to sign-in. A failed check falls
+ * through so the shell can show its own retryable error.
+ */
+function SignedIn({ children }: { children: ReactNode }) {
+  const router = useRouter(),
+    [state, setState] = useState<"pending" | "ready">("pending");
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const value = await api("/api/auth/get-session");
+        if (!active) return;
+        if (value?.user?.emailVerified) setState("ready");
+        else router.replace("/sign-in");
+      } catch {
+        if (active) setState("ready");
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [router]);
+  return state === "ready" ? <>{children}</> : <SessionPending />;
 }
 function Session({ pathname }: { pathname: string }) {
   const router = useRouter(),

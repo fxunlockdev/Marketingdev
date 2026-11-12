@@ -6,31 +6,6 @@
 @font-face { font-family: 'Desvio Display'; src: url('/site-brand/fonts/SpaceGrotesk-Regular.ttf') format('truetype'); font-weight: 400; font-display: swap; }
 @font-face { font-family: 'Desvio Display'; src: url('/site-brand/fonts/SpaceGrotesk-Medium.ttf') format('truetype'); font-weight: 500; font-display: swap; }
 @font-face { font-family: 'Desvio Display'; src: url('/site-brand/fonts/SpaceGrotesk-Bold.ttf') format('truetype'); font-weight: 600 700; font-display: swap; }
-:root, [data-astryx-theme="neutral"], body.desvio-redesign.desvio-polished {
-  --brand-paper: #f4f0e7;
-  --brand-field: #f8f5ee;
-  --brand-ink: #161713;
-  --brand-muted: #62655b;
-  --brand-link: #475b16;
-  --brand-wash: #eef4dc;
-  --brand-border: #dedbd1;
-  --brand-strong-border: #929b7b;
-  --brand-accent: #d9ff65;
-  --brand-accent-hover: #b7dd3a;
-  --font-family-heading: 'Desvio Display', 'Helvetica Neue', Arial, sans-serif;
-  --font-family-body: 'Desvio Body', 'Helvetica Neue', Arial, sans-serif;
-  --paper: var(--brand-paper); --ink: var(--brand-ink); --muted: var(--brand-muted);
-  --line: var(--brand-border); --blue: var(--brand-link); --blue-wash: var(--brand-wash);
-  --color-accent: var(--brand-link); --color-accent-muted: var(--brand-wash);
-  --color-text-accent: var(--brand-link); --color-icon-accent: var(--brand-link);
-  --color-text-primary: var(--brand-ink); --color-text-secondary: var(--brand-muted);
-  --color-background-body: var(--brand-paper); --color-background-muted: var(--brand-field);
-  --color-border: var(--brand-border); --color-border-emphasized: var(--brand-strong-border);
-  --ds-focus: var(--brand-link); --ds-focus-wash: #475b161a;
-  --focus-ring: var(--brand-link); --surface-soft: var(--brand-field);
-  --ds-field: var(--brand-field); --ds-ink: var(--brand-ink); --ds-muted: var(--brand-muted);
-  --ds-border: var(--brand-border); --ds-panel-radius: 16px; --radius-container: 16px;
-}
 ::selection { background: #d9ff65; color: #161713; }
 body.desvio-redesign.desvio-polished :is(h1,h2,h3,h4) {
   font-family: var(--font-family-heading); font-weight: 600; letter-spacing: -.03em;

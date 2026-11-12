@@ -1,0 +1,166 @@
+/* Desvio theme: the single source of design tokens for apps/web.
+ *
+ * A theme is a set of CSS custom property overrides on Astryx token names.
+ * Astryx ships its neutral theme inside `@layer astryx-theme`; these unlayered
+ * declarations therefore win without `!important`, for both the root element
+ * and any nested `<Theme>` scope.
+ *
+ * Rules for every other stylesheet:
+ *   - no hex literals: reference a token from this file;
+ *   - no new `:root` token blocks: add the token here;
+ *   - scoped surfaces (the dark canvas, onboarding) may re-point the legacy
+ *     aliases, but only to tokens.
+ * `node scripts/check-ui-tokens.mjs` enforces this against a committed baseline.
+ */
+:root,
+[data-astryx-theme="neutral"] {
+  /* 1. Brand palette: paper, ink and lime. The only raw colours in the app. */
+  --brand-paper: #f4f0e7;
+  --brand-field: #f8f5ee;
+  --brand-surface: #ffffff;
+  --brand-ink: #161713;
+  --brand-muted: #62655b;
+  --brand-link: #475b16;
+  --brand-wash: #eef4dc;
+  --brand-border: #dedbd1;
+  --brand-strong-border: #929b7b;
+  --brand-accent: #d9ff65;
+  --brand-accent-hover: #b7dd3a;
+  --brand-sand: #ebe6da;
+  --brand-clay: #e0dacb;
+  --brand-disabled: #eeedf2;
+  --brand-ink-raised: #35372f;
+  --brand-ink-line: #3b3f32;
+  --brand-ink-muted: #c9ccbf;
+
+  /* Status hues, tuned to sit on paper. Text values pass 4.5:1 on their wash. */
+  --status-positive: #2f6b2c;
+  --status-positive-wash: #e3f0d9;
+  --status-positive-border: #b5d3a4;
+  --status-info: #23506e;
+  --status-info-wash: #e2edf3;
+  --status-info-border: #b3cddb;
+  --status-caution: #7a4a05;
+  --status-caution-wash: #fbefcf;
+  --status-caution-border: #e6cf8f;
+  --status-danger: #a12039;
+  --status-danger-wash: #fff4f5;
+  --status-danger-border: #edc5ce;
+  --status-neutral: #4d5047;
+  --status-neutral-wash: #ebe9e1;
+  --status-neutral-border: #d3d0c5;
+
+  /* 2. Colour roles, on Astryx token names. */
+  --color-background-body: var(--brand-paper);
+  --color-background-surface: var(--brand-surface);
+  --color-background-card: var(--brand-surface);
+  --color-background-popover: var(--brand-surface);
+  --color-background-muted: var(--brand-field);
+  --color-background-inverted: var(--brand-ink);
+  --color-text-primary: var(--brand-ink);
+  --color-text-secondary: var(--brand-muted);
+  --color-text-accent: var(--brand-link);
+  --color-text-success: var(--status-positive);
+  --color-text-info: var(--status-info);
+  --color-text-warning: var(--status-caution);
+  --color-text-error: var(--status-danger);
+  --color-icon-accent: var(--brand-link);
+  --color-accent: var(--brand-link);
+  --color-accent-muted: var(--brand-wash);
+  --color-on-accent: var(--brand-surface);
+  --color-on-dark: var(--brand-paper);
+  --color-success: var(--status-positive);
+  --color-success-muted: var(--status-positive-wash);
+  --color-info: var(--status-info);
+  --color-info-muted: var(--status-info-wash);
+  --color-warning-muted: var(--status-caution-wash);
+  --color-error: var(--status-danger);
+  --color-error-muted: var(--status-danger-wash);
+  --color-border: var(--brand-border);
+  --color-border-emphasized: var(--brand-strong-border);
+  --color-track: var(--brand-border);
+  --color-focus: var(--brand-link);
+  --color-focus-wash: #475b161a;
+  --color-shadow: #1617131a;
+
+  /* 3. Spacing: Astryx's 4px scale (--spacing-1 … --spacing-12) is the only
+        scale. The --ds-space-* names are aliases kept for existing rules. */
+  --ds-space-1: var(--spacing-1);
+  --ds-space-2: var(--spacing-2);
+  --ds-space-3: var(--spacing-3);
+  --ds-space-4: var(--spacing-4);
+  --ds-space-5: var(--spacing-5);
+  --ds-space-6: var(--spacing-6);
+  --ds-space-8: var(--spacing-8);
+  --panel-gap: var(--spacing-5);
+
+  /* 4. Radius: one scale. */
+  --radius-inner: 8px;
+  --radius-element: 12px;
+  --radius-container: 16px;
+  --radius-page: 24px;
+  --radius-full: 9999px;
+
+  /* 5. Elevation: three shadows. */
+  --shadow-low: 0 1px 2px #16171308;
+  --shadow-med: 0 6px 18px #16171312, 0 1px 2px #1617130a;
+  --shadow-high: 0 18px 44px #16171324, 0 2px 6px #1617130f;
+
+  /* 6. Motion: two durations and one easing. */
+  --duration-fast: 120ms;
+  --duration-medium: 180ms;
+  --ease-standard: cubic-bezier(.2, .8, .2, 1);
+
+  /* 7. Type: DM Sans for text, Space Grotesk for display. The scale has its
+        own names: Astryx's --font-size-* tokens size its components and body
+        copy, and re-pointing them shifted existing screens. */
+  --font-family-body: 'Desvio Body', 'Helvetica Neue', Arial, sans-serif;
+  --font-family-heading: 'Desvio Display', 'Helvetica Neue', Arial, sans-serif;
+  --type-xs: .75rem;
+  --type-sm: .875rem;
+  --type-base: 1rem;
+  --type-lg: 1.125rem;
+  --type-xl: 1.375rem;
+  --type-2xl: 1.75rem;
+  --type-3xl: 2.25rem;
+  --type-4xl: 3rem;
+  --leading-tight: 1.1;
+  --leading-snug: 1.35;
+  --leading-body: 1.55;
+
+  /* 8. Control metrics. */
+  --control-height: 44px;
+  --control-height-sm: 36px;
+  --control-height-lg: 52px;
+
+  /* 9. Aliases for names already used across the 37 stylesheets. They carry
+        no values of their own; new code uses the Astryx names above. */
+  --paper: var(--brand-paper);
+  --white: var(--brand-surface);
+  --ink: var(--brand-ink);
+  --muted: var(--brand-muted);
+  --line: var(--brand-border);
+  --blue: var(--brand-link);
+  --blue-wash: var(--brand-wash);
+  --studio-orange: var(--brand-link);
+  --green: #51603c;
+  --red: #a32b2b;
+  --radius: var(--radius-page);
+  --studio-ease: var(--ease-standard);
+  --ease-settle: var(--ease-standard);
+  --motion-quick: var(--duration-fast);
+  --motion-settle: var(--duration-medium);
+  --surface-soft: var(--brand-field);
+  --focus-ring: var(--color-focus);
+  --ds-focus: var(--color-focus);
+  --ds-focus-wash: var(--color-focus-wash);
+  --ds-field: var(--brand-field);
+  --ds-ink: var(--brand-ink);
+  --ds-muted: var(--brand-muted);
+  --ds-border: var(--brand-border);
+  --ds-surface: var(--brand-surface);
+  --ds-control-height: var(--control-height);
+  --ds-field-radius: var(--radius-element);
+  --ds-panel-radius: var(--radius-container);
+  --ds-panel-padding: clamp(20px, 2.2vw, 32px);
+}

@@ -1,13 +1,4 @@
 /* Shared chrome only. Artwork, dragging and exported creative styles are untouched. */
-.desvio-redesign.desvio-polished {
-  --motion-quick: 120ms;
-  --motion-settle: 180ms;
-  --ease-settle: cubic-bezier(.2, .8, .2, 1);
-  --surface-soft: var(--brand-field);
-  --focus-ring: var(--brand-link);
-  --panel-gap: 20px;
-}
-
 /* Immediate press feedback, with no transition that delays an action. */
 .desvio-redesign.desvio-polished :is(.v5-shell, .create-chat-screen, .auth-layout) :is(button, a.button, summary) {
   -webkit-tap-highlight-color: transparent;

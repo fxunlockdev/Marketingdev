@@ -2,7 +2,7 @@
    editorial headings. Presentation only; application states remain authoritative. */
 @font-face{font-family:'Desvio Sans';src:url('/fonts/dm-sans.ttf') format('truetype');font-weight:100 900;font-display:swap}
 @font-face{font-family:'Desvio Serif';src:url('/fonts/dm-serif-display.ttf') format('truetype');font-weight:400;font-display:swap}
-.desvio-redesign{--paper:var(--brand-paper);--white:#fff;--ink:var(--brand-ink);--muted:var(--brand-muted);--line:var(--brand-border);--blue:var(--brand-link);--blue-wash:var(--brand-wash);--studio-orange:var(--brand-link);--radius:24px;background:var(--paper);color:var(--ink);font-family:'Desvio Sans',system-ui,sans-serif}
+.desvio-redesign{background:var(--paper);color:var(--ink);font-family:'Desvio Sans',system-ui,sans-serif}
 .desvio-redesign :is(button,input,textarea,select){font-family:inherit}
 .desvio-redesign :is(h1,h2,h3,p){overflow-wrap:break-word}
 .desvio-redesign h1{font-family:var(--font-family-heading);font-weight:400;font-size:clamp(32px,3.3vw,48px);letter-spacing:-.8px;line-height:1.08;text-wrap:balance}
@@ -85,9 +85,9 @@
 .desvio-redesign .auth-story{grid-column:2;grid-row:1;position:relative;isolation:isolate;overflow:hidden;border-radius:28px;background:var(--brand-ink);color:#fff;padding:48px}
 .desvio-redesign .auth-story:after{content:'';position:absolute;z-index:-1;width:330px;height:330px;border-radius:50%;background:var(--brand-link);right:-80px;top:-60px}
 .desvio-redesign .auth-story h2{font-family:var(--font-family-heading);font-size:clamp(36px,4.5vw,64px);color:#fff}
-.desvio-redesign .auth-story p,.desvio-redesign .auth-story .eyebrow,.desvio-redesign .story-foot{color:#d0cedd}
+.desvio-redesign .auth-story p,.desvio-redesign .auth-story .eyebrow,.desvio-redesign .story-foot{color:var(--brand-ink-muted)}
 .desvio-redesign .auth-card{max-width:420px;width:100%}
-.desvio-redesign .auth-card .mobile-wordmark{display:block;margin-bottom:32px}
+.desvio-redesign .auth-card .mobile-wordmark{margin-bottom:32px}
 .desvio-redesign .auth-card .wordmark{font-family:var(--font-family-heading);gap:0;font-size:30px;font-weight:400}
 @media(max-width:1100px) and (min-width:761px){.desvio-redesign .v5-shell{grid-template-columns:210px minmax(0,1fr)}.desvio-redesign .v5-topbar{padding:14px 18px}.desvio-redesign .v5-main{padding-inline:0}.desvio-redesign .redesign-welcome{flex-wrap:wrap}.desvio-redesign .v5-panel{padding:22px}}
 @media(max-width:760px){.desvio-redesign .v5-shell{display:block;padding:8px}.desvio-redesign .v5-sidebar{position:relative;top:0;height:auto;overflow:visible;padding:16px;border-radius:22px;gap:12px}.desvio-redesign .workspace-switcher{padding:0;flex:1;gap:12px}.desvio-redesign .workspace-switcher .field{max-width:260px}.desvio-redesign .v5-topbar{margin-top:8px;padding:14px 16px;flex-wrap:wrap;border-radius:20px}.desvio-redesign .v5-main{padding:16px 0 40px}.desvio-redesign .v5-panel,.desvio-redesign .overview-upcoming,.desvio-redesign .overview-campaigns,.desvio-redesign .overview-details,.desvio-redesign .preference-section{padding:20px;border-radius:22px}.desvio-redesign .redesign-welcome{padding:24px;flex-direction:column;align-items:flex-start;min-height:240px}.desvio-redesign .auth-layout{display:block;padding:8px}.desvio-redesign .auth-main{padding:32px 24px;min-height:calc(100dvh - 16px)}.desvio-redesign .auth-story{display:none}.desvio-redesign .section-heading{align-items:flex-start;flex-wrap:wrap}.desvio-redesign :is(input:not([type=checkbox]):not([type=radio]),select,textarea){font-size:16px}}
@@ -205,7 +205,7 @@
 .desvio-redesign .v5-business-card,.desvio-redesign .v5-add-card{min-width:0}
 @media(max-width:480px){.desvio-redesign .learnings-workspace>.workspace-view-switch{gap:6px}.desvio-redesign .learnings-workspace>.workspace-view-switch button{padding:10px 12px;font-size:13px}}
 
-.desvio-redesign .header-actions .header-create{background:var(--brand-ink);color:#fff;border:0;border-radius:999px;min-height:40px;display:inline-flex;gap:8px;align-items:center;padding:0 18px;font-size:14px}.desvio-redesign .header-actions .header-create:hover{background:var(--brand-link);color:white}
+.desvio-redesign .header-actions .header-create{background:var(--color-background-surface);color:var(--brand-ink);border:1px solid var(--color-border);border-radius:var(--radius-full);min-height:var(--control-height);display:inline-flex;gap:8px;align-items:center;padding:0 18px;font-size:14px;font-weight:600}.desvio-redesign .header-actions .header-create:hover{background:var(--brand-wash);border-color:var(--brand-strong-border);color:var(--brand-link)}.desvio-redesign .header-actions .header-create:active{background:var(--brand-sand)}
 
 /* Export is a sequence of review steps shared by canvas and campaign posts. */
 .desvio-redesign .final-image-review{display:flex;flex-direction:column;align-items:flex-start;gap:16px;margin:28px 0 0;padding:24px 0 0;min-width:0;border-color:var(--line)}

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import {MfaChallenge} from './mfa';
 import { api } from "./api";
 import { Field, Notice, Wordmark } from "./primitives";
+import { Button } from "./ui/button";
 export function AuthScreen({ mode }: { mode: string }) {
   const router = useRouter(),
     [email, setEmail] = useState(""),
@@ -88,7 +89,7 @@ export function AuthScreen({ mode }: { mode: string }) {
     }
   }
   const title = challenge ? "Verify it’s you." : signup
-    ? "A clear home for every brand."
+    ? "A clear home for your brand."
     : forgot
       ? "Let’s get you back in."
       : reset
@@ -96,12 +97,21 @@ export function AuthScreen({ mode }: { mode: string }) {
         : verify
           ? "Verify your email."
           : "Welcome back.";
+  const submitLabel = signup
+    ? "Create account"
+    : forgot
+      ? "Send reset link"
+      : verify
+        ? "Send verification link"
+        : reset
+          ? "Save new password"
+          : "Sign in";
   return (
     <div className="auth-layout">
       <aside className="auth-story">
-        <Wordmark />
+        <Wordmark tone="paper" />
         <div>
-          <span className="eyebrow">YOUR BRANDS. YOUR DIRECTION.</span>
+          <span className="eyebrow">YOUR BRAND. YOUR DIRECTION.</span>
           <h2>
             Good creative starts
             <br />
@@ -110,8 +120,8 @@ export function AuthScreen({ mode }: { mode: string }) {
             <em>your brand.</em>
           </h2>
           <p>
-            Keep each client’s identity, references and team together in one
-            considered workspace.
+            One account for your business: your brand, your content plan and
+            your approvals, together in one considered workspace.
           </p>
         </div>
         <span className="story-foot">
@@ -127,7 +137,7 @@ export function AuthScreen({ mode }: { mode: string }) {
           <h1>{title}</h1>
           <p className="intro">
             {signup
-              ? "Start with your account. Add your clients and brands next."
+              ? "Start with your account. Add your business next."
               : forgot
                 ? "We’ll email a secure link if there’s an account with that address."
                 : reset
@@ -146,15 +156,15 @@ export function AuthScreen({ mode }: { mode: string }) {
                     ? "If an account exists, a reset email is queued. Check your inbox and spam folder."
                     : "A verification email has been requested. Open its link before signing in."}
               </p>
-              <a
-                className="button primary"
+              <Button
+                variant="primary"
                 href={
                   "/sign-in" +
                   (invite ? "#invite=" + encodeURIComponent(invite) : "")
                 }
               >
                 Back to sign in
-              </a>
+              </Button>
             </section>
           ) : challenge ? <MfaChallenge onVerified={finishSignIn} onCancel={()=>{setChallenge(false);setError(undefined);}}/> : (
             <form onSubmit={submit} aria-busy={busy}>
@@ -209,23 +219,16 @@ export function AuthScreen({ mode }: { mode: string }) {
                 </Field>
               )}
               <Notice error={error} />
-              <button
-                className="primary full"
-                disabled={busy || (reset && !token)}
-              >
-                {busy
-                  ? "Please wait…"
-                  : signup
-                    ? "Create account"
-                    : forgot
-                      ? "Send reset link"
-                      : verify
-                        ? "Send verification link"
-                        : reset
-                          ? "Save new password"
-                          : "Sign in"}
-                <span aria-hidden="true">↗</span>
-              </button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                block
+                loading={busy}
+                disabled={reset && !token}
+                label={submitLabel}
+                endContent={<span aria-hidden="true">↗</span>}
+              />
               {reset && !token && (
                 <p className="hint">
                   Open the link from your reset email to continue.{" "}
