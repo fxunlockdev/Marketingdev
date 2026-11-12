@@ -56,10 +56,11 @@ export class BrandStrategies{
    try{input=validateStrategyInput({task:'strategy',brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:{id:string;field:string;value:string})=>({id:f.id,field:f.field,value:f.value}))},preferences,...v});}
    catch{throw new BadRequestException('Check the research evidence and context supplied for this strategy');}
    const grant=(await db.query("SELECT model FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' AND enabled AND expires_at>now()",[b.organization_id,id])).rows[0];
-   const job=randomUUID();
+   // The worker compares scheduled_at with its own clock; use the API clock, as plan requests do, not the database's.
+   const job=randomUUID(),due=new Date().toISOString();
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'plan.generate')",[job,b.organization_id,id,user]);
-   await db.query("INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'openai',$9,now())",[job,b.organization_id,id,brain.id,JSON.stringify(input),hash(canonicalJSON(input)),requestKey,requestHash,grant?.model??null]);
-   await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',now())",[job,b.organization_id,id]);
+   await db.query("INSERT INTO app.planning_requests(job_id,organization_id,brand_id,brain_id,input,input_sha256,request_key,request_hash,provider,selected_model,scheduled_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'openai',$9,$10)",[job,b.organization_id,id,brain.id,JSON.stringify(input),hash(canonicalJSON(input)),requestKey,requestHash,grant?.model??null,due]);
+   await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind,available_at) VALUES($1,$2,$3,'plan.generate',$4)",[job,b.organization_id,id,due]);
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'plan.requested',$4)",[b.organization_id,id,user,job]);
    return {id:job,status:'queued'};
   });
