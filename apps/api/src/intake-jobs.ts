@@ -1,7 +1,12 @@
 type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string):Promise<{
  pages:WebsitePage[];captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture['snapshots'][number]}[]}>;
  visualErrors:{url:string;code:string}[];coverage:Record<string,any>;
-}>};
+}>;
+ /** Optional second step: open-web market and competitor research for a guided brief. */
+ market?(jobs:AssetJobs,scope:JobScope,url:string,brief?:GuidedBrief|null):Promise<MarketResearch>;
+};
+import {BRAND_RESERVED_SQL,MARKET_RESEARCH_VERSION,type MarketPage,type MarketResearch} from './openai-website-research.js';
+import type {GuidedBrief} from './guided-campaign-contracts.js';
 import {exhaustedIntakeOutcome} from "./intake-outcome.js";
 import {BUSINESS_RESEARCH_AGENT_VERSION} from './guided-campaign-contracts.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
@@ -15,9 +20,31 @@ import {
   BrandAnalyzer,
   analysisRequest,
   type AnalysisInput,
+  type EvidenceChunk,
 } from "./brand-analysis.js";
 import { lockReview, bumpReview } from "./brand-brain.js";
 import { prepareVisuals, visualManifest } from "./visual-analysis.js";
+/** Website photographs sent to analysis when a capture produced no page screenshots. */
+export const PHOTO_EVIDENCE_LIMIT = 6;
+const EVIDENCE_CHARACTERS = 40000, MARKET_EVIDENCE_CHARACTERS = 12000;
+type EvidenceRow = EvidenceChunk & { market?: boolean };
+/** Fit evidence to the analysis limit. The business's own evidence comes first and
+ * market notes get a bounded share, so competitor material can never crowd it out. */
+export function selectEvidence(rows: EvidenceRow[]): EvidenceChunk[] {
+  const take = (list: EvidenceRow[], budget: number) => {
+    let length = 0;
+    return list.flatMap((row) => {
+      const { market, ...chunk } = row, text = chunk.text.slice(0, budget - length);
+      length += text.length;
+      return text ? [{ ...chunk, text, ...(market ? { origin: "market" as const } : {}) }] : [];
+    });
+  };
+  const marketRows = rows.filter((row) => row.market), ownRows = rows.filter((row) => !row.market);
+  const marketShare = Math.min(MARKET_EVIDENCE_CHARACTERS, marketRows.reduce((n, row) => n + row.text.length, 0));
+  const own = take(ownRows, EVIDENCE_CHARACTERS - marketShare);
+  const used = own.reduce((n, chunk) => n + chunk.text.length, 0);
+  return [...own, ...take(marketRows, Math.min(MARKET_EVIDENCE_CHARACTERS, EVIDENCE_CHARACTERS - used))];
+}
 const terminal = new Set([
   "succeeded",
   "rejected",
@@ -98,18 +125,21 @@ export class IntakeJobs {
       async (db, j) =>
         (
           await db.query(
-            "SELECT website_url FROM app.intake_requests WHERE job_id=$1",
+            "SELECT website_url,research_context FROM app.intake_requests WHERE job_id=$1",
             [j.id],
           )
         ).rows[0],
     );
     if(this.websiteIntake){
       const captured=await this.websiteIntake.capture(this.jobs,scope,input.website_url);
-      return this.persistWebsite(scope,captured.pages,captured.captures,captured.visualErrors,captured.coverage);
+      // Own-site research is already saved in its ledger. The market step is separate
+      // and best-effort, so its outcome is reported beside the capture, never instead of it.
+      const market=this.websiteIntake.market?await this.websiteIntake.market(this.jobs,scope,input.website_url,input.research_context):undefined;
+      return this.persistWebsite(scope,captured.pages,captured.captures,captured.visualErrors,market?{...captured.coverage,market:market.summary}:captured.coverage,market?.pages??[]);
     }
     throw new IntakeError("AI_NOT_CONFIGURED");
   }
-  private async persistWebsite(scope:JobScope,pages:WebsitePage[],captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture["snapshots"][number]}[]}>,visualErrors:{url:string;code:string}[],coverage:any){
+  private async persistWebsite(scope:JobScope,pages:WebsitePage[],captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture["snapshots"][number]}[]}>,visualErrors:{url:string;code:string}[],coverage:any,marketPages:MarketPage[]=[]){
     const newBytes = [...captures.values()].reduce(
       (n, c) =>
         n +
@@ -233,10 +263,24 @@ export class IntakeJobs {
             );
         inserted++;
       }
-      if (inserted) {
+      // Market and competitor notes are stored beside own-site evidence but tagged by
+      // parser version and coverage type, so no later stage can mistake them for the
+      // business's own words. They never fail the capture: at the source limit they stop.
+      let marketInserted = 0;
+      for (const page of marketPages) {
+        if (state.source_count + inserted + marketInserted >= 100) break;
+        if ((await db.query("SELECT id FROM app.brand_sources WHERE organization_id=$1 AND brand_id=$2 AND website_url=$3 AND sha256=$4 AND parser_version=$5",[j.organization_id,j.brand_id,page.url,page.sha256,MARKET_RESEARCH_VERSION])).rowCount) continue;
+        const source = randomUUID();
+        await db.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,$5,$6,$7)",
+          [source,j.organization_id,j.brand_id,page.sha256,MARKET_RESEARCH_VERSION,JSON.stringify({type:"ai_market_research",origin:"market",truncated:false,warning:"AI-written market and competitor research from third-party pages. Analysis only: not the business's own website, not an approved brand fact and never wording to copy."}),page.url]);
+        for (const chunk of page.chunks)
+          await db.query("INSERT INTO app.brand_chunks(id,organization_id,brand_id,source_id,page,anchor,text) VALUES($1,$2,$3,$4,1,$5,$6)",[randomUUID(),j.organization_id,j.brand_id,source,chunk.anchor,chunk.text]);
+        marketInserted++;
+      }
+      if (inserted + marketInserted) {
         await db.query(
           "UPDATE app.brand_review_state SET source_count=source_count+$3 WHERE organization_id=$1 AND brand_id=$2",
-          [j.organization_id, j.brand_id, inserted],
+          [j.organization_id, j.brand_id, inserted + marketInserted],
         );
         await bumpReview(db, j.organization_id, j.brand_id);
       }
@@ -257,6 +301,7 @@ export class IntakeJobs {
             visualPages: captures.size,
             visualErrors,
             newSources: inserted,
+            ...(coverage.market ? {market:{...coverage.market,newSources:marketInserted}} : {}),
           }),
         ],
       );
@@ -287,6 +332,17 @@ export class IntakeJobs {
           [j.organization_id, j.brand_id],
         )
       ).rows;
+      // A capture without page screenshots still has the site's own photographs. Use a
+      // capped set of the largest ones so the direction is not written blind.
+      const photoRows = rows.length ? [] : (
+        await db.query(
+          `SELECT v.*,s.website_url FROM app.website_visuals v JOIN app.brand_sources s ON s.id=v.source_id
+        WHERE v.organization_id=$1 AND v.brand_id=$2 AND v.viewport='photo' AND v.job_id=(SELECT x.job_id FROM app.website_visuals x WHERE x.organization_id=$1 AND x.brand_id=$2 ORDER BY x.captured_at DESC LIMIT 1)
+        ORDER BY v.width*v.height DESC,v.id LIMIT $3`,
+          [j.organization_id, j.brand_id, PHOTO_EVIDENCE_LIMIT],
+        )
+      ).rows;
+      const websiteRows = rows.length ? rows : photoRows;
       const documentRows = (await db.query(`SELECT v.*,v.page AS document_page,s.sha256 AS document_sha256,'document' AS viewport,'{}'::jsonb AS observations
         FROM app.document_visuals v JOIN app.brand_sources s ON s.id=v.source_id
         WHERE v.organization_id=$1 AND v.brand_id=$2
@@ -294,7 +350,7 @@ export class IntakeJobs {
       const documentPageCount = Number((await db.query("SELECT count(*) AS n FROM app.document_visuals WHERE organization_id=$1 AND brand_id=$2", [j.organization_id,j.brand_id])).rows[0].n);
       // Share the existing ten-source budget. Keep website evidence alongside
       // documents, and record exactly which pages reached the model manifest.
-      const selectedRows = documentRows.length ? [...rows.slice(0, Math.min(rows.length, 4)), ...documentRows.slice(0, 10-Math.min(rows.length, 4))] : rows;
+      const selectedRows = documentRows.length ? [...websiteRows.slice(0, Math.min(websiteRows.length, 4)), ...documentRows.slice(0, 10-Math.min(websiteRows.length, 4))] : websiteRows;
       if (!selectedRows.length) return null;
       const grant = (
         await db.query(
@@ -302,8 +358,12 @@ export class IntakeJobs {
           [j.organization_id, j.brand_id],
         )
       ).rows[0];
-      if (!grant?.max_tokens_per_image)
+      if (!grant?.max_tokens_per_image) {
+        // Photographs are an addition to text research, not a prerequisite: a business
+        // without a vision allowance keeps the text-only analysis it had before.
+        if (selectedRows.every((row) => row.viewport === "photo")) return null;
         throw new IntakeError("AI_VISION_APPROVAL_REQUIRED");
+      }
       return {
         rows: selectedRows,
         documentPageCount,
@@ -350,16 +410,11 @@ export class IntakeJobs {
       // Keep archived questionnaires for history, but ground this run only in its submitted snapshot.
       const chunks = (
         await db.query(
-          "SELECT c.id,c.source_id,c.text,c.page,s.website_url FROM app.brand_chunks c JOIN app.brand_sources s ON s.id=c.source_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND CASE WHEN $3::jsonb IS NOT NULL AND s.parser_version=$4 THEN (c.text::jsonb - 'brand_name')=$3::jsonb ELSE true END ORDER BY s.captured_at DESC,c.page,c.anchor,c.id LIMIT 100",
-          [j.organization_id, j.brand_id,researchContext?JSON.stringify(researchContext):null,BUSINESS_RESEARCH_AGENT_VERSION],
+          "SELECT c.id,c.source_id,c.text,c.page,s.website_url,(s.parser_version=$5) AS market FROM app.brand_chunks c JOIN app.brand_sources s ON s.id=c.source_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND CASE WHEN $3::jsonb IS NOT NULL AND s.parser_version=$4 THEN (c.text::jsonb - 'brand_name')=$3::jsonb ELSE true END ORDER BY s.captured_at DESC,c.page,c.anchor,c.id LIMIT 100",
+          [j.organization_id, j.brand_id,researchContext?JSON.stringify(researchContext):null,BUSINESS_RESEARCH_AGENT_VERSION,MARKET_RESEARCH_VERSION],
         )
       ).rows;
-      let length = 0;
-      const selected = chunks.flatMap((c) => {
-        const text = c.text.slice(0, 40000 - length);
-        length += text.length;
-        return text ? [{ ...c, text }] : [];
-      });
+      const selected = selectEvidence(chunks);
       const reviewed = (
         await db.query(
           "SELECT field,value,status FROM app.brand_findings WHERE organization_id=$1 AND brand_id=$2 AND status<>'unreviewed' ORDER BY field,id LIMIT 500",
@@ -384,7 +439,7 @@ export class IntakeJobs {
       const used = Number(
         (
           await db.query(
-            "SELECT COALESCE(sum(reserved_micros),0) AS used FROM app.analysis_calls WHERE organization_id=$1 AND brand_id=$2",
+            BRAND_RESERVED_SQL,
             [j.organization_id, j.brand_id],
           )
         ).rows[0].used,

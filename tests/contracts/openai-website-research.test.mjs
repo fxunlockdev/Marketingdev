@@ -54,3 +54,100 @@ test('completed research without citations falls back once and persists reusable
  const first=await provider.capture(jobs,{},'https://example.org/');assert.deepEqual(first.pages,pages);assert.equal(first.coverage.method,'direct_website_text');
  const second=await provider.capture(jobs,{},'https://example.org/');assert.deepEqual(second.pages,pages);assert.equal(paid,1);assert.equal(direct,1);
 });
+
+// ---- Market and competitor research: a second, separately recorded request ----
+const marketBrief={offering:'Scheduling tools for dental practices',audience:'Practice managers',market:'Lisbon',goal:'leads',visual_direction:'',must_follow:'',details:{social_profile:{platform:'instagram',handle:'@acmedental'},business_name:'Acme',website:'https://example.org/',business_type:'services',industry:'professional',cta:'',differentiator:'',timing:'',competitors:['Rival One','https://rival-two.test'],priority_offers:'',folder_url:'',guidelines:'',references:[]}};
+const marketOutput=()=>({notes:[
+ {section:'market_language',subject:'',text:'Practices talk about "no-shows" and "chair time".',source_url:'https://trade.test/guide'},
+ {section:'competitor_positioning',subject:'Rival One',text:'Positions itself as the all-in-one front desk.',source_url:'https://rival-one.test/'},
+ {section:'audience_pain',subject:'',text:'"We lose two hours a day to phone tag."',source_url:'https://forum.test/thread?utm_source=openai'},
+ {section:'content_gap',subject:'',text:'Nobody explains recall scheduling with real examples.',source_url:'https://trade.test/guide'},
+ {section:'competitor_offers',subject:'Rival One',text:'Invented claim with a source that was never consulted.',source_url:'https://never-opened.test/'}],
+ discovered_competitors:[{name:'Third Chair',url:'https://third-chair.test/',reason:'Sells reminders to the same practices.'},{name:'Self',url:'https://www.example.org/',reason:'The business itself.'},{name:'Ghost',url:'https://ghost.test/',reason:'Never consulted.'}]});
+const marketResponse=(value=marketOutput())=>({id:'resp_market',status:'completed',usage:{input_tokens:10},output:[
+ {type:'web_search_call',status:'completed',action:{type:'search',query:'dental scheduling',sources:[{type:'url',url:'https://trade.test/guide'},{type:'url',url:'https://rival-one.test'},{type:'url',url:'https://third-chair.test/pricing'}]}},
+ {type:'web_search_call',status:'completed',action:{type:'open_page',url:'https://forum.test/thread'}},
+ {type:'message',content:[{type:'output_text',text:JSON.stringify(value),annotations:[]}]}]});
+test('market research is a separate, unrestricted, capped request built only from the saved brief',async()=>{
+ const {marketResearchRequest,MARKET_RESEARCH_RESERVATION_MICROS,RESEARCH_RESERVATION_MICROS}=await import('../../dist/openai-website-research.js');
+ const {reservationRates}=await import('../../dist/model-policy.js');
+ const r=marketResearchRequest('https://www.example.org/',marketBrief);
+ assert.equal(r.model,RESEARCH_MODEL);assert.equal(r.store,false);assert.equal(r.max_tool_calls,8);assert.equal(r.max_output_tokens,8000);assert.equal(r.tool_choice,'required');
+ assert.equal(r.tools.length,1);assert.equal(r.tools[0].type,'web_search');assert.equal(r.tools[0].filters,undefined);
+ assert.equal(r.text.format.type,'json_schema');assert.equal(r.text.format.strict,true);
+ const input=JSON.parse(r.input);assert.equal(input.business.name,'Acme');assert.equal(input.business.market,'Lisbon');assert.equal(input.business.industry,'professional');
+ assert.deepEqual(input.named_competitors,['Rival One','https://rival-two.test']);assert.deepEqual(input.social_profile,{platform:'instagram',handle:'@acmedental'});
+ assert.match(r.instructions,/untrusted/i);assert.match(r.instructions,/never cop/i);
+ // The customer's answers travel as data, never inside the instructions.
+ assert.ok(!r.instructions.includes('Rival One')&&!r.instructions.includes('Acme'));
+ const rates=reservationRates('research');
+ assert.ok(MARKET_RESEARCH_RESERVATION_MICROS>=8000*rates.output_micros_per_token+200000*rates.input_micros_per_token);
+ assert.ok(MARKET_RESEARCH_RESERVATION_MICROS>RESEARCH_RESERVATION_MICROS&&Number.isSafeInteger(MARKET_RESEARCH_RESERVATION_MICROS));
+ assert.throws(()=>marketResearchRequest('http://127.0.0.1',marketBrief));
+ // A brief without the optional details still produces a bounded request.
+ const {details,...plain}=marketBrief;const bare=JSON.parse(marketResearchRequest('https://example.org/',plain).input);
+ assert.equal(bare.business.name,'example.org');assert.deepEqual(bare.named_competitors,[]);assert.equal(bare.social_profile,null);
+});
+test('market notes keep their own source, are tagged apart from own-site research and drop unconsulted sources',async()=>{
+ const {marketResearchPages,MARKET_RESEARCH_VERSION}=await import('../../dist/openai-website-research.js');
+ const {pages,discovered}=marketResearchPages(marketResponse(),'https://example.org/');
+ assert.deepEqual(pages.map(p=>p.url).sort(),['https://forum.test/thread','https://rival-one.test/','https://trade.test/guide']);
+ assert.ok(pages.every(p=>p.coverage==='ai_market_research'&&p.parserVersion===MARKET_RESEARCH_VERSION&&/^[a-f0-9]{64}$/.test(p.sha256)));
+ const trade=pages.find(p=>p.url==='https://trade.test/guide');assert.equal(trade.chunks.length,2);
+ assert.ok(pages.flatMap(p=>p.chunks).every(c=>/analysis only/.test(c.text)&&/never an approved brand fact/.test(c.text)&&c.anchor.startsWith('ai-market:')&&c.anchor.length<=200));
+ assert.match(pages.find(p=>p.url==='https://rival-one.test/').chunks[0].text,/Competitor positioning · Rival One/);
+ assert.ok(!JSON.stringify(pages).includes('Invented claim'));
+ assert.deepEqual(discovered,[{name:'Third Chair',url:'https://third-chair.test/'}]);
+});
+test('market research fails closed on unfinished, refused, unsearched, malformed or wholly unsourced output',async()=>{
+ const {marketResearchPages}=await import('../../dist/openai-website-research.js');
+ for(const mutate of [r=>r.status='incomplete',r=>r.output.splice(0,2),r=>r.output[2].content[0].text='not json',r=>r.output[2].content=[{type:'refusal',refusal:'no'}],
+  r=>r.output[2].content[0].text=JSON.stringify({notes:[{section:'content_gap',subject:'',text:'x',source_url:'https://never-opened.test/'}],discovered_competitors:[]}),
+  r=>r.output[2].content[0].text=JSON.stringify({notes:[{section:'content_gap',subject:'',text:'x',source_url:'http://127.0.0.1/'}],discovered_competitors:[]}),
+  r=>{for(let i=0;i<8;i++)r.output.unshift({type:'web_search_call',status:'completed',action:{type:'search'}});}]){
+  const r=marketResponse();mutate(r);assert.throws(()=>marketResearchPages(r,'https://example.org/'),/AI_/);
+ }
+ const oversized=marketOutput();oversized.notes[0].text='x'.repeat(1201);oversized.notes[1].section='brand_fact';
+ const {pages}=marketResearchPages(marketResponse(oversized),'https://example.org/');assert.ok(!JSON.stringify(pages).includes('xxxx')&&!pages.some(p=>p.url==='https://rival-one.test/'));
+});
+const marketLedger=({budget=100000000,used=0,monthly=false}={})=>{
+ const state={row:null,inserts:0};
+ const db={query:async(sql,args)=>{
+  if(sql.startsWith('SELECT * FROM app.market_research_calls'))return {rows:state.row?[state.row]:[]};
+  if(sql.includes('analysis_grants'))return {rows:budget===null?[]:[{budget_micros:budget}]};
+  if(sql.includes('sum(reserved_micros)'))return {rows:[{used}]};
+  if(sql.startsWith('INSERT INTO app.market_research_calls')){if(monthly)throw Object.assign(new Error('MONTHLY_GENERATION_BUDGET_EXHAUSTED'),{code:'P0001'});state.inserts++;state.row={status:'submitted',reserved_micros:args[4]};return {rows:[]};}
+  if(sql.startsWith('UPDATE app.market_research_calls')){state.row={...state.row,status:sql.includes("'succeeded'")?'succeeded':args[1],result:JSON.parse(sql.includes("'succeeded'")?args[2]:args[2])};return {rows:[]};}
+  return {rows:[{revision:1}],rowCount:1};
+ }};
+ return {state,jobs:{transaction:async(_,fn)=>fn(db,{id:'job',kind:'website.extract',organization_id:'org',brand_id:'brand'}),permitted:async()=>true}};
+};
+test('the market step reserves once, replays its saved result and never pays twice',async()=>{
+ const {OpenAIWebsiteResearch,MARKET_RESEARCH_RESERVATION_MICROS}=await import('../../dist/openai-website-research.js');let paid=0;
+ const {state,jobs}=marketLedger();
+ const provider=new OpenAIWebsiteResearch(undefined,{responses:{create:async(body)=>{paid++;assert.equal(body.max_tool_calls,8);return marketResponse();}}});
+ const first=await provider.market(jobs,{},'https://example.org/',marketBrief);
+ assert.equal(first.pages.length,3);assert.equal(first.summary.status,'completed');assert.equal(first.summary.notes,4);assert.deepEqual(first.summary.discovered_competitors,[{name:'Third Chair',url:'https://third-chair.test/'}]);
+ assert.equal(state.row.reserved_micros,MARKET_RESEARCH_RESERVATION_MICROS);
+ const second=await provider.market(jobs,{},'https://example.org/',marketBrief);assert.deepEqual(second,first);assert.equal(paid,1);assert.equal(state.inserts,1);
+});
+test('a failed or uncertain market step never fails own-site research and is never retried',async()=>{
+ const {OpenAIWebsiteResearch}=await import('../../dist/openai-website-research.js');
+ for(const [failure,status,code] of [[new Error('socket hang up'),'unknown','AI_RESEARCH_SUBMISSION_UNKNOWN'],[null,'rejected','AI_RESEARCH_NO_SOURCES']]){
+  let paid=0;const {state,jobs}=marketLedger();
+  const provider=new OpenAIWebsiteResearch(undefined,{responses:{create:async()=>{paid++;if(failure)throw failure;const r=marketResponse();r.output.splice(0,2);return r;}}});
+  const first=await provider.market(jobs,{},'https://example.org/',marketBrief);
+  assert.deepEqual(first.pages,[]);assert.equal(first.summary.status,'unavailable');assert.equal(first.summary.code,code);assert.equal(state.row.status,status);
+  const replay=await provider.market(jobs,{},'https://example.org/',marketBrief);assert.equal(replay.summary.code,code);assert.equal(paid,1);
+ }
+});
+test('the market step is skipped without spending when there is no brief, grant, budget or key',async()=>{
+ const {OpenAIWebsiteResearch}=await import('../../dist/openai-website-research.js');let paid=0;const sdk={responses:{create:async()=>{paid++;return marketResponse();}}};
+ for(const [ledger,client,brief,code] of [[marketLedger(),sdk,null,'NO_GUIDED_BRIEF'],[marketLedger({budget:null}),sdk,marketBrief,'AI_STAGING_APPROVAL_REQUIRED'],[marketLedger({budget:1000}),sdk,marketBrief,'AI_BUDGET_EXHAUSTED'],[marketLedger({monthly:true}),sdk,marketBrief,'MONTHLY_GENERATION_BUDGET_EXHAUSTED'],[marketLedger(),undefined,marketBrief,'AI_NOT_CONFIGURED']]){
+  const result=await new OpenAIWebsiteResearch(undefined,client).market(ledger.jobs,{},'https://example.org/',brief);
+  assert.equal(result.summary.status,'skipped');assert.equal(result.summary.code,code);assert.deepEqual(result.pages,[]);assert.equal(ledger.state.inserts,0);
+ }
+ assert.equal(paid,0);
+ const revoked=marketLedger();revoked.jobs.permitted=async()=>false;
+ await assert.rejects(new OpenAIWebsiteResearch(undefined,sdk).market(revoked.jobs,{},'https://example.org/',marketBrief),/ACCESS_REVOKED_OR_CANCELED/);
+});

@@ -874,3 +874,63 @@ for(const withScreenshot of [true,false])test(`self-hosted rendered text and pho
  await assert.rejects(intake.read(bob,business.id));
  assert.equal(await pipeline.run(scoped),'finished');assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.website_visuals WHERE source_id=$1',[sources[0].id])).rows[0].n,withScreenshot?2:1);
 });
+
+test('guided research adds separately ledgered market evidence and analyses website photographs (MOCK provider; real database/storage)',async(t)=>{
+ const {OpenAIWebsiteResearch,RESEARCH_RESERVATION_MICROS,MARKET_RESEARCH_RESERVATION_MICROS,MARKET_RESEARCH_VERSION}=await import('../../dist/openai-website-research.js');
+ const {IntakeJobs:ResearchJobs,PHOTO_EVIDENCE_LIMIT}=await import('../../dist/intake-jobs.js');
+ const {WebsitePhotos}=await import('../../dist/website-photos.js');const {default:sharp}=await import('sharp');
+ const business=await workspaces.createBrand(alice,org.id,{name:'Market research fixture',website:'https://example.org/'},randomUUID());
+ await admin.query("INSERT INTO app.analysis_grants(organization_id,brand_id,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_tokens_per_image,approved_by,enabled) VALUES($1,$2,'MOCK-model',now()+interval '1 hour',100000000,1,1,1000,'LOCAL TEST ONLY',true)",[org.id,business.id]);
+ const submitted=await intake.submit(alice,business.id,{kind:'website.extract',autoAnalyze:true},randomUUID());
+ const brief={offering:'Scheduling tools for dental practices',audience:'Practice managers',market:'Lisbon',goal:'leads',visual_direction:'',must_follow:'',details:{social_profile:{platform:'help',handle:''},business_name:'Market research fixture',website:'https://example.org/',business_type:'services',industry:'professional',cta:'',differentiator:'',timing:'',competitors:['Rival One'],priority_offers:'',folder_url:'',guidelines:'',references:[]}};
+ // The guided flow saves this snapshot on both requests; set it directly here.
+ await admin.query('UPDATE app.intake_requests SET research_context=$2 WHERE organization_id=$1 AND brand_id=$3',[org.id,JSON.stringify(brief),business.id]);
+ const scoped={organizationId:org.id,brandId:business.id,jobId:submitted.id};
+ const calls={own:0,market:0};const text='Acme makes scheduling tools for dental practices. Source';
+ const market={notes:[{section:'competitor_positioning',subject:'Rival One',text:'Rival One calls itself the fastest front desk in Lisbon.',source_url:'https://rival-one.test/'},{section:'audience_pain',subject:'',text:'Managers say they lose two hours a day to phone tag.',source_url:'https://forum.test/thread'},{section:'content_gap',subject:'',text:'Nobody shows recall scheduling with real examples.',source_url:'https://example.org/about'}],discovered_competitors:[{name:'Third Chair',url:'https://third-chair.test/',reason:'Same buyers.'}]};
+ const sdk=new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_url,init)=>{const request=JSON.parse(init.body);
+  if(request.tools[0].filters){calls.own++;return Response.json({id:'resp_own',object:'response',status:'completed',output:[{id:'ws_own',type:'web_search_call',status:'completed',action:{type:'search',query:'example.org'}},{type:'message',role:'assistant',content:[{type:'output_text',text,annotations:[{type:'url_citation',url:'https://example.org/about',title:'About',start_index:text.indexOf('Source'),end_index:text.length}]}]}],usage:{input_tokens:100,output_tokens:80,total_tokens:180}});}
+  calls.market++;assert.equal(request.max_tool_calls,8);assert.deepEqual(JSON.parse(request.input).named_competitors,['Rival One']);
+  return Response.json({id:'resp_market',object:'response',status:'completed',output:[{id:'ws_market',type:'web_search_call',status:'completed',action:{type:'search',query:'dental scheduling lisbon',sources:[{type:'url',url:'https://rival-one.test/'},{type:'url',url:'https://forum.test/thread'},{type:'url',url:'https://third-chair.test/'},{type:'url',url:'https://example.org/about'}]}},{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(market),annotations:[]}]}],usage:{input_tokens:900,output_tokens:300,total_tokens:1200}});}});
+ const store=new ObjectStore(config.storage),jobs=new AssetJobs(worker,store,null);t.after(()=>store.close());
+ const photos=await Promise.all(['#ab2233','#2266cc'].map(background=>sharp({create:{width:640,height:480,channels:3,background}}).png().toBuffer()));
+ const photoProvider=new WebsitePhotos({fetch:async(url)=>({status:url.pathname==='/robots.txt'?404:200,headers:{'content-type':url.pathname.endsWith('.png')?'image/png':'text/html'},bytes:url.pathname.endsWith('.png')?photos[url.pathname==='/a.png'?0:1]:Buffer.from('<img src="/a.png"><img src="/b.png">')})});
+ const provider=new OpenAIWebsiteResearch(undefined,sdk,photoProvider),handler=new ResearchJobs(jobs,new BrandAnalyzer(),provider);
+ assert.equal(await handler.run(scoped),'succeeded');assert.deepEqual(calls,{own:1,market:1});
+ // Replays read both ledgers; neither request is paid twice.
+ assert.equal(await handler.run(scoped),'finished');
+ assert.equal((await provider.market(jobs,scoped,'https://example.org/',brief)).summary.notes,3);assert.deepEqual(calls,{own:1,market:1});
+ const own=(await admin.query('SELECT * FROM app.analysis_calls WHERE job_id=$1',[submitted.id])).rows[0],ledger=(await admin.query('SELECT * FROM app.market_research_calls WHERE job_id=$1',[submitted.id])).rows[0];
+ assert.equal(Number(own.reserved_micros),RESEARCH_RESERVATION_MICROS);assert.equal(Number(ledger.reserved_micros),MARKET_RESEARCH_RESERVATION_MICROS);assert.equal(ledger.status,'succeeded');assert.equal(ledger.response_id,'resp_market');
+ const sources=(await admin.query('SELECT s.id,s.website_url,s.parser_version,s.coverage FROM app.brand_sources s WHERE s.brand_id=$1',[business.id])).rows;
+ const marketSources=sources.filter(s=>s.parser_version===MARKET_RESEARCH_VERSION);
+ assert.deepEqual(marketSources.map(s=>s.website_url).sort(),['https://example.org/about','https://forum.test/thread','https://rival-one.test/']);
+ assert.ok(marketSources.every(s=>s.coverage.type==='ai_market_research'&&s.coverage.origin==='market'));
+ // The business's own page is cited by both steps, yet stays two separately tagged sources.
+ assert.deepEqual(sources.filter(s=>s.parser_version!==MARKET_RESEARCH_VERSION).map(s=>s.coverage.type),['ai_web_research']);
+ const saved=(await intake.read(alice,business.id)).jobs.find(j=>j.id===submitted.id).result;
+ assert.equal(saved.newSources,1);assert.equal(saved.market.status,'completed');assert.equal(saved.market.newSources,3);assert.deepEqual(saved.market.discovered_competitors,[{name:'Third Chair',url:'https://third-chair.test/'}]);
+ // Photographs are fetched only from the business's own pages, never a competitor's.
+ const visuals=(await admin.query('SELECT v.viewport,s.parser_version FROM app.website_visuals v JOIN app.brand_sources s ON s.id=v.source_id WHERE v.brand_id=$1',[business.id])).rows;
+ assert.equal(visuals.length,2);assert.ok(visuals.every(v=>v.viewport==='photo'&&v.parser_version!==MARKET_RESEARCH_VERSION));
+ await assert.rejects(app.query('SELECT * FROM app.market_research_calls'),/permission denied/);
+
+ const child=(await intake.read(alice,business.id)).jobs.find(j=>j.kind==='brand.analyze');let seen;
+ const model=analyzer(async(_url,init)=>{const body=JSON.parse(init.body),content=body.input[0].content,evidence=JSON.parse(content[0].text);seen={body,evidence,images:content.filter(c=>c.type==='input_image').length};
+  const ownChunk=evidence.chunks.find(c=>!c.origin),rival=evidence.chunks.find(c=>c.origin==='market'&&c.text.includes('fastest front desk'));
+  return response({findings:[{field:'offering',value:'Scheduling tools for dental practices',chunk_id:ownChunk.id,quote:'scheduling tools for dental practices'},{field:'positioning',value:'The fastest front desk in Lisbon',chunk_id:rival.id,quote:'the fastest front desk in Lisbon'}],recommendation:null,missing:[],
+   visual_guidance:[{category:'imagery',observation:'Flat colour photographs.',creative_direction:'Keep imagery simple.',image_ids:[evidence.visual_manifest[0].id]}],
+   business_direction:{summary:'Scheduling tools for dental practices.',rationale:'Proposed calm, practical direction.',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#ffffff'},{role:'accent',hex:'#ffcc00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Calm and practical',imagery:'Real front desks in daylight',pillars:['Fewer no-shows','Front desk calm'],starter_ideas:[{format:'static',title:'A quiet front desk',concept:'A tidy reception in daylight.'},{format:'carousel',title:'Three steps',concept:'Booking, reminder, arrival.'}],essential_questions:[],evidence_ids:[ownChunk.id,rival.id],
+    audience_suggestions:['Practice managers in Lisbon losing hours to phone tag','Dentists opening a second clinic who need shared calendars','Receptionists who want fewer no-shows'],competitor_gaps:['Nobody shows recall scheduling with real examples']}});});
+ assert.equal(await new ResearchJobs(jobs,model,provider).run({...scoped,jobId:child.id}),'succeeded',JSON.stringify((await admin.query('SELECT error_code FROM app.jobs WHERE id=$1',[child.id])).rows[0]));
+ assert.equal(seen.images,2);assert.ok(seen.images<=PHOTO_EVIDENCE_LIMIT);assert.ok(seen.evidence.visual_manifest.every(v=>v.viewport==='photo'));
+ assert.match(seen.body.instructions,/viewport is "photo"/);assert.match(seen.body.instructions,/origin "market"/);
+ assert.equal(seen.evidence.chunks.filter(c=>c.origin==='market').length,3);assert.ok(seen.evidence.chunks.every(c=>!('market' in c)));
+ const findings=(await brain.read(alice,org.id,business.id)).findings;
+ assert.ok(findings.some(f=>f.field==='offering'&&f.status==='unreviewed'));
+ // A competitor's claim never becomes a suggested fact about this business.
+ assert.ok(!findings.some(f=>f.field==='positioning'));
+ const analysis=(await intake.read(alice,business.id)).jobs.find(j=>j.id===child.id).result;
+ assert.equal(analysis.business_direction.audience_suggestions.length,3);assert.deepEqual(analysis.business_direction.competitor_gaps,['Nobody shows recall scheduling with real examples']);
+ assert.equal(analysis.visual_manifest.length,2);
+});

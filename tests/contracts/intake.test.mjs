@@ -352,3 +352,20 @@ test("partial recovery cannot accept wholly forged facts or overwrite owner revi
  assert.equal(recoverAnalysis(result,reviewed).findings.length,0);
  assert.throws(()=>recoverAnalysis({...result,extra:true},input),/AI_OUTPUT_INVALID/);
 });
+
+test("analysis evidence keeps the business's own text first and gives market notes a bounded share", async () => {
+  const { selectEvidence } = await import("../../dist/intake-jobs.js");
+  const row = (id, length, market = false) => ({ id, source_id: "s-" + id, text: id[0].repeat(length), page: 1, website_url: null, market });
+  const small = selectEvidence([row("m1", 500, true), row("a1", 1000), row("b1", 1000)]);
+  assert.deepEqual(small.map((c) => c.id), ["a1", "b1", "m1"]);
+  assert.equal(small[2].origin, "market");
+  assert.ok(small.every((c) => !("market" in c)) && !("origin" in small[0]));
+  // Plenty of both: market notes are capped at 12,000 characters and own evidence keeps the rest.
+  const full = selectEvidence([row("m1", 11000, true), row("m2", 11000, true), row("a1", 30000), row("b1", 30000)]);
+  const size = (list) => list.reduce((n, c) => n + c.text.length, 0);
+  assert.equal(size(full.filter((c) => c.origin)), 12000);
+  assert.equal(size(full.filter((c) => !c.origin)), 28000);
+  assert.equal(size(full), 40000);
+  // Without market notes the previous 40,000-character behaviour is unchanged.
+  assert.equal(size(selectEvidence([row("a1", 30000), row("b1", 30000)])), 40000);
+});
