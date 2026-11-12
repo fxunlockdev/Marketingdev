@@ -10,6 +10,8 @@ import {Assets} from './assets.js';
 import {StockProvider} from './stock-provider.js';
 import {object,uuid} from './workspaces.js';
 import {pregeneratePreviews} from './preview-pregeneration.js';
+import {recordSignal} from './learning-signals.js';
+import {manifestContext} from './creative-edit-signal.js';
 export class StockMedia{
  constructor(readonly businesses:Businesses,readonly assets:Assets,readonly provider:StockProvider){}
  private async scope<T>(user:string,id:string,write:boolean,fn:(db:any,b:any)=>Promise<T>){const b=await this.businesses.resolve(user,id);return this.businesses.database.transaction(user,b.organization_id,write,db=>fn(db,b),id);}
@@ -62,7 +64,9 @@ export class StockMedia{
    }
    const version=randomUUID();await db.query('INSERT INTO app.creative_versions(id,organization_id,brand_id,project_id,parent_id,brain_id,media_id,design,caption,skill_manifest,sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)',[version,b.organization_id,id,projectId,parent,p.brain_id,mediaId,JSON.stringify(design),p.caption,JSON.stringify(p.skill_manifest),versionHash,user]);
    await db.query('UPDATE app.creative_projects SET latest_version_id=$2 WHERE id=$1',[projectId,version]);
-   await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'creative.stock_photo_replaced',$4)",[b.organization_id,id,user,version]);return {id:version};
+   await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'creative.stock_photo_replaced',$4)",[b.organization_id,id,user,version]);
+   await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'stock_swapped',creative_version_id:version,version_kind:'creative',reason:'Replaced the photo with an approved stock photo',context:{...manifestContext(p.skill_manifest),stock_used:true}});
+   return {id:version};
   });
   if(created)await pregeneratePreviews(this.assets.store.previews,{jobId:`stock-replace:${result.id}`,organizationId:created.organizationId,brandId:id},created.key,created.sha,created.bytes);
   return result;

@@ -3,7 +3,8 @@ import {generationTimingEstimate} from './generation-timing.js';
 import {campaignDesignDirection,campaignCreativeContext} from './campaign-design.js';
 import {normalizeCreativeSpec,type CreativeSpec} from "./campaign-formats.js";
 import {withCampaignRefinement,savedCampaignRefinement} from './campaign-refinement.js';
-import {approvedLearning} from './learning-context.js';
+import {planningLearning} from './learning-context.js';
+import {recordSignal} from './learning-signals.js';
 import {creativeTextProvider,creativeTextModel} from "./creative-planning.js";
 import {validateVideoBrief,type VideoPlanningInput} from './video-planning.js';
 import {BadRequestException,ConflictException,ForbiddenException,NotFoundException} from '@nestjs/common';
@@ -66,7 +67,7 @@ export class VideoCanvas {
    await db.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind) VALUES($1,$2,$3,$4,'creative.video')",[job,b.organization_id,brand,user]);
    await this.references.bind(user,brand,job,v.reference,{db,b});
    if(!v.parent_version_id&&!retrySource)await db.query('INSERT INTO app.video_projects(id,organization_id,brand_id,thread_id,title,created_by) VALUES($1,$2,$3,$4,$5,$6)',[project,b.organization_id,brand,threadId,prompt.slice(0,140),user]);
-   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision,text_provider,selected_text_model,memory_context,creative_spec,generation_authorized_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint,slotId,v.slot_revision??null,textProvider,selectedTextModel,JSON.stringify(await approvedLearning(db)),creativeSpec?JSON.stringify(creativeSpec):null,v.generate===true?user:null]);
+   await db.query('INSERT INTO app.video_requests(job_id,organization_id,brand_id,project_id,brain_id,prompt,channel,duration_seconds,request_key,request_hash,slot_id,slot_revision,text_provider,selected_text_model,memory_context,creative_spec,generation_authorized_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)',[job,b.organization_id,brand,project,brain.id,prompt,v.channel,v.duration_seconds,requestKey,fingerprint,slotId,v.slot_revision??null,textProvider,selectedTextModel,JSON.stringify(await planningLearning(db)),creativeSpec?JSON.stringify(creativeSpec):null,v.generate===true?user:null]);
    await db.query("INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.video')",[job,b.organization_id,brand]);
    await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'video.requested',$4)",[b.organization_id,brand,user,job]);
    if(v.generate===true)await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'video.generation_authorized',$4)",[b.organization_id,brand,user,job]);
@@ -137,6 +138,7 @@ export class VideoCanvas {
    if(v.decision==='in_review'?!['draft','changes_requested'].includes(row.status):row.status!=='in_review')throw new ConflictException('This video is not eligible for that review action');
    await db.query('UPDATE app.video_versions SET status=$2,review_revision=review_revision+1,reviewed_by=$3,reviewed_at=$4 WHERE id=$1',[id,v.decision,v.decision==='in_review'?null:user,v.decision==='in_review'?null:new Date()]);
    await db.query('INSERT INTO app.video_reviews(id,organization_id,brand_id,version_id,actor_id,decision,feedback,sha256,revision) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[randomUUID(),b.organization_id,brand,id,user,v.decision,v.feedback,v.sha256,Number(v.revision)+1]);
+   if(v.decision==='approved'||v.decision==='rejected')await recordSignal(db,{organizationId:b.organization_id,brandId:brand,actorId:user},{kind:v.decision,creative_version_id:id,version_kind:'video',reason:String(v.feedback),context:{format:'video'}});
    return {id,status:v.decision,revision:Number(v.revision)+1};
   },v.decision!=='in_review');
  }

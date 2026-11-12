@@ -477,6 +477,13 @@ test("manual layer edits persist as new versions; review approves the exact curr
     (v) => v.id === saved.id,
   );
   assert.equal(version.status, "approved");
+  // Owner feedback from the Create canvas: one edit signal (a replayed save adds none) and the decision.
+  const signals = (await admin.query("SELECT kind,reason,diff,actor_id FROM app.creative_signals WHERE creative_version_id=$1 ORDER BY created_at,id", [saved.id])).rows;
+  assert.deepEqual(signals.map((s) => [s.kind, s.actor_id]), [["edited", editor], ["approved", alice]]);
+  assert.deepEqual(signals[0].diff.headline, { before: "A calmer schedule", after: "Owner headline" });
+  assert.equal(signals[0].diff.caption.after, "Owner caption");
+  assert.match(signals[0].reason, /moved headline/);assert.match(signals[0].reason, /restyled headline/);assert.match(signals[0].reason, /added custom/);
+  assert.equal(signals[1].reason, "Approved exact version");
   await assert.rejects(
     app.query("UPDATE app.creative_versions SET caption=$1 WHERE id=$2", [
       "tampered",
@@ -495,6 +502,8 @@ test("natural-language image edit sends persisted prior pixels and creates an un
     JSON.stringify(await row(j)),
   );
   assert.equal(imageCalls, 2);
+  // Asking to change an image is recorded as a regeneration signal on the version it replaces.
+  assert.deepEqual((await admin.query("SELECT kind,reason FROM app.creative_signals WHERE creative_version_id=$1 AND kind='regenerated'", [prior.id])).rows, [{ kind: "regenerated", reason: "Make the background sage" }]);
   const p = await canvas.project(alice, brand.id, project.id);
   version = p.versions.find((v) => v.id === p.project.latest_version_id);
   assert.equal(version.parent_id, prior.id);

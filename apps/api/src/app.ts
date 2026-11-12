@@ -56,6 +56,7 @@ import {Assets} from './assets.js';
 import {ObjectStore} from './object-store.js';
 import {MediaLibrary} from './media-library.js';
 import {KnowledgeReview} from './knowledge-review.js';
+import {LearningReviews} from './learning-review-api.js';
 import {createMediaController} from './media-controller.js';
 import {s3PreviewPersistence} from './media-storage.js';
 import {logActivityFailure} from './activity-log.js';
@@ -104,6 +105,13 @@ class ProjectArchiveController {
  @Get('creative-project-archive') list(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query);}
  @Post('creative-projects/:project/archive') archive(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,true);}
  @Post('creative-projects/:project/restore') restore(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,false);}
+}
+
+@Controller('api/v1/businesses/:id/learning')
+@UseGuards(SessionGuard)
+class LearningController {
+ constructor(@Inject(LearningReviews) private readonly service:LearningReviews){}
+ @Get('review') review(@Req() r:AuthRequest,@Param('id') id:string,@Query('month') month:unknown){return this.service.review(r.actorId,id,month);}
 }
 
 @Controller('api/v1/businesses/:id/knowledge')
@@ -519,7 +527,8 @@ export async function createApplication(config: Config) {
     // Derived previews live in private storage next to their originals; a storage fault only costs the reuse.
     store.previews.persistTo(s3PreviewPersistence(store.client,config.storage.bucket),error=>logActivityFailure('PreviewStorage',{jobId:'api-previews'},error));
     // Registered first: it owns the cacheable preview routes (creative media, exports, video posters, carousel covers).
-    @Module({ controllers: [createMediaController(SessionGuard),KnowledgeController,UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [createMediaController(SessionGuard),KnowledgeController,LearningController,UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+ {provide:LearningReviews,useValue:new LearningReviews(new Businesses(database,workspaces))},
  {provide:KnowledgeReview,useValue:new KnowledgeReview(new Businesses(database,workspaces))},
  {provide:MediaLibrary,useValue:new MediaLibrary(new Canvas(new Businesses(database,workspaces),store))},
  {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning,carousels:CarouselGeneration)=>new ChatConversations(canvas,planning,carousels),inject:[Canvas,Planning,CarouselGeneration]},

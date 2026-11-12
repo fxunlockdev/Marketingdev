@@ -25,6 +25,8 @@ import {PlanningJobs} from "./planning-jobs.js";
 import {CreativeJobs} from './creative-jobs.js';
 import {CreativeProvider} from './creative-provider.js';
 import {ImageQa} from './image-qa.js';
+import {PostformeClient} from './postforme-client.js';
+import {learningSyncTick,LEARNING_SYNC_INTERVAL_MS} from './learning-schedule.js';
 import {SkillRuntime} from './skill-runtime.js';
 import {Worker,NativeConnection} from '@temporalio/worker';
 import {Connection,Client} from '@temporalio/client';
@@ -101,4 +103,8 @@ const worker=await Worker.create({connection,namespace:config.jobs.namespace,tas
   }});
 let dispatching=false,lastDispatchLog=0;
 const timer=setInterval(async()=>{if(dispatching)return;dispatching=true;try{await dispatcher.runOnce();}catch(e){const now=Date.now();if(now-lastDispatchLog>60000){lastDispatchLog=now;logActivityFailure('JobDispatcher',{jobId:'dispatcher'},e);}}finally{dispatching=false;}},300);
-try{await worker.run();}finally{clearInterval(timer);await connection.close();await clientConnection.close();store.close();await Promise.all([pool.end(),dispatchPool.end()]);}
+// Post for Me metrics for published posts, on the dispatcher role (the collector policies of migration 115).
+const learningSync=process.env.POSTFORME_ENABLED==='true'&&process.env.POSTFORME_API_KEY?.trim()
+ ?learningSyncTick({pool:dispatchPool,client:new PostformeClient(process.env.POSTFORME_API_KEY.trim()),onError:e=>logActivityFailure('LearningSync',{jobId:'learning-sync'},e)}):undefined;
+const learningTimer=learningSync?setInterval(()=>{void learningSync();},LEARNING_SYNC_INTERVAL_MS):undefined;
+try{await worker.run();}finally{clearInterval(timer);if(learningTimer)clearInterval(learningTimer);await connection.close();await clientConnection.close();store.close();await Promise.all([pool.end(),dispatchPool.end()]);}
