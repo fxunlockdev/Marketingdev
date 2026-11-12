@@ -9,9 +9,13 @@ import {randomUUID} from 'node:crypto';
 import {ContentPlan} from './content-plan.js';
 import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
-import type {PlanningInput,PostIdeaPurpose} from './planning-contracts.js';
+import {planningContext,type PlanningContext,type PlanningInput,type PostIdeaPurpose} from './planning-contracts.js';
+import {approvedStrategy} from './strategy-store.js';
+/** Supplies the knowledge-graph context pack, market research notes and learned preferences for one plan request. */
+export type PlanningContextSource=(db:PoolClient,scope:{organization_id:string;brand_id:string})=>Promise<PlanningContext|undefined>;
+import {planHorizon} from './planning-schema.js';
 export class Planning {
- constructor(readonly plans:ContentPlan){}
+ constructor(readonly plans:ContentPlan,readonly context?:PlanningContextSource){}
  submit(user:string,id:string,body:unknown,key:unknown,scoped?:{db:PoolClient;b:{organization_id:string};budgetMicros:number;weeklyIncrease:number;single?:boolean},ideas?:PostIdeaPurpose){
   const v=object(body,['starts_on','brief','duration_days','post_count','video_count','provider','repeat_cycles','loop_budget_micros','confirm_recurring_spend','canvas_thread_id','planning_mode','reference_plan_id','campaign','content_mix']),brief=v.brief??'';
   const campaign=campaignInput(v.campaign);
@@ -41,14 +45,20 @@ export class Planning {
    const prior=(await db.query('SELECT r.request_hash,j.id,j.status,r.output_plan_id,r.thread_id,r.loop_id FROM app.planning_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.request_key=$3',[b.organization_id,id,key])).rows[0];
    if(prior){if(prior.request_hash!==requestHash)throw new ConflictException('That request key belongs to another planning request');return {id:prior.id,status:prior.status,output_plan_id:prior.output_plan_id,thread_id:prior.thread_id,loop_id:prior.loop_id};}
    if((await db.query("SELECT j.id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND NOT coalesce(r.input->'chat' ? 'prompt_suggestion',false) AND (j.status='unknown' OR (j.status IN ('queued','running','retrying') AND r.scheduled_at<=now() AND (r.loop_id IS NULL OR EXISTS(SELECT 1 FROM app.planning_loops l WHERE l.id=r.loop_id AND l.stopped_at IS NULL))))",[b.organization_id,id])).rowCount)throw new ConflictException('A plan is running or its uncertain provider result needs reconciliation');
-   if((await db.query("SELECT count(*)::int AS n FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND j.created_at>now()-interval '1 day' AND r.input->'chat' IS NULL AND (r.input->'post_ideas' IS NOT NULL)=$3",[b.organization_id,id,!!ideas])).rows[0].n>=(ideas?20:5))throw new ConflictException('Daily planning request limit reached');
+   if((await db.query("SELECT count(*)::int AS n FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND j.created_at>now()-interval '1 day' AND r.input->'chat' IS NULL AND r.input->>'task' IS DISTINCT FROM 'strategy' AND (r.input->'post_ideas' IS NOT NULL)=$3",[b.organization_id,id,!!ideas])).rows[0].n>=(ideas?20:5))throw new ConflictException('Daily planning request limit reached');
    if(!ideas&&(await db.query('SELECT count(*)::int AS n FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0].n>=36)throw new ConflictException('This business has reached its plan limit');
    const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,id])).rows[0];
    if(!brain)throw new ConflictException('Confirm your brand profile before planning');
    if(hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('The approved brand profile needs an integrity check');
    const prefs=(await db.query('SELECT goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,creative_brief,revision,step FROM app.business_onboarding WHERE organization_id=$1 AND brand_id=$2',[b.organization_id,id])).rows[0];
    if(!prefs||prefs.step!==3||!prefs.channels.length)throw new ConflictException('Finish your brand goals and choose content channels before planning');
-   const input:PlanningInput={...(ideas?{post_ideas:ideas}:{}),...(scoped?{max_posts_per_day:2}:{}),task:'content_plan',references:await planningReferences(db,b.organization_id,id),brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:ideas?[ideas.channel as 'instagram'|'facebook'|'linkedin']:mix?[...new Set(mix.map(r=>r.channel))]:campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(mix||v.video_count!==undefined?{video_count:Number(videos)}:{}),...(mix?{content_mix:mix}:{})};
+   const input:PlanningInput={...(ideas?{post_ideas:ideas}:{storylines:true as const}),...(scoped?{max_posts_per_day:2}:{}),task:'content_plan',references:await planningReferences(db,b.organization_id,id),brand:{id:brain.id,sha256:brain.sha256,learning:await approvedLearning(db),facts:brain.snapshot.facts.map((f:any)=>({id:f.id,field:f.field,value:f.value}))},preferences:{starts_on:v.starts_on as string,timezone:prefs.timezone,goal:prefs.goal,cadence:prefs.cadence,channels:ideas?[ideas.channel as 'instagram'|'facebook'|'linkedin']:mix?[...new Set(mix.map(r=>r.channel))]:campaign?.channels??prefs.channels,must_avoid:prefs.must_avoid,business_stage:prefs.business_stage,growth_expectation:prefs.growth_expectation,creative_brief:prefs.creative_brief,revision:prefs.revision},brief,duration_days:Number(days),post_count:Number(count),...(mix||v.video_count!==undefined?{video_count:Number(videos)}:{}),...(mix?{content_mix:mix}:{})};
+   if(!ideas){
+    // Ground the plan in the owner-approved strategy and whatever the graph and learning loop supply. All optional.
+    const strategy=await approvedStrategy(db,b.organization_id,id);
+    if(strategy)input.strategy=strategy;
+    try{Object.assign(input,planningContext(await this.context?.(db,{organization_id:b.organization_id,brand_id:id})));}catch{throw new ConflictException('The planning context for this business exceeds its limits');}
+   }
    if(campaign)input.campaign=campaign;
    if(v.planning_mode==='natural')input.planning_mode='natural';
    if(referenceId){
@@ -93,7 +103,7 @@ export class Planning {
   await db.query("UPDATE app.jobs SET cancel_requested=true WHERE id IN (SELECT job_id FROM app.planning_requests WHERE loop_id=$1) AND status IN ('queued','running','retrying')",[loopId]);
   return r.rows[0];
  });}
- jobs(user:string,id:string){return this.plans.scope(user,id,false,async(db,b)=>({jobs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.output_plan_id,r.input->'preferences' AS preferences,COALESCE(r.output->'plan'->'settings'->'duration_days',r.input->'duration_days') AS duration_days,COALESCE(r.output->'plan'->'settings'->'post_count',r.input->'post_count') AS post_count,r.provider,r.selected_model,r.loop_id,r.scheduled_at,r.thread_id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->'post_ideas' IS NULL AND r.input->'chat' IS NULL ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id])).rows}));}
+ jobs(user:string,id:string){return this.plans.scope(user,id,false,async(db,b)=>({jobs:(await db.query("SELECT j.id,j.status,j.cancel_requested,j.error_code,j.created_at,r.output_plan_id,r.input->'preferences' AS preferences,COALESCE(r.output->'plan'->'settings'->'duration_days',r.input->'duration_days') AS duration_days,COALESCE(r.output->'plan'->'settings'->'post_count',r.input->'post_count') AS post_count,r.provider,r.selected_model,r.loop_id,r.scheduled_at,r.thread_id FROM app.jobs j JOIN app.planning_requests r ON r.job_id=j.id WHERE j.organization_id=$1 AND j.brand_id=$2 AND j.kind='plan.generate' AND r.input->'post_ideas' IS NULL AND r.input->'chat' IS NULL AND r.input->>'task' IS DISTINCT FROM 'strategy' ORDER BY j.created_at DESC,j.id LIMIT 100",[b.organization_id,id])).rows}));}
  cancel(user:string,id:string,jobId:string){jobId=uuid(jobId);return this.plans.scope(user,id,true,async(db,b)=>{
   const j=(await db.query("SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND kind='plan.generate'",[b.organization_id,id,jobId])).rows[0];
   if(!j)throw new NotFoundException('Planning request not found');
@@ -102,6 +112,12 @@ export class Planning {
  });}
  detail(user:string,id:string,planId:string){planId=uuid(planId);return this.plans.scope(user,id,false,async(db,b)=>{
   const p=(await db.query('SELECT id,title,objective,starts_on::text,timezone,duration_days,origin,brain_id,strategy,skill_manifest,created_by,created_at FROM app.content_plans WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,planId])).rows[0];
-  if(!p)throw new NotFoundException('Content plan not found');return p;
+  if(!p)throw new NotFoundException('Content plan not found');
+  // The review screen reads each post's storyline here, before anything is generated.
+  const slots=(await db.query('SELECT id,revision,state,channel,planned_at,format,brief,pillar,hook,cta,video_draft,storyline,strategy_ref,creative_spec FROM app.content_slots WHERE organization_id=$1 AND brand_id=$2 AND plan_id=$3 ORDER BY planned_at,id LIMIT 120',[b.organization_id,id,planId])).rows;
+  const strategyId=p.skill_manifest?.strategy?.id;
+  const source=strategyId?(await db.query('SELECT strategy FROM app.brand_strategies WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,id,strategyId])).rows[0]?.strategy:undefined;
+  const names=(rows:{id:string}[]|undefined,field:string)=>Object.fromEntries((rows??[]).map(row=>[row.id,(row as Record<string,string>)[field]]));
+  return {...p,slots,...(source?{strategy_labels:{personas:names(source.personas,'name'),pains:names(source.pains,'statement'),angles:names(source.angles,'angle')}}:{}),horizon:planHorizon(p.duration_days,p.starts_on,p.timezone)};
  });}
 }

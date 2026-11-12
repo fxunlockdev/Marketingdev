@@ -12,15 +12,21 @@ import {AssetJobs,type JobScope} from './jobs.js';
 import {SkillRuntime} from './skill-runtime.js';
 import {CreativeProvider} from './creative-provider.js';
 import {CreativeError,type PlannerRequest} from './creative-contracts.js';
-import {validatePlanningResult,resolvedPlanningInput,type PlanningInput,type PlanningResult} from './planning-contracts.js';
+import {validatePlanningResult,resolvedPlanningInput,planOutputTokens,type PlanningInput,type PlanningResult,type PlanOutputTokens} from './planning-contracts.js';
 import {canonicalJSON,hash} from './brand-brain.js';
+import {STRATEGY_OUTPUT_TOKENS,validateStrategyInput,validateStrategyResult,type StrategyResult} from './strategy-contracts.js';
+import {saveDraftStrategy} from './strategy-store.js';
+// The providers still type their limit as 512|4000|16000 and forward the number unchanged.
+// Remove this bridge once creative-provider.ts and gemini-planner.ts accept PlanOutputTokens.
+type ProviderLimit=Parameters<CreativeProvider['plannerRequest']>[2];
+const providerLimit=(tokens:PlanOutputTokens)=>tokens as ProviderLimit;
 const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class PlanningJobs {
  constructor(readonly jobs:AssetJobs,readonly runtime:SkillRuntime,readonly provider:CreativeProvider,readonly gemini:GeminiPlanner=new GeminiPlanner()){}
  finish(db:any,j:any,status:string,code:string|null=null){return db.query('UPDATE app.jobs SET status=$2,error_code=$3,updated_at=now() WHERE id=$1',[j.id,status,code]).then(()=>status);}
- async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:512|4000|16000=16000){
+ async call(scope:JobScope,message:PlannerRequest,model:string,providerName='openai',maxOutputTokens:PlanOutputTokens=16000){
   const provider=providerName==='gemini'?this.gemini:this.provider;
-  const wire=provider.plannerRequest(message,model,maxOutputTokens);
+  const wire=provider.plannerRequest(message,model,providerLimit(maxOutputTokens));
   const prepared=await this.jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='plan.generate')throw new Error('JOB_KIND_DENIED');
    if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
@@ -55,7 +61,7 @@ export class PlanningJobs {
   if('cached' in prepared)return prepared.cached;
   if('blocked' in prepared)throw new CreativeError(prepared.blocked!);
   let result;
-  try{result=await provider.plan(message,model,maxOutputTokens);}catch(error){
+  try{result=await provider.plan(message,model,providerLimit(maxOutputTokens));}catch(error){
    const known=error instanceof CreativeError||((error instanceof OpenAI.APIError||error instanceof GeminiAPIError)&&[400,401,403,404,422,429].includes(error.status??0));
    await this.jobs.transaction(scope,async(db,j)=>{await db.query('UPDATE app.planning_calls SET status=$3 WHERE job_id=$1 AND step=$2',[j.id,message.step,known?'rejected':'unknown']);});
    throw new CreativeError(known?(error instanceof CreativeError?error.code:'PLAN_PROVIDER_REJECTED'):'PLAN_SUBMISSION_UNKNOWN');
@@ -121,9 +127,28 @@ export class PlanningJobs {
      return this.finish(db,j,'succeeded');
     });
    }
+   if((input as {task:string}).task==='strategy'){
+    const strategyInput=validateStrategyInput(input);
+    let strategy:StrategyResult=request.output;
+    if(!strategy){
+     strategy=await this.runtime.strategy(strategyInput,message=>this.call(scope,message,model,request.provider,STRATEGY_OUTPUT_TOKENS));
+     await this.jobs.transaction(scope,async(db,j)=>{
+      if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
+      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(strategy)]);
+     });
+    }
+    const checked=validateStrategyResult(strategy,strategyInput);
+    // A draft only: the owner reads and approves it before any plan may use it.
+    return await this.jobs.transaction(scope,async(db,j)=>{
+     if(terminal.has(j.status))return j.status;
+     if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
+     await saveDraftStrategy(db,j,request,checked,model);
+     return this.finish(db,j,'succeeded');
+    });
+   }
    let result:PlanningResult=request.output;
    if(!result){
-    result=await this.runtime.contentPlan(input,message=>this.call(scope,message,model,request.provider,input.post_ideas?4000:16000));
+    result=await this.runtime.contentPlan(input,message=>this.call(scope,message,model,request.provider,planOutputTokens(input)));
     await this.jobs.transaction(scope,async(db,j)=>{
      if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(result)]);
@@ -144,13 +169,13 @@ export class PlanningJobs {
     const selected=new Set(result.plan.slots.flatMap(s=>s.reference_ids??[]));
     await assertPlanningReferences(db,j.organization_id,j.brand_id,(input.references??[]).filter(r=>selected.has(r.id)));
     const planId=randomUUID(),reserved=(await db.query('SELECT sum(reserved_micros)::text AS n FROM app.planning_calls WHERE job_id=$1',[j.id])).rows[0].n;
-    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,learning:input.brand.learning??[],resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},content_mix:resolved.content_mix??null,source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
+    const manifest={skills:result.skills,reads:result.reads,runtime:result.version,provider:request.provider,model,model_calls:result.model_calls,reserved_cost_micros:Number(reserved),source_preferences:input.preferences,learning:input.brand.learning??[],strategy:input.strategy?{id:input.strategy.id,version:input.strategy.version,sha256:input.strategy.sha256}:null,context:{context_pack:!!input.context_pack,market_research:input.market_research?.length??0,preferences_learned:input.preferences_learned?.length??0},resolved_counts:{duration_days:resolved.duration_days??30,post_count:resolved.post_count,video_count:resolved.video_count??0},content_mix:resolved.content_mix??null,source_plan:input.reference_plan?{id:input.reference_plan.id,sha256:input.reference_plan.sha256}:null,input_sha256:request.input_sha256,helpers_executed:false};
     await db.query(`INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,origin,created_by,request_key,request_hash,job_id,brain_id,strategy,skill_manifest,duration_days)
       VALUES($1,$2,$3,$4,$5,$6,$7,'generated',$8,$9,$10,$11,$12,$13,$14,$15)`,[planId,j.organization_id,j.brand_id,input.campaign?.name??result.plan.title,input.preferences.goal,input.preferences.starts_on,input.preferences.timezone,j.requested_by,`generation:${j.id}`,request.request_hash,j.id,request.brain_id,JSON.stringify({...result.plan,...(input.campaign?{campaign:input.campaign}: {})}),JSON.stringify(manifest),resolved.duration_days??30]);
     for(const [index,s] of result.plan.slots.entries()){
      const sid=randomUUID();
-     await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index,video_draft,reference_ids,creative_spec)
-       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,[sid,j.organization_id,j.brand_id,planId,s.channel,s.planned_at,s.format,s.brief,s.pillar,s.hook,s.cta,j.requested_by,index,s.video_draft?JSON.stringify(s.video_draft):null,s.reference_ids??[],s.creative_spec?JSON.stringify(s.creative_spec):null]);
+     await db.query(`INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by,strategy_slot_index,video_draft,reference_ids,creative_spec,storyline,strategy_ref)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,[sid,j.organization_id,j.brand_id,planId,s.channel,s.planned_at,s.format,s.brief,s.pillar,s.hook,s.cta,j.requested_by,index,s.video_draft?JSON.stringify(s.video_draft):null,s.reference_ids??[],s.creative_spec?JSON.stringify(s.creative_spec):null,s.storyline?JSON.stringify(s.storyline):null,s.strategy_ref?JSON.stringify(s.strategy_ref):null]);
      const snapshot={...s,plan_id:planId,origin:'generated',strategy_slot_index:index,state:'content_needed',creative_version_id:null,creative_sha256:null};
      await db.query(`INSERT INTO app.content_slot_events(id,organization_id,brand_id,slot_id,revision,action,actor_id,feedback,snapshot)
        VALUES($1,$2,$3,$4,1,'created',$5,'',$6)`,[randomUUID(),j.organization_id,j.brand_id,sid,j.requested_by,JSON.stringify(snapshot)]);

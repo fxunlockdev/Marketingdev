@@ -2,6 +2,7 @@ import {planningSchema} from './planning-schema.js';
 import {hasCurrentProductionRules} from './production-skill-pin.js';
 import {carouselPlanSchema,validateCarouselInput,validateCarouselResult,type CarouselInput,type CarouselResult} from './carousel-planning.js';
 import {validateInsightResult,type InsightInput} from './insight-contracts.js';
+import {strategySchema,validateStrategyInput,validateStrategyResult,type StrategyInput,type StrategyResult} from './strategy-contracts.js';
 import {scheduleGeneratedPlan,validatePlanningResult,type PlanningInput,type PlanningResult} from "./planning-contracts.js";
 import {normalizeGeneratedVideoBrief,validateVideoInput,validateVideoPlanningResult,type VideoPlanningInput,type VideoPlanningResult} from './video-planning.js';
 import { spawn, execFile } from "node:child_process";
@@ -27,6 +28,12 @@ export class SkillRuntime {
     // Daily placement limits belong to the application, not the isolated model input.
     const {max_posts_per_day,post_ideas,...providerInput}=input;
     return this.run(providerInput,request=>model({...request,content_plan_schema:planningSchema(input)}),value=>validatePlanningResult({...value,plan:scheduleGeneratedPlan(value.plan,input)},input));
+  }
+  /** Brand strategy. The strict JSON schema travels in the planner-schema slot of the broker request. */
+  strategy(input:StrategyInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<StrategyResult> {
+    validateStrategyInput(input);
+    // run() accepts any task payload at runtime; its input union is owned by the other task methods.
+    return this.run(input as unknown as PlanningInput,request=>model({...request,content_plan_schema:strategySchema(input)}),value=>validateStrategyResult(value,input));
   }
   videoPlan(input:VideoPlanningInput,model:(request:PlannerRequest)=>Promise<PlannerResponse>):Promise<VideoPlanningResult> {
     validateVideoInput(input);
