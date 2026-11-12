@@ -45,7 +45,7 @@ export class ChatConversations {
  async own(db:any,id:string){const c=(await db.query('SELECT * FROM app.chat_conversations WHERE id=$1',[id])).rows[0];if(!c)throw new NotFoundException('Conversation not found');return c;}
  read(user:string,brand:string,id:string){id=uuid(id);return this.canvas.scope(user,brand,false,async db=>{
   const conversation=await this.own(db,id);
-  const turns=(await db.query(`SELECT t.job_id AS id,t.message,t.created_at,t.action_result,j.status,j.error_code,a.status AS action_status,a.error_code AS action_error,r.output,r.input->'chat'->'memories' AS source_records FROM app.chat_turns t JOIN app.jobs j ON j.id=t.job_id JOIN app.planning_requests r ON r.job_id=t.job_id LEFT JOIN delivery.chat_actions a ON a.job_id=t.job_id WHERE t.conversation_id=$1 ORDER BY t.created_at,t.job_id LIMIT 150`,[id])).rows;
+  const turns=(await db.query(`SELECT t.job_id AS id,t.message,t.created_at,t.action_result,j.status,j.error_code,a.status AS action_status,a.error_code AS action_error,a.error_message AS action_message,r.output,r.input->'chat'->'memories' AS source_records FROM app.chat_turns t JOIN app.jobs j ON j.id=t.job_id JOIN app.planning_requests r ON r.job_id=t.job_id LEFT JOIN delivery.chat_actions a ON a.job_id=t.job_id WHERE t.conversation_id=$1 ORDER BY t.created_at,t.job_id LIMIT 150`,[id])).rows;
   // Saved versions are the durable chat attachment. No second write or retry-created message.
   const saved_images=(await db.query(`SELECT v.id,v.project_id,v.design,v.created_at,
     (SELECT count(*)::int FROM app.creative_versions prior WHERE prior.project_id=v.project_id AND (prior.created_at,prior.id)<=(v.created_at,v.id)) AS version_number

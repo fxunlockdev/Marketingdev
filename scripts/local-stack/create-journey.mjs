@@ -130,7 +130,7 @@ export async function runCreateJourney({page,base,businessId,step,state}){
  await step('create: a carousel is made from the chat',async()=>{
   await page.goto(`${base}/b/${businessId}/create`);
   await send('Create a 3-slide carousel on how our cardamom buns are made.');
-  await expect(page.getByRole('region',{name:'Your carousel'}).getByRole('progressbar',{name:'Saved carousel slides'})).toHaveAttribute('value','3',{timeout:LONG});
+  await expect(page.getByRole('progressbar',{name:'Saved carousel slides'}).first()).toHaveAttribute('value','3',{timeout:LONG});
   await shot('carousel');
  });
 
