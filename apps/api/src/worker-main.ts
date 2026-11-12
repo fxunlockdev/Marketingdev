@@ -37,6 +37,7 @@ import {workerConfigFromEnv} from './config.js';
 import {AssetJobs,JobDispatcher,assertJobRole,type JobScope} from './jobs.js';
 import {OpenAIWebsiteResearch} from './openai-website-research.js';
 import {IntakeJobs} from './intake-jobs.js';
+import {ResearchKnowledge,KnowledgeExtractor} from './knowledge-research.js';
 
 import {BrandAnalyzer} from './brand-analysis.js';
 import {DocumentJobs} from './document-jobs.js';
@@ -53,7 +54,8 @@ await assertJobRole(pool,'desvio_worker');await assertJobRole(dispatchPool,'desv
 const connection=await NativeConnection.connect({address:config.jobs.address}),clientConnection=await Connection.connect({address:config.jobs.address});
 const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
-const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)));
+// Research and analysis feed the knowledge graph afterwards; extraction never changes a job's outcome.
+const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)),new ResearchKnowledge(jobs,new KnowledgeExtractor(process.env.OPENAI_API_KEY)));
 const imageReplacements=config.higgsfieldImages?new HiggsfieldReplacementJobs(jobs,new HiggsfieldImageClient(config.higgsfieldImages),new ImageReplacementVault(config.higgsfieldImages.encryptionKey)):undefined;
 const creativeProvider=new CreativeProvider(process.env.OPENAI_API_KEY);
 // The vision check shares the creative provider; it is optional per image and never fails a creative.
