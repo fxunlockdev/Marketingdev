@@ -1,7 +1,7 @@
 import type {ContentMixItem} from './generation-plan.js';
 // Only what the schema reads. Kept structural so the web app can import this file
 // without pulling the server-side planning contracts into its type check.
-type PlanningInput={content_mix?:ContentMixItem[];preferences:{channels:string[]};references?:{id:string}[];planning_mode?:'natural';post_count:number;brand:{facts:{id:string}[]};storylines?:true};
+type PlanningInput={content_mix?:ContentMixItem[];preferences:{channels:string[]};references?:{id:string}[];planning_mode?:'natural';post_count:number;brand:{facts:{id:string}[]};storylines?:true;strategy?:{personas:{id:string}[];pains:{id:string}[];angles:{id:string}[]}};
 import {campaignMonthDays} from './generation-plan.js';
 import {addDays,dayStart} from './local-calendar.js';
 const object=(properties:Record<string,unknown>)=>({type:'object',additionalProperties:false,required:Object.keys(properties),properties});
@@ -20,6 +20,7 @@ export function planningSchema(input:PlanningInput):Record<string,unknown>{
   ...(row.spec?{creative_spec:literal(row.spec)}:{}),brief:text(1000),pillar:text(140),hook:text(200),cta:text(120),
   fact_ids:array({$ref:'#/$defs/factId'},1,10),
   ...(input.references?.length?{reference_ids:array({type:'string',enum:input.references.map(r=>r.id)},0,row.format==='video'?0:3)}:{}),
+  ...(input.strategy?{strategy_ref:object({persona_id:{type:'string',enum:input.strategy.personas.map(p=>p.id)},pain_id:{type:'string',enum:input.strategy.pains.map(p=>p.id)},angle_id:{type:'string',enum:input.strategy.angles.map(a=>a.id)}})}:{}),
   ...(input.storylines?{storyline:storylineSchema(storylineKind(row.format,row.spec),row.spec?.slide_count??undefined)}:{}),
   ...(row.format==='video'?{video_draft:object({storyline:text(600),script:text(1200),prompt:text(1200),duration_seconds:{type:'integer',minimum:3,maximum:15}})}:{}),
  }));
