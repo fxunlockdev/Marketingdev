@@ -135,14 +135,17 @@ Consider Graphify later, in a sandbox job, for one thing our step does not do: c
 
 In a scratch directory outside version control: create a virtual environment, `uv pip install graphifyy`, write Markdown notes with "Type: Label" headings, and run `graphify update <dir>` with no API keys in the environment. The sample embedded in `tests/contracts/knowledge-graphify-import.test.mjs` is that run's `graph.json` reduced to the fields the importer reads.
 
-## Wiring still needed
+## Wiring status
 
-None of this is done; these files belong to other owners.
+Done (integration wave 1):
 
-1. **Back-fill on profile approval** (`brand-brain.ts`, inside the approval transaction, after the `brand_brain_versions` insert): `applyMutations(db, scope, fromBrandBrainSnapshot(snapshot), {actor: userId})`. For businesses approved earlier, the same call from an owner or admin request, or an operator script run with the migration credential (an operator policy exists on all three tables).
-2. **Research and analysis jobs** (`intake-jobs.ts`, `brand-analysis.ts`, registered in `worker-main.ts`): after sources are stored, call the provider with `extractionRequest(...)`, pass the answer through `validateExtraction(...)`, then `applyMutations(db, jobScope, mutations)` inside `AssetJobs.transaction`. Needs a spend reservation for the `check` model in the grant the job already uses.
-3. **Planning** (`planning-jobs.ts`, `planning.ts`): `buildContextPack(db, scope, {kind: 'plan', input})`, put the pack in the planner input in place of `facts`, and store `used_node_ids` on the planning request.
-4. **Creative, carousel and video** (`creative-jobs.ts`, `carousel-jobs.ts`, `video-jobs.ts`): the same with kinds `creative`, `carousel`, `video`. After a version is saved, record a post node and `used_in` edges for the angle, format, pillar and assets used.
-5. **Insights** (`insight-jobs.ts`): pack of kind `insights`; write result and lesson nodes with `performed` and `learned_from` edges.
-6. **Owner view** (`app.ts` routes plus a web screen): list nodes by status, with evidence, and call `reviewNode`, `reviewEdge` and `supersedeNode`.
-7. **Job kinds**: if a dedicated `knowledge.build` job is wanted, a later migration must add it to `jobs_kind_check` and to `app.knowledge_scope`.
+1. **Back-fill on profile approval**: `brand-brain.ts` applies `fromBrandBrainSnapshot` in the approval transaction. Existing businesses: `scripts/backfill-knowledge.mjs` (operator, `MIGRATION_DATABASE_URL`, dry run unless `--apply`, idempotent).
+2. **Creative and carousel slides** (`creative-jobs.ts`): a pack of kind `creative` (or `carousel` for a slide) is built under the worker role before planning and stored in `creative_requests.knowledge_context` (migration 122) so retries send the same input. The runtime receives it as `brand.knowledge` (the sandbox accepts any `brand` object; top-level keys are strict). A job that called a model before this change keeps its original input. After the version is saved, a `post` node and `used_in` edges from production types (angle, format, pillar, asset, visual_direction, offer, persona, pain, proof_point, audience) are written as suggestions; provenance is in `skill_manifest.knowledge`. Failures are logged and never fail the creative.
+3. **Insights** (`insight-jobs.ts`): pack of kind `insights`, stored in `insight_requests.knowledge_context`, sent as `brand.knowledge`; after success a `result` node and suggested `lesson` nodes with `learned_from` edges.
+4. **Owner review API** (`knowledge-review.ts`, `app.ts`): `GET /api/v1/businesses/:id/knowledge?status=&type=&cursor=&limit=` (≤100 nodes, ≤500 edges), `POST .../knowledge/nodes/:nodeId/review`, `POST .../knowledge/edges/:edgeId/review`, `POST .../knowledge/nodes/:nodeId/supersede`. Reviewer role enforced by row-level security (403).
+
+Still needed (files owned elsewhere):
+
+- Research and analysis extraction (`intake-jobs.ts`, `brand-analysis.ts`).
+- Planning packs (`planning-jobs.ts`, `planning.ts`), carousel parent planning (`carousel-jobs.ts`), video (`video-jobs.ts`).
+- The owner screen in the web app.

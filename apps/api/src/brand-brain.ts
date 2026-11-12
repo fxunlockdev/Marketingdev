@@ -9,6 +9,8 @@ import type { PoolClient } from "pg";
 import { TenantDatabase } from "./database.js";
 import { object, uuid } from "./workspaces.js";
 import {visualDirections,reviewVisual,approvedVisualFacts} from "./brand-visual-review.js";
+import {applyMutations} from "./knowledge-graph.js";
+import {fromBrandBrainSnapshot} from "./knowledge-extract.js";
 export const FIELDS = [
   "brand_name",
   "offering",
@@ -383,6 +385,8 @@ export class BrandBrain {
           [id, org, brand, revision, serialized, hash(serialized), user],
         )
       ).rows[0];
+      // The approved profile becomes approved knowledge in the same transaction. Idempotent: a repeat only touches last_seen.
+      await applyMutations(db, { organizationId: org, brandId: brand }, fromBrandBrainSnapshot(snapshot), { actor: user });
       await this.audit(db, user, org, brand, "brain.approved", id);
       return result;
     });

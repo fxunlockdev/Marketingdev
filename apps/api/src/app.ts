@@ -55,6 +55,7 @@ import {BrandBrain} from './brand-brain.js';
 import {Assets} from './assets.js';
 import {ObjectStore} from './object-store.js';
 import {MediaLibrary} from './media-library.js';
+import {KnowledgeReview} from './knowledge-review.js';
 import {createMediaController} from './media-controller.js';
 import {s3PreviewPersistence} from './media-storage.js';
 import {logActivityFailure} from './activity-log.js';
@@ -103,6 +104,16 @@ class ProjectArchiveController {
  @Get('creative-project-archive') list(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:unknown){return this.service.list(r.actorId,id,query);}
  @Post('creative-projects/:project/archive') archive(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,true);}
  @Post('creative-projects/:project/restore') restore(@Req() r:AuthRequest,@Param('id') id:string,@Param('project') project:string,@Body() body:unknown){return this.service.change(r.actorId,id,project,body,false);}
+}
+
+@Controller('api/v1/businesses/:id/knowledge')
+@UseGuards(SessionGuard)
+class KnowledgeController {
+ constructor(@Inject(KnowledgeReview) private readonly service:KnowledgeReview){}
+ @Get() list(@Req() r:AuthRequest,@Param('id') id:string,@Query() query:Record<string,unknown>){return this.service.list(r.actorId,id,{status:query.status,type:query.type,cursor:query.cursor,limit:query.limit});}
+ @Post('nodes/:nodeId/review') reviewNode(@Req() r:AuthRequest,@Param('id') id:string,@Param('nodeId') node:string,@Body() body:unknown){return this.service.reviewNode(r.actorId,id,node,body);}
+ @Post('edges/:edgeId/review') reviewEdge(@Req() r:AuthRequest,@Param('id') id:string,@Param('edgeId') edge:string,@Body() body:unknown){return this.service.reviewEdge(r.actorId,id,edge,body);}
+ @Post('nodes/:nodeId/supersede') supersede(@Req() r:AuthRequest,@Param('id') id:string,@Param('nodeId') node:string,@Body() body:unknown){return this.service.supersede(r.actorId,id,node,body);}
 }
 
 @Controller('api/v1/businesses/:id/strategies')
@@ -508,7 +519,8 @@ export async function createApplication(config: Config) {
     // Derived previews live in private storage next to their originals; a storage fault only costs the reuse.
     store.previews.persistTo(s3PreviewPersistence(store.client,config.storage.bucket),error=>logActivityFailure('PreviewStorage',{jobId:'api-previews'},error));
     // Registered first: it owns the cacheable preview routes (creative media, exports, video posters, carousel covers).
-    @Module({ controllers: [createMediaController(SessionGuard),UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+    @Module({ controllers: [createMediaController(SessionGuard),KnowledgeController,UncertainRequestsController,CampaignBlogsController,PostformeReturnController,PostformeController,HiggsfieldReplacementsController,StrategiesController,StandaloneGenerationNotificationsController,StockMediaController,GenerationNotificationsController,ProjectArchiveController,CarouselGenerationController,CarouselsController,InsightsController,AnalyticsController,VideoController,PublicationController,SocialController,ExportController,WorkspaceController,InvitationController,AssetController,BrainController,BusinessController,CanvasController,ContentPlanController], providers: [SessionGuard,
+ {provide:KnowledgeReview,useValue:new KnowledgeReview(new Businesses(database,workspaces))},
  {provide:MediaLibrary,useValue:new MediaLibrary(new Canvas(new Businesses(database,workspaces),store))},
  {provide:ChatConversations,useFactory:(canvas:Canvas,planning:Planning,carousels:CarouselGeneration)=>new ChatConversations(canvas,planning,carousels),inject:[Canvas,Planning,CarouselGeneration]},
  {provide:CampaignBlogs,useValue:new CampaignBlogs(new ContentPlan(new Businesses(database,workspaces),config.renderImage),new CreativeProvider(config.openaiApiKey))},

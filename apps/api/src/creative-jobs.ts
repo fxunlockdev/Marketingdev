@@ -1,5 +1,7 @@
 import {acceptsModel} from './model-policy.js';
 import {pregeneratePreviews} from './preview-pregeneration.js';
+import {packForJob,promptKnowledge,recordPost,type StoredKnowledge} from './knowledge-production.js';
+import {logActivityFailure} from './activity-log.js';
 import {StockAssets,tooCloseToStock,STOCK_TOO_CLOSE_DISTANCE} from './stock-assets.js';
 import {stockReferenceLabel} from './stock-planning.js';
 import {StockError} from './vecteezy-client.js';
@@ -255,6 +257,23 @@ export class CreativeJobs {
     const secondStock=stockPhoto&&firstStock?{...firstStock,checks:[...firstStock.checks,await this.stockCheck('qa:2',second,stockPhoto)]}:undefined;
     return {image:second,qa:qaReport(model,expectation,[initial,retried],true,undefined,secondStock)};
   }
+  /** The stored pack, or a new one saved before any planner call. A job that already called a model before
+   * packs existed keeps its original input, so its recorded calls still match. */
+  private async knowledgeContext(db:any,j:any,request:any):Promise<StoredKnowledge>{
+    if(request.knowledge_context)return request.knowledge_context as StoredKnowledge;
+    const started=(await db.query("SELECT 1 FROM app.creative_calls WHERE job_id=$1 LIMIT 1",[j.id])).rowCount;
+    const slide=(await db.query('SELECT 1 FROM app.carousel_children WHERE generation_job_id=$1',[j.id])).rowCount;
+    const stored:StoredKnowledge=started?{status:'skipped',reason:'KNOWLEDGE_JOB_ALREADY_STARTED'}:await packForJob(db,{organizationId:j.organization_id,brandId:j.brand_id},slide?'carousel':'creative',request.prompt);
+    await db.query('UPDATE app.creative_requests SET knowledge_context=$2 WHERE job_id=$1',[j.id,JSON.stringify(stored)]);
+    return stored;
+  }
+  /** Production record for the graph: a post node and used_in edges. Optional, never fails the creative. */
+  private async recordKnowledge(scope:JobScope,versionId:string,label:string,knowledge:StoredKnowledge):Promise<void>{
+    if(knowledge.status!=='ready')return;
+    try{
+      await this.jobs.transaction(scope,db=>recordPost(db,scope,{key:`creative ${versionId}`,label,jobId:scope.jobId,properties:{creative_version_id:versionId}},knowledge.used_node_ids));
+    }catch(error){logActivityFailure('KnowledgeRecord',scope,error);}
+  }
   async run(scope: JobScope) {
     try {
       const prepared = await this.jobs.transaction(scope, async (db, j) => {
@@ -332,9 +351,11 @@ export class CreativeJobs {
           "UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",
           [j.id],
         );
+        const knowledge=await this.knowledgeContext(db,j,request);
         const input: CreativeInput = {
           brand: {
             learning:request.memory_context,
+            ...(promptKnowledge(knowledge)?{knowledge:promptKnowledge(knowledge)}:{}),
             id: brain.id,
             sha256: brain.sha256,
             facts: brain.snapshot.facts.map((f: any) => ({
@@ -366,10 +387,10 @@ export class CreativeJobs {
         const references=(await db.query(`SELECT ${referenceColumns},c.position FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id ${referenceJoins} WHERE c.job_id=$1 ORDER BY c.position`,[j.id])).rows;
         // Only a mood board locked before this request was made: the prompt must be identical on replay.
         const moodboard=(await db.query('SELECT m.direction,m.feedback FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0]??null;
-        return { request, grant, parent, input, references, moodboard, actor: j.requested_by };
+        return { request, grant, parent, input, references, moodboard, knowledge, actor: j.requested_by };
       });
       if (!prepared) return "finished";
-      const { request, grant, input, parent, references, moodboard } = prepared;
+      const { request, grant, input, parent, references, moodboard, knowledge } = prepared;
       const referenceImages:Buffer[]=[],referenceManifest:any[]=[];
       for(const r of references){
         if(!r.object_key||!r.sha256)throw new CreativeError('CREATIVE_REFERENCE_INVALID');
@@ -519,7 +540,8 @@ export class CreativeJobs {
       };
       const first=await render('image',basePrompt);
       const {image,qa}=await this.inspected(scope,first,qaExpectation(plan.brief,textMode,identity),notes=>render('image:retry',basePrompt+notes),stockPhoto);
-      return this.jobs.transaction(scope, async (db, j) => {
+      let savedVersion:string|undefined;
+      const status=await this.jobs.transaction(scope, async (db, j) => {
         if (terminal.has(j.status)) return j.status;
         if (!(await this.jobs.permitted(db, j)))
           return this.finish(db, j, "canceled", "CREATIVE_ACCESS_REVOKED");
@@ -579,6 +601,7 @@ export class CreativeJobs {
           text_provider:request.text_provider,
           text_model: request.selected_text_model,
           learning:request.memory_context,
+          knowledge:knowledge.status==='ready'?{used_node_ids:knowledge.used_node_ids,used_edge_ids:knowledge.used_edge_ids,bytes:knowledge.bytes,truncated:knowledge.prompt.truncated}:{status:knowledge.status,reason:knowledge.reason},
           image_model: grant.image_model,
           reserved_cost_micros: reserved,
         };
@@ -675,8 +698,11 @@ export class CreativeJobs {
             ],
           );
         }
+        savedVersion=version;
         return this.finish(db, j, "succeeded");
       });
+      if(status==='succeeded'&&savedVersion)await this.recordKnowledge(scope,savedVersion,plan.brief.headline||plan.brief.caption,knowledge);
+      return status;
     } catch (error) {
       if(error instanceof StockError)error=new CreativeError(error.code);
       if(monthlyBudgetExceeded(error))error=new CreativeError('MONTHLY_GENERATION_BUDGET_EXHAUSTED');

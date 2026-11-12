@@ -9,6 +9,9 @@ import {CreativeProvider} from './creative-provider.js';
 import {CreativeError,type PlannerRequest} from './creative-contracts.js';
 import {validateInsightResult} from './insight-contracts.js';
 import {canonicalJSON,hash} from './brand-brain.js';
+import {packForJob,promptKnowledge,insightMutations,type StoredKnowledge} from './knowledge-production.js';
+import {applyMutations} from './knowledge-graph.js';
+import {logActivityFailure} from './activity-log.js';
 const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class InsightJobs {
  constructor(readonly jobs:AssetJobs,readonly runtime:SkillRuntime,readonly provider:CreativeProvider,readonly gemini:GeminiPlanner=new GeminiPlanner()){}
@@ -49,6 +52,19 @@ export class InsightJobs {
   await this.jobs.transaction(scope,async(db,j)=>{await db.query("UPDATE app.insight_calls SET status='succeeded',result=$3 WHERE job_id=$1 AND step=$2",[j.id,message.step,JSON.stringify(result)]);});
   return result;
  }
+ /** Stored once before any model call; a job that already called a model keeps its original input. */
+ private async knowledgeContext(db:any,j:any,r:any):Promise<StoredKnowledge>{
+  if(r.knowledge_context)return r.knowledge_context;
+  const started=(await db.query('SELECT 1 FROM app.insight_calls WHERE job_id=$1 LIMIT 1',[j.id])).rowCount;
+  const stored:StoredKnowledge=started||r.output?{status:'skipped',reason:'KNOWLEDGE_JOB_ALREADY_STARTED'}:await packForJob(db,{organizationId:j.organization_id,brandId:j.brand_id},'insights','What worked and what did not in recent posts');
+  await db.query('UPDATE app.insight_requests SET knowledge_context=$2 WHERE job_id=$1',[j.id,JSON.stringify(stored)]);
+  return stored;
+ }
+ /** A result node for this run and a suggested lesson per insight. Optional: a failure is logged only. */
+ private async recordLessons(scope:JobScope,insights:{title:string;summary?:string}[]):Promise<void>{
+  try{await this.jobs.transaction(scope,db=>applyMutations(db,scope,insightMutations({jobId:scope.jobId,label:`Performance review ${new Date().toISOString().slice(0,10)}`},insights.map(i=>({title:i.title,detail:i.summary})))));}
+  catch(error){logActivityFailure('KnowledgeRecord',scope,error);}
+ }
  async run(scope:JobScope):Promise<string>{
   try{
    const request=await this.jobs.transaction(scope,async(db,j)=>{
@@ -56,16 +72,20 @@ export class InsightJobs {
     if(!await this.jobs.permitted(db,j)){await this.finish(db,j,'canceled','INSIGHT_ACCESS_REVOKED');return null;}
     const r=(await db.query('SELECT * FROM app.insight_requests WHERE job_id=$1',[j.id])).rows[0];if(!r||hash(canonicalJSON(r.input))!==r.input_sha256)throw new CreativeError('INSIGHT_INPUT_CHANGED');
     if(!this.runtime.configured||!(r.provider==='gemini'?this.gemini:this.provider).configured)throw new CreativeError('INSIGHT_PROVIDER_NOT_CONFIGURED');
-    await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);return r;
+    await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);
+    return {...r,knowledge_context:await this.knowledgeContext(db,j,r)};
    });
    if(!request)return 'finished';
-   const result=validateInsightResult(request.output??await this.runtime.insights(request.input,message=>this.call(scope,message,request.selected_model,request.provider)),request.input);
+   const knowledge:StoredKnowledge=request.knowledge_context;
+   // The pack travels inside the brand data the runtime already accepts; the hashed request input is unchanged.
+   const pack=promptKnowledge(knowledge),input=pack?{...request.input,brand:{...request.input.brand,knowledge:pack}}:request.input;
+   const result=validateInsightResult(request.output??await this.runtime.insights(input,message=>this.call(scope,message,request.selected_model,request.provider)),request.input);
    return await this.jobs.transaction(scope,async(db,j)=>{
     if(terminal.has(j.status))return j.status;if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','INSIGHT_ACCESS_REVOKED');
     await db.query('UPDATE app.insight_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(result)]);
     for(const [position,content] of result.analysis.insights.entries())await db.query('INSERT INTO app.memory_lessons(id,organization_id,brand_id,job_id,position,content) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(job_id,position) DO NOTHING',[randomUUID(),j.organization_id,j.brand_id,j.id,position,JSON.stringify(content)]);
     return this.finish(db,j,'succeeded');
-   });
+   }).then(async status=>{if(status==='succeeded')await this.recordLessons(scope,result.analysis.insights);return status;});
   }catch(error){if(!(error instanceof CreativeError))throw error;return this.jobs.transaction(scope,(db,j)=>terminal.has(j.status)?j.status:this.finish(db,j,['INSIGHT_SUBMISSION_UNKNOWN','INSIGHT_REPLAY_MISMATCH'].includes(error.code)?'unknown':error.code==='INSIGHT_ACCESS_REVOKED'?'canceled':'rejected',error.code));}
  }
  fail(scope:JobScope){return this.jobs.transaction(scope,async(db,j)=>{if(j.kind!=='insight.generate')throw new Error('JOB_KIND_DENIED');if(terminal.has(j.status))return j.status;const uncertain=(await db.query("SELECT 1 FROM app.insight_calls WHERE job_id=$1 AND status IN ('submitted','unknown')",[j.id])).rowCount;return this.finish(db,j,uncertain?'unknown':'failed',uncertain?'INSIGHT_SUBMISSION_UNKNOWN':'INSIGHT_RETRIES_EXHAUSTED');});}

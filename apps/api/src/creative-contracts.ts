@@ -25,6 +25,8 @@ export type CreativeInput = {
     sha256: string;
     facts: { id: string; field: string; value: string }[];
     learning?:LearningContext;
+    /** Bounded knowledge-graph context pack (notice, ranked items, recent-use ledger). Untrusted data. */
+    knowledge?:unknown;
   };
   prompt: string;
   format: "static" | "ad";
