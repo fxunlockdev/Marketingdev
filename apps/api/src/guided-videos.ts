@@ -6,6 +6,9 @@ import {VideoCanvas} from './video-canvas.js';
 export class GuidedVideos {
  constructor(readonly videos:VideoCanvas){}
  async advance(user:string,brand:string,id:string){
+  // Videos stay parked, not failed, until video generation is connected. Concepts and
+  // chosen starting images are kept and resume without another approval.
+  if(!this.videos.enabled)return;
   try {
    const next=await this.videos.canvas.scope(user,brand,true,async(db,b)=>{
     const plan=(await db.query('SELECT * FROM app.guided_campaigns WHERE organization_id=$1 AND brand_id=$2 AND id=$3',[b.organization_id,brand,id])).rows[0];

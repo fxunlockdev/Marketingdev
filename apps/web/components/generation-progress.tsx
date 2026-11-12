@@ -1,6 +1,8 @@
 "use client";
 import {useEffect,useRef,useState} from 'react';
 import './generation-progress.css';
+import {slotProgress} from '../../api/src/creative-budget';
+import {CreativeRecovery} from './creative-recovery';
 type Timing={min_seconds:number;max_seconds:number;sample_count?:number};
 type Run={id:string;status:string;created_at?:string;cancel_requested?:boolean;awaiting_approval?:boolean;provider_progress?:number|null};
 export function GenerationProgress({media,run,stage=0,timing,disconnected=false}:{media:'image'|'video';run:Run;stage?:number;timing?:Timing|null;disconnected?:boolean}){
@@ -30,5 +32,22 @@ export function GenerationProgress({media,run,stage=0,timing,disconnected=false}
   {active&&<p className="generation-progress-note">{pct!==null?`${pct}% rendered. `:''}{estimate?'Estimate based on recent completed '+media+' jobs. ':''}The moving line shows activity, not a countdown. You can return through History.</p>}
   {disconnected&&<p className="generation-progress-note">Your saved request is still available. Live updates will resume when the connection returns.</p>}
   {!disconnected&&run.status==='unknown'&&<p className="generation-progress-note">We’re checking the provider’s response. No duplicate request will be sent automatically.</p>}
+ </section>;
+}
+
+type BatchJob={id:string;slot_id:string;status:string;error_code?:string|null;scheduled_for?:string|null};
+/** One row per post, read from the saved job state. No percentage is ever invented. */
+export function BatchProgress({businessId,jobs,slots,canWrite,onChanged}:{businessId:string;jobs:BatchJob[];slots:{id:string;brief?:string;format?:string}[];canWrite:boolean;onChanged:()=>Promise<void>|void}){
+ if(!jobs.length)return null;
+ const rows=jobs.map(job=>({job,slot:slots.find(s=>s.id===job.slot_id),progress:slotProgress({...job,scheduled_for:job.scheduled_for?new Date(job.scheduled_for).toLocaleString([], {dateStyle:'medium',timeStyle:'short'}):null})})).filter(r=>r.progress);
+ const ready=rows.filter(r=>r.progress!.state==='ready').length;
+ return <section className="batch-progress" aria-label="Progress for each post">
+  <p role="status" className="batch-progress-summary">{ready} of {rows.length} posts ready</p>
+  <ol>{rows.map(({job,slot,progress})=><li key={job.slot_id} className={`batch-progress-row is-${progress!.state}`}>
+   <span className="batch-progress-topic">{slot?.format==='carousel'?'Carousel':slot?.format==='video'?'Video':'Image'} · {(slot?.brief??'Post').slice(0,80)}</span>
+   <strong>{progress!.label}</strong>
+   {progress!.reason&&<span className="batch-progress-reason">{progress!.reason}</span>}
+   {canWrite&&progress!.state==='waiting'&&<CreativeRecovery businessId={businessId} jobId={job.id} onRecovered={async()=>{await onChanged();}}/>}
+  </li>)}</ol>
  </section>;
 }
