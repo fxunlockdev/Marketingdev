@@ -199,7 +199,7 @@ export class Canvas {
     threadId: string,
     body: unknown,
     requestKey: unknown,
-    scoped?: { db: any; b: any; batchJobIds?: string[] },
+    scoped?: { db: any; b: any; batchJobIds?: string[]; recordSignal?: boolean },
   ) {
     threadId = uuid(threadId);
     const v = object(body, [
@@ -376,7 +376,8 @@ export class Canvas {
         [randomUUID(), b.organization_id, id, threadId, job, prompt],
       );
       // A request to change an existing image says the previous one was not right yet.
-      if(parent)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'regenerated',creative_version_id:parent,version_kind:'creative',reason:prompt});
+      // Callers that know the customer's own words (a post's feedback) record the signal themselves.
+      if(parent&&scoped?.recordSignal!==false)await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:'regenerated',creative_version_id:parent,version_kind:'creative',reason:prompt});
       await db.query(
         "INSERT INTO app.job_dispatch(job_id,organization_id,brand_id,kind) VALUES($1,$2,$3,'creative.generate')",
         [job, b.organization_id, id],
@@ -566,7 +567,7 @@ export class Canvas {
           v.feedback,
         ],
       );
-      if(v.decision==='approved'||v.decision==='rejected')await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:v.decision,creative_version_id:versionId,version_kind:'creative',reason:String(v.feedback),context:manifestContext(version.skill_manifest)});
+      if(v.decision==='approved'||v.decision==='rejected'||v.decision==='changes_requested')await recordSignal(db,{organizationId:b.organization_id,brandId:id,actorId:user},{kind:v.decision,creative_version_id:versionId,version_kind:'creative',reason:String(v.feedback),context:manifestContext(version.skill_manifest)});
       return {
         id: versionId,
         status: v.decision,

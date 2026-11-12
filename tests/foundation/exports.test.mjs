@@ -345,6 +345,8 @@ test('carousel is one immutable ordered composition; scoped reviewers approve ex
  await assert.rejects(service.review(reviewer.id,brand.id,v.id,decision(1,'approved')),/Refresh/);
  await service.review(reviewer.id,brand.id,v.id,decision(2,'approved'));
  data=await service.read(viewer.id,brand.id,result.project_id);assert.equal(data.versions[0].status,'approved');assert.equal(data.reviews.length,2);
+ // Sending for review is not a decision; refused decisions record nothing; the approval records exactly one signal.
+ assert.deepEqual((await admin.query('SELECT kind,version_kind,reason,actor_id,context FROM app.creative_signals WHERE creative_version_id=$1',[v.id])).rows,[{kind:'approved',version_kind:'carousel',reason:'',actor_id:reviewer.id,context:{format:'carousel',channel:'linkedin'}}]);
  await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query("UPDATE app.carousel_versions SET caption='forged' WHERE id=$1",[v.id]),brand.id),e=>e.code==='42501');
  await assert.rejects(app.database.transaction(alice.id,org.id,true,db=>db.query('DELETE FROM app.carousel_pages WHERE carousel_version_id=$1',[v.id]),brand.id),e=>e.code==='42501');
  const edited=await service.save(editor.id,brand.id,{...input,project_id:result.project_id,parent_id:v.id,pages:[input.pages[1],input.pages[0]]},randomUUID());

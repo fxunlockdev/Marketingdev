@@ -6,6 +6,7 @@ import {CarouselGeneration} from './carousel-generation.js';
 import {object,uuid} from './workspaces.js';
 import {hash,canonicalJSON} from './brand-brain.js';
 import {directionFeedback,requireGuidedRevision,nextDirectionVersion} from './guided-campaign-contracts.js';
+import {recordSignal} from './learning-signals.js';
 
 export function moodboardStatus(image:string,carousel:string,approved:boolean){
  if(approved)return 'locked';
@@ -68,6 +69,9 @@ export class GuidedMoodboards {
    const image=await this.canvas.submit(user,brand,thread.id,{prompt:imagePrompt,format:'static',channel:'instagram',size:'1024x1024',creative_spec:{placement:'feed',aspect:'square',slide_count:null,artwork}},`moodboard:image:${id}`,{db,b});
    const carousel=await this.carousels.submit(user,brand,{prompt:carouselPrompt,slide_count:3,channel:'instagram',size:'1024x1024',creative_spec:{placement:'feed',aspect:'square',slide_count:3,artwork}},`moodboard:carousel:${id}`,{db,b,batchJobIds:[image.id],threadId:thread.id});
    await db.query(`INSERT INTO app.guided_moodboards(id,organization_id,brand_id,brief_revision,ordinal,direction,feedback,image_job_id,carousel_job_id,request_key,request_hash,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,[id,b.organization_id,brand,brief.revision,ordinal,JSON.stringify(direction),feedback,image.id,carousel.id,key,fingerprint,user]);
+   // Revision feedback is about the mood board the customer last saw finish.
+   if(feedback){const seen=[...previous].reverse().find((r:any)=>moodboardStatus(r.image_status,r.carousel_status,false)==='ready');
+    await recordSignal(db,{organizationId:b.organization_id,brandId:brand,actorId:user},{kind:'regenerated',subject_kind:'moodboard',subject_id:seen?.id??id,creative_version_id:seen?.generated_image_version??null,version_kind:seen?.generated_image_version?'creative':null,reason:feedback});}
    return {id};
   });
  }
@@ -83,6 +87,7 @@ export class GuidedMoodboards {
   // Answers are frozen once a mood board exists; questionnaire navigation may still change its revision.
   await db.query('UPDATE app.guided_moodboards SET approved_at=now(),approved_by=$2,image_version_id=$3,carousel_version_id=$4 WHERE id=$1',[id,user,row.generated_image_version,row.generated_carousel_version]);
   await db.query("INSERT INTO app.audit_events(organization_id,brand_id,actor_id,action,resource_id) VALUES($1,$2,$3,'moodboard.approved',$4)",[b.organization_id,brand,user,id]);
+  await recordSignal(db,{organizationId:b.organization_id,brandId:brand,actorId:user},{kind:'approved',subject_kind:'moodboard',subject_id:id,creative_version_id:row.generated_image_version,version_kind:'creative'});
   // Direction approval never approves the example posts for publication.
   return {id,status:'locked'};
  });}

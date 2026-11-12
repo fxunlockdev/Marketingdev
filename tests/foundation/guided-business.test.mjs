@@ -572,3 +572,47 @@ test('an uncertain early capture never blocks for good: release it, then submit 
  assert.equal((await jobs('website.extract')).length,2);
  assert.equal((await guided.read(alice,target.id)).prefill_status,'canceled');
 });
+
+const feedbackSignals=async brand=>(await admin.query('SELECT kind,subject_kind,subject_id,slot_id,creative_version_id,version_kind,reason,actor_id FROM app.creative_signals WHERE brand_id=$1 ORDER BY created_at,id',[brand])).rows;
+test('mood board revision and approval each record one learning signal; failed or repeated actions record none',async()=>{
+ const {org,brand}=await readyBusiness();
+ const first=await boards.create(alice,brand.id,{revision:1},randomUUID());
+ assert.deepEqual(await feedbackSignals(brand.id),[],'a first mood board without feedback is not feedback');
+ const outputs=await completeBoardFixture(brand,org,first);
+ await assert.rejects(boards.create(alice,brand.id,{revision:1},randomUUID()),/what to change/);
+ await assert.rejects(boards.approve(bob,brand.id,first.id),/not found|access|Forbidden/i);
+ assert.deepEqual(await feedbackSignals(brand.id),[]);
+ const key=randomUUID(),revised=await boards.create(alice,brand.id,{revision:1,feedback:'Warmer daylight, fewer people'},key);
+ await boards.create(alice,brand.id,{revision:1,feedback:'Warmer daylight, fewer people'},key);
+ assert.deepEqual(await feedbackSignals(brand.id),[{kind:'regenerated',subject_kind:'moodboard',subject_id:first.id,slot_id:null,creative_version_id:outputs.version,version_kind:'creative',reason:'Warmer daylight, fewer people',actor_id:alice}]);
+ await assert.rejects(boards.approve(alice,brand.id,revised.id),/finish/);
+ const done=await completeBoardFixture(brand,org,revised);
+ await boards.approve(alice,brand.id,revised.id);await boards.approve(alice,brand.id,revised.id);
+ const rows=await feedbackSignals(brand.id);
+ assert.equal(rows.length,2);assert.deepEqual(rows[1],{kind:'approved',subject_kind:'moodboard',subject_id:revised.id,slot_id:null,creative_version_id:done.version,version_kind:'creative',reason:'',actor_id:alice});
+});
+test('monthly plan approval and a planning retry each record one learning signal; rejected attempts record none',async()=>{
+ const {org,brand}=await readyBusiness();
+ const board=await boards.create(alice,brand.id,{revision:1},randomUUID());
+ await completeBoardFixture(brand,org,board);await boards.approve(alice,brand.id,board.id);
+ const planSignals=async()=>(await feedbackSignals(brand.id)).filter(s=>s.subject_kind==='plan');
+ const campaign=await campaigns.create(alice,brand.id,{moodboard_id:board.id,starts_on:'2026-12-01',duration:'week',channels:['instagram'],static_count:2,carousel_count:0,timezone:'UTC'},randomUUID());
+ const {planning_job_id}=(await admin.query('SELECT planning_job_id FROM app.guided_campaigns WHERE id=$1',[campaign.id])).rows[0];
+ await admin.query("UPDATE app.jobs SET status='failed' WHERE id=$1",[planning_job_id]);
+ await campaigns.retry(alice,brand.id,campaign.id);
+ assert.deepEqual((await planSignals()).map(s=>[s.kind,s.subject_id]),[['retried',campaign.id]]);
+ await campaigns.retry(alice,brand.id,campaign.id);
+ assert.equal((await planSignals()).length,1,'a retry while the new plan is still being prepared changes nothing');
+ const slots=[1,2].map(day=>({channel:'instagram',planned_at:`2026-12-0${day}T09:00:00Z`,format:'static',brief:'Fresh coffee and community',creative_spec:{placement:'feed',aspect:'square',slide_count:null}}));
+ const plan=await plans.create(alice,brand.id,{title:'Weekly fixture',objective:'Community',starts_on:'2026-12-01',timezone:'UTC',slots},randomUUID());
+ const retried=(await admin.query('SELECT planning_job_id FROM app.guided_campaigns WHERE id=$1',[campaign.id])).rows[0].planning_job_id;
+ await admin.query('UPDATE app.planning_requests SET output_plan_id=$2 WHERE job_id=$1',[retried,plan.id]);
+ await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[retried]);
+ const reviewed=(await campaigns.read(alice,brand.id)).campaigns[0].slots.map(({id,revision})=>({id,revision}));
+ await assert.rejects(campaigns.approvePlan(alice,brand.id,campaign.id,{slots:reviewed.slice(1)}),/plan changed/);
+ await assert.rejects(campaigns.approvePlan(bob,brand.id,campaign.id,{slots:reviewed}),/not found|access|Forbidden/i);
+ assert.equal((await planSignals()).length,1);
+ await campaigns.approvePlan(alice,brand.id,campaign.id,{slots:reviewed});
+ await campaigns.approvePlan(alice,brand.id,campaign.id,{slots:reviewed});
+ assert.deepEqual((await planSignals()).map(s=>[s.kind,s.subject_id,s.actor_id]),[['retried',campaign.id,alice],['approved',campaign.id,alice]]);
+});

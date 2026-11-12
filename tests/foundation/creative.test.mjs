@@ -652,7 +652,12 @@ test('review feedback reaches the actual skill input and image editing uses the 
  version=(await canvas.project(alice,brand.id,linkedSlot.project_id)).versions.find(v=>v.id===s.creative_version_id);
  transport=async(url,init)=>{const path=new URL(url).pathname;if(path==='/v1/responses'){const payload=JSON.parse(init.body);sawFeedback=JSON.stringify(payload).includes('Use a calmer visual')&&JSON.stringify(payload).includes('Less clutter');}if(path==='/v1/images/edits')sawEdit=true;return standard(url,init);};
  try{
+  await assert.rejects(slotCreatives.generate(editor,brand.id,s.id,{revision:s.revision-1,feedback:'Stale request'},randomUUID()),/changed/);
   const j=await slotCreatives.generate(editor,brand.id,s.id,{revision:s.revision,feedback:'Less clutter'},randomUUID());
+  // One signal per customer action, carrying their own words rather than the generated prompt.
+  const signals=(await admin.query('SELECT kind,slot_id,creative_version_id,version_kind,reason,actor_id FROM app.creative_signals WHERE slot_id=$1 OR creative_version_id=$2 ORDER BY created_at,id',[s.id,s.creative_version_id])).rows;
+  assert.deepEqual(signals.map(r=>[r.kind,r.creative_version_id,r.reason,r.actor_id]),[['regenerated',null,'Keep it simple',alice],['changes_requested',s.creative_version_id,'Use a calmer visual',alice],['regenerated',s.creative_version_id,'Less clutter',editor]]);
+  assert.ok(signals.every(r=>r.slot_id===s.id));
   assert.equal(await handler.run(scope(j)),'succeeded',JSON.stringify(await row(j)));assert.ok(sawFeedback&&sawEdit);
  }finally{transport=undefined;}
  linkedSlot=(await slotCreatives.detail(alice,brand.id,s.id)).slot;assert.equal(linkedSlot.state,'draft_ready');assert.notEqual(linkedSlot.creative_version_id,s.creative_version_id);assert.equal(linkedSlot.approved_by,null);
@@ -1213,4 +1218,22 @@ test('stock-backed creative that is nearly a copy of its stock photo is regenera
   assert.equal(v.qa.verdict,'flag');
   assert.deepEqual(v.qa.stock_source.checks.map(c=>c.too_close),[true,true]);
  }finally{transport=undefined;await admin.query('DELETE FROM app.stock_grants WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);}
+});
+
+test('retrying failed campaign posts records one signal per post; a refused retry records none',async()=>{
+ await grant(100000000);transport=undefined;
+ const plan=await plans.create(alice,brand.id,{title:'TEST retry batch',objective:'Explain the offering',starts_on:'2026-11-01',timezone:'UTC',slots:[{channel:'linkedin',planned_at:'2026-11-03T08:00:00Z',format:'static',brief:'Our scheduling tool',pillar:'Education',hook:'A calmer day',cta:'Learn more'}]},randomUUID());
+ const [s]=(await plans.list(alice,brand.id,{start:'2026-11-01T00:00:00Z',end:'2026-12-01T00:00:00Z',plan_id:plan.id})).slots;
+ const quote=(await slotCreatives.batchStatus(alice,brand.id,plan.id)).quote,body={slots:[{id:s.id,revision:s.revision}],credit_cap:quote.slots.reduce((n,q)=>n+q.credits,0)};
+ const signals=async()=>(await admin.query('SELECT kind,slot_id,reason,context,actor_id FROM app.creative_signals WHERE slot_id=$1 ORDER BY created_at,id',[s.id])).rows;
+ const first=await slotCreatives.generateBatch(alice,brand.id,plan.id,body,randomUUID());
+ assert.deepEqual(await signals(),[],'a first generation is not feedback');
+ await assert.rejects(slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,retry_failed:true},randomUUID()),/Only posts whose last attempt failed/);
+ assert.deepEqual(await signals(),[]);
+ await admin.query("UPDATE app.jobs SET status='failed',error_code='CREATIVE_RETRIES_EXHAUSTED' WHERE id=$1",[first.jobs[0].id]);
+ const current=(await slotCreatives.detail(alice,brand.id,s.id)).slot;body.slots=[{id:s.id,revision:current.revision}];
+ const key=randomUUID(),retried=await slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,retry_failed:true},key);
+ await slotCreatives.generateBatch(alice,brand.id,plan.id,{...body,retry_failed:true},key);
+ assert.deepEqual(await signals(),[{kind:'retried',slot_id:s.id,reason:'Retried after generation failed',context:{format:'static',channel:'linkedin',pillar:'Education'},actor_id:alice}]);
+ await canvas.cancel(alice,brand.id,retried.jobs[0].id);await handler.run(scope(retried.jobs[0]));
 });

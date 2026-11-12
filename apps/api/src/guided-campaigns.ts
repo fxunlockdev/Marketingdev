@@ -9,6 +9,7 @@ import {object,uuid} from './workspaces.js';
 import {hash,canonicalJSON} from './brand-brain.js';
 import {campaignMonthDays} from './generation-plan.js';
 import {allowanceMessage,allowanceShortfalls,type AllowanceKind} from './creative-budget.js';
+import {recordSignal} from './learning-signals.js';
 const SCHEDULE_SCAN_MS=60000,RELEASE_RETRY_MS=600000;
 const formatCounts=(slots:readonly {format?:string}[]):Partial<Record<AllowanceKind,number>>=>({static:slots.filter(s=>s.format==='static').length,carousel:slots.filter(s=>s.format==='carousel').length});
 export class GuidedCampaigns {
@@ -92,6 +93,8 @@ export class GuidedCampaigns {
    }
    await db.query('UPDATE app.guided_campaigns SET video_references=$2,video_error=NULL WHERE id=$1',[id,JSON.stringify(videoReferences)]);
    await db.query('UPDATE app.guided_campaigns SET plan_approved_at=now(),plan_approved_by=$2,approved_slots=$3,last_error=NULL WHERE id=$1',[id,user,JSON.stringify(slots)]);
+   // A repeated approval of the same reviewed plan is the same decision, not a new one.
+   if(!row.plan_approved_at)await recordSignal(db,{organizationId:b.organization_id,brandId:brand,actorId:user},{kind:'approved',subject_kind:'plan',subject_id:id});
    return {id};
   });
  }
@@ -148,6 +151,7 @@ export class GuidedCampaigns {
   if(['failed','rejected','canceled'].includes(row.status)){
    const job=await this.planning.submit(user,brand,row.planning_request,`guided-retry:${row.planning_job_id}`,{db,b,budgetMicros:0,weeklyIncrease:0,single:true});
    await db.query('UPDATE app.guided_campaigns SET planning_job_id=$2,last_error=NULL,attempted_at=NULL,generation_request=NULL WHERE id=$1',[id,job.id]);
+   await recordSignal(db,{organizationId:b.organization_id,brandId:brand,actorId:user},{kind:'retried',subject_kind:'plan',subject_id:id,reason:'Asked for the monthly plan again after it failed'});
   }else if(row.status==='succeeded')await db.query('UPDATE app.guided_campaigns SET last_error=NULL,attempted_at=NULL WHERE id=$1',[id]);
   else if(row.status==='unknown')throw new ConflictException('We are checking the previous request before retrying');
   return {id};

@@ -17,7 +17,7 @@ test('recordSignal appends one row for the acting user in the given business',as
  const calls=[],db={query:async(sql,params)=>{calls.push([sql,params]);return {rows:[]};}};
  const {id}=await recordSignal(db,{organizationId:'org',brandId:'brand',actorId:'user'},{kind:'rejected',slot_id:slot,reason:'No people please',context:{format:'static'}});
  assert.match(id,/^[0-9a-f-]{36}$/);assert.equal(calls.length,1);assert.match(calls[0][0],/^INSERT INTO app\.creative_signals/);
- assert.deepEqual(calls[0][1].slice(1),['org','brand',slot,null,null,'rejected','No people please','{}','{"format":"static"}','user']);
+ assert.deepEqual(calls[0][1].slice(1),['org','brand',slot,null,null,'rejected','No people please','{}','{"format":"static"}','user',null,null]);
  await assert.rejects(recordSignal(db,{organizationId:'org',brandId:'brand',actorId:'user'},{kind:'rejected'}),SignalError);assert.equal(calls.length,1);
 });
 test('rejection reasons become counted preference statements',()=>{
@@ -47,4 +47,18 @@ test('regenerations and stock swaps are counted; output is deterministic, window
 test('signalSummary reads a bounded recent window',async()=>{
  let seen;const db={query:async(sql,params)=>{seen=[sql,params];return {rows:[row('regenerated'),row('regenerated')]};}};
  const out=await signalSummary(db,now);assert.equal(out.length,1);assert.equal(seen[0],recentSignalsSQL);assert.deepEqual(seen[1],[now.toISOString()]);assert.match(recentSignalsSQL,/LIMIT 500/);
+});
+
+test('mood board and plan signals name their subject; change requests and retries are their own kinds',()=>{
+ const board='33333333-3333-4333-8333-333333333333';
+ const s=normaliseSignal({kind:'changes_requested',subject_kind:'moodboard',subject_id:board,reason:'Warmer light'});
+ assert.equal(s.subject_kind,'moodboard');assert.equal(s.subject_id,board);assert.equal(s.slot_id,null);assert.equal(s.kind,'changes_requested');
+ assert.equal(normaliseSignal({kind:'retried',subject_kind:'plan',subject_id:board}).kind,'retried');
+ for(const bad of [{kind:'approved',subject_kind:'moodboard'},{kind:'approved',subject_id:board},{kind:'approved',subject_kind:'campaign',subject_id:board}])assert.throws(()=>normaliseSignal(bad),SignalError);
+});
+test('topic, brief and storyline diffs stay under the stored byte limit even with wide characters',()=>{
+ const wide='\u{1F600}'.repeat(600),diff=signalDiff({brief:{before:wide,after:'b'+wide},pillar:{before:wide,after:'p'},hook:{before:wide,after:'h'},cta:{before:wide,after:'c'},storyline:{before:wide,after:'s'+wide},headline:{before:wide,after:'x'}});
+ assert.deepEqual(Object.keys(diff).sort(),['brief','cta','headline','hook','pillar','storyline']);
+ assert.ok(Buffer.byteLength(JSON.stringify(diff))<=7000,'fits the 8000-byte column check');
+ assert.deepEqual(signalDiff({storyline:{before:'Open on the shop',after:'Open on the owner'}}),{storyline:{before:'Open on the shop',after:'Open on the owner'}});
 });
