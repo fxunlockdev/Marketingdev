@@ -14,6 +14,8 @@ import {CreativeProvider} from './creative-provider.js';
 import {CreativeError,type PlannerRequest} from './creative-contracts.js';
 import {validatePlanningResult,resolvedPlanningInput,type PlanningInput,type PlanningResult} from './planning-contracts.js';
 import {canonicalJSON,hash} from './brand-brain.js';
+import {validateStrategyInput,validateStrategyResult,type StrategyResult} from './strategy-contracts.js';
+import {saveDraftStrategy} from './strategy-store.js';
 const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 export class PlanningJobs {
  constructor(readonly jobs:AssetJobs,readonly runtime:SkillRuntime,readonly provider:CreativeProvider,readonly gemini:GeminiPlanner=new GeminiPlanner()){}
@@ -118,6 +120,25 @@ export class PlanningJobs {
      if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(response)]);
      if(['image','edit_image','carousel','campaign'].includes(response.action))await db.query('INSERT INTO delivery.chat_actions(job_id,organization_id,brand_id,actor_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING',[j.id,j.organization_id,j.brand_id,j.requested_by]);
+     return this.finish(db,j,'succeeded');
+    });
+   }
+   if((input as {task:string}).task==='strategy'){
+    const strategyInput=validateStrategyInput(input);
+    let strategy:StrategyResult=request.output;
+    if(!strategy){
+     strategy=await this.runtime.strategy(strategyInput,message=>this.call(scope,message,model,request.provider,16000));
+     await this.jobs.transaction(scope,async(db,j)=>{
+      if(!await this.jobs.permitted(db,j))throw new CreativeError('PLAN_ACCESS_REVOKED');
+      await db.query('UPDATE app.planning_requests SET output=$2 WHERE job_id=$1',[j.id,JSON.stringify(strategy)]);
+     });
+    }
+    const checked=validateStrategyResult(strategy,strategyInput);
+    // A draft only: the owner reads and approves it before any plan may use it.
+    return await this.jobs.transaction(scope,async(db,j)=>{
+     if(terminal.has(j.status))return j.status;
+     if(!await this.jobs.permitted(db,j))return this.finish(db,j,'canceled','PLAN_ACCESS_REVOKED');
+     await saveDraftStrategy(db,j,request,checked,model);
      return this.finish(db,j,'succeeded');
     });
    }
