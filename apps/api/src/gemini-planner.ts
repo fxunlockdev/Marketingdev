@@ -1,3 +1,4 @@
+import type {PlanOutputTokens} from './planning-contracts.js';
 import {GoogleGenAI, type Content, type Part, type GenerateContentParameters} from '@google/genai';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {CreativeError,type PlannerRequest,type PlannerResponse} from './creative-contracts.js';
@@ -18,7 +19,7 @@ export class GeminiPlanner {
  get configured(){return !!this.sdk;}
  /** This transport does not send request images; stock ranking falls back to titles. */
  readonly acceptsImages=false;
- plannerRequest(request:PlannerRequest,model:string,maxOutputTokens:512|4000|16000=16000){
+ plannerRequest(request:PlannerRequest,model:string,maxOutputTokens:PlanOutputTokens=16000){
   if(request.images!==undefined&&request.images.length)fail();
   if(!/^gemini-[a-zA-Z0-9._-]{1,90}$/.test(model)||!Number.isInteger(request.step)||request.step<1||request.step>3||!request.messages.length||request.messages.length>30||request.tools.length>1||request.tools.some(t=>t?.type!=='function'||t.function?.name!=='read_file'))fail();
   const contents:Content[]=[],system:string[]=[],calls=new Map<string,{name:string;id?:string}>();
@@ -50,7 +51,7 @@ export class GeminiPlanner {
   const size=Buffer.byteLength(canonicalJSON(body));if(size>400000)throw new CreativeError('SKILL_INPUT_LIMIT');
   return {body,sha256:hash(canonicalJSON({provider:'gemini',...body})),maxInputTokens:size+2048,maxOutputTokens};
  }
- async plan(request:PlannerRequest,model:string,maxOutputTokens:512|4000|16000=16000):Promise<PlannerResponse>{
+ async plan(request:PlannerRequest,model:string,maxOutputTokens:PlanOutputTokens=16000):Promise<PlannerResponse>{
   if(!this.sdk)throw new CreativeError('PLAN_PROVIDER_NOT_CONFIGURED');
   const response=await this.sdk.models.generateContent(this.plannerRequest(request,model,maxOutputTokens).body);
   const candidate=response.candidates?.[0];

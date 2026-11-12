@@ -136,7 +136,7 @@ export class SkillRuntime {
               )
                 return done(new CreativeError("SKILL_BROKER_INVALID"));
               pending = true;
-              void model({...value,chat_response:undefined,video_plan:undefined,content_plan_schema:undefined,carousel_plan_schema:undefined,creative_fact_ids:undefined})
+              void model({...value,chat_response:undefined,video_plan:undefined,content_plan_schema:undefined,carousel_plan_schema:undefined,creative_fact_ids:undefined,images:undefined})
                 .then((result) => {
                   pending = false;
                   if (!settled)
