@@ -1357,6 +1357,10 @@ test('Calendar generates a missing image in place and retains the finished previ
  const plans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
  const p=await plans.create(actor,brand,{title:'Calendar image handoff',objective:'Generate directly from a saved topic',starts_on:'2027-04-01',timezone:'UTC',slots:[{channel:'instagram',format:'static',brief:'TEST clear product story for calendar',planned_at:'2027-04-03T10:00:00Z'}]},randomUUID());
  await page.goto(`${base}/b/${brand}/content-plan?start=2027-04-03&plan=${p.id}`);
+ // The calendar opens on the visual week; a missing image is generated from the Day view's post card.
+ await expect(page.getByText('1 post in this view',{exact:true})).toBeVisible();
+ const dayView=async()=>{await page.getByText('Calendar options',{exact:true}).click();await selectOption(page.getByLabel('Calendar view',{exact:true}),'day');await page.getByText('Calendar options',{exact:true}).click();};
+ await dayView();
  const card=page.locator('.daily-post');
  await expect(card.getByRole('button',{name:'Generate 1 image',exact:true})).toBeEnabled();
  await expect(card.locator('.post-thumbnail')).toHaveCount(0);
@@ -1364,7 +1368,7 @@ test('Calendar generates a missing image in place and retains the finished previ
  await card.getByRole('button',{name:'Generate 1 image',exact:true}).click();
  await expect(card.locator('.post-thumbnail svg')).toBeVisible({timeout:90000});
  await expect(card.getByText('Draft ready',{exact:true})).toBeVisible();
- await page.reload();await expect(card.locator('.post-thumbnail svg')).toBeVisible();
+ await page.reload();await dayView();await expect(card.locator('.post-thumbnail svg')).toBeVisible();
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.content_slot_generations g JOIN app.content_slots s ON s.id=g.slot_id WHERE s.plan_id=$1',[p.id])).rows[0].n,1);
  await page.screenshot({path:'work/browser/calendar-image-ready.png',fullPage:true});
  assert.deepEqual((await new AxeBuilder({page}).analyze()).violations,[]);

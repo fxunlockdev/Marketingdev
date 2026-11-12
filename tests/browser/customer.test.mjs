@@ -262,16 +262,16 @@ test("V5 signup and real email verification lead to zero businesses and exact na
   await expect(alice.getByRole('combobox',{name:'Business',exact:true})).toHaveCount(0);
   await expect(alice.locator('.workspace-context')).toHaveText('Your workspace');
   await expect(alice.locator('.header-create')).toHaveCount(0);
-  await expect(
-    alice.getByRole("link", { name: "Add business", exact: true }),
-  ).toBeVisible();
+  // A verified account with no business is taken straight to adding its first one.
+  await expect(alice).toHaveURL(base + "/brands/new");
+  await expect(alice.getByRole("heading", { name: "Your content. Your brand.", exact: true })).toBeVisible();
   assert.deepEqual(await alice.locator("#business-nav a").allTextContents(), ['Home','Calendar','Create','Approvals','Brand Kit','Content Preferences','Integrations','Learnings','Insights','Archived Posts','Brands','Team','Billing','Profile']);
   // Every group heading sits above at least one link; the topbar has no second profile link.
   assert.deepEqual(await alice.locator('#business-nav .nav-group').allTextContents(),['Plan & create','Brand','Results','Library','Workspace']);
   await expect(alice.locator('.v5-topbar a[href="/profile"]')).toHaveCount(0);  await alice.goto(base + "/brands");
-  await expect(
-    alice.getByText("0 of 3 owned businesses", { exact: false }),
-  ).toBeVisible();
+  // One account can run several businesses; the default allowance is ten.
+  await expect(alice.getByText("0 of 10 businesses in use.", { exact: true })).toBeVisible();
+  await expect(alice.getByRole("link", { name: "Set up my business", exact: true })).toHaveAttribute("href", "/brands/new");
   assert.equal(await alice.locator(".v5-business-card").count(), 0);
   const colors = await alice.evaluate(() => ({
     paper: getComputedStyle(document.documentElement)
@@ -327,7 +327,7 @@ test("three-step manual fallback saves evidence, corrections, goals and immutabl
     .getByRole("button", { name: "Confirm details & continue" })
     .click();
   await expect(
-    alice.getByRole("heading", { name: "Review your direction" }),
+    alice.getByRole("heading", { name: "Your content preferences." }),
   ).toBeVisible();
   await expect(
     alice.getByText("No AI recommendations yet.", {
@@ -527,9 +527,13 @@ test("three saved businesses, server fourth rejection, selector isolation and ca
   await createBusiness("Northside Studio");
   await alice.goto(base + "/brands");
   await expect(alice.locator(".v5-business-card")).toHaveCount(3);
-  await expect(
-    alice.getByText("3 of 3 owned businesses", { exact: false }),
-  ).toBeVisible();
+  await expect(alice.getByText("3 of 10 businesses in use.", { exact: true })).toBeVisible();
+  // The allowance is account data an operator can lower; the server enforces whatever is set.
+  const account = (await (await alice.request.get(base + "/api/v1/businesses")).json()).businesses[0].organization_id;
+  await admin.query("UPDATE app.account_entitlements SET max_active_businesses=3,version=version+1 WHERE organization_id=$1", [account]);
+  await alice.reload();
+  await expect(alice.getByText("3 of 3 businesses in use.", { exact: true })).toBeVisible();
+  await expect(alice.getByRole("link", { name: "+ Add business", exact: true })).toHaveCount(0);
   await alice.screenshot({
     path: "work/browser/v5-brands-desktop.png",
     fullPage: true,
@@ -565,14 +569,19 @@ test("three saved businesses, server fourth rejection, selector isolation and ca
     await alice.getByText("Botanical refill packs for stores", { exact: true }).count(),
     0,
   );
+  // The retired Canvas link opens Create; planning for an unconfirmed brand starts with the brand.
   await alice.goto(base + `/b/${secondBusiness}/canvas`);
-  await expect(alice).toHaveURL(base + `/b/${secondBusiness}/campaigns`);
+  await expect(alice).toHaveURL(base + `/b/${secondBusiness}/create`);
   await expect(alice.getByRole('link', {name:'Canvas',exact:true})).toHaveCount(0);
-  await alice.getByRole('link', {name:'Plan a campaign →',exact:true}).click();
-  await expect(alice.getByRole('heading', {name:'Confirm your brand first',exact:true})).toBeVisible();
-  await expect(alice.getByRole('link', {name:'Open brand setup',exact:true})).toHaveAttribute('href', `/b/${secondBusiness}/onboarding`);
-  await expect(alice.getByRole('button', {name:'Create campaign plan',exact:true})).toHaveCount(0);
+  await alice.goto(base + `/b/${secondBusiness}/overview`);
+  await expect(alice.getByRole('link', {name:'Finish brand setup',exact:true})).toHaveAttribute('href', `/b/${secondBusiness}/guided-onboarding`);
+  await alice.getByRole('link', {name:'Plan my content',exact:true}).first().click();
+  await expect(alice).toHaveURL(base + `/b/${secondBusiness}/monthly-planning`);
+  await expect(alice.getByRole('heading', {name:'Let’s get to know your business',exact:true})).toBeVisible();
+  await expect(alice.getByRole('button', {name:/Create .*plan|Approve/})).toHaveCount(0);
   assert.equal(await alice.getByRole('button',{name:/Publish/}).count(),0);
+  // The navigation highlight leaving Home is still fading; check contrast once it has settled.
+  await alice.waitForFunction(()=>document.getAnimations().every(a=>!(a instanceof CSSTransition)||a.playState!=='running'));
   const canvasAccessibility=(await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations;
   assert.deepEqual(canvasAccessibility.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[],JSON.stringify(canvasAccessibility.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))}))));
   await alice.screenshot({
@@ -919,7 +928,8 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   draft=await (await alice.request.get(brainURL)).json();
   assert.equal(draft.active.snapshot.facts.find(f=>f.field==='visual_direction_composition').value,'Use spacious layouts with calm typography.');
   const approvedFact=draft.active.snapshot.facts.find(f=>f.field==='offering'),sourceRoute=`**/brain/sources/${approvedFact.source_id}`;
-  await alice.route(sourceRoute,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Source temporarily unavailable'})}),{times:1});
+  // Reads retry one transient failure on their own; a source that stays unavailable offers an explicit retry.
+  await alice.route(sourceRoute,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'Source temporarily unavailable'})}),{times:2});
   await alice.getByText('Evidence for offering',{exact:true}).click();await expect(alice.getByRole('button',{name:'Retry source evidence',exact:true})).toBeVisible();
   await alice.getByRole('button',{name:'Retry source evidence',exact:true}).click();await expect(alice.locator('blockquote').filter({hasText:'offering: '+approvedFact.value})).toBeVisible();
   await alice.getByText('Evidence for visual direction composition',{exact:true}).click();await expect(alice.getByText(/Approved visual interpretation with/)).toBeVisible();
@@ -934,7 +944,9 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   const starts=new Date().toISOString().slice(0,10);
   const planResponse=await alice.request.post(`${base}/api/v1/businesses/${target.id}/content-plans`,{headers:{origin:base,'idempotency-key':randomUUID()},data:{title:'Reference selection fixture',objective:'Verify selected approved references',starts_on:starts,timezone:'UTC',slots:[{channel:'instagram',format:'static',planned_at:starts+'T12:00:00Z',brief:'Reference selection draft'}]}});
   assert.equal(planResponse.status(),201,await planResponse.text());
-  await alice.goto(`${base}/b/${target.id}/campaigns`);
+  // New posts are added from the plan's review screen; the Calendar has no separate composer.
+  const referencePlan=(await planResponse.json()).id;
+  await alice.goto(`${base}/b/${target.id}/campaign-review?plan=${referencePlan}`);
   await alice.getByRole('button',{name:'＋ New Post',exact:true}).click();
   const composer=alice.getByRole('dialog',{name:'New Post',exact:true});
   await composer.getByRole('button',{name:'Media library',exact:true}).click();
@@ -948,7 +960,7 @@ test("saved AI recommendation pre-fills step three and user changes survive relo
   await alice.locator('.reference-list li').filter({has:alice.getByRole('img',{name:'My guideline reference',exact:true})}).getByText('Approved',{exact:true}).click();
   await alice.getByRole('button',{name:'Remove approval for My guideline reference',exact:true}).click();
   await expect(alice.getByRole('button',{name:'Remove approval for My guideline reference',exact:true})).toHaveCount(0);
-  await alice.goto(`${base}/b/${target.id}/campaigns`);
+  await alice.goto(`${base}/b/${target.id}/campaign-review?plan=${referencePlan}`);
   await alice.getByRole('button',{name:'＋ New Post',exact:true}).click();
   await composer.getByRole('button',{name:'Media library',exact:true}).click();
   await expect(composer.getByRole('checkbox',{name:'My guideline reference',exact:true})).toHaveCount(0);
@@ -1028,7 +1040,7 @@ test('business Team invites through real email, accepts selected access, changes
  await alice.getByRole('button',{name:'Refresh team',exact:true}).click();await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),'editor');await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByText('Business role saved.',{exact:true})).toBeVisible();
  await alice.reload();await expect(alice.getByRole('region',{name:'People with access'}).getByText('editor',{exact:true})).toBeVisible();assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-desktop.png',fullPage:true});
  await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/business-team-mobile.png',fullPage:true});
- for(const role of ['reviewer','analyst']){await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),role);await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByRole('region',{name:'People with access'}).getByText(role,{exact:true})).toBeVisible();}
+ for(const role of ['reviewer','analyst']){await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),role);await alice.getByRole('button',{name:'Save role',exact:true}).click();await expect(alice.getByRole('combobox',{name:'Role for Sam Rivera'})).toHaveCount(0);await expect(alice.getByRole('region',{name:'People with access'}).getByText(role,{exact:true})).toBeVisible();}
  await bob.goto(base+`/b/${firstBusiness}/team`);await expect(bob.getByRole('heading',{name:'Team',exact:true})).toBeVisible();await expect(bob.getByRole('button',{name:'Send invitation'})).toHaveCount(0);
  await alice.getByRole('button',{name:'Manage Sam Rivera',exact:true}).click();await selectOption(alice.getByLabel('Role for Sam Rivera'),'admin');await alice.getByRole('button',{name:'Save role',exact:true}).click();
  await bob.reload();await expect(bob.getByRole('button',{name:'Send invitation',exact:true})).toBeVisible();
@@ -1368,47 +1380,33 @@ test('first-plan confirmation routes new work through the mood board and resumes
 
  });
 
-test('campaign builder reviews details and resumes the same uncertain request after reload (MOCK transport)',async()=>{
- const settingsPath=base+`/api/v1/businesses/${firstBusiness}/onboarding`;
- const current=await(await alice.request.get(settingsPath)).json();
- const {revision,goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation}=current;
- assert.equal((await alice.request.patch(settingsPath,{headers:{origin:base},data:{revision,step:3,goal,timezone,cadence,channels,must_avoid,business_stage,growth_expectation,preferences_edited:true}})).status(),200);
- await alice.goto(base+`/b/${firstBusiness}/campaigns`);await alice.getByRole('button',{name:'＋ Create new',exact:true}).click();await alice.getByRole('dialog').getByRole('link',{name:/Campaign A themed set/}).click();
- await expect(alice.getByRole('heading',{name:'What’s your campaign about?',exact:true})).toBeVisible();
- await alice.getByLabel('Campaign name',{exact:true}).fill('A fresh start');await alice.getByLabel('Theme',{exact:true}).fill('Introduce our refill range with practical everyday tips.');
- await alice.getByLabel('Call to action (optional)',{exact:true}).fill('Explore the range');await alice.getByLabel('Target link (optional)',{exact:true}).fill('www.example.com/refills');
- await alice.getByRole('button',{name:'Continue',exact:true}).click();await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'Instagram',true);await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'LinkedIn',false);
- await alice.getByLabel('Image posts',{exact:true}).fill('1');await selectOption(alice.getByLabel('Image posts shape',{exact:true}),'portrait');
- await alice.getByLabel('Carousels',{exact:true}).fill('1');await alice.getByLabel('Slides per carousel',{exact:true}).fill('4');
- await alice.getByLabel('Image stories',{exact:true}).fill('1');await alice.getByLabel('Reels',{exact:true}).fill('1');await alice.getByLabel('Video stories',{exact:true}).fill('1');await alice.getByLabel('Video posts',{exact:true}).fill('1');
- await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'LinkedIn',true);await alice.getByRole('group',{name:'Choose a platform',exact:true}).getByRole('button',{name:'LinkedIn',exact:true}).click();await expect(alice.getByLabel('Reels',{exact:true})).toHaveCount(0);await expect(alice.getByLabel('Image stories',{exact:true})).toHaveCount(0);await expect(alice.getByLabel('Video stories',{exact:true})).toHaveCount(0);
- await setSelectedOption(alice.getByRole('combobox',{name:'Where should these posts go?',exact:true}),'LinkedIn',false);await expect(alice.getByLabel('Slides per carousel',{exact:true})).toHaveValue('4');
- await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);await alice.screenshot({path:'work/browser/campaign-format-mix-mobile.png',fullPage:true});await alice.getByRole('button',{name:'Continue',exact:true}).click();
- await expect(alice.getByRole('heading',{name:'Find your visual style',exact:true})).toBeVisible();
- await alice.getByRole('radio',{name:/Editorial/}).check();await alice.getByRole('button',{name:'Continue',exact:true}).click();
- await alice.getByRole('radio',{name:/Classic/}).check();await alice.setViewportSize({width:390,height:844});
- assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
- await alice.screenshot({path:'work/browser/campaign-font-picker.png',fullPage:true});
- await alice.getByRole('button',{name:'Continue',exact:true}).click();
- await expect(alice.getByRole('heading',{name:'How creative should we get?',exact:true})).toBeVisible();
- await alice.getByRole('radio',{name:'Super creative',exact:true}).check();
- await alice.getByRole('button',{name:'Back',exact:true}).click();await alice.getByRole('button',{name:'Continue',exact:true}).click();
- await expect(alice.getByRole('radio',{name:'Super creative',exact:true})).toBeChecked();
- assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
- await alice.screenshot({path:'work/browser/campaign-creativity.png',fullPage:true});
- await alice.getByRole('button',{name:'Continue',exact:true}).click();
- await expect(alice.getByRole('heading',{name:'A fresh start',exact:true})).toBeVisible();
- await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
- await alice.getByText('Make it yours',{exact:false}).click();await alice.getByRole('button',{name:'Warm',exact:true}).click();await alice.getByLabel('Inspiration brands',{exact:true}).fill('Editorial magazines');await alice.getByLabel('Include',{exact:true}).fill('Approved refill details');await alice.getByLabel('Avoid',{exact:true}).fill('Discount claims');
- assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
- await alice.screenshot({path:'work/browser/campaign-builder-review.png',fullPage:true});
- const campaignThread=randomUUID(),submitted=[],route='**/api/v1/businesses/'+firstBusiness+'/content-plan/generate';
- const transport=async r=>{submitted.push({key:r.request().headers()['idempotency-key'],body:r.request().postDataJSON()});if(submitted.length===1)await r.abort();else await r.fulfill({status:201,json:{id:randomUUID(),thread_id:campaignThread,status:'queued'}});};
- await alice.route(route,transport);
- try{await alice.getByRole('button',{name:'Create campaign plan',exact:true}).click();await expect(alice.getByRole('button',{name:'Check campaign request',exact:true})).toBeEnabled();await alice.reload();
- await expect(alice.getByRole('heading',{name:'A fresh start',exact:true})).toBeVisible();await alice.getByRole('button',{name:'Check campaign request',exact:true}).click();await expect(alice).toHaveURL(base+`/b/${firstBusiness}/campaign-review?created=1&thread=${campaignThread}`);
- assert.equal(submitted.length,2);assert.deepEqual(submitted[0],submitted[1]);assert.equal(submitted[0].body.campaign.target_url,'www.example.com/refills');assert.deepEqual(submitted[0].body.campaign.refinement,{tone:'Warm',references:'Editorial magazines',include:'Approved refill details',avoid:'Discount claims'});assert.deepEqual(submitted[0].body.campaign.design,{style:'editorial',font:'classic',creativity:'super_creative'});assert.equal(submitted[0].body.post_count,6);assert.equal(submitted[0].body.video_count,3);assert.deepEqual(submitted[0].body.content_mix.map(row=>[row.format,row.creative_spec.placement,row.creative_spec.aspect,row.creative_spec.slide_count,row.count]),[['static','feed','portrait',null,1],['carousel','feed','square',4,1],['static','story','vertical',null,1],['video','reel','vertical',null,1],['video','story','vertical',null,1],['video','feed','square',null,1]]);assert.deepEqual(submitted[0].body.campaign.channels,['instagram']);assert.equal(submitted[0].body.campaign.design.creativity,'super_creative');
- }finally{await alice.unroute(route,transport);}
+// The free-form campaign builder was replaced by monthly planning: the owner answers the
+// brief, approves a mood board and reviews the calendar before anything is planned or made.
+// The planner request itself (resume after reload, one submission) is covered with a mock
+// planner in tests/browser/guided-business.test.mjs.
+test('campaign builder reviews the brief before any plan request: old builder links open monthly planning and answers survive reload (real database)',async()=>{
+ const requests=[],watch=r=>{if(r.method()==='POST'&&/\/(content-plan\/generate|guided-campaigns|generate-images|guided-brief\/research)/.test(new URL(r.url()).pathname))requests.push(r.url());};
+ alice.on('request',watch);
+ try{
+  await alice.setViewportSize({width:1440,height:1000});
+  await alice.goto(base+`/b/${firstBusiness}/campaigns`);
+  await expect(alice.getByRole('heading',{name:'Calendar',exact:true})).toBeVisible();
+  await expect(alice.getByRole('button',{name:'＋ Create new',exact:true})).toHaveCount(0);
+  await alice.goto(base+`/b/${firstBusiness}/campaign-new`);
+  await expect(alice.getByRole('heading',{name:'Let’s get to know your business',exact:true})).toBeVisible();
+  await expect(alice.getByText('Step 1 of 5 · Business',{exact:true})).toBeVisible();
+  await alice.getByLabel('What does your business do?',{exact:true}).fill('Refillable botanical soap for independent stores.');
+  await alice.getByRole('button',{name:'Continue',exact:true}).click();
+  await expect(alice.getByText('Step 2 of 5 · Customers',{exact:true})).toBeVisible();
+  await alice.reload();
+  await expect(alice.getByText('Step 2 of 5 · Customers',{exact:true})).toBeVisible();
+  await alice.getByRole('button',{name:'Back',exact:true}).click();
+  await expect(alice.getByLabel('What does your business do?',{exact:true})).toHaveValue('Refillable botanical soap for independent stores.');
+  await alice.setViewportSize({width:390,height:844});assert.ok(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+  assert.deepEqual((await new AxeBuilder({page:alice}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
+  await alice.screenshot({path:'work/browser/campaign-builder-monthly-planning.png',fullPage:true});
+  assert.deepEqual(requests,[],'No plan, research or generation request starts before the owner sends the brief');
+ }finally{alice.off('request',watch);await alice.setViewportSize({width:1440,height:1000});}
 });
 
 test('onboarding renders website photos and incomplete capture metadata without crashing', async () => {
@@ -1438,14 +1436,17 @@ test('Create chat persists author answers and denies another tenant (real databa
  bob=await(await browser.newContext()).newPage();
  await signup(bob,'chat-outsider@example.test','Chat Outsider');await signin(bob,'chat-outsider@example.test');
  firstBusiness=await createBusiness('Chat review brand');
+ // Home leads to Create through the header action; Create opens on the conversation.
  await alice.goto(base+`/b/${firstBusiness}/overview`);
- const home=alice.getByRole('region',{name:'Create with Desvio'});
- await expect(home.getByRole('textbox',{name:'Ask Desvio'})).toBeVisible();
- await home.getByRole('textbox',{name:'Ask Desvio'}).fill('A post about our new collection');
- await expect(alice).toHaveURL(base+`/b/${firstBusiness}/overview`);
+ await alice.locator('.header-create').click();
+ await expect(alice).toHaveURL(base+`/b/${firstBusiness}/create`);
+ const chat=alice.getByRole('region',{name:'Create with Desvio'});
+ await expect(chat.getByRole('textbox',{name:'Message Desvio'})).toBeEnabled();
+ await chat.getByRole('textbox',{name:'Message Desvio'}).fill('A post about our new collection');
+ await expect(alice).toHaveURL(base+`/b/${firstBusiness}/create`);
  for(const width of [1440,390]){await alice.setViewportSize({width,height:1000});assert.equal(await alice.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await alice.screenshot({path:`work/browser/home-chat-${width}.png`,fullPage:true});}
- await home.getByRole('button',{name:/Add strategy/}).click();
- await expect(alice).toHaveURL(/guided=1/);
+ // A recurring strategy is chosen in the guided chat the conversation links to.
+ await alice.goto(base+`/b/${firstBusiness}/create?guided=1&start=strategy`);
  await expect(alice.getByText('What should your strategy focus on?',{exact:true})).toBeVisible();
  await alice.getByRole('button',{name:'↶ Start over',exact:true}).click();
  await alice.getByRole('dialog').getByRole('button',{name:'Start over',exact:true}).click();
@@ -1518,4 +1519,22 @@ test('Create chat persists author answers and denies another tenant (real databa
  await alice.unroute('**/create-chat/draft');
  await alice.reload();
  await expect(alice.getByRole('heading',{name:'Your idea lands here.'})).toBeVisible();
+});
+
+test('Create chat persists a plan link and lists every topic in a business time zone far from UTC (real database)',async()=>{
+ const business=(await(await alice.request.get(base+'/api/v1/businesses')).json()).businesses.find(b=>b.id===firstBusiness);
+ const user=(await admin.query('SELECT id FROM auth."user" WHERE email=$1',['chat-author@example.test'])).rows[0];
+ const plan=randomUUID();
+ await admin.query("INSERT INTO app.content_plans(id,organization_id,brand_id,title,objective,starts_on,timezone,duration_days,created_by,request_key,request_hash) VALUES($1,$2,$3,'Kiritimati fortnight','Time zone fixture','2027-03-01','Pacific/Kiritimati',2,$4,$5,$6)",[plan,business.organization_id,firstBusiness,user.id,randomUUID(),'a'.repeat(64)]);
+ // UTC+14: the first local morning is still the previous day in UTC, and the last local
+ // evening ends before UTC midnight. A UTC-midnight window would drop the first topic.
+ for(const [at,hook] of [['2027-02-28T10:30:00Z','First local morning topic'],['2027-03-02T09:30:00Z','Last local evening topic']])
+  await admin.query("INSERT INTO app.content_slots(id,organization_id,brand_id,plan_id,channel,planned_at,format,brief,pillar,hook,cta,created_by) VALUES($1,$2,$3,$4,'instagram',$5,'static','TEST time zone topic','',$6,'',$7)",[randomUUID(),business.organization_id,firstBusiness,plan,at,hook,user.id]);
+ const path=base+`/api/v1/businesses/${firstBusiness}/create-chat/draft`,current=await(await alice.request.get(path)).json();
+ const snapshot={version:1,mode:'campaign',step:11,data:{name:'Kiritimati fortnight'},messages:[{role:'assistant',text:'Your topics are ready. Review them before approving image creation.'}],planId:plan};
+ assert.equal((await alice.request.put(path,{headers:{origin:base},data:{revision:current.draft?.revision??0,snapshot}})).status(),200);
+ await alice.goto(base+`/b/${firstBusiness}/create?guided=1`);
+ const topics=alice.locator('section').filter({has:alice.getByRole('heading',{name:'Topics ready',exact:true})}).getByRole('listitem');
+ await expect(topics).toHaveText(['First local morning topic','Last local evening topic']);
+ await expect(alice.getByRole('button',{name:'Approve brief & create posts',exact:true})).toBeEnabled();
 });
