@@ -447,3 +447,120 @@ test('researched audience and competitor suggestions reach the questionnaire and
  assert.equal(after.research_job_id,null);assert.equal(after.result,null);assert.deepEqual(after.suggestions,researched.suggestions);
  await assert.rejects(guided.read(bob,target.id));
 });
+
+// ---- Early research: started on step 0, reused by the final submit (MOCK OpenAI) ----
+const {OpenAIWebsiteResearch}=await import('../../dist/openai-website-research.js');
+const {UncertainRequests}=await import('../../dist/uncertain-requests.js');
+const earlyAudiences=['Parents nearby planning a relaxed weekend brunch','Remote workers who want a calm table before noon','Families booking small birthday meals'];
+const earlyDetails=(website,competitors=['Rival One'])=>({social_profile:{platform:'help',handle:''},business_name:'Early cafe',website,business_type:'services',industry:'food',cta:'',differentiator:'',timing:'',competitors,priority_offers:'',folder_url:'',guidelines:'',references:[]});
+const earlyBrief=(website,competitors)=>({...brief,details:earlyDetails(website,competitors)});
+async function earlyFixture(name){
+ const account=await workspaces.create(alice,{name:`${name} account`});
+ const target=await workspaces.createBrand(alice,account.id,{name},randomUUID());
+ await admin.query("INSERT INTO app.analysis_grants(organization_id,brand_id,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by,enabled) VALUES($1,$2,'MOCK-model',now()+interval '1 hour',100000000,1,1,'LOCAL TEST ONLY',true)",[account.id,target.id]);
+ const calls={own:[],market:[],followup:[],analysis:0};
+ const research=new OpenAIWebsiteResearch(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
+  const request=JSON.parse(init.body);
+  if(request.tools[0].filters){const domain=request.tools[0].filters.allowed_domains[0],text='Early cafe serves breakfast all day. Source';calls.own.push(domain);
+   return Response.json({id:'resp_own',object:'response',status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'search',query:domain}},{type:'message',role:'assistant',content:[{type:'output_text',text,annotations:[{type:'url_citation',url:`https://${domain}/about`,start_index:text.indexOf('Source'),end_index:text.length}]}]}],usage:{input_tokens:10,output_tokens:10}});}
+  const input=JSON.parse(request.input),followup=input.mode==='competitors_only';
+  (followup?calls.followup:calls.market).push(input.named_competitors);
+  const value={notes:[{section:'competitor_positioning',subject:input.named_competitors[0]??'',text:'Positions itself as the quick option.',source_url:followup?'https://new-rival.test/':'https://rival.test/'},{section:'audience_pain',subject:'',text:'Parents say weekend tables are hard to find.',source_url:'https://forum.test/thread'}],
+   discovered_competitors:followup?[]:[{name:'Third Table',url:'https://third-table.test/',reason:'Same families.'}],audience_suggestions:followup?[]:earlyAudiences};
+  return Response.json({id:followup?'resp_followup':'resp_market',object:'response',status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'search',query:'cafes',sources:[{type:'url',url:'https://rival.test/'},{type:'url',url:'https://new-rival.test/'},{type:'url',url:'https://forum.test/thread'},{type:'url',url:'https://third-table.test/'}]}},{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(value),annotations:[]}]}],usage:{input_tokens:10,output_tokens:10}});
+ }}));
+ const analyzer=new BrandAnalyzer(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
+  calls.analysis++;const context=JSON.parse(JSON.parse(init.body).input),own=context.chunks.find(c=>!c.origin);
+  const direction={summary:'A family cafe',rationale:'Proposed friendly direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food in daylight',pillars:['Local stories','Everyday rituals'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A table in daylight.'},{format:'carousel',title:'A ritual',concept:'Arrival, coffee, shared table.'}],essential_questions:[],evidence_ids:[own.id],audience_suggestions:earlyAudiences,competitor_gaps:[]};
+  return Response.json({object:'response',id:'resp_analysis',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({findings:[],recommendation:null,missing:[],business_direction:direction}),annotations:[]}]}],usage:{input_tokens:10,output_tokens:10}});
+ }}));
+ const runner=new IntakeJobs(new AssetJobs(worker,null,null),analyzer,research);
+ const run=job=>runner.run({organizationId:account.id,brandId:target.id,jobId:job});
+ const jobs=async kind=>(await admin.query('SELECT j.id,j.status,r.website_url FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id WHERE j.brand_id=$1 AND j.kind=$2 ORDER BY j.created_at',[target.id,kind])).rows;
+ return {account,target,calls,run,jobs};
+}
+
+test('early research starts on step 0, suggests audiences before submit and allows edits while it runs (MOCK OpenAI)',async()=>{
+ const {target,calls,run,jobs}=await earlyFixture('Early start cafe');
+ // Without a website nothing starts.
+ const plain=await guided.save(alice,target.id,{revision:0,brief,step:1});assert.equal(plain.prefill_job_id,null);assert.equal((await jobs('website.extract')).length,0);
+ const first=await guided.save(alice,target.id,{revision:1,brief:earlyBrief('https://early-cafe.test/'),step:1});
+ assert.ok(first.prefill_job_id);assert.equal(first.prefill_status,'queued');assert.equal(first.prefill_website,'https://early-cafe.test/');
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.intake_dependencies WHERE capture_job_id=$1',[first.prefill_job_id])).rows[0].n,0,'early research never starts analysis');
+ const queued=await guided.read(alice,target.id);assert.equal(queued.research_job_id,null);assert.equal(queued.prefill_status,'queued');assert.deepEqual(queued.suggestions,{audience:[],competitors:[]});
+ // Editing and moving between steps while it runs is allowed and starts nothing new.
+ const edited=await guided.save(alice,target.id,{revision:2,brief:{...earlyBrief('https://early-cafe.test/'),market:'Lisbon'},step:2});
+ assert.equal(edited.revision,3);assert.equal(edited.prefill_job_id,first.prefill_job_id);assert.equal((await jobs('website.extract')).length,1);
+ assert.equal(await run(first.prefill_job_id),'succeeded');assert.deepEqual(calls.own,['early-cafe.test']);assert.equal(calls.market.length,1);assert.equal(calls.analysis,0);
+ const ready=await guided.read(alice,target.id);
+ assert.equal(ready.prefill_status,'succeeded');assert.equal(ready.research_job_id,null);
+ assert.deepEqual(ready.suggestions,{audience:earlyAudiences,competitors:[{name:'Third Table',url:'https://third-table.test/'}]});
+ await assert.rejects(guided.read(bob,target.id));
+});
+
+test('the final submit reuses a finished early capture: one capture, one market call (MOCK OpenAI)',async()=>{
+ const {target,calls,run,jobs}=await earlyFixture('Early reuse cafe');
+ const saved=await guided.save(alice,target.id,{revision:0,brief:earlyBrief('https://reuse-cafe.test/'),step:1});
+ assert.equal(await run(saved.prefill_job_id),'succeeded');
+ const job=await guided.research(alice,target.id,{revision:1},randomUUID());
+ const kind=(await admin.query('SELECT kind FROM app.jobs WHERE id=$1',[job.id])).rows[0].kind;assert.equal(kind,'brand.analyze');
+ assert.equal((await admin.query('SELECT market_followup FROM app.intake_requests WHERE job_id=$1',[job.id])).rows[0].market_followup,null);
+ assert.equal(await run(job.id),'succeeded');assert.equal(await run(job.id),'finished');
+ assert.equal((await jobs('website.extract')).length,1);assert.equal(calls.own.length,1);assert.equal(calls.market.length,1);assert.equal(calls.followup.length,0);assert.equal(calls.analysis,1);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.market_research_calls WHERE brand_id=$1',[target.id])).rows[0].n,1);
+ const read=await guided.read(alice,target.id);assert.equal(read.status,'succeeded');assert.equal(read.result.business_direction.heading_font,'Lora');
+});
+
+test('a final submit waits for running early research and researches only competitors it did not cover (MOCK OpenAI)',async()=>{
+ const {target,calls,run,jobs}=await earlyFixture('Early waiting cafe');
+ const saved=await guided.save(alice,target.id,{revision:0,brief:earlyBrief('https://wait-cafe.test/',['Rival One']),step:1});
+ await guided.save(alice,target.id,{revision:1,brief:earlyBrief('https://wait-cafe.test/',['rival one','New Rival']),step:4});
+ const job=await guided.research(alice,target.id,{revision:2},randomUUID());
+ const dependency=(await admin.query('SELECT capture_job_id FROM app.intake_dependencies WHERE analysis_job_id=$1',[job.id])).rows[0];assert.equal(dependency.capture_job_id,saved.prefill_job_id);
+ assert.deepEqual((await admin.query('SELECT market_followup FROM app.intake_requests WHERE job_id=$1',[job.id])).rows[0].market_followup,{website:'https://wait-cafe.test/',competitors:['New Rival']});
+ assert.equal(await run(job.id),'waiting');assert.equal(calls.analysis,0);
+ assert.equal(await run(saved.prefill_job_id),'succeeded');
+ assert.equal(await run(job.id),'succeeded');assert.equal(await run(job.id),'finished');
+ assert.deepEqual(calls.market,[['Rival One']]);assert.deepEqual(calls.followup,[['New Rival']]);assert.equal(calls.own.length,1);assert.equal(calls.analysis,1);
+ assert.equal((await jobs('website.extract')).length,1);
+ const ledgers=(await admin.query('SELECT job_id,reserved_micros,status FROM app.market_research_calls WHERE brand_id=$1 ORDER BY created_at',[target.id])).rows;
+ assert.deepEqual(ledgers.map(l=>l.job_id),[saved.prefill_job_id,job.id]);assert.ok(ledgers.every(l=>l.status==='succeeded'));
+ const followupSources=(await admin.query("SELECT website_url FROM app.brand_sources WHERE brand_id=$1 AND parser_version='openai-market-research-v1' ORDER BY website_url",[target.id])).rows.map(r=>r.website_url);
+ assert.ok(followupSources.includes('https://new-rival.test/'));
+ assert.equal((await admin.query('SELECT result FROM app.intake_requests WHERE job_id=$1',[job.id])).rows[0].result.market_followup.status,'completed');
+});
+
+test('a changed website starts fresh early research instead of reusing the old capture (MOCK OpenAI)',async()=>{
+ const {target,calls,run,jobs}=await earlyFixture('Early moved cafe');
+ const first=await guided.save(alice,target.id,{revision:0,brief:earlyBrief('https://old-cafe.test/'),step:1});
+ // While the old site is still being read, the change asks it to stop and waits.
+ const moved=await guided.save(alice,target.id,{revision:1,brief:earlyBrief('https://new-cafe.test/'),step:1});
+ assert.equal(moved.prefill_job_id,first.prefill_job_id);
+ assert.equal((await admin.query('SELECT cancel_requested FROM app.jobs WHERE id=$1',[first.prefill_job_id])).rows[0].cancel_requested,true);
+ assert.equal(await run(first.prefill_job_id),'finished');assert.equal(calls.own.length,0);
+ const fresh=await guided.save(alice,target.id,{revision:2,brief:earlyBrief('https://new-cafe.test/'),step:2});
+ assert.notEqual(fresh.prefill_job_id,first.prefill_job_id);assert.equal(fresh.prefill_website,'https://new-cafe.test/');
+ assert.equal(await run(fresh.prefill_job_id),'succeeded');
+ const job=await guided.research(alice,target.id,{revision:3},randomUUID());
+ assert.equal(await run(job.id),'succeeded');
+ assert.deepEqual(calls.own,['new-cafe.test']);assert.deepEqual((await jobs('website.extract')).map(j=>j.website_url),['https://old-cafe.test/','https://new-cafe.test/']);
+ // A website changed after early research finished: the final submit captures it fresh.
+ await guided.save(alice,target.id,{revision:3,brief:{...earlyBrief('https://third-cafe.test/'),offering:''},step:0});
+ const third=await guided.save(alice,target.id,{revision:4,brief:earlyBrief('https://third-cafe.test/'),step:4});
+ assert.equal(third.prefill_website,'https://third-cafe.test/');
+});
+
+test('an uncertain early capture never blocks for good: release it, then submit (MOCK OpenAI)',async()=>{
+ const {target,jobs}=await earlyFixture('Early uncertain cafe');
+ const saved=await guided.save(alice,target.id,{revision:0,brief:earlyBrief('https://unsure-cafe.test/'),step:1});
+ await admin.query("UPDATE app.jobs SET status='unknown',error_code='AI_RESEARCH_SUBMISSION_UNKNOWN' WHERE id=$1",[saved.prefill_job_id]);
+ // Answers stay editable and nothing new starts while the outcome is uncertain.
+ const edited=await guided.save(alice,target.id,{revision:1,brief:{...earlyBrief('https://unsure-cafe.test/'),market:'Porto'},step:2});
+ assert.equal(edited.prefill_status,'unknown');assert.equal((await jobs('website.extract')).length,1);
+ await assert.rejects(guided.research(alice,target.id,{revision:2},randomUUID()),/uncertain outcome/);
+ const released=await new UncertainRequests(businesses).stopWaiting(alice,target.id,saved.prefill_job_id,{acknowledge_possible_charge:true});assert.equal(released.status,'canceled');
+ const job=await guided.research(alice,target.id,{revision:2},randomUUID());
+ assert.equal((await admin.query('SELECT kind FROM app.jobs WHERE id=$1',[job.id])).rows[0].kind,'website.extract');
+ assert.equal((await jobs('website.extract')).length,2);
+ assert.equal((await guided.read(alice,target.id)).prefill_status,'canceled');
+});

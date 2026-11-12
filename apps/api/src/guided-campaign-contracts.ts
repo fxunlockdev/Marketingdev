@@ -1,6 +1,7 @@
 import {ONBOARDING_REFERENCES} from './onboarding-references.js';
 import {BadRequestException, ConflictException} from '@nestjs/common';
 import {object} from './workspaces.js';
+import {websiteURL} from './safe-web.js';
 
 export type OnboardingSocialProfile={platform:'instagram'|'facebook'|'linkedin'|'help';handle:string};
 export type OnboardingDetails={social_profile?:OnboardingSocialProfile;business_name:string;website:string;business_type:'products'|'services'|'both';industry:string;cta:string;differentiator:string;timing:string;competitors:string[];priority_offers:string;folder_url:string;guidelines:string;references:string[]};
@@ -21,6 +22,28 @@ export function researchSuggestions(audience:unknown,competitors:unknown):Resear
     return name&&url?[{name,url}]:[];
   });
   return {audience:[...new Set(audiences)].slice(0,3),competitors:found.filter((c,i)=>found.findIndex(x=>x.url===c.url)===i).slice(0,3)};
+}
+/** One comparable form for a competitor typed as a name or a link. */
+export function competitorKey(value:string):string {
+  const v=value.trim().toLowerCase();
+  return v.replace(/^https?:\/\//,'').replace(/^www\./,'').replace(/\/+$/,'');
+}
+/** Competitors in the brief that an earlier market request did not already cover. */
+export function uncoveredCompetitors(competitors:readonly string[]|undefined,covered:readonly string[]):string[] {
+  const done=new Set(covered.map(competitorKey)),out:string[]=[];
+  for(const c of competitors??[]){
+    const key=competitorKey(c);
+    if(!key||done.has(key))continue;
+    done.add(key);out.push(c.trim());
+  }
+  return out.slice(0,3);
+}
+/** The public website early research may start on, or null while the first step lacks
+ * a usable website or an offering to research. */
+export function earlyResearchWebsite(brief:GuidedBrief):string|null {
+  const raw=brief.details?.website;
+  if(!raw||!brief.offering.trim())return null;
+  try{return websiteURL(raw).href;}catch{return null;}
 }
 export type GuidedStage = 'brief'|'research'|'direction_generating'|'direction_review'|'direction_locked'|'planning'|'generating'|'review';
 const controls=/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/;
