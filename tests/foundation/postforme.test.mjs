@@ -184,6 +184,11 @@ test('Home counts are scoped to one business and agree with the upcoming list be
  const listed=after.upcoming_posts.map(p=>p.id);
  assert.ok(!listed.includes(slots[0]),'a published post is counted as published, not listed as upcoming');
  assert.ok(listed.includes(slots[1])&&listed.includes(slots[2]));
+ // A failed post needs attention until it is retried; the retry itself is then what is tracked.
+ const failed=randomUUID();await admin.query("INSERT INTO app.postforme_publications(id,organization_id,brand_id,account_id,slot_id,revision,request_key,request_hash,proof,caption,scheduled_at,phase,observed_state,failure_reason) VALUES($1,$2,$3,$4,$5,1,$6,$7,'{}','Home fixture',now()-interval '1 hour','accepted','failed','Rejected by the network')",[failed,org.id,home.id,account.id,slots[2],randomUUID(),'f'.repeat(64)]);
+ assert.equal((await overview.read(alice,home.id)).counts.publication_attention-before.publication_attention,1);
+ await admin.query("INSERT INTO app.postforme_publications(id,organization_id,brand_id,account_id,slot_id,revision,request_key,request_hash,proof,caption,scheduled_at,phase,retry_of) VALUES($1,$2,$3,$4,$5,1,$6,$7,'{}','Home fixture',now()+interval '1 day','accepted',$8)",[randomUUID(),org.id,home.id,account.id,slots[2],randomUUID(),'r'.repeat(64),failed]);
+ assert.equal((await overview.read(alice,home.id)).counts.publication_attention,before.publication_attention,'a retried failure no longer needs attention');
  const siblingView=await overview.read(alice,sibling.id);
  assert.equal(siblingView.counts.active_jobs,1);assert.equal(siblingView.upcoming_posts.length,1);assert.equal(siblingView.counts.published_posts,0);
 });
