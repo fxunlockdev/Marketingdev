@@ -898,12 +898,19 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
  const upcoming=page.getByRole('region',{name:'Upcoming posts',exact:true}),upcomingPosts=upcoming.getByRole('listitem');
  await expect(upcomingPosts).not.toHaveCount(0);
  assert.ok(await upcomingPosts.locator('h3').evaluateAll(nodes=>nodes.length>0&&nodes.every(node=>getComputedStyle(node).webkitLineClamp==='2')));
- const readyHomePost=upcomingPosts.filter({hasText:'Draft ready'}).first();
- await readyHomePost.scrollIntoViewIfNeeded();
- const homeCreative=readyHomePost.locator('.post-thumbnail svg, .post-thumbnail img').first();
- await expect(homeCreative).toBeVisible({timeout:15000});
- await expect.poll(()=>homeCreative.evaluate(node=>node instanceof HTMLImageElement?node.complete&&node.naturalWidth>0:!!node.querySelector('image')?.getAttribute('href'))).toBeTruthy();
- assert.ok(await homeCreative.evaluate(node=>{const box=node instanceof HTMLImageElement?{width:node.naturalWidth,height:node.naturalHeight}:node.viewBox.baseVal;const ratio=node.parentElement.style.aspectRatio.split('/').map(Number);return ratio.length===2&&Math.abs(ratio[0]/ratio[1]-box.width/box.height)<0.01;}));
+ // Home lists the business's next six posts. Earlier journeys may fill them with other plans' posts, so read which posts
+ // are next; when a generated draft is among them its cover is shown at the creative's aspect ratio.
+ const nextSix=(await admin.query("SELECT s.state FROM app.content_slots s JOIN app.content_plans p ON p.id=s.plan_id WHERE s.brand_id=$1 AND s.state<>'cancelled' AND (s.planned_at AT TIME ZONE p.timezone)::date>=(now() AT TIME ZONE p.timezone)::date ORDER BY s.planned_at,s.id LIMIT 6",[brand])).rows;
+ await expect(upcomingPosts).toHaveCount(nextSix.length);
+ if(!nextSix.some(r=>r.state==='draft_ready'))await expect(upcomingPosts.filter({hasText:'Draft ready'})).toHaveCount(0);
+ else {
+  const readyHomePost=upcomingPosts.filter({hasText:'Draft ready'}).first();
+  await readyHomePost.scrollIntoViewIfNeeded();
+  const homeCreative=readyHomePost.locator('.post-thumbnail svg, .post-thumbnail img').first();
+  await expect(homeCreative).toBeVisible({timeout:15000});
+  await expect.poll(()=>homeCreative.evaluate(node=>node instanceof HTMLImageElement?node.complete&&node.naturalWidth>0:!!node.querySelector('image')?.getAttribute('href'))).toBeTruthy();
+  assert.ok(await homeCreative.evaluate(node=>{const box=node instanceof HTMLImageElement?{width:node.naturalWidth,height:node.naturalHeight}:node.viewBox.baseVal;const ratio=node.parentElement.style.aspectRatio.split('/').map(Number);return ratio.length===2&&Math.abs(ratio[0]/ratio[1]-box.width/box.height)<0.01;}));
+ }
 
  // The sidebar names the open business: a selector when the account has several, the name alone when it has one.
  const businessSwitcher=page.locator('.workspace-switcher').getByRole('combobox',{name:'Business',exact:true});
