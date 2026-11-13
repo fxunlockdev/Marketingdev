@@ -5,6 +5,7 @@ import {logActivityFailure} from './activity-log.js';
 import {StockAssets,tooCloseToStock,STOCK_TOO_CLOSE_DISTANCE,type StockReference} from './stock-assets.js';
 import {StockError} from './vecteezy-client.js';
 import {imagePlanningRates} from './creative-planning.js';
+import {CHARGED_MICROS,settledMicros,type TokenRates} from './call-settlement.js';
 import {inImageCopy} from './image-typography.js';
 import {imageCallPlan,sceneReferences,type BrandReference,type LogoInput,type MoodboardInput} from './image-render.js';
 import {isLogoLabel} from './image-logo.js';
@@ -69,7 +70,8 @@ export class CreativeJobs {
     // Steps 4 and 5 are trusted stock planning; images arriving on a sandbox step (1-3) are dropped.
     const providerMessage=message.step===4||message.step===5?{...message,step:1}:{...message,images:undefined};
     const wire=provider.plannerRequest(providerMessage,model,maxOutputTokens);
-    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const rates=acceptsModel('brief',model)?imagePlanningRates(wire.maxInputTokens):g;return wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token);},()=>provider.plan(providerMessage,model,maxOutputTokens),request.text_provider);
+    const rates=(g:any):TokenRates=>acceptsModel('brief',model)?imagePlanningRates(wire.maxInputTokens):g;
+    return this.call(scope,`plan:${message.step}`,model,wire.sha256,g=>{const r=rates(g);return wire.maxInputTokens*Number(r.input_micros_per_token)+wire.maxOutputTokens*Number(r.output_micros_per_token);},()=>provider.plan(providerMessage,model,maxOutputTokens),request.text_provider,{settleRates:rates});
   }
   finish(db: any, j: any, status: string, code: string | null = null) {
     return db
@@ -89,7 +91,9 @@ export class CreativeJobs {
     providerName="openai",
     // Optional calls (quality check, its one regeneration) never leave a request uncertain:
     // a failure is recorded as rejected and the caller carries on with what it has.
-    options:{optional?:boolean}={},
+    // A text call whose result reports token usage settles at these rates (the reservation's own).
+    // Without them, or without a usage report, the call keeps its full reservation.
+    options:{optional?:boolean;settleRates?:(grant:any)=>TokenRates}={},
   ) {
     const imageStep=step==='image'||step==='image:retry',qaStep=step.startsWith('qa:');
     const prepared = await this.jobs.transaction(scope, async (db, j) => {
@@ -144,7 +148,7 @@ export class CreativeJobs {
         used = Number(
           (
             await db.query(
-              "SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3",
+              `SELECT COALESCE(sum(${CHARGED_MICROS}),0) AS n FROM app.creative_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3`,
               [j.organization_id, j.brand_id,providerName],
             )
           ).rows[0].n,
@@ -158,7 +162,7 @@ export class CreativeJobs {
       if(j.kind==='creative.generate'||j.kind==='carousel.generate'){
         const limit=(await db.query(j.kind==='carousel.generate'?'SELECT max_cost_micros FROM app.carousel_requests WHERE job_id=$1':'SELECT max_cost_micros FROM app.creative_requests WHERE job_id=$1',[j.id])).rows[0]?.max_cost_micros;
         if(limit!==null&&limit!==undefined){
-          const spent=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE job_id=$1',[j.id])).rows[0].n);
+          const spent=Number((await db.query(`SELECT COALESCE(sum(${CHARGED_MICROS}),0) AS n FROM app.creative_calls WHERE job_id=$1`,[j.id])).rows[0].n);
           // Do not pay for planning when the request cannot also afford its image.
           // Existing image reservations are already included in spent on replay.
           let remainingImage=0;
@@ -173,7 +177,7 @@ export class CreativeJobs {
         "INSERT INTO app.creative_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8)",
         [j.id, step, j.organization_id, j.brand_id, model, inputHash, reserved,providerName],
       );
-      return { submit: true };
+      return { submit: true, reserved, rates: options.settleRates?.(grant) ?? null };
     });
     if ("cached" in prepared) return prepared.cached;
     if ("blocked" in prepared) throw new CreativeError(prepared.blocked!);
@@ -203,10 +207,11 @@ export class CreativeJobs {
     }
     // A DB failure after provider success remains submitted/unknown on retry. Never
     // repeat a paid call merely because its local result could not be committed.
+    const settled = "rates" in prepared ? settledMicros(result?.usage, prepared.rates, prepared.reserved) : null;
     await this.jobs.transaction(scope, async (db, j) => {
       await db.query(
-        "UPDATE app.creative_calls SET status='succeeded',result=$3 WHERE job_id=$1 AND step=$2",
-        [j.id, step, JSON.stringify(result)],
+        "UPDATE app.creative_calls SET status='succeeded',result=$3,settled_micros=$4 WHERE job_id=$1 AND step=$2",
+        [j.id, step, JSON.stringify(result), settled],
       );
     });
     return result;
@@ -295,7 +300,7 @@ export class CreativeJobs {
     return this.jobs.transaction(scope,async(db,j)=>{
       const limit=(await db.query('SELECT max_cost_micros FROM app.creative_requests WHERE job_id=$1',[j.id])).rows[0]?.max_cost_micros;
       if(limit===null||limit===undefined)return 2;
-      const spent=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE job_id=$1 AND step NOT LIKE 'image%' AND step NOT LIKE 'qa:%'",[j.id])).rows[0].n);
+      const spent=Number((await db.query(`SELECT COALESCE(sum(${CHARGED_MICROS}),0) AS n FROM app.creative_calls WHERE job_id=$1 AND step NOT LIKE 'image%' AND step NOT LIKE 'qa:%'`,[j.id])).rows[0].n);
       const perImage=Number(grant.max_image_request_micros);
       return Math.max(0,Math.min(2,Math.floor((Number(limit)-spent)/perImage)-1-sent));
     });

@@ -4,6 +4,7 @@ import {CHAT_RATES,chatRequest,validateChatDecision} from './chat-contracts.js';
 import {planningReferences,assertPlanningReferences} from './planning-references.js';
 import {withProductPhotos} from './product-photo-match.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from "./spending-allowance.js";
+import {CHARGED_MICROS,settledMicros,type TokenRates} from './call-settlement.js';
 import {assertLearningCurrent,refreshLearning} from './learning-context.js';
 import {recordPlanPosts,type PlannedSlot} from './planning-knowledge.js';
 import {logActivityFailure} from './activity-log.js';
@@ -49,13 +50,14 @@ export class PlanningJobs {
    const grant=(await db.query('SELECT * FROM app.planning_grants WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 AND enabled AND expires_at>now()',[j.organization_id,j.brand_id,providerName])).rows[0];
    if(!grant)throw new CreativeError('PLAN_STAGING_APPROVAL_REQUIRED');
    if(bound.input.chat?!acceptsModel('chat',model):grant.model!==model)throw new CreativeError('PLAN_CONFIG_CHANGED');
-   const cost=Math.ceil(wire.maxInputTokens*Number(bound.input.chat?CHAT_RATES.input:grant.input_micros_per_token)+wire.maxOutputTokens*Number(bound.input.chat?CHAT_RATES.output:grant.output_micros_per_token));
+   const rates:TokenRates=bound.input.chat?{input_micros_per_token:CHAT_RATES.input,output_micros_per_token:CHAT_RATES.output}:{input_micros_per_token:grant.input_micros_per_token,output_micros_per_token:grant.output_micros_per_token};
+   const cost=Math.ceil(wire.maxInputTokens*Number(rates.input_micros_per_token)+wire.maxOutputTokens*Number(rates.output_micros_per_token));
    if(bound.input.chat?.prompt_suggestion&&cost>50000)throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
-   const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM (SELECT reserved_micros FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2 AND $3='openai') reservations",[j.organization_id,j.brand_id,providerName])).rows[0].n);
+   const used=Number((await db.query(`SELECT COALESCE(sum(charged),0) AS n FROM (SELECT ${CHARGED_MICROS} AS charged FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider=$3 UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2 AND $3='openai') reservations`,[j.organization_id,j.brand_id,providerName])).rows[0].n);
    if(!Number.isSafeInteger(cost)||cost<=0||exceedsAllowance(cost+used,grant.budget_micros))throw new CreativeError('PLAN_BUDGET_EXHAUSTED');
-   if(loop){const loopUsed=Number((await db.query('SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.planning_calls WHERE loop_id=$1',[loop.id])).rows[0].n);if(cost+loopUsed>Number(loop.budget_micros))throw new CreativeError('PLAN_LOOP_BUDGET_EXHAUSTED');}
+   if(loop){const loopUsed=Number((await db.query(`SELECT COALESCE(sum(${CHARGED_MICROS}),0) AS n FROM app.planning_calls WHERE loop_id=$1`,[loop.id])).rows[0].n);if(cost+loopUsed>Number(loop.budget_micros))throw new CreativeError('PLAN_LOOP_BUDGET_EXHAUSTED');}
    await db.query("INSERT INTO app.planning_calls(job_id,step,organization_id,brand_id,model,input_sha256,reserved_micros,status,provider,loop_id) VALUES($1,$2,$3,$4,$5,$6,$7,'submitted',$8,$9)",[j.id,message.step,j.organization_id,j.brand_id,model,wire.sha256,cost,providerName,bound.loop_id]);
-   return {submit:true};
+   return {submit:true,reserved:cost,rates};
   });
   if('cached' in prepared)return prepared.cached;
   if('blocked' in prepared)throw new CreativeError(prepared.blocked!);
@@ -66,7 +68,9 @@ export class PlanningJobs {
    throw new CreativeError(known?(error instanceof CreativeError?error.code:'PLAN_PROVIDER_REJECTED'):'PLAN_SUBMISSION_UNKNOWN');
   }
   // A lost commit after provider success stays submitted; replay never resubmits it.
-  await this.jobs.transaction(scope,async(db,j)=>{await db.query("UPDATE app.planning_calls SET status='succeeded',result=$3 WHERE job_id=$1 AND step=$2",[j.id,message.step,JSON.stringify(result)]);});
+  // Settled at the rates the reservation used; without a usage report the full reservation stays.
+  const settled='rates' in prepared?settledMicros(result?.usage,prepared.rates,prepared.reserved):null;
+  await this.jobs.transaction(scope,async(db,j)=>{await db.query("UPDATE app.planning_calls SET status='succeeded',result=$3,settled_micros=$4 WHERE job_id=$1 AND step=$2",[j.id,message.step,JSON.stringify(result),settled]);});
   return result;
  }
  async run(scope:JobScope):Promise<string>{

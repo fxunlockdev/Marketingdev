@@ -16,12 +16,13 @@ import {canonicalJSON,hash} from './brand-brain.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from './spending-allowance.js';
 import {packForJob,promptKnowledge,type StoredKnowledge} from './knowledge-production.js';
 import {BLOG_OUTPUT_TOKENS,blogSchema,validateBlogInput,validateBlogResult,type BlogInput,type BlogResult} from './blog-contracts.js';
+import {CHARGED_MICROS} from './call-settlement.js';
 
 const terminal=new Set(['succeeded','failed','rejected','canceled','unknown']);
 const UNCERTAIN=['BLOG_SUBMISSION_UNKNOWN','BLOG_REPLAY_MISMATCH'];
 /** Shared planning credit: plans, earlier articles and this article's own steps. */
 const USED_SQL=`SELECT COALESCE(sum(n),0) AS n FROM (
- SELECT reserved_micros n FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider='openai'
+ SELECT ${CHARGED_MICROS} n FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider='openai'
  UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2) q`;
 type Job={id:string;kind:string;status:string;organization_id:string;brand_id:string};
 type BlogRequest={job_id:string;blog_id:string;call_id:string;revision:number;model:string;requested_by:string;input:BlogInput;input_sha256:string;knowledge_context:StoredKnowledge|null;output:BlogResult|null};

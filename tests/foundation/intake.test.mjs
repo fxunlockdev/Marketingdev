@@ -821,6 +821,44 @@ test('monthly budget shares all provider ledgers, serializes concurrent spend an
 });
 
 
+test('monthly budget shares settlements: a succeeded call returns its unused reservation once, an uncertain or failed call never does',async()=>{
+ const account=await workspaces.create(alice,{name:'Settlement allowance fixture'});
+ const b=await workspaces.createBrand(alice,account.id,{name:'Settlement brand'},randomUUID());
+ await admin.query('INSERT INTO app.generation_plans(organization_id,monthly_price_usd) VALUES($1,500)',[account.id]);
+ const usage=async()=>Number((await admin.query("SELECT reserved_micros FROM app.monthly_generation_usage WHERE organization_id=$1 AND month_start=date_trunc('month',now() AT TIME ZONE 'UTC')::date",[account.id])).rows[0].reserved_micros);
+ const ledgers={analysis_calls:[',review_revision',',1'],creative_calls:[',step',",'plan:1'"],planning_calls:[',step',',1'],market_research_calls:['',''],knowledge_extraction_calls:['','']};
+ const call=async(table,cost,status='submitted')=>{
+  const id=randomUUID(),[column,value]=ledgers[table];
+  await admin.query("INSERT INTO app.jobs(id,organization_id,brand_id,requested_by,kind,status) VALUES($1,$2,$3,$4,'website.extract','succeeded')",[id,account.id,b.id,alice]);
+  await admin.query(`INSERT INTO app.${table}(job_id,organization_id,brand_id,model,reserved_micros${column},input_sha256,status) VALUES($1,$2,$3,'MOCK',$4${value},'fixture',$5)`,[id,account.id,b.id,cost,status]);
+  return id;
+ };
+ const settle=(table,id,micros)=>admin.query(`UPDATE app.${table} SET settled_micros=$2 WHERE job_id=$1`,[id,micros]);
+ let expected=0;
+ for(const table of Object.keys(ledgers)){
+  const id=await call(table,10000000,'succeeded');expected+=10000000;assert.equal(await usage(),expected);
+  await settle(table,id,2500000);expected-=7500000;assert.equal(await usage(),expected,table);
+  // Settled once: a second settlement, or clearing it, is refused and changes nothing.
+  await assert.rejects(settle(table,id,1),/CALL_ALREADY_SETTLED/);await assert.rejects(settle(table,id,null),/CALL_ALREADY_SETTLED/);
+  // Never above the reservation and never on a call that did not succeed.
+  await assert.rejects(settle(table,await call(table,1000,'succeeded'),1001),/settled_check/);expected+=1000;
+  for(const status of ['submitted','unknown','rejected']){
+   const open=await call(table,1000,status);expected+=1000;
+   await assert.rejects(settle(table,open,10),/CALL_SETTLEMENT_REQUIRES_SUCCESS/);
+  }
+  assert.equal(await usage(),expected,table);
+  await assert.rejects(admin.query(`INSERT INTO app.${table}(job_id,organization_id,brand_id,model,reserved_micros${ledgers[table][0]},input_sha256,status,settled_micros) SELECT $1,$2,$3,'MOCK',10${ledgers[table][1]},'fixture','succeeded',1`,[await call('analysis_calls',1),account.id,b.id]),/CALL_SETTLEMENT_REQUIRES_SUCCESS/);expected+=1;
+ }
+ // The counter never drops below zero.
+ const late=await call('planning_calls',5000,'succeeded');
+ await admin.query("UPDATE app.monthly_generation_usage SET reserved_micros=0 WHERE organization_id=$1",[account.id]);
+ await settle('planning_calls',late,0);assert.equal(await usage(),0);
+ // Runtime roles cannot write a settlement outside their policies, nor touch the reservation.
+ for(const pool of [app,worker])await assert.rejects(pool.query('UPDATE app.planning_calls SET reserved_micros=1'),/permission denied/);
+ await assert.rejects(app.query('UPDATE app.planning_calls SET settled_micros=1'),/permission denied/);
+ assert.equal((await worker.query('UPDATE app.planning_calls SET settled_micros=1')).rowCount,0);
+});
+
 test('monthly budget shares a tenant-scoped rounded credit balance without exposing provider costs',async()=>{
  const account=await workspaces.create(alice,{name:'Credit balance account'});
  assert.deepEqual(await workspaces.generationUsage(alice,account.id),{configured:false});

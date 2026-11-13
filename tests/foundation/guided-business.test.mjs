@@ -457,7 +457,7 @@ test('researched audience and competitor suggestions reach the questionnaire and
 });
 
 // ---- Early research: started on step 0, reused by the final submit (MOCK OpenAI) ----
-const {OpenAIWebsiteResearch}=await import('../../dist/openai-website-research.js');
+const {OpenAIWebsiteResearch,BRAND_RESERVED_SQL}=await import('../../dist/openai-website-research.js');
 const {UncertainRequests}=await import('../../dist/uncertain-requests.js');
 const earlyAudiences=['Parents nearby planning a relaxed weekend brunch','Remote workers who want a calm table before noon','Families booking small birthday meals'];
 const earlyDetails=(website,competitors=['Rival One'])=>({social_profile:{platform:'help',handle:''},business_name:'Early cafe',website,business_type:'services',industry:'food',cta:'',differentiator:'',timing:'',competitors,priority_offers:'',folder_url:'',guidelines:'',references:[]});
@@ -507,7 +507,7 @@ test('early research starts on step 0, suggests audiences before submit and allo
 });
 
 test('the final submit reuses a finished early capture: one capture, one market call (MOCK OpenAI)',async()=>{
- const {target,calls,run,jobs}=await earlyFixture('Early reuse cafe');
+ const {account,target,calls,run,jobs}=await earlyFixture('Early reuse cafe');
  const saved=await guided.save(alice,target.id,{revision:0,brief:earlyBrief('https://reuse-cafe.test/'),step:1});
  assert.equal(await run(saved.prefill_job_id),'succeeded');
  const job=await guided.research(alice,target.id,{revision:1},randomUUID());
@@ -516,6 +516,13 @@ test('the final submit reuses a finished early capture: one capture, one market 
  assert.equal(await run(job.id),'succeeded');assert.equal(await run(job.id),'finished');
  assert.equal((await jobs('website.extract')).length,1);assert.equal(calls.own.length,1);assert.equal(calls.market.length,1);assert.equal(calls.followup.length,0);assert.equal(calls.analysis,1);
  assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.market_research_calls WHERE brand_id=$1',[target.id])).rows[0].n,1);
+ // Each succeeded call settles from its MOCK usage (10 in, 10 out): research at the Sol research rates plus
+ // the 25000 micro allowance for its one search, brand analysis at the grant's 1 micro per token.
+ const settled=(await admin.query("SELECT 'market' AS ledger,reserved_micros::int AS reserved,settled_micros::int AS settled FROM app.market_research_calls WHERE brand_id=$1 UNION ALL SELECT j.kind,c.reserved_micros::int,c.settled_micros::int FROM app.analysis_calls c JOIN app.jobs j ON j.id=c.job_id WHERE c.brand_id=$1 ORDER BY 1",[target.id])).rows;
+ assert.deepEqual(settled.map(c=>[c.ledger,c.settled]),[['brand.analyze',20],['market',25125],['website.extract',25125]]);
+ assert.ok(settled.every(c=>c.settled<c.reserved));
+ // The onboarding allowance counts these settlements, not the reservations.
+ assert.equal(Number((await admin.query(BRAND_RESERVED_SQL,[account.id,target.id])).rows[0].used),20+25125+25125);
  const read=await guided.read(alice,target.id);assert.equal(read.status,'succeeded');assert.equal(read.result.business_direction.heading_font,'Lora');
 });
 

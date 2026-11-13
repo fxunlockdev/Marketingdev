@@ -557,6 +557,54 @@ test("unknown paid outcomes and worker resumption do not resubmit or bypass the 
   await grant();
 });
 
+test("a succeeded text call counts its settled cost in the business budget; image and uncertain calls keep their full reservation", async () => {
+  await grant();
+  const ledger = async (id) => (await admin.query("SELECT step,status,model,reserved_micros::int AS reserved,settled_micros::int AS settled,result FROM app.creative_calls WHERE job_id=$1 ORDER BY step", [id])).rows;
+  const brandTotals = async () => (await admin.query("SELECT sum(reserved_micros)::bigint AS reserved,sum(COALESCE(settled_micros,reserved_micros))::bigint AS charged FROM app.creative_calls WHERE organization_id=$1 AND brand_id=$2 AND provider='openai'", [org.id, brand.id])).rows[0];
+  const first = await submit("Settled spend");
+  assert.equal(await handler.run(scope(first)), "succeeded");
+  const calls = await ledger(first.id), plans = calls.filter((c) => c.step.startsWith("plan:")), images = calls.filter((c) => c.step.startsWith("image"));
+  assert.ok(plans.length > 0 && images.length > 0);
+  for (const c of plans) {
+    // MOCK usage is 100 input and 100 output tokens at the brief rates its reservation used.
+    assert.equal(c.status, "succeeded");
+    assert.deepEqual([c.result.usage.input_tokens, c.result.usage.output_tokens], [100, 100]);
+    assert.equal(c.settled, 100 * 2.5 + 100 * 10);
+    assert.ok(c.settled < c.reserved);
+  }
+  // No per-token image rate exists in the model policy, so image calls stay reserved.
+  for (const c of images) assert.equal(c.settled, null);
+  await assert.rejects(admin.query("UPDATE app.creative_calls SET settled_micros=0 WHERE job_id=$1 AND step=$2", [first.id, plans[0].step]), /CALL_ALREADY_SETTLED/);
+  // An allowance that covers what the first post cost plus one more post at full reservation. Counting
+  // reservations alone, the first post would already have used most of it and the second would be refused.
+  const reservedFirst = calls.reduce((n, c) => n + c.reserved, 0), totals = await brandTotals();
+  const budget = Number(totals.charged) + Math.ceil(reservedFirst * 1.01);
+  assert.ok(Number(totals.reserved) + reservedFirst > budget);
+  await grant(budget);
+  const second = await submit("Settled spend");
+  assert.equal(await handler.run(scope(second)), "succeeded");
+  assert.ok((await ledger(second.id)).filter((c) => c.step.startsWith("plan:")).every((c) => c.settled === 1250));
+  // An image call whose outcome is uncertain keeps its full reservation in the budget.
+  await grant();
+  transport = async (url, init) => {
+    if (new URL(url).pathname.startsWith("/v1/images/")) throw new TypeError("MOCK lost provider response");
+    return standard(url, init);
+  };
+  try {
+    const uncertain = await submit("Settled spend");
+    assert.equal(await handler.run(scope(uncertain)), "unknown");
+    const rows = await ledger(uncertain.id);
+    assert.ok(rows.some((c) => c.step === "image" && c.status === "unknown" && c.settled === null));
+    for (const c of rows) assert.equal(c.settled === null, c.status !== "succeeded");
+    const before = await brandTotals();
+    await assert.rejects(admin.query("UPDATE app.creative_calls SET settled_micros=1 WHERE job_id=$1 AND step='image'", [uncertain.id]), /CALL_SETTLEMENT_REQUIRES_SUCCESS/);
+    assert.deepEqual(await brandTotals(), before);
+    await canvas.stopWaiting(alice, brand.id, uncertain.id, { acknowledge_possible_charge: true });
+  } finally {
+    transport = undefined;
+  }
+});
+
 test("cancellation and access loss prevent creative promotion; new user edits are not overwritten by an in-flight image", async () => {
   let pending;
   transport = async (url, init) => {

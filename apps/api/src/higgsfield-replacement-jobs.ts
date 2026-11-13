@@ -9,6 +9,7 @@ import {canonicalJSON,hash} from './brand-brain.js';
 import {digest} from './object-store.js';
 import {validateDesign} from './creative-design.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from './spending-allowance.js';
+import {CHARGED_MICROS} from './call-settlement.js';
 const terminal=new Set(['succeeded','rejected','failed','canceled','unknown']);
 export class HiggsfieldReplacementJobs {
  constructor(readonly jobs:AssetJobs,readonly provider:HiggsfieldImageClient,readonly vault:ImageReplacementVault,readonly web=new SafeWeb()){}
@@ -32,7 +33,7 @@ export class HiggsfieldReplacementJobs {
      if(!p||p.latest_version_id!==p.id||p.archived_at)return {done:await this.finish(db,j,'rejected','CREATIVE_VERSION_CHANGED')};
      const aspect=r.creative_spec?.aspect==='vertical'?'9:16':p.width===p.height?'1:1':p.width>p.height?'3:2':'2:3';
      const intent:StillIntent={model:HIGGSFIELD_IMAGE_MODEL,idempotencyKey:j.id,prompt:'Generate only a photographic background for an editable marketing design. No text, logos, watermark or collage. Do not depict invented buildings as actual business properties. User visual direction: '+r.prompt,aspect};
-     const prepared=this.provider.prepare(intent),cap=Number(r.max_cost_micros),used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE provider='higgsfield'",[])).rows[0].n);
+     const prepared=this.provider.prepare(intent),cap=Number(r.max_cost_micros),used=Number((await db.query(`SELECT COALESCE(sum(${CHARGED_MICROS}),0) AS n FROM app.creative_calls WHERE provider='higgsfield'`,[])).rows[0].n);
      if(!Number.isSafeInteger(cap)||cap<1||cap!==Number(g.max_request_micros)||exceedsAllowance(used+cap,g.budget_micros))return {done:await this.finish(db,j,'rejected','IMAGE_REPLACEMENT_BUDGET_EXHAUSTED')};
      // Shares the account monthly budget trigger. Reserve before any external request.
      await db.query("INSERT INTO app.creative_calls(job_id,organization_id,brand_id,step,provider,model,input_sha256,reserved_micros,status) VALUES($1,$2,$3,'image','higgsfield',$4,$5,$6,'submitted')",[j.id,j.organization_id,j.brand_id,intent.model,prepared.sha256,cap]);
@@ -60,7 +61,7 @@ export class HiggsfieldReplacementJobs {
      if(terminal.has(j.status)||op.phase!=='prepared')return false;
      if(!await this.jobs.permitted(db,j)){await this.finish(db,j,'canceled','ACCESS_REVOKED_OR_CANCELED');return false;}
      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[`higgsfield-image-budget:${j.brand_id}`]);
-     const g=await this.grant(db,j),reserved=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM app.creative_calls WHERE provider='higgsfield'")).rows[0].n);
+     const g=await this.grant(db,j),reserved=Number((await db.query(`SELECT COALESCE(sum(${CHARGED_MICROS}),0) AS n FROM app.creative_calls WHERE provider='higgsfield'`)).rows[0].n);
      if(exceedsAllowance(reserved,g.budget_micros)){await this.finish(db,j,'rejected','IMAGE_REPLACEMENT_BUDGET_CHANGED');return false;}
      if(price>state.cap||Number(g.max_request_micros)!==state.cap){await this.finish(db,j,'rejected','IMAGE_REPLACEMENT_ESTIMATE_EXCEEDS_CAP');return false;}
      await db.query("UPDATE app.higgsfield_image_operations SET phase='submitting' WHERE job_id=$1",[j.id]);return true;
