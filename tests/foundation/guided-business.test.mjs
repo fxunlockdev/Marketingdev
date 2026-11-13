@@ -12,6 +12,7 @@ import {AssetJobs} from '../../dist/jobs.js';
 import {IntakeJobs} from '../../dist/intake-jobs.js';
 import {BrandAnalyzer} from '../../dist/brand-analysis.js';
 import OpenAI from 'openai';
+import {ONBOARDING_REFERENCES} from '../../dist/onboarding-references.js';
 const config=JSON.parse(process.env.DESVIO_TEST_CONFIG),admin=new Pool({connectionString:process.env.DESVIO_TEST_ADMIN_URL}),app=new Pool({connectionString:config.appDatabaseUrl});
 const database=new TenantDatabase(app),workspaces=new Workspaces(database),businesses=new Businesses(database,workspaces),alice=randomUUID(),bob=randomUUID();
 import {GuidedBusiness} from '../../dist/guided-business.js';
@@ -462,13 +463,14 @@ const {UncertainRequests}=await import('../../dist/uncertain-requests.js');
 const earlyAudiences=['Parents nearby planning a relaxed weekend brunch','Remote workers who want a calm table before noon','Families booking small birthday meals'];
 const earlyDetails=(website,competitors=['Rival One'])=>({social_profile:{platform:'help',handle:''},business_name:'Early cafe',website,business_type:'services',industry:'food',cta:'',differentiator:'',timing:'',competitors,priority_offers:'',folder_url:'',guidelines:'',references:[]});
 const earlyBrief=(website,competitors)=>({...brief,details:earlyDetails(website,competitors)});
-async function earlyFixture(name){
+async function earlyFixture(name,delay=0){
+ const pause=()=>delay?new Promise(resolve=>setTimeout(resolve,delay)):undefined;
  const account=await workspaces.create(alice,{name:`${name} account`});
  const target=await workspaces.createBrand(alice,account.id,{name},randomUUID());
  await admin.query("INSERT INTO app.analysis_grants(organization_id,brand_id,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by,enabled) VALUES($1,$2,'MOCK-model',now()+interval '1 hour',100000000,1,1,'LOCAL TEST ONLY',true)",[account.id,target.id]);
  const calls={own:[],market:[],followup:[],analysis:0};
  const research=new OpenAIWebsiteResearch(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
-  const request=JSON.parse(init.body);
+  await pause();const request=JSON.parse(init.body);
   if(request.tools[0].filters){const domain=request.tools[0].filters.allowed_domains[0],text='Early cafe serves breakfast all day. Source';calls.own.push(domain);
    return Response.json({id:'resp_own',object:'response',status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'search',query:domain}},{type:'message',role:'assistant',content:[{type:'output_text',text,annotations:[{type:'url_citation',url:`https://${domain}/about`,start_index:text.indexOf('Source'),end_index:text.length}]}]}],usage:{input_tokens:10,output_tokens:10}});}
   const input=JSON.parse(request.input),followup=input.mode==='competitors_only';
@@ -478,7 +480,7 @@ async function earlyFixture(name){
   return Response.json({id:followup?'resp_followup':'resp_market',object:'response',status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'search',query:'cafes',sources:[{type:'url',url:'https://rival.test/'},{type:'url',url:'https://new-rival.test/'},{type:'url',url:'https://forum.test/thread'},{type:'url',url:'https://third-table.test/'}]}},{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(value),annotations:[]}]}],usage:{input_tokens:10,output_tokens:10}});
  }}));
  const analyzer=new BrandAnalyzer(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
-  calls.analysis++;const context=JSON.parse(JSON.parse(init.body).input),own=context.chunks.find(c=>!c.origin);
+  await pause();calls.analysis++;const context=JSON.parse(JSON.parse(init.body).input),own=context.chunks.find(c=>!c.origin);
   const direction={summary:'A family cafe',rationale:'Proposed friendly direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food in daylight',pillars:['Local stories','Everyday rituals'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A table in daylight.'},{format:'carousel',title:'A ritual',concept:'Arrival, coffee, shared table.'}],essential_questions:[],evidence_ids:[own.id],audience_suggestions:earlyAudiences,competitor_gaps:[]};
   return Response.json({object:'response',id:'resp_analysis',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({findings:[],recommendation:null,missing:[],business_direction:direction}),annotations:[]}]}],usage:{input_tokens:10,output_tokens:10}});
  }}));
@@ -578,6 +580,123 @@ test('an uncertain early capture never blocks for good: release it, then submit 
  assert.equal((await admin.query('SELECT kind FROM app.jobs WHERE id=$1',[job.id])).rows[0].kind,'website.extract');
  assert.equal((await jobs('website.extract')).length,2);
  assert.equal((await guided.read(alice,target.id)).prefill_status,'canceled');
+});
+
+// ---- Early analysis: started after step 2, adopted by "Send my brief" (MOCK OpenAI) ----
+const earlyAnalyses=async target=>(await admin.query("SELECT j.id,j.status,j.error_code,j.cancel_requested FROM app.jobs j WHERE j.brand_id=$1 AND j.kind='brand.analyze' ORDER BY j.created_at",[target.id])).rows;
+test('early analysis starts after step 2, waits on the running capture, and send adopts it with no second paid call (MOCK OpenAI)',async()=>{
+ const {target,calls,run}=await earlyFixture('Early analysis cafe');
+ const first=await guided.save(alice,target.id,{revision:0,brief:earlyBrief('https://analysis-cafe.test/',['Rival One']),step:1});
+ assert.equal(first.early_analysis_job_id,null,'nothing is analysed before step 2 is saved');
+ // Step 2 adds a competitor and is saved while the website is still being read.
+ const second=await guided.save(alice,target.id,{revision:1,brief:earlyBrief('https://analysis-cafe.test/',['Rival One','New Rival']),step:2});
+ assert.ok(second.early_analysis_job_id);assert.equal(second.early_analysis_status,'queued');assert.equal(second.early_analysis_current,true);
+ assert.equal((await admin.query('SELECT capture_job_id FROM app.intake_dependencies WHERE analysis_job_id=$1',[second.early_analysis_job_id])).rows[0].capture_job_id,first.prefill_job_id);
+ assert.deepEqual((await admin.query('SELECT market_followup FROM app.intake_requests WHERE job_id=$1',[second.early_analysis_job_id])).rows[0].market_followup,{website:'https://analysis-cafe.test/',competitors:['New Rival']});
+ const waiting=await guided.read(alice,target.id);
+ assert.equal(waiting.research_job_id,null);assert.deepEqual(waiting.progress,{website:'waiting',market:'waiting',analysis:'waiting'});
+ assert.equal(await run(second.early_analysis_job_id),'waiting');assert.equal(calls.analysis,0);
+ assert.equal(await run(first.prefill_job_id),'succeeded');
+ assert.equal(await run(second.early_analysis_job_id),'succeeded');assert.equal(calls.analysis,1);
+ assert.deepEqual((await guided.read(alice,target.id)).progress,{website:'done',market:'done',analysis:'done'});
+ // Moving through looks and files saves the same research answers: nothing restarts.
+ await guided.save(alice,target.id,{revision:2,brief:earlyBrief('https://analysis-cafe.test/',['Rival One','New Rival']),step:4});
+ const key=randomUUID(),job=await guided.research(alice,target.id,{revision:3},key);
+ assert.deepEqual(job,{id:second.early_analysis_job_id,status:'succeeded'},'send adopts the finished analysis');
+ assert.deepEqual(await guided.research(alice,target.id,{revision:3},key),job,'a retried send replays');
+ await assert.rejects(guided.research(alice,target.id,{revision:3},randomUUID()),/already exists/);
+ assert.equal(calls.analysis,1);assert.equal(calls.own.length,1);assert.equal(calls.market.length,1);assert.equal(calls.followup.length,1);
+ assert.equal((await earlyAnalyses(target)).length,1);
+ const ready=await guided.read(alice,target.id);
+ assert.equal(ready.research_job_id,job.id);assert.equal(ready.status,'succeeded');assert.equal(ready.result.business_direction.heading_font,'Lora');
+ // Support reads each stage from job and ledger timestamps.
+ const timings=(await admin.query('SELECT kind,started_early,queued_at,finished_at,provider_started_at,provider_completed_at,market_started_at,market_completed_at,waited_on_capture FROM app.onboarding_research_timings WHERE brand_id=$1 ORDER BY queued_at',[target.id])).rows;
+ assert.deepEqual(timings.map(t=>[t.kind,t.started_early]),[['website.extract',true],['brand.analyze',true]]);
+ assert.ok(timings.every(t=>t.provider_completed_at>=t.provider_started_at&&t.market_completed_at>=t.market_started_at));
+ assert.equal(timings[1].waited_on_capture,first.prefill_job_id);
+ await assert.rejects(guided.read(bob,target.id));
+});
+
+test('a research-relevant change restarts the early analysis; looks, folder links and guidelines do not (MOCK OpenAI)',async()=>{
+ const {target,calls,run}=await earlyFixture('Early restart cafe');
+ const site='https://restart-cafe.test/',start=await guided.save(alice,target.id,{revision:0,brief:earlyBrief(site),step:1});
+ assert.equal(await run(start.prefill_job_id),'succeeded');
+ const a=await guided.save(alice,target.id,{revision:1,brief:earlyBrief(site),step:2});
+ assert.ok(a.early_analysis_job_id);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.intake_dependencies WHERE analysis_job_id=$1',[a.early_analysis_job_id])).rows[0].n,0,'a finished capture needs no wait');
+ const looks={...earlyBrief(site),visual_direction:'Soft film grain',details:{...earlyDetails(site),references:[ONBOARDING_REFERENCES[0].id],folder_url:'https://drive.test/folder',guidelines:'Navy and cream'}};
+ const styled=await guided.save(alice,target.id,{revision:2,brief:looks,step:3});
+ assert.equal(styled.early_analysis_job_id,a.early_analysis_job_id);assert.equal(styled.early_analysis_current,true);
+ assert.deepEqual((await earlyAnalyses(target)).map(j=>[j.status,j.cancel_requested]),[['queued',false]]);
+ // A changed audience supersedes the analysis that never started and starts one for the new answers.
+ const b=await guided.save(alice,target.id,{revision:3,brief:{...looks,audience:'Remote workers'},step:3});
+ assert.notEqual(b.early_analysis_job_id,a.early_analysis_job_id);
+ assert.deepEqual((await earlyAnalyses(target)).map(j=>[j.status,j.error_code]),[['canceled','EARLY_ANALYSIS_SUPERSEDED'],['queued',null]]);
+ assert.equal(await run(a.early_analysis_job_id),'finished');assert.equal(calls.analysis,0);
+ // Saving the same answers again starts nothing: at most one start per digest.
+ await guided.save(alice,target.id,{revision:4,brief:{...looks,audience:'Remote workers'},step:4});
+ assert.equal((await earlyAnalyses(target)).length,2);
+ // One already running is asked to stop (its call may be in flight) and never applies a result.
+ await admin.query("UPDATE app.jobs SET status='running',attempt=1 WHERE id=$1",[b.early_analysis_job_id]);
+ const c=await guided.save(alice,target.id,{revision:5,brief:{...looks,audience:'Remote workers',market:'Porto'},step:4});
+ assert.notEqual(c.early_analysis_job_id,b.early_analysis_job_id);
+ const all=await earlyAnalyses(target);assert.equal(all.length,3);assert.equal(all[1].cancel_requested,true);
+ assert.equal(await run(b.early_analysis_job_id),'finished');assert.equal((await earlyAnalyses(target))[1].status,'canceled');
+ assert.equal(await run(c.early_analysis_job_id),'succeeded');assert.equal(calls.analysis,1);
+ const job=await guided.research(alice,target.id,{revision:6},randomUUID());
+ assert.equal(job.id,c.early_analysis_job_id);assert.equal(calls.analysis,1);
+ assert.equal(calls.own.length,1,'the website is read once');
+});
+
+test('an uncertain early analysis is never repeated: send shows it for a stop-waiting decision, then research runs as before (MOCK OpenAI)',async()=>{
+ const {target,calls,run}=await earlyFixture('Early unsure analysis cafe');
+ const site='https://unsure-analysis.test/',start=await guided.save(alice,target.id,{revision:0,brief:earlyBrief(site),step:1});
+ assert.equal(await run(start.prefill_job_id),'succeeded');
+ const a=await guided.save(alice,target.id,{revision:1,brief:earlyBrief(site),step:2});
+ await admin.query("UPDATE app.jobs SET status='unknown',error_code='AI_SUBMISSION_UNKNOWN' WHERE id=$1",[a.early_analysis_job_id]);
+ // Neither a changed answer nor a repeated save starts another paid analysis.
+ const changed=await guided.save(alice,target.id,{revision:2,brief:{...earlyBrief(site),market:'Goa'},step:3});
+ assert.equal(changed.early_analysis_job_id,a.early_analysis_job_id);assert.equal(changed.early_analysis_status,'unknown');
+ await guided.save(alice,target.id,{revision:3,brief:{...earlyBrief(site),market:'Goa'},step:4});
+ assert.equal((await earlyAnalyses(target)).length,1);
+ const shown=await guided.research(alice,target.id,{revision:4},randomUUID());
+ assert.deepEqual(shown,{id:a.early_analysis_job_id,status:'unknown'});
+ assert.equal((await guided.read(alice,target.id)).status,'unknown');
+ const released=await new UncertainRequests(businesses).stopWaiting(alice,target.id,a.early_analysis_job_id,{acknowledge_possible_charge:true});assert.equal(released.status,'canceled');
+ const job=await guided.research(alice,target.id,{revision:4},randomUUID());
+ assert.notEqual(job.id,a.early_analysis_job_id);
+ assert.equal(await run(job.id),'succeeded');assert.equal(calls.analysis,1);assert.equal(calls.own.length,1);
+ assert.equal((await earlyAnalyses(target)).length,2);
+});
+
+test('without a website the early analysis starts from the saved answers alone (MOCK OpenAI)',async()=>{
+ const {target,calls,run}=await earlyFixture('Early answers cafe');
+ const saved=await guided.save(alice,target.id,{revision:0,brief,step:2});
+ assert.ok(saved.early_analysis_job_id);assert.equal(saved.prefill_job_id,null);
+ assert.deepEqual((await guided.read(alice,target.id)).progress,{website:'skipped',market:'skipped',analysis:'waiting'});
+ assert.equal(await run(saved.early_analysis_job_id),'succeeded');assert.equal(calls.analysis,1);assert.equal(calls.own.length,0);
+ const job=await guided.research(alice,target.id,{revision:1},randomUUID());
+ assert.deepEqual(job,{id:saved.early_analysis_job_id,status:'succeeded'});assert.equal(calls.analysis,1);
+});
+
+test('stage timings with 300 ms MOCK calls: website and market research overlap, and send finds the analysis ready',async t=>{
+ const delay=300,{target,run}=await earlyFixture('Early timing cafe',delay);
+ const site='https://timing-cafe.test/',start=await guided.save(alice,target.id,{revision:0,brief:earlyBrief(site,['Rival One']),step:1});
+ let at=Date.now();
+ assert.equal(await run(start.prefill_job_id),'succeeded');
+ const capture=Date.now()-at;
+ const second=await guided.save(alice,target.id,{revision:1,brief:earlyBrief(site,['Rival One']),step:2});
+ at=Date.now();
+ // The worker runs the early analysis while the owner picks looks and files.
+ if(second.early_analysis_job_id)assert.equal(await run(second.early_analysis_job_id),'succeeded');
+ const background=Date.now()-at;
+ at=Date.now();
+ const job=await guided.research(alice,target.id,{revision:2},randomUUID());
+ if(job.status!=='succeeded')assert.equal(await run(job.id),'succeeded');
+ const send=Date.now()-at;
+ t.diagnostic(`MOCK ${delay} ms per provider call: capture (own site + market) ${capture} ms; early analysis in background ${background} ms; Send my brief -> result ready ${send} ms`);
+ assert.ok(capture<2*delay,`own-site and market research run side by side (${capture} ms)`);
+ assert.ok(send<delay,`send finds the result ready (${send} ms)`);
 });
 
 test('the first guided monthly plan also requests the brand strategy once, without blocking the plan',async()=>{
