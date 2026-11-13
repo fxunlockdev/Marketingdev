@@ -381,8 +381,10 @@ test('campaign planning selects approved brand photos and persists choices witho
   });
   assert.equal(await handler.run(scope(b,j)),'succeeded',JSON.stringify(await row(j)));
   const plan=(await planning.jobs(alice,b.id)).jobs.find(x=>x.id===j.id).output_plan_id;
-  const slots=(await admin.query('SELECT reference_ids FROM app.content_slots WHERE plan_id=$1 ORDER BY strategy_slot_index',[plan])).rows;
-  assert.deepEqual(slots[0].reference_ids,[photo]);assert.ok(slots.slice(1).every(s=>s.reference_ids.length===0));
+  const slots=(await admin.query('SELECT format,reference_ids FROM app.content_slots WHERE plan_id=$1 ORDER BY strategy_slot_index',[plan])).rows;
+  assert.deepEqual(slots[0].reference_ids,[photo]);
+  // Other static posts may get this business's best-matching approved photo (never another business's, never more than one); other formats get none.
+  assert.ok(slots.slice(1).every(s=>s.reference_ids.length===0||(s.format==='static'&&s.reference_ids.length===1&&s.reference_ids[0]===photo)),JSON.stringify(slots));
  }finally{transport=undefined;}
 });
 test('campaign planning rejects references revoked before spending or while a result is being prepared',async()=>{
