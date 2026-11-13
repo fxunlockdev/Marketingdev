@@ -25,9 +25,10 @@ import {StaticRenderer} from '../../dist/static-renderer.js';
 import {Businesses} from '../../dist/businesses.js';
 import {Workspaces} from '../../dist/workspaces.js';
 import {generatedPlan,modelResponse} from '../fixtures/planning.mjs';
+import {generatedStrategy} from '../fixtures/strategy.mjs';
 // Browser integration proof uses real auth, RLS, Temporal, S3, Fabric and isolated
 // owner skills. Only the paid OpenAI transport is MOCK; no provider request leaves this test.
-import { test, before, after, afterEach } from "node:test";
+import { test, before, after, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
@@ -234,6 +235,8 @@ before(async () => {
           );
           if(input.task==='video')return modelResponse({title:'TEST video',caption:'TEST video caption',video_prompt:'TEST subtle camera motion',fact_ids:[input.brand.facts[0].id],warnings:[],beats:[{start_ms:0,end_ms:input.duration_seconds*1000,action:'Show the approved image',camera:'Slow push'}],overlays:[{text:'Discover more',start_ms:0,end_ms:2000,position:'bottom',foreground:'#ffffff',background:'#111111'}]});
           if(input.task==='carousel'){const plan=carouselPlan(input.slide_count);for(const slide of plan.slides){slide.fact_ids=[input.brand.facts[0].id];slide.headline=`Story ${slide.position}`;slide.body='';slide.cta='';}return modelResponse(plan);}
+          // The first guided plan also queues the business's initial brand strategy (a draft the owner reviews).
+          if(input.task==='strategy')return modelResponse(generatedStrategy(input));
           if(input.task==='content_plan'){const settings=input.planning_mode==='natural'?(/four-day/i.test(JSON.stringify(input))?{duration_days:4,post_count:4,video_count:2}:{duration_days:7,post_count:7,video_count:2}):null;return modelResponse(settings?{...generatedPlan({...input,...settings}),settings}:generatedPlan(input));}
           planned++;
           const brief = {
@@ -275,8 +278,10 @@ before(async () => {
         if (failImages) throw new TypeError("MOCK lost response");
         if (new URL(url).pathname === "/v1/images/edits") {
           const references=init.body.getAll('image[]');
-          // The image engine may add mood-board style references and the logo; the owner's selected photo must be one of them, byte-exact in pixels.
-          if(references.length){const expected=await sharp(referenceBytes).raw().toBuffer(),sent=await Promise.all(references.map(async r=>sharp(Buffer.from(await r.arrayBuffer())).raw().toBuffer()));assert.ok(sent.some(b=>b.equals(expected)),'selected reference photo is sent');referenceUploads++;}
+          // The image engine may add mood-board style references and the logo. Count requests carrying the owner's selected photo
+          // byte-exact; tests assert that count. Never throw here: a throw is a lost response, which leaves the job `unknown`
+          // and holds every later generation for the business (other tests legitimately send other approved photos).
+          if(references.length){const expected=await sharp(referenceBytes).raw().toBuffer(),sent=await Promise.all(references.map(async r=>sharp(Buffer.from(await r.arrayBuffer())).raw().toBuffer()));if(sent.some(b=>b.equals(expected)))referenceUploads++;}
           else assert.equal(init.body.get("image").type, "image/png");
         }
         else assert.equal(new URL(url).pathname, "/v1/images/generations");
@@ -448,6 +453,9 @@ before(async () => {
     "INSERT INTO app.creative_grants(organization_id,brand_id,text_model,image_model,quality,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,max_image_request_micros,approved_by,enabled) VALUES($1,$2,'MOCK-text','gpt-image-fixture','low',now()+interval '1 hour',10000000,0.01,0.02,100000,'LOCAL BROWSER TEST ONLY',true)",
     [org, brand],
   );
+  // The suite makes more posts than one month's default allowance (5 carousels, 5 videos, 20 images); allowance limits
+  // and their customer messages have their own coverage. An operator-set account plan keeps later journeys independent.
+  await admin.query("INSERT INTO app.content_allowance_plans(organization_id,static_limit,carousel_limit,video_limit) VALUES($1,200,50,50) ON CONFLICT(organization_id) DO UPDATE SET static_limit=200,carousel_limit=50,video_limit=50",[org]);
 });
 after(async () => {
   clearInterval(dispatchTimer);
@@ -475,6 +483,9 @@ after(async () => {
   await smtp?.close();
   await Promise.all([admin.end(), workerPool.end(), dispatchPool.end()]);
 });
+// Each journey starts with a fresh auth rate-limit window, as the other suites do: Better Auth counts every page
+// load's session read per IP and only resets after a quiet minute, so earlier tests' traffic must not lock this one out.
+beforeEach(async()=>{await admin.query('DELETE FROM auth."rateLimit"');});
 afterEach(async()=>{
  await page.screenshot({path:'work/browser/canvas-latest-check.png',fullPage:true}).catch(()=>{});
  if(errors.length)console.error('BROWSER ERRORS',JSON.stringify(errors));
@@ -845,15 +856,24 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
  await page.screenshot({path:'work/browser/focused-post-review-mobile.png',fullPage:true});
- await focused.getByRole('button',{name:'Close post',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Calendar',exact:true,level:1})).toBeFocused();
+ // "Review post" opens the post over the campaign; its close control lives in the drawer header.
+ const drawer=page.getByRole('dialog',{name:'Post details',exact:true});
+ await drawer.getByRole('button',{name:'Close post',exact:true}).click();
+ await expect(drawer).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Review post',exact:true}).first()).toBeFocused();
  assert.equal(new URL(page.url()).searchParams.has('slot'),false);
  await page.setViewportSize({width:1440,height:1000});
+ await page.goto(campaignUrl);
+ await expect(page.getByRole('heading',{name:'Calendar',exact:true,level:1})).toBeVisible({timeout:30000});
+ // View and filters sit inside the collapsed "Calendar options" panel.
+ await page.getByText('Calendar options',{exact:true}).click();
  await selectOption(page.getByLabel('Calendar view',{exact:true}),'week');
  await expect(page.locator('.calendar-activity')).not.toHaveAttribute('open');
  await expect(page.locator('.plan-grid-week .plan-day')).toHaveCount(7);
  await expect(page.locator('.plan-grid-week .post-thumbnail svg')).toHaveCount(2,{timeout:15000});
- assert.ok(await page.locator('.plan-grid-week .plan-card').first().evaluate(el=>el.getBoundingClientRect().width>=240));
+ // The redesigned desktop week shows all seven days side by side (no sideways scrolling) with readable cards.
+ assert.ok(await page.locator('.plan-grid-week').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
+ assert.ok(await page.locator('.plan-grid-week .plan-card').first().evaluate(el=>el.getBoundingClientRect().width>=100));
  await expect(page.getByLabel('Post status',{exact:true})).not.toBeVisible();
  await page.locator('.calendar-filters > summary').click();
  await expect(page.getByLabel('Post status',{exact:true})).toBeVisible();
@@ -862,6 +882,7 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
  await page.getByRole('button',{name:'Clear filters',exact:true}).click();
  await expect(selectField(page.getByLabel('Post status',{exact:true}))).toHaveValue('');
  await page.locator('.calendar-filters > summary').click();
+ await page.getByText('Calendar options',{exact:true}).click();
  await expect(page.locator('.plan-grid-week .post-thumbnail svg')).toHaveCount(2,{timeout:15000});
  await page.screenshot({path:'work/browser/calendar-week-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
@@ -869,28 +890,33 @@ test('Canvas creates a custom four-day plan from the Create chat and opens its a
  assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
  await page.screenshot({path:'work/browser/calendar-week-mobile.png',fullPage:true});
  const overviewRoute=`**/api/v1/businesses/${brand}/overview`;let overviewFailures=0;
- await page.route(overviewRoute,async route=>{if(overviewFailures++===0)return route.fulfill({status:503,json:{message:'TEST temporary overview failure'}});return route.continue();});
+  // The client retries a failed read once by itself; fail the read and that retry so the customer sees Try again.
+ await page.route(overviewRoute,async route=>{if(overviewFailures++<2)return route.fulfill({status:503,json:{message:'TEST temporary overview failure'}});return route.continue();});
  await page.goto(`${base}/b/${brand}/overview`);await page.getByRole('button',{name:'Try again',exact:true}).click();
  await expect(page.getByRole('heading',{name:'Upcoming posts',exact:true})).toBeVisible();await page.unroute(overviewRoute);
- await expect(page.locator('.upcoming-post')).not.toHaveCount(0);
- assert.ok(await page.locator('.upcoming-copy h3').evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).webkitLineClamp==='2')));
- const readyHomePost=page.locator('.upcoming-post').filter({hasText:'Draft ready'}).first();
+ // Home (redesigned): upcoming posts are a labelled list with two-line titles and status badges.
+ const upcoming=page.getByRole('region',{name:'Upcoming posts',exact:true}),upcomingPosts=upcoming.getByRole('listitem');
+ await expect(upcomingPosts).not.toHaveCount(0);
+ assert.ok(await upcomingPosts.locator('h3').evaluateAll(nodes=>nodes.length>0&&nodes.every(node=>getComputedStyle(node).webkitLineClamp==='2')));
+ const readyHomePost=upcomingPosts.filter({hasText:'Draft ready'}).first();
  await readyHomePost.scrollIntoViewIfNeeded();
  const homeCreative=readyHomePost.locator('.post-thumbnail svg, .post-thumbnail img').first();
  await expect(homeCreative).toBeVisible({timeout:15000});
  await expect.poll(()=>homeCreative.evaluate(node=>node instanceof HTMLImageElement?node.complete&&node.naturalWidth>0:!!node.querySelector('image')?.getAttribute('href'))).toBeTruthy();
  assert.ok(await homeCreative.evaluate(node=>{const box=node instanceof HTMLImageElement?{width:node.naturalWidth,height:node.naturalHeight}:node.viewBox.baseVal;const ratio=node.parentElement.style.aspectRatio.split('/').map(Number);return ratio.length===2&&Math.abs(ratio[0]/ratio[1]-box.width/box.height)<0.01;}));
 
- await expect(selectField(page.locator('.workspace-switcher').getByRole('combobox',{name:'Business',exact:true}))).toHaveValue(brand);
- await expect(page.locator('.workspace-page-title')).toContainText('Welcome back,');
- await expect(page.getByRole('link',{name:'View calendar',exact:true})).toHaveAttribute('href',`/b/${brand}/content-plan`);
+ // The sidebar names the open business: a selector when the account has several, the name alone when it has one.
+ const businessSwitcher=page.locator('.workspace-switcher').getByRole('combobox',{name:'Business',exact:true});
+ if(await businessSwitcher.count())await expect(selectField(businessSwitcher)).toHaveValue(brand);else await expect(page.locator('.workspace-switcher')).toContainText('Cedar & Bloom');
+ await expect(page.getByRole('heading',{level:1,name:'Hello, Canvas',exact:true})).toBeVisible();
+ await expect(upcoming.getByRole('link',{name:'View calendar',exact:true})).toHaveAttribute('href',`/b/${brand}/content-plan`);
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
  assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
  await page.screenshot({path:'work/browser/workspace-home-mobile.png',fullPage:true});
  await page.getByRole('button',{name:'Menu',exact:true}).click();
  await expect(page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('link',{name:'Brand Kit',exact:true})).toBeVisible();
  await page.setViewportSize({width:1440,height:1000});
- await expect(page.locator('.v5-topbar').getByRole('link',{name:'Profile',exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:'Your account',exact:true})).toHaveAttribute('href','/profile');
  await page.screenshot({path:'work/browser/workspace-home-desktop.png',fullPage:true});
  const videoSlot=(await admin.query("SELECT id FROM app.content_slots WHERE plan_id=$1 AND format='video' ORDER BY planned_at LIMIT 1",[saved.id])).rows[0];assert.ok(videoSlot);
  await page.goto(`${base}/b/${brand}/content-plan?start=2026-12-01&slot=${videoSlot.id}`);
@@ -1105,7 +1131,10 @@ test('created starting frame works where an uploaded product photo starts video:
  await expect(page.getByText('TEST frame-first video of morning bread',{exact:true}).first()).toBeVisible({timeout:30000});
  await context.getByRole('button',{name:'Create a starting frame',exact:true}).click();
  const frame=context.getByRole('img',{name:'Created starting frame for the video',exact:true});
- await expect(frame).toBeVisible({timeout:150000});assert.equal(generated,imagesBefore+1,'The frame is one normal image-engine generation');assert.equal(videoSubmits,videosBefore);
+ await expect(frame).toBeVisible({timeout:150000});
+ // The owner approves what they see: the frame must actually display (a signed storage URL would be blocked by the page's CSP).
+ await expect.poll(()=>frame.evaluate(img=>img.complete&&img.naturalWidth>0&&img.src.startsWith('blob:')),{timeout:30000}).toBe(true);
+ assert.equal(generated,imagesBefore+1,'The frame is one normal image-engine generation');assert.equal(videoSubmits,videosBefore);
  const request=(await admin.query("SELECT r.size,r.creative_spec,r.prompt FROM app.creative_requests r JOIN app.jobs j ON j.id=r.job_id WHERE r.brand_id=$1 ORDER BY j.created_at DESC LIMIT 1",[brand])).rows[0];
  assert.equal(request.size,'1024x1536');assert.deepEqual(request.creative_spec,{placement:'story',aspect:'vertical',slide_count:null},'A 9:16 reel starts from a true 9:16 story frame');assert.match(request.prompt,/no words, letters, numbers or captions/);
  await page.screenshot({path:'work/browser/video-starting-frame.png'});
@@ -1122,6 +1151,7 @@ test('created starting frame works where an uploaded product photo starts video:
  assert.equal(bound.export_id,exported.id);assert.equal(bound.export_sha256,exported.sha256);assert.equal(bound.brand_reference_id,null);assert.equal(bound.slot_id,slot.id);
  assert.equal(generated,imagesBefore+1,'Approving the frame and the video never generates another image');
  const accessibility=(await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations;assert.deepEqual(accessibility.map(v=>({id:v.id,nodes:v.nodes.map(n=>({target:n.target,summary:n.failureSummary}))})),[]);
+ assert.deepEqual(errors,[]);
 });
 
 test('Archive displays removed posts and restores a real draft across reloads',async()=>{
@@ -1235,6 +1265,8 @@ test('Archive displays generated carousels with saved slide history and restores
  const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(selectField(history.getByLabel('Saved media version',{exact:true})).locator('option')).toHaveCount(2);await expect(history.getByRole('img')).toHaveCount(3);
  await expect.poll(()=>history.getByRole('img').evaluateAll(images=>images.every(img=>img.complete&&img.naturalWidth>0))).toBe(true);
  await selectOption(history.getByLabel('Saved media version',{exact:true}),original.id);await expect(history.getByRole('img')).toHaveCount(3);await expect(history.getByRole('button',{name:'Approve carousel',exact:true})).toHaveCount(0);
+ // Audit the page, not the version menu's closing animation (its focus guards are transient).
+ await expect(page.getByRole('listbox')).toHaveCount(0);
  await page.screenshot({path:'work/browser/canvas-carousel-archive.png',fullPage:true});assert.deepEqual((await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze()).violations,[]);
  await history.getByRole('button',{name:'Restore carousel',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived saved creatives',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await expect(page.getByRole('heading',{name:'No archived saved creatives',exact:true})).toBeVisible();
  assert.deepEqual((await admin.query('SELECT id,sha256,status FROM app.carousel_versions WHERE project_id=$1 ORDER BY id',[project.id])).rows,before);assert.equal((await admin.query('SELECT archived_at FROM app.carousel_projects WHERE id=$1',[project.id])).rows[0].archived_at,null);
@@ -1244,19 +1276,18 @@ test('Archive displays generated carousels with saved slide history and restores
 test('Archive displays generated video history, plays saved media and restores across reloads (MOCK providers)',async()=>{
  // Auth, storage, worker, approvals and video rendering are real; provider response uses the fixture MP4.
  await admin.query("INSERT INTO app.video_grants(organization_id,brand_id,models,expires_at,budget_micros,max_create_micros,max_edit_micros,operator_reference,enabled) VALUES($1,$2,ARRAY['runway/router'],now()+interval '1 hour',10000000,100000,100000,'LOCAL BROWSER TEST ONLY',true) ON CONFLICT(organization_id,brand_id) DO UPDATE SET enabled=true,expires_at=now()+interval '1 hour'",[org,brand]);
- // Rewritten from the retired /canvas conversation: the video is made from its calendar post with an approved product photo.
- await approveFixtureReference('Archive video reference');
- const archivePlans=new ContentPlan(new Businesses(runtime.database,new Workspaces(runtime.database)));
- const archivePlan=await archivePlans.create(actor,brand,{title:'Archive video history',objective:'Video versions for the archive',starts_on:'2027-08-01',timezone:'UTC',slots:[{channel:'instagram',format:'video',creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},brief:'TEST archive video history',planned_at:'2027-08-02T10:00:00Z'}]},randomUUID());
- const archiveSlot=(await admin.query('SELECT id FROM app.content_slots WHERE plan_id=$1',[archivePlan.id])).rows[0];
- await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/campaign-post?slot=${archiveSlot.id}`);
- await page.getByRole('button',{name:'Use Archive video reference for video',exact:true}).click();await expect(page.getByText('Make a video from this approved image',{exact:true})).toBeVisible();
- await page.getByLabel('Video length (seconds)',{exact:true}).fill('3');await page.getByRole('button',{name:'Draft video script',exact:true}).click();
+ // Archive covers standalone saved media. A video attached to a calendar post is archived with its post (the API refuses
+ // to archive it on its own), so this video is requested in its own thread through the same customer API the video form uses.
+ const archiveImage=await approveFixtureReference('Archive video reference');
+ const archiveReference=(await admin.query('SELECT id FROM app.brand_references WHERE brand_id=$1 AND label=$2 ORDER BY approved_at DESC LIMIT 1',[brand,'Archive video reference'])).rows[0];
+ const archiveRoot=`/api/v1/businesses/${brand}`,archiveThread=await post(`${archiveRoot}/canvas/threads`,{title:'Archive video history'},randomUUID());assert.equal(archiveThread.status,201);
+ const requested=await post(`${archiveRoot}/canvas/threads/${archiveThread.body.id}/videos`,{prompt:'TEST archive video history',channel:'instagram',text_provider:'openai',duration_seconds:3,creative_spec:{placement:'reel',aspect:'vertical',slide_count:null},reference:{brand_reference_id:archiveReference.id,source_sha256:digest(archiveImage),confirmed:true}},randomUUID());assert.ok([200,201].includes(requested.status),JSON.stringify(requested.body));
+ await page.setViewportSize({width:1440,height:1000});await page.goto(`${base}/b/${brand}/campaign-post?thread=${archiveThread.body.id}`);
  async function approveArchivePrompt(){await expect(page.getByLabel('Video prompt',{exact:true})).toBeVisible({timeout:60000});await page.getByLabel('Video prompt',{exact:true}).fill('TEST user edited video prompt for archive');await page.getByLabel('Scene 1 action',{exact:true}).fill('TEST revised storyline for archive');await page.getByLabel('I approve this prompt and authorize video generation using the configured allowance.').check();await page.getByRole('button',{name:'Approve prompt and generate video',exact:true}).click();}
  await approveArchivePrompt();await expect(page.getByRole('link',{name:'Download video',exact:true})).toBeVisible({timeout:150000});const project=(await admin.query('SELECT id FROM app.video_projects WHERE brand_id=$1 ORDER BY created_at DESC LIMIT 1',[brand])).rows[0];
  await page.getByLabel('Video feedback',{exact:true}).fill('TEST softer movement for archive revision');await page.getByRole('button',{name:'Draft a revised video from feedback',exact:true}).click();await approveArchivePrompt();await expect.poll(async()=>Number((await admin.query('SELECT count(*) AS n FROM app.video_versions WHERE project_id=$1',[project.id])).rows[0].n),{timeout:150000}).toBe(2);await expect(selectField(page.getByLabel(/^Saved video version/)).locator('option')).toHaveCount(2);
  const before=(await admin.query('SELECT id,sha256,status FROM app.video_versions WHERE project_id=$1 ORDER BY created_at,id',[project.id])).rows;const publications=Number((await admin.query('SELECT count(*) AS n FROM app.publication_requests WHERE brand_id=$1',[brand])).rows[0].n);
- const slotsUsingVideo=Number((await admin.query('SELECT count(*) AS n FROM app.content_slots WHERE video_version_id=ANY($1::uuid[])',[before.map(v=>v.id)])).rows[0].n);const thread=(await admin.query('SELECT thread_id FROM app.video_projects WHERE id=$1',[project.id])).rows[0].thread_id;await page.goto(`${base}/b/${brand}/campaign-post?thread=${thread}`);await page.getByRole('button',{name:'Archive video',exact:true}).click();await expect(page.getByRole('button',{name:'Restore video',exact:true})).toBeVisible();await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
+ const slotsUsingVideo=Number((await admin.query('SELECT count(*) AS n FROM app.content_slots WHERE video_version_id=ANY($1::uuid[])',[before.map(v=>v.id)])).rows[0].n);const thread=(await admin.query('SELECT thread_id FROM app.video_projects WHERE id=$1',[project.id])).rows[0].thread_id;await page.goto(`${base}/b/${brand}/campaign-post?thread=${thread}`);await page.getByRole('button',{name:'Archive video',exact:true}).click();await expect(page.getByRole('status').filter({hasText:'Archived. All versions are retained.'})).toBeVisible();await expect(page.getByRole('button',{name:'Restore video',exact:true})).toBeVisible();await page.goto(`${base}/b/${brand}/archive`);await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.reload();await page.getByRole('button',{name:'Saved creatives',exact:true}).click();await page.getByRole('button',{name:'View creative & history',exact:true}).click();
  const history=page.getByRole('region',{name:'Archived media history',exact:true});await expect(selectField(history.getByLabel('Saved media version',{exact:true})).locator('option')).toHaveCount(2);
  const failedDownload=`**/video-versions/${before[0].id}/download`;await page.route(failedDownload,route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({message:'TEST transient video download failure'})}));
  await selectOption(history.getByLabel('Saved media version',{exact:true}),before[0].id);await expect(history.getByRole('button',{name:'Reload video preview',exact:true})).toBeVisible();await expect(history.getByText('Video preview unavailable',{exact:true})).toBeVisible();await expect(history.locator('video')).toHaveCount(0);
@@ -1373,6 +1404,8 @@ test('Generated replacement confirms credits, survives reload and preserves sche
 
 
 test('AI canvas interprets, generates inline, resumes a lost response and remembers history (MOCK OpenAI)',async()=>{
+ // The counters are shared by the whole file; count this test's paid and chat requests from its own baseline.
+ const chatBaseline=chatCalls,generatedBaseline=generated;
  await admin.query("INSERT INTO app.planning_grants(organization_id,brand_id,enabled,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by) VALUES($1,$2,true,'MOCK-plan',now()+interval '1 hour',10000000,0.01,0.02,'LOCAL TEST ONLY') ON CONFLICT(organization_id,brand_id,provider) DO UPDATE SET enabled=true,expires_at=EXCLUDED.expires_at,budget_micros=EXCLUDED.budget_micros",[org,brand]);
  await page.goto(`${base}/b/${brand}/create`);
  const startMenu=page.getByRole('navigation',{name:'Create and manage your content'});
@@ -1384,7 +1417,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await page.getByRole('button',{name:'Image',exact:true}).click();
  await page.getByRole('button',{name:'Creation options +',exact:true}).click();
  await expect(page.getByLabel('Format',{exact:true})).toBeVisible();
- assert.equal(chatCalls,0,'Choosing a format never submits an incomplete or paid request');
+ assert.equal(chatCalls-chatBaseline,0,'Choosing a format never submits an incomplete or paid request');
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Create a clean botanical soap image for mindful households without text');
  // Server commits the message but the response is lost. Reload must resume the same envelope.
  let dropped=false;
@@ -1394,7 +1427,7 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  await page.reload();
  await expect(page).toHaveURL(/conversation=/,{timeout:20000});
  await expect(page.getByRole('region',{name:'Your creative',exact:true})).toBeVisible({timeout:90000});
- assert.equal(chatCalls,1);assert.equal(generated,1);
+ assert.equal(chatCalls-chatBaseline,1);assert.equal(generated-generatedBaseline,1);
  // The reference editor is available directly under the image, with durable manual edits.
  await expect(page.getByRole('heading',{name:'Text layers',exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Text layers',exact:true})).toHaveCount(1);
@@ -1465,10 +1498,10 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  assert.equal(savedHistory[0].id,savedAttachment);
  assert.equal(savedHistory[0].design.layers[0].text,'A little everyday care');
  assert.equal(savedHistory[1].id,manual.body.id);
- assert.equal(generated,1,'Manual save does not generate another paid image');
+ assert.equal(generated-generatedBaseline,1,'Manual save does not generate another paid image');
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Make it warmer');
  await page.getByRole('button',{name:'Send message',exact:true}).click();
- await expect.poll(()=>generated,{timeout:90000}).toBe(2);
+ await expect.poll(()=>generated-generatedBaseline,{timeout:90000}).toBe(2);
  const edited=(await admin.query('SELECT parent_version_id FROM app.creative_requests WHERE thread_id=$1 ORDER BY job_id',[conversation])).rows;
  assert.ok(edited.some(r=>r.parent_version_id===manual.body.id));
  await expect.poll(async()=> (await admin.query('SELECT latest_version_id FROM app.creative_projects WHERE id=$1',[project.id])).rows[0].latest_version_id,{timeout:90000}).not.toBe(manual.body.id);
@@ -1477,9 +1510,10 @@ test('AI canvas interprets, generates inline, resumes a lost response and rememb
  assert.equal(revised.layers[0].fontFamily,'Lora');
  await page.getByRole('button',{name:'Start over',exact:true}).click();
  await page.getByRole('textbox',{name:'Message Desvio'}).fill('Remember the soap image we created?');await page.getByRole('button',{name:'Send message',exact:true}).click();
- await expect(page.getByText('I found your saved conversation.',{exact:true})).toBeVisible({timeout:60000});assert.equal(generated,2);
+ await expect(page.getByText('I found your saved conversation.',{exact:true})).toBeVisible({timeout:60000});assert.equal(generated-generatedBaseline,2);
  await page.locator('.conversation-sources button').click();await expect(page).toHaveURL(new RegExp(conversation));
- await page.getByRole('button',{name:'Conversation history',exact:true}).click();await expect(page.getByRole('dialog',{name:'Conversation history'})).toBeVisible();await page.getByLabel('Search this business’s conversations').fill('botanical');await expect(page.getByRole('dialog').locator('li')).toHaveCount(1);
+ await page.getByRole('button',{name:'Conversation history',exact:true}).click();await expect(page.getByRole('dialog',{name:'Conversation history'})).toBeVisible();// Search for words only this conversation used: earlier tests in the file save other botanical-soap chats.
+ await page.getByLabel('Search this business’s conversations').fill('clean botanical');await expect(page.getByRole('dialog').locator('li')).toHaveCount(1);
  await page.getByRole('button',{name:'Close history',exact:true}).click();
  for(const viewport of [{width:1280,height:720},{width:390,height:844}]){await page.setViewportSize(viewport);await page.screenshot({path:`work/browser/chat-canvas-${viewport.width}.png`,fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
  await page.setViewportSize({width:1440,height:1000});
