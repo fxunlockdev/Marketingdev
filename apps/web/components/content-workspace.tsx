@@ -147,6 +147,7 @@ export function ContentWorkspace({
     [selection, setSelection] = useState<any[]>([]),
     [confirmed, setConfirmed] = useState(false),
     [message, setMessage] = useState("");
+  const refreshPosts = useCallback(() => setReload((n) => n + 1), []);
   const [moveDay, setMoveDay] = useState<string>();
   const dragged = useRef<string | null>(null);
   const [postDirty, setPostDirty] = useState(false),
@@ -338,7 +339,7 @@ export function ContentWorkspace({
   return (
     <div className={`content-workspace ${inbox ? "approval-workspace" : "calendar-workspace"}`}>
       <header className="section-heading calendar-page-heading"><div><p className="calendar-business-name">{business.name}</p><h1 ref={calendarHeading} tabIndex={-1}>{inbox?'Approvals':'Calendar'}</h1>{inbox&&<p>{data?`${data.total} ${data.total===1?'post is':'posts are'} in your review queue.`:'Review your posts, make adjustments, and approve the versions you love.'}</p>}</div><div className="actions"><button onClick={()=>setReload(n=>n+1)}>Refresh posts</button>{!inbox&&canWrite&&<a className="button primary" href={`/b/${business.id}/monthly-planning`}>Plan my content</a>}</div></header>
-      {!inbox&&<MonthlyPlanReview timezone={prefs?.timezone} businessId={business.id} canWrite={canWrite} refresh={reload} onOpen={setSelected}/>}
+      {!inbox&&<MonthlyPlanReview timezone={prefs?.timezone} businessId={business.id} canWrite={canWrite} refresh={reload} onOpen={setSelected} onProgress={refreshPosts}/>}
       <Notice error={error} />
       {message && <p role="status">{message}</p>}
       {generate && (
