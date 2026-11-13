@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-11-13T15:08:44.764Z",
+  "passed": true,
+  "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
+  "previous": {
+    "id": "62f96166d079404ed68adb6d2fd80022e4b7f7b3899383062104152cef7d7604",
+    "image": "sha256:982c399859d7194f9f02042389ac7e34efbfc4ece1ee4e4a0e3d9688636dff32"
+  },
+  "image": "sha256:60164f0755742b5a034f5a4b691ff36a7ae4be02384aac2c441af9fa5da3f2f4",
+  "backup_container": "desvio-worker-rollback-20261113150816",
+  "paid_calls": false,
+  "scope": "dev2 worker replaced after an idle check; registration verified. Previous container kept stopped for rollback."
+}

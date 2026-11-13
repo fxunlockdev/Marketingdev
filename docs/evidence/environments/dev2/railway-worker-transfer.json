@@ -1,9 +1,9 @@
 {
-  "checked_at": "2026-11-13T13:59:30.124Z",
+  "checked_at": "2026-11-13T15:04:39.191Z",
   "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
   "environment_id": "36a03b4f-6f19-4424-8a8e-289cfe220561",
-  "sha256": "4de98e8d0056f04ec663224ee88aa5bd3377b6bfdc0399cc379edb885556eadd",
-  "bytes": 1560611104,
+  "sha256": "cfd19489da451d72318309b474ef1144abc6fcbc2f9d307bc5366b4945e8c5c6",
+  "bytes": 1560643221,
   "verified": true,
   "temporary_private_object_removed": true,
   "scope": "Exact Docker archive bytes transferred and hashed on private host; image import and worker readiness not yet proven"

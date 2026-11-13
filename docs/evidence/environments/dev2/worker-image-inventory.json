@@ -1,11 +1,11 @@
 {
-  "checked_at": "2026-11-13T13:53:27.611Z",
+  "checked_at": "2026-11-13T14:59:50.243Z",
   "environment_id": "36a03b4f-6f19-4424-8a8e-289cfe220561",
-  "source_commit": "6410f4d (app-fixes)",
+  "source_commit": "d2c70be (app-fixes)",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:982c399859d7194f9f02042389ac7e34efbfc4ece1ee4e4a0e3d9688636dff32",
+      "image_id": "sha256:60164f0755742b5a034f5a4b691ff36a7ae4be02384aac2c441af9fa5da3f2f4",
       "architecture": "amd64",
       "user": "node"
     },
@@ -41,14 +41,14 @@
     }
   ],
   "rebuilt": [
-    "trusted_worker",
-    "static_renderer",
-    "skills",
-    "video_renderer"
+    "trusted_worker"
   ],
   "reused": {
     "documents": "image files identical to apps/ingestion sources",
-    "website_renderer": "image files identical to apps/website-renderer sources"
+    "website_renderer": "image files identical to apps/website-renderer sources",
+    "skills": "no apps/skills or skill input change since 6410f4d build",
+    "static_renderer": "no apps/media change since 6410f4d build",
+    "video_renderer": "no apps/video change since 6410f4d build"
   },
   "scope": "Local linux/amd64 builds for the dev2 worker host; activation pending."
 }

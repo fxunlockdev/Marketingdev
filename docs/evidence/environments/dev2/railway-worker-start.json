@@ -1,7 +1,7 @@
 {
-  "checked_at": "2026-11-13T14:01:33.210Z",
+  "checked_at": "2026-11-13T15:08:31.734Z",
   "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
   "status": "running",
-  "image": "sha256:982c399859d7194f9f02042389ac7e34efbfc4ece1ee4e4a0e3d9688636dff32",
+  "image": "sha256:60164f0755742b5a034f5a4b691ff36a7ae4be02384aac2c441af9fa5da3f2f4",
   "scope": "Container process only; Temporal registration, database roles and end-to-end jobs must be checked separately"
 }
