@@ -14,6 +14,8 @@ export const RESEARCH_VERSION='openai-web-research-v1';
 // Conservative reservation for bounded context/output and <=3 hosted calls,
 // including repeated model turns at audited standard rates. Not an actual charge.
 export const RESEARCH_RESERVATION_MICROS=1000000;
+/** Own-site research is one attempt of at most this long; the capture runs other readers beside it. */
+export const CAPTURE_CALL_TIMEOUT_MS=70000;
 /** Every onboarding charge for one business, across both research ledgers: a settled call at its
  * settlement, any other call at its full reservation. */
 export const BRAND_RESERVED_SQL=`SELECT COALESCE(sum(charged),0) AS used FROM (SELECT ${CHARGED_MICROS} AS charged FROM app.analysis_calls WHERE organization_id=$1 AND brand_id=$2 UNION ALL SELECT ${CHARGED_MICROS} FROM app.market_research_calls WHERE organization_id=$1 AND brand_id=$2) reservations`;
@@ -182,7 +184,7 @@ export function researchFailure(error:unknown):{code:string;known:boolean}{
 export class OpenAIWebsiteResearch{
  readonly client?:OpenAI;
  constructor(key?:string,client?:OpenAI,readonly photos?:WebsitePhotos,readonly text=new WebsiteText()){this.client=client??(key?new OpenAI({apiKey:key,maxRetries:0,timeout:180000}):undefined);}
- async capture(jobs:AssetJobs,scope:JobScope,url:string){
+ async capture(jobs:AssetJobs,scope:JobScope,url:string,options:{signal?:AbortSignal}={}){
   const body=researchRequest(url);
   const saved=await jobs.transaction(scope,async(db,j)=>{
    if(j.kind!=='website.extract'||!await jobs.permitted(db,j))throw new IntakeError('ACCESS_REVOKED_OR_CANCELED');
@@ -203,7 +205,8 @@ export class OpenAIWebsiteResearch{
   if(!saved){
    let response:any;
    try{
-    response=await this.client!.responses.create(body);
+    // One attempt, bounded by the capture deadline: domain-filtered search can stall for minutes.
+    response=await this.client!.responses.create(body,{signal:options.signal,timeout:CAPTURE_CALL_TIMEOUT_MS,maxRetries:0});
     try{pages=researchPages(response,url);}catch(error){
      // A completed search without citations is not a failed website. Read the
      // actual public pages, preserving their URLs and verbatim text provenance.
