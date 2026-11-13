@@ -4,7 +4,18 @@ import {mkdir} from 'node:fs/promises';
 import {chromium,expect} from '@playwright/test';
 import sharp from 'sharp';
 import AxeBuilder from '@axe-core/playwright';
+import {directionFromLooks} from '../../dist/brand-direction.js';
 const origin=process.env.DESVIO_UI_BASE;
+/** Mock creative-direction endpoints: saving from onboarding stores the picked looks as version 1. */
+function directionMock(){
+ const state={current:null,saves:[]};
+ const handle=(req,path)=>{
+  if(path.endsWith('/creative-direction/onboarding')){state.saves.push(req.postDataJSON());state.current??={id:'22222222-2222-4222-8222-222222222222',version:1,source:'onboarding',created_at:'2026-11-13T10:00:00Z',direction:directionFromLooks(['still-01','formae-03'],{voice:'Warm and welcoming',summary:'A welcoming neighbourhood cafe',pillars:['Community']},'')};return state.current;}
+  if(path.endsWith('/creative-direction'))return {current:state.current,versions:state.current?[state.current]:[],legacy_moodboard:null,can_edit:true};
+  return undefined;
+ };
+ return {state,handle};
+}
 test('MOCK API: dashboard priorities and saved questionnaire work at desktop, tablet and phone sizes',{skip:!origin,timeout:90000},async()=>{
  const browser=await chromium.launch(),context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
@@ -111,56 +122,50 @@ test('MOCK API: dashboard priorities and saved questionnaire work at desktop, ta
  }finally{await browser.close();}
 });
 
-test('MOCK API: mood board revision, approval and campaign setup remain usable across screen sizes',{skip:!origin,timeout:90000},async()=>{
+test('MOCK API: picked looks become the saved direction, shown as a summary, and campaign setup follows it across screen sizes',{skip:!origin,timeout:90000},async()=>{
  const browser=await chromium.launch(),context=await browser.newContext({viewport:{width:1440,height:1000}}),page=await context.newPage(),id='11111111-1111-4111-8111-111111111111';
- const direction={summary:'A welcoming neighbourhood cafe',rationale:'Natural light and honest food.',palette:[{role:'primary',hex:'#244536'},{role:'secondary',hex:'#FAF7EF'},{role:'accent',hex:'#B96135'}],heading_font:'Lora',body_font:'DM Sans',voice:'Warm and welcoming',imagery:'Everyday cafe moments in natural light',pillars:['Community','Seasonal food'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Arrival, coffee, and a shared table.'}],essential_questions:[]};
+ const direction={summary:'A welcoming neighbourhood cafe',rationale:'Natural light and honest food.',palette:[{role:'primary',hex:'#244536'},{role:'secondary',hex:'#FAF7EF'},{role:'accent',hex:'#B96135'}],heading_font:'Lora',body_font:'DM Sans',voice:'Warm and welcoming',imagery:'Everyday cafe moments in natural light',pillars:['Community','Seasonal food'],starter_ideas:[],essential_questions:[],evidence_ids:['fixture']};
  const business={id,organization_id:id,name:'Courtyard Studio',website:null,role:'owner',has_approved_brand:true};
- let boards=[],campaigns=[],submissions=0;
- const preview={width:1024,height:1024,background_media_id:id,layers:[]};
+ let campaigns=[],submissions=0,moodboardPosts=0;const looks=directionMock();
  await page.route('**/api/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname;let data={};
-  if(path.includes('/creative-media/')){await route.fulfill({contentType:'image/webp',body:await sharp(Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024"><rect width="1024" height="1024" fill="#244536"/><circle cx="700" cy="300" r="220" fill="#B96135"/><text x="80" y="800" fill="#FAF7EF" font-size="80">Fixture preview</text></svg>')).webp().toBuffer()});return;}
-  if(path.endsWith('/get-session'))data={user:{id:'fixture',name:'Maya',emailVerified:true}};
+  const saved=looks.handle(req,path);
+  if(saved!==undefined)data=saved;
+  else if(path.endsWith('/get-session'))data={user:{id:'fixture',name:'Maya',emailVerified:true}};
   else if(path==='/api/v1/businesses')data={businesses:[business]};
   else if(path.endsWith('/canvas/references'))data={references:[]};
   else if(path.endsWith('/generation-notifications'))data={notifications:[]};
   else if(path.endsWith('/guided-brief'))data={revision:1,step:4,brief:{offering:'Cafe',audience:'Families',market:'Mumbai',goal:'awareness',visual_direction:'Natural',must_follow:''},research_job_id:id,status:'succeeded',result:{business_direction:direction}};
   else if(path.endsWith('/brain'))data={active:{id},findings:[],revision:1};
-  else if(path.endsWith('/moodboards')){
-   if(req.method()==='POST'){const input=req.postDataJSON();if(boards.length){assert.equal(input.feedback,'More everyday moments');assert.equal(input.style.palette[0].hex,'#123456');assert.deepEqual(Object.keys(input.style).sort(),['body_font','heading_font','palette']);}boards.push({id:`board-${boards.length}`,status:'ready',direction,image_status:'succeeded',carousel_status:'succeeded',design:preview,slides:[{design:preview},{design:preview},{design:preview}]});data={id:boards.at(-1).id};}
-   else data={boards,allowance:{items:{static:{remaining:20},carousel:{remaining:5},video:{remaining:5}}}};
-  }else if(path.endsWith('/approve')){boards.at(-1).status='locked';data={id:boards.at(-1).id,status:'locked'};}
+  else if(path.endsWith('/moodboards')){if(req.method()==='POST')moodboardPosts++;data={boards:[],allowance:{items:{static:{remaining:20},carousel:{remaining:5},video:{remaining:5}}}};}
   else if(path.endsWith('/guided-campaigns')){
-   if(req.method()==='POST'){submissions++;assert.equal(req.postDataJSON().static_count,5);assert.equal(req.postDataJSON().carousel_count,1);campaigns=[{id,planning_status:'queued'}];data={id};}
+   if(req.method()==='POST'){submissions++;const input=req.postDataJSON();assert.equal(input.static_count,5);assert.equal(input.carousel_count,1);assert.equal(input.direction_id,looks.state.current.id);assert.equal(input.moodboard_id,undefined);assert.ok(input.timezone);campaigns=[{id,planning_status:'queued'}];data={id};}
    else data={channels:['instagram'],campaigns};
   }
   await route.fulfill({json:data});
  });
  try{
   await page.goto(`${origin}/b/${id}/guided-onboarding`);
-  await page.getByRole('button',{name:'Create my mood board'}).click();
-  await expect(page.getByRole('heading',{name:'Your brand, brought together.'})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Create my mood board'})).toHaveCount(0);
+  await page.getByRole('button',{name:'Save my brand direction'}).click();
+  await expect(page.getByRole('heading',{name:'Your brand direction'})).toBeVisible();
+  assert.deepEqual(looks.state.saves,[{brief_revision:1}]);
+  await expect(page.getByRole('list',{name:'Your looks'}).getByRole('listitem')).toHaveCount(2);
+  await expect(page.getByRole('list',{name:'Palette'}).getByRole('listitem')).toHaveCount(4);
+  await expect(page.getByRole('link',{name:'Edit in Brand Kit'})).toHaveAttribute('href',`/b/${id}/brand-kit#direction`);
+  await expect(page.getByRole('heading',{name:'Let’s plan your content'})).toBeVisible();
+  await expect(page.getByLabel('Business time zone',{exact:true})).toBeVisible();
   for(const width of [1440,768,390]){
    await page.setViewportSize({width,height:1000});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
    const audit=await new AxeBuilder({page}).withTags(['wcag2a','wcag2aa']).analyze();assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
-   await page.locator('figcaption').last().scrollIntoViewIfNeeded();await expect(page.locator('figure svg image')).toHaveCount(4);
-   if(process.env.DESVIO_UI_EVIDENCE)await page.screenshot({path:`${process.env.DESVIO_UI_EVIDENCE}/moodboard-${width}.png`,fullPage:true});
+   if(process.env.DESVIO_UI_EVIDENCE){await mkdir(process.env.DESVIO_UI_EVIDENCE,{recursive:true});await page.screenshot({path:`${process.env.DESVIO_UI_EVIDENCE}/brand-direction-${width}.png`,fullPage:true});}
   }
-  await page.getByText('Adjust colours and fonts',{exact:true}).click();
-  await page.getByLabel('primary colour',{exact:true}).fill('#123456');
-  await page.getByLabel('What would you change?').fill('More everyday moments');
-  await page.getByRole('button',{name:'Revise mood board'}).click();
-  await expect(page.getByRole('button',{name:'Revise mood board'})).toHaveCount(0);
-  await page.goto(`${origin}/b/${id}/monthly-planning`);
-  await expect(page.getByRole('button',{name:'Prepare my content plan'})).toHaveCount(0);
-  await page.getByRole('button',{name:'Approve this direction'}).click();
-  await expect(page.getByRole('heading',{name:'Let’s plan your content'})).toBeVisible();
   await page.goto(`${origin}/b/${id}/monthly-planning`);
   await expect(page.getByRole('heading',{name:'Plan my content',exact:true})).toBeVisible();
   await expect(page.getByText('Your business answers',{exact:true})).toHaveCount(0);
-  await expect(page.getByRole('heading',{name:'Your brand, brought together.'})).toHaveCount(0);
-  await expect(page.getByRole('link',{name:'View my approved direction'})).toHaveAttribute('href',`/b/${id}/guided-onboarding`);
+  await expect(page.getByRole('heading',{name:'Your brand direction'})).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'View my creative direction'})).toHaveAttribute('href',`/b/${id}/guided-onboarding`);
   for(const width of [1440,768,390]){
    await page.setViewportSize({width,height:1000});
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
@@ -177,7 +182,7 @@ test('MOCK API: mood board revision, approval and campaign setup remain usable a
   campaigns[0]={...campaigns[0],generation_started_at:'2026-11-10T10:00:00Z',total_posts:6,ready_posts:6};
   await page.reload();await page.getByRole('button',{name:'Plan more content'}).click();
   await expect(page.getByRole('heading',{name:'Let’s plan your content'})).toBeVisible();
-  await expect(page.getByRole('button',{name:'Create my mood board'})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'Create my mood board'})).toHaveCount(0);assert.equal(moodboardPosts,0,'No mood board is generated');
   await page.getByRole('button',{name:'Back to current plan'}).click();
   await expect(page.getByRole('heading',{name:'Your monthly content is ready to review'})).toBeVisible();
   campaigns[0]={...campaigns[0],ready_posts:5,generation_attention:true};
@@ -195,9 +200,10 @@ test('MOCK API: mood board revision, approval and campaign setup remain usable a
 
 test('MOCK API: repeated research requires resolving alternative facts before approval',{skip:!origin,timeout:60000},async()=>{
  const browser=await chromium.launch(),page=await browser.newPage(),id='11111111-1111-4111-8111-111111111111';
- const findings=[{id:'a',field:'audience',value:'Local families',status:'correct',revision:1},{id:'b',field:'audience',value:'Local neighbours',status:'correct',revision:1},{id:'name',field:'brand_name',value:'Cafe',status:'correct',revision:1},{id:'offer',field:'offering',value:'Coffee',status:'correct',revision:1}];let approved=false;
+ const looks=directionMock();const findings=[{id:'a',field:'audience',value:'Local families',status:'correct',revision:1},{id:'b',field:'audience',value:'Local neighbours',status:'correct',revision:1},{id:'name',field:'brand_name',value:'Cafe',status:'correct',revision:1},{id:'offer',field:'offering',value:'Coffee',status:'correct',revision:1}];let approved=false;
  await page.route('**/api/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname;let data={};
+  if(path.includes('/creative-direction')){await route.fulfill({json:looks.handle(req,path)});return;}
   if(path.endsWith('/get-session'))data={user:{id:'fixture',name:'Maya',emailVerified:true}};
   else if(path==='/api/v1/businesses')data={businesses:[{id,organization_id:id,name:'Cafe',role:'owner'}]};
   else if(path.endsWith('/canvas/references'))data={references:[]};
@@ -210,7 +216,7 @@ test('MOCK API: repeated research requires resolving alternative facts before ap
   else if(path.endsWith('/guided-campaigns'))data={channels:['instagram'],campaigns:[]};
   await route.fulfill({json:data});
  });
- try{await page.goto(`${origin}/b/${id}/guided-onboarding`);await expect(page.getByRole('button',{name:'Confirm business details'})).toBeDisabled();await expect(page.getByRole('status')).toContainText('alternative descriptions');await page.getByRole('checkbox',{name:'Leave this detail out'}).nth(1).check();await page.getByRole('button',{name:'Confirm business details'}).click();await expect(page.getByRole('button',{name:'Create my mood board'})).toBeVisible();assert.equal(approved,true);}finally{await browser.close();}
+ try{await page.goto(`${origin}/b/${id}/guided-onboarding`);await expect(page.getByRole('button',{name:'Confirm business details'})).toBeDisabled();await expect(page.getByRole('status')).toContainText('alternative descriptions');await page.getByRole('checkbox',{name:'Leave this detail out'}).nth(1).check();await page.getByRole('button',{name:'Confirm business details'}).click();await expect(page.getByRole('heading',{name:'Your brand direction'})).toBeVisible();assert.equal(approved,true);assert.deepEqual(looks.state.saves,[{brief_revision:1}]);}finally{await browser.close();}
 });
 
 test('MOCK API: Calendar reviews the exact plan and starts assets only after approval',{skip:!origin,timeout:60000},async()=>{
@@ -291,9 +297,10 @@ test('MOCK API: calendar video image choice is included in the explicit approval
 
 test('MOCK API: missing research facts can be supplied and explicitly confirmed without leaving onboarding',{skip:!origin,timeout:60000},async()=>{
  const browser=await chromium.launch(),page=await browser.newPage(),id='11111111-1111-4111-8111-111111111111';
- const findings=[];let approved=false,adds=0,loseReply=true;const keys=new Map();
+ const findings=[];let approved=false,adds=0,loseReply=true;const keys=new Map(),looks=directionMock();
  await page.route('**/api/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname;let data={};
+  if(path.includes('/creative-direction')){await route.fulfill({json:looks.handle(req,path)});return;}
   if(path.endsWith('/get-session'))data={user:{id:'fixture',name:'Maya',emailVerified:true}};
   else if(path==='/api/v1/businesses')data={businesses:[{id,organization_id:id,name:'Cafe',role:'owner'}]};
   else if(path.endsWith('/canvas/references'))data={references:[]};
@@ -321,8 +328,9 @@ test('MOCK API: missing research facts can be supplied and explicitly confirmed 
   await expect(page.getByRole('button',{name:'Confirm business details'})).toBeEnabled();
   assert.equal(adds,3);assert.equal(approved,false);assert.equal(findings.find(f=>f.field==='audience').value,'Neighbourhood families');
   await page.getByRole('button',{name:'Confirm business details'}).click();
-  await expect(page.getByRole('button',{name:'Create my mood board'})).toBeVisible();assert.equal(approved,true);
-  await page.reload();await expect(page.getByRole('button',{name:'Create my mood board'})).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Your brand direction'})).toBeVisible();assert.equal(approved,true);
+  await page.reload();await expect(page.getByRole('heading',{name:'Your brand direction'})).toBeVisible();assert.equal(looks.state.saves.length,1);
+  await expect(page.getByRole('button',{name:'Create my mood board'})).toHaveCount(0);
  }finally{await browser.close();}
 });
 
