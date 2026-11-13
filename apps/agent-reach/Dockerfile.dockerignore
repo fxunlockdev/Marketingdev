@@ -1,0 +1,8 @@
+**
+!apps/
+!apps/agent-reach/
+!apps/agent-reach/Dockerfile
+!apps/agent-reach/requirements.lock
+!apps/agent-reach/runtime.py
+!apps/agent-reach/channels.py
+!agent-reach-source/

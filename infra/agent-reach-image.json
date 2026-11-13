@@ -1,0 +1,8 @@
+{
+  "repository": "https://github.com/Panniantong/Agent-Reach.git",
+  "commit": "c70ae6da5d39bc90e09ad2ae0575ccc89f31e284",
+  "tree": "ea2c02f80614deb8e31d8ebf01d89f7ce15b4633",
+  "version": "1.6.1",
+  "license": "MIT",
+  "note": "Agent Reach source at this commit (git tree of agent_reach/ verified before every build). Not the unrelated PyPI package named agent-reach. Base images: infra/python-runtime-image.json and infra/render-runtime-image.json."
+}
