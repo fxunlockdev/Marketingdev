@@ -28,7 +28,7 @@ export const BUCKET='desvio-local';
 export const SENDER='accounts@desvio.localhost';
 
 /** Fixed loopback ports so URLs and stored settings survive restarts. --web-port overrides the web port. */
-export const DEFAULT_PORTS=Object.freeze({web:3000,api:3101,postgres:55432,storage:53900,scanner:53310,temporal:57233,temporalHttp:57243,temporalMetrics:57253,smtp:52525,mock:54010,mockRunway:54011});
+export const DEFAULT_PORTS=Object.freeze({web:3000,api:3101,postgres:55432,storage:53900,scanner:53310,temporal:57233,temporalHttp:57243,temporalMetrics:57253,smtp:52525,mock:54010,mockRunway:54012});
 
 const hex=bytes=>randomBytes(bytes).toString('hex');
 const ROLE_KEYS=['APP_DATABASE_PASSWORD','AUTH_DATABASE_PASSWORD','MAIL_DATABASE_PASSWORD','WORKER_DATABASE_PASSWORD','DISPATCHER_DATABASE_PASSWORD','POSTIZ_PROVISIONER_DATABASE_PASSWORD'];

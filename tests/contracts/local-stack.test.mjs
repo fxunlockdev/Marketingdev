@@ -77,3 +77,8 @@ test('mock image check reports exactly the expected lettering; placeholder image
   assert.equal(`${meta.width}x${meta.height}`,size);assert.equal(meta.format,'png');
  }
 });
+
+test('every local service listens on its own port (the Post for Me mock uses mock+1)',()=>{
+ const ports=[...Object.values(DEFAULT_PORTS),DEFAULT_PORTS.mock+1];
+ assert.equal(new Set(ports).size,ports.length,JSON.stringify(DEFAULT_PORTS));
+});

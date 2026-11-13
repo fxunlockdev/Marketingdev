@@ -71,7 +71,7 @@ export async function supervise(){
  try{
   closers.push((await startMailSink(context.ports.smtp,say)).close);
   if(context.mode==='mock')closers.push((await startMockProviders(context.ports.mock,say)).close);
-  if(context.mode==='mock'&&context.images?.video)closers.push((await startMockRunway(context.ports.mockRunway??54011,say,{logFile:join(PATHS.logs,'runway-requests.jsonl')})).close);
+  if(context.mode==='mock'&&context.images?.video)closers.push((await startMockRunway(context.ports.mockRunway??54012,say,{logFile:join(PATHS.logs,'runway-requests.jsonl')})).close);
   const temporal=await temporalBinary();
   launch('temporal',temporal,['server','start-dev','--ip','127.0.0.1','-p',String(context.ports.temporal),'--http-port',String(context.ports.temporalHttp),'--metrics-port',String(context.ports.temporalMetrics),
    '--headless','-n',TEMPORAL_NAMESPACE,'-f',join(PATHS.temporal,'temporal.db'),'--log-level','error'],{PATH:process.env.PATH,HOME:process.env.HOME});
