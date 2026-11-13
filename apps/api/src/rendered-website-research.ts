@@ -12,23 +12,24 @@ export class RenderedWebsiteResearch{
   if(!this.primary.market)return {pages:[],summary:{status:'skipped',code:'AI_NOT_CONFIGURED',notes:0,sources:0,discovered_competitors:[],audience_suggestions:[],competitors_covered:[]}};
   return this.primary.market(jobs,scope,url,brief,competitors);
  }
- async capture(jobs:AssetJobs,scope:JobScope,url:string){
-  let primary:Awaited<ReturnType<OpenAIWebsiteResearch['capture']>>|undefined;
-  try{primary=await this.primary.capture(jobs,scope,url);}
-  catch(error){if(!(error instanceof IntakeError)||error.code!=='AI_RESEARCH_NO_SOURCES'||!this.renderer.configured)throw error;}
-  if(!this.renderer.configured||(primary&&Number(primary.coverage.photosAvailable)>0))return primary!;
-  try{
-   const rendered=await this.renderer.capture(jobs,scope,url);
-   if(!primary)return rendered;
-   // Prefer genuine page text over AI notes for matching URLs; preserve other
-   // cited pages and add actual rendered image evidence to the same intake.
-   const pages=[...rendered.pages,...primary.pages.filter(p=>!rendered.pages.some(r=>r.url===p.url))];
-   const captures=new Map([...primary.captures,...rendered.captures]);
-   return {...rendered,pages,captures,visualErrors:[...primary.visualErrors,...rendered.visualErrors],coverage:{...rendered.coverage,pages:pages.map(p=>p.url),researchAvailable:true}};
-  }catch(error){
-   if(error instanceof IntakeError&&error.code==='ACCESS_REVOKED_OR_CANCELED')throw error;
-   if(!primary)throw error;
-   return {...primary,visualErrors:[...primary.visualErrors,{url,code:error instanceof IntakeError?error.code:'WEBSITE_RENDER_FAILED'}]};
+ /** GPT site research and the rendered crawler read the site side by side; the capture succeeds
+  * when either produced pages. Genuine page text is preferred over AI notes for the same URL. */
+ async capture(jobs:AssetJobs,scope:JobScope,url:string,options:{signal?:AbortSignal}={}){
+  const [first,second]=await Promise.allSettled([this.primary.capture(jobs,scope,url,options),this.renderer.configured?this.renderer.capture(jobs,scope,url):Promise.reject(new IntakeError('WEBSITE_RENDER_NOT_CONFIGURED'))]);
+  const revoked=(r:PromiseSettledResult<unknown>)=>r.status==='rejected'&&r.reason instanceof IntakeError&&r.reason.code==='ACCESS_REVOKED_OR_CANCELED';
+  if(revoked(first)||revoked(second))throw new IntakeError('ACCESS_REVOKED_OR_CANCELED');
+  if(first.status==='rejected'){
+   if(second.status==='fulfilled'&&first.reason instanceof IntakeError)return second.value;
+   throw first.reason;
   }
+  const primary=first.value;
+  if(second.status==='rejected'){
+   if(!this.renderer.configured||Number(primary.coverage.photosAvailable)>0)return primary;
+   return {...primary,visualErrors:[...primary.visualErrors,{url,code:second.reason instanceof IntakeError?second.reason.code:'WEBSITE_RENDER_FAILED'}]};
+  }
+  const rendered=second.value;
+  const pages=[...rendered.pages,...primary.pages.filter(p=>!rendered.pages.some(r=>r.url===p.url))];
+  const captures=new Map([...primary.captures,...rendered.captures]);
+  return {...rendered,pages,captures,visualErrors:[...primary.visualErrors,...rendered.visualErrors],coverage:{...rendered.coverage,pages:pages.map(p=>p.url),researchAvailable:true}};
  }
 }

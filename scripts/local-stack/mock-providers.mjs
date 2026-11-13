@@ -7,6 +7,8 @@ import {createHash} from 'node:crypto';
 import sharp from 'sharp';
 import {generate} from './mock-schema.mjs';
 import {mockVideoBrief} from './mock-runway.mjs';
+// Agent Reach answers come from the product's own deterministic mock (built into dist/).
+import {mockAgentReachEnvelope} from '../../dist/agent-reach-mock.js';
 
 const MAX_BODY=60*1024*1024;
 const PALETTE=['#1F4E5F','#F2A541','#F7F1E8'];
@@ -268,6 +270,7 @@ export function startMockProviders(port,log=()=>{}){
    let kind,json;
    if(req.method==='POST'&&url.pathname==='/v1/responses'){({kind,json}=respond(JSON.parse(raw.toString('utf8'))));}
    else if(req.method==='POST'&&url.pathname==='/v1/images/generations'){kind='image-generate';json=await imageResponse(JSON.parse(raw.toString('utf8')));}
+   else if(req.method==='POST'&&url.pathname==='/agent-reach/v1/task'){kind='agent-reach';json=mockAgentReachEnvelope(JSON.parse(raw.toString('utf8')));}
    else if(req.method==='POST'&&url.pathname==='/v1/images/edits'){kind='image-edit';json=await imageResponse(multipartFields(raw,req.headers['content-type']??''));}
    else{log(`mock: no handler for ${req.method} ${url.pathname}`);return send(404,{error:{message:'Not mocked',type:'invalid_request_error'}});}
    counts[kind]=(counts[kind]??0)+1;log(`mock: ${kind}`);

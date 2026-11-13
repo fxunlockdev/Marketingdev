@@ -5,7 +5,7 @@ export type WebsitePage = {
   chunks: { text: string; anchor: string }[];
   links: string[];
   truncated: boolean;
-  coverage: "ai_web_research" | "server_html_only" | "rendered_desktop_mobile" | "rendered_provider";
+  coverage: "ai_web_research" | "server_html_only" | "rendered_desktop_mobile" | "rendered_provider" | "agent_reach_page_text";
 };
 export type VisualCapture = {
   version: string;

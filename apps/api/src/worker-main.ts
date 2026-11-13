@@ -35,6 +35,8 @@ import {workerConfigFromEnv} from './config.js';
 import {AssetJobs,JobDispatcher,assertJobRole,type JobScope} from './jobs.js';
 import {OpenAIWebsiteResearch} from './openai-website-research.js';
 import {IntakeJobs} from './intake-jobs.js';
+import {AgentReachResearch} from './agent-reach-research.js';
+import {MockServerTransport,SandboxTransport} from './agent-reach-sandbox.js';
 import {ResearchKnowledge,KnowledgeExtractor} from './knowledge-research.js';
 
 import {BrandAnalyzer} from './brand-analysis.js';
@@ -53,7 +55,10 @@ const connection=await NativeConnection.connect({address:config.jobs.address}),c
 const jobs=new AssetJobs(pool,store,new MalwareScanner(config.scanner));
 const documents=new DocumentJobs(jobs,new DocumentParser(config.documentImage));
 // Research and analysis feed the knowledge graph afterwards; extraction never changes a job's outcome.
-const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)),new ResearchKnowledge(jobs,new KnowledgeExtractor(process.env.OPENAI_API_KEY)));
+// Login-free Agent Reach research beside the website capture: the pinned sandbox, or the loopback mock in development and test.
+// The mock never fetches a page, so no robots.txt applies to it; real reads check robots.txt first.
+const agentReach=new AgentReachResearch({enabled:config.agentReach.enabled,...(config.agentReach.mockOrigin?{robots:()=>({allowed:async()=>true})}:{}),transport:config.agentReach.mockOrigin?new MockServerTransport(config.agentReach.mockOrigin):config.agentReach.image?new SandboxTransport(config.agentReach.image):undefined});
+const intake=new IntakeJobs(jobs,new BrandAnalyzer(process.env.OPENAI_API_KEY),new RenderedWebsiteResearch(new OpenAIWebsiteResearch(process.env.OPENAI_API_KEY,undefined,new WebsitePhotos()),new WebsiteRenderer(config.websiteRenderImage)),new ResearchKnowledge(jobs,new KnowledgeExtractor(process.env.OPENAI_API_KEY)),agentReach);
 const imageReplacements=config.higgsfieldImages?new HiggsfieldReplacementJobs(jobs,new HiggsfieldImageClient(config.higgsfieldImages),new ImageReplacementVault(config.higgsfieldImages.encryptionKey)):undefined;
 const creativeProvider=new CreativeProvider(process.env.OPENAI_API_KEY);
 // The vision check shares the creative provider; it is optional per image and never fails a creative.

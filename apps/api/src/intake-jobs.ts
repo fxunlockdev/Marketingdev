@@ -1,4 +1,4 @@
-type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string):Promise<{
+type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string,options?:{signal?:AbortSignal}):Promise<{
  pages:WebsitePage[];captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture['snapshots'][number]}[]}>;
  visualErrors:{url:string;code:string}[];coverage:Record<string,any>;
 }>;
@@ -6,6 +6,8 @@ type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string):Promise<
  market?(jobs:AssetJobs,scope:JobScope,url:string,brief?:GuidedBrief|null,competitors?:readonly string[]):Promise<MarketResearch>;
 };
 import {BRAND_RESERVED_SQL,MARKET_RESEARCH_VERSION,type MarketPage,type MarketResearch} from './openai-website-research.js';
+import {AGENT_REACH_VERSION,type ReachPage} from './agent-reach-contract.js';
+import type {AgentReachResearch,ReachRun} from './agent-reach-research.js';
 import {settledMicros} from './call-settlement.js';
 import type {GuidedBrief} from './guided-campaign-contracts.js';
 import {exhaustedIntakeOutcome} from "./intake-outcome.js";
@@ -28,24 +30,64 @@ import { prepareVisuals, visualManifest } from "./visual-analysis.js";
 /** Website photographs sent to analysis when a capture produced no page screenshots. */
 export const PHOTO_EVIDENCE_LIMIT = 6;
 const EVIDENCE_CHARACTERS = 40000, MARKET_EVIDENCE_CHARACTERS = 12000;
-type EvidenceRow = EvidenceChunk & { market?: boolean };
-/** Fit evidence to the analysis limit. The business's own evidence comes first and
- * market notes get a bounded share, so competitor material can never crowd it out. */
+type EvidenceRow = EvidenceChunk & { market?: boolean; agent_reach?: boolean };
+/** Website capture: GPT site research, the rendered crawler and the Agent Reach page reads run side
+ * by side and the capture ends within this limit. Once Agent Reach has read the site, GPT site
+ * research gets only the shorter grace period. */
+export const CAPTURE_DEADLINE_MS = 75000, CAPTURE_GRACE_AFTER_DIRECT_MS = 20000;
+const totalLength = (list: EvidenceRow[]) => list.reduce((n, row) => n + row.text.length, 0);
+/** Fit evidence to the analysis limit. The business's own evidence comes first (captured pages,
+ * then Agent Reach reads of the same site) and market notes get a bounded share, so competitor
+ * material can never crowd it out. Within that share, GPT market notes and Agent Reach's
+ * third-party pages each get half, and either may use what the other leaves. */
 export function selectEvidence(rows: EvidenceRow[]): EvidenceChunk[] {
   const take = (list: EvidenceRow[], budget: number) => {
     let length = 0;
     return list.flatMap((row) => {
-      const { market, ...chunk } = row, text = chunk.text.slice(0, budget - length);
+      const { market, agent_reach: _reach, ...chunk } = row, text = chunk.text.slice(0, Math.max(0, budget - length));
       length += text.length;
       return text ? [{ ...chunk, text, ...(market ? { origin: "market" as const } : {}) }] : [];
     });
   };
-  const marketRows = rows.filter((row) => row.market), ownRows = rows.filter((row) => !row.market);
-  const marketShare = Math.min(MARKET_EVIDENCE_CHARACTERS, marketRows.reduce((n, row) => n + row.text.length, 0));
-  const own = take(ownRows, EVIDENCE_CHARACTERS - marketShare);
-  const used = own.reduce((n, chunk) => n + chunk.text.length, 0);
-  return [...own, ...take(marketRows, Math.min(MARKET_EVIDENCE_CHARACTERS, EVIDENCE_CHARACTERS - used))];
+  const own = [...rows.filter((row) => !row.market && !row.agent_reach), ...rows.filter((row) => !row.market && row.agent_reach)];
+  const marketAi = rows.filter((row) => row.market && !row.agent_reach), marketReach = rows.filter((row) => row.market && row.agent_reach);
+  const marketShare = Math.min(MARKET_EVIDENCE_CHARACTERS, totalLength(marketAi) + totalLength(marketReach));
+  const ownChunks = take(own, EVIDENCE_CHARACTERS - marketShare);
+  const used = ownChunks.reduce((n, chunk) => n + chunk.text.length, 0), budget = Math.min(MARKET_EVIDENCE_CHARACTERS, EVIDENCE_CHARACTERS - used);
+  const aiChunks = take(marketAi, Math.min(totalLength(marketAi), Math.max(Math.floor(budget / 2), budget - totalLength(marketReach))));
+  const aiUsed = aiChunks.reduce((n, chunk) => n + chunk.text.length, 0);
+  return [...ownChunks, ...aiChunks, ...take(marketReach, budget - aiUsed)];
 }
+/** Agent Reach pages as stored evidence: URL, title, retrieval time and channel on the source. */
+function reachCoverage(page: ReachPage) {
+  return { type: page.coverage, origin: page.origin, channel: page.channel, action: page.action, provider: page.provider, purpose: page.purpose, title: page.title, retrieved_at: page.retrievedAt, truncated: page.truncated,
+    warning: page.origin === "own" ? "Public page text read by Agent Reach (Jina Reader or Exa); observed website text, not approved brand identity." : "Third-party page text, search results or videos read by Agent Reach. Analysis only: not the business's own website, not an approved brand fact and never wording to copy." };
+}
+/** Store Agent Reach pages beside the other evidence. Stops quietly at the source limit. */
+async function insertReachPages(db: any, j: any, pages: ReachPage[], room: number): Promise<number> {
+  let inserted = 0;
+  for (const page of pages) {
+    if (inserted >= room) break;
+    if ((await db.query("SELECT id FROM app.brand_sources WHERE organization_id=$1 AND brand_id=$2 AND website_url=$3 AND sha256=$4 AND parser_version=$5",[j.organization_id,j.brand_id,page.url,page.sha256,AGENT_REACH_VERSION])).rowCount) continue;
+    const source = randomUUID();
+    await db.query("INSERT INTO app.brand_sources(id,organization_id,brand_id,kind,sha256,parser_version,coverage,website_url) VALUES($1,$2,$3,'website',$4,$5,$6,$7)",
+      [source,j.organization_id,j.brand_id,page.sha256,AGENT_REACH_VERSION,JSON.stringify(reachCoverage(page)),page.url]);
+    for (const chunk of page.chunks)
+      await db.query("INSERT INTO app.brand_chunks(id,organization_id,brand_id,source_id,page,anchor,text) VALUES($1,$2,$3,$4,1,$5,$6)",[randomUUID(),j.organization_id,j.brand_id,source,chunk.anchor,chunk.text]);
+    inserted++;
+  }
+  return inserted;
+}
+/** Own-site Agent Reach reads as the capture's pages, when nothing else could read the site. */
+function directCapture(run: ReachRun, primaryError: string) {
+  return { pages: run.ownPages.map((p) => ({ parserVersion: p.parserVersion, url: p.url, sha256: p.sha256, chunks: p.chunks, links: [], truncated: p.truncated, coverage: "agent_reach_page_text" as const })),
+    captures: new Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture["snapshots"][number]}[]}>(), visualErrors: [] as {url:string;code:string}[],
+    coverage: { provider: "agent_reach", method: "direct_page_read", pages: run.ownPages.map((p) => p.url), screenshotsAvailable: false, photosAvailable: 0, partial: true, primaryError } };
+}
+const deadline = <T,>(work: Promise<T>, ms: number, code: string): Promise<T> => {
+  let timer: NodeJS.Timeout | undefined;
+  return Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new IntakeError(code)), ms); })]).finally(() => clearTimeout(timer));
+};
 /** Store market notes beside own-site evidence, tagged by parser version and coverage so
  * no later stage can mistake them for the business's own words. Stops quietly at the
  * source limit: market evidence is never a reason to fail research. */
@@ -77,6 +119,10 @@ export class IntakeJobs {
     readonly websiteIntake?: WebsiteIntake,
     /** Turns a succeeded job's new sources into graph suggestions. Never throws; never changes the job. */
     readonly knowledge?: { afterSuccess(scope: JobScope): Promise<unknown> },
+    /** Login-free Agent Reach research beside the capture. Absent or switched off: research is as before. */
+    readonly agentReach?: Pick<AgentReachResearch,'research'|'configured'>,
+    /** Capture time limits; tests shorten them. */
+    readonly timing: { deadlineMs: number; graceMs: number } = { deadlineMs: CAPTURE_DEADLINE_MS, graceMs: CAPTURE_GRACE_AFTER_DIRECT_MS },
   ) {}
   private finish(
     db: any,
@@ -102,8 +148,11 @@ export class IntakeJobs {
         return null;
       }
       if (j.kind === "brand.analyze") {
-        const parent = (await db.query("SELECT p.status,p.cancel_requested FROM app.intake_dependencies d JOIN app.jobs p ON p.id=d.capture_job_id WHERE d.analysis_job_id=$1", [j.id])).rows[0];
-        if (parent) {
+        const parent = (await db.query("SELECT p.status,p.cancel_requested,(r.research_context IS NOT NULL) AS guided FROM app.intake_dependencies d JOIN app.jobs p ON p.id=d.capture_job_id JOIN app.intake_requests r ON r.job_id=$1 WHERE d.analysis_job_id=$1", [j.id])).rows[0];
+        // Guided onboarding never dead-ends on its website: a capture that failed leaves the
+        // analysis to run on the owner's answers and market research, noting the unread site.
+        const unreadWebsite = parent && parent.guided && !parent.cancel_requested && terminal.has(parent.status) && parent.status !== "succeeded";
+        if (parent && !unreadWebsite) {
           if (parent.cancel_requested || (terminal.has(parent.status) && parent.status !== "succeeded")) {
             await this.finish(db,j,"canceled","WEBSITE_PREREQUISITE_FAILED");
             return null;
@@ -158,24 +207,59 @@ export class IntakeJobs {
         ).rows[0],
     );
     if(this.websiteIntake){
-      // Own-site and market research are independent provider calls, so they run side by side
-      // instead of one after the other. Each reserves its budget in a transaction that locks
-      // this job's row, so the two reservations still see each other. Both are awaited: the
-      // job never finishes while either call is still writing its ledger.
-      const websiteIntake=this.websiteIntake;
-      const [own,marketOutcome]=await Promise.allSettled([
-        websiteIntake.capture(this.jobs,scope,input.website_url),
-        websiteIntake.market?websiteIntake.market(this.jobs,scope,input.website_url,input.research_context):Promise.resolve(undefined),
-      ]);
-      if(own.status==="rejected")throw own.reason;
+      // Own-site research (GPT site research and the rendered crawler), market research and
+      // Agent Reach run side by side. Each paid call reserves its budget in a transaction that
+      // locks this job's row, so the reservations still see each other. Every branch is
+      // awaited: the job never finishes while one is still writing its ledger. The capture
+      // ends within CAPTURE_DEADLINE_MS, and once Agent Reach has read the site itself GPT
+      // site research gets only the grace period.
+      const websiteIntake=this.websiteIntake,controller=new AbortController();
+      let grace:NodeJS.Timeout|undefined;
+      const hard=setTimeout(()=>controller.abort(),this.timing.deadlineMs);
+      const own=deadline(websiteIntake.capture(this.jobs,scope,input.website_url,{signal:controller.signal}),this.timing.deadlineMs+5000,"WEBSITE_CAPTURE_TIMEOUT");
+      const market=websiteIntake.market?websiteIntake.market(this.jobs,scope,input.website_url,input.research_context):Promise.resolve(undefined);
+      const reach=this.agentReach?.configured?this.agentReach.research(this.jobs,scope,input.website_url,input.research_context,{
+        stopWhen:own.then(()=>market.catch(()=>undefined)),
+        onOwnPage:()=>{grace??=setTimeout(()=>controller.abort(),this.timing.graceMs);},
+      }):Promise.resolve(undefined);
+      const [[ownOutcome,marketOutcome],run]=await Promise.all([Promise.allSettled([own,market]),reach.catch(()=>undefined)]);
+      clearTimeout(hard);clearTimeout(grace);
       if(marketOutcome.status==="rejected")throw marketOutcome.reason;
-      const captured=own.value,market=marketOutcome.value;
+      const marketResult=marketOutcome.value;
+      if(ownOutcome.status==="rejected"){
+        const reason=ownOutcome.reason;
+        if(!(reason instanceof IntakeError)||reason.code==="ACCESS_REVOKED_OR_CANCELED"||!run?.ownPages.length){
+          // Nothing read the site: keep the market evidence for the analysis, then fail the capture.
+          if(reason instanceof IntakeError&&reason.code!=="ACCESS_REVOKED_OR_CANCELED")await this.persistSideEvidence(scope,marketResult?.pages??[],run?.marketPages??[]);
+          throw reason;
+        }
+        const direct=directCapture(run,reason.code);
+        return this.persistWebsite(scope,direct.pages,direct.captures,direct.visualErrors,{...direct.coverage,...(marketResult?{market:marketResult.summary}:{}),agent_reach:run.summary},marketResult?.pages??[],run.marketPages);
+      }
+      const captured=ownOutcome.value;
+      // Verbatim captured text wins over a second read of the same page.
+      const verbatim=new Set(captured.pages.filter(p=>p.coverage!=="ai_web_research").map(p=>p.url));
+      const reachPages=run?[...run.ownPages.filter(p=>!verbatim.has(p.url)),...run.marketPages]:[];
       // The market step is best-effort, so its outcome is reported beside the capture, never instead of it.
-      return this.persistWebsite(scope,captured.pages,captured.captures,captured.visualErrors,market?{...captured.coverage,market:market.summary}:captured.coverage,market?.pages??[]);
+      return this.persistWebsite(scope,captured.pages,captured.captures,captured.visualErrors,{...captured.coverage,...(marketResult?{market:marketResult.summary}:{}),...(run?{agent_reach:run.summary}:{})},marketResult?.pages??[],reachPages);
     }
     throw new IntakeError("AI_NOT_CONFIGURED");
   }
-  private async persistWebsite(scope:JobScope,pages:WebsitePage[],captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture["snapshots"][number]}[]}>,visualErrors:{url:string;code:string}[],coverage:any,marketPages:MarketPage[]=[]){
+  /** A failed capture still keeps the market evidence it gathered, for the analysis that follows. */
+  private async persistSideEvidence(scope:JobScope,marketPages:MarketPage[],reachPages:ReachPage[]){
+    if(!marketPages.length&&!reachPages.length)return;
+    await this.jobs.transaction(scope,async(db,j)=>{
+      if(!(await this.jobs.permitted(db,j)))return;
+      await lockReview(db,j.organization_id,j.brand_id);
+      const state=(await db.query("SELECT source_count FROM app.brand_review_state WHERE organization_id=$1 AND brand_id=$2",[j.organization_id,j.brand_id])).rows[0];
+      const market=await insertMarketPages(db,j,marketPages,100-state.source_count);
+      const reach=await insertReachPages(db,j,reachPages,100-state.source_count-market);
+      if(!market&&!reach)return;
+      await db.query("UPDATE app.brand_review_state SET source_count=source_count+$3 WHERE organization_id=$1 AND brand_id=$2",[j.organization_id,j.brand_id,market+reach]);
+      await bumpReview(db,j.organization_id,j.brand_id);
+    });
+  }
+  private async persistWebsite(scope:JobScope,pages:WebsitePage[],captures:Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture["snapshots"][number]}[]}>,visualErrors:{url:string;code:string}[],coverage:any,marketPages:MarketPage[]=[],reachPages:ReachPage[]=[]){
     const newBytes = [...captures.values()].reduce(
       (n, c) =>
         n +
@@ -250,7 +334,9 @@ export class IntakeJobs {
               type: page.coverage,
               truncated: page.truncated,
               warning:
-                page.coverage === "ai_web_research"
+                page.coverage === "agent_reach_page_text"
+                  ? "Public page text read by Agent Reach (Jina Reader or Exa); observed website text, not approved brand identity."
+                  : page.coverage === "ai_web_research"
                   ? "AI-written research with cited website sources; not a verbatim website capture or approved brand identity."
                   : page.coverage === "server_html_only"
                   ? "Visual capture unavailable; server HTML only."
@@ -303,10 +389,11 @@ export class IntakeJobs {
       // parser version and coverage type, so no later stage can mistake them for the
       // business's own words. They never fail the capture: at the source limit they stop.
       const marketInserted = await insertMarketPages(db, j, marketPages, 100 - state.source_count - inserted);
-      if (inserted + marketInserted) {
+      const reachInserted = await insertReachPages(db, j, reachPages, 100 - state.source_count - inserted - marketInserted);
+      if (inserted + marketInserted + reachInserted) {
         await db.query(
           "UPDATE app.brand_review_state SET source_count=source_count+$3 WHERE organization_id=$1 AND brand_id=$2",
-          [j.organization_id, j.brand_id, inserted + marketInserted],
+          [j.organization_id, j.brand_id, inserted + marketInserted + reachInserted],
         );
         await bumpReview(db, j.organization_id, j.brand_id);
       }
@@ -317,7 +404,7 @@ export class IntakeJobs {
           JSON.stringify({
             ...coverage,
             coverage:
-              coverage.method === "web_research" ? "ai_web_research" : coverage.provider === "self_hosted_browser"
+              coverage.method === "direct_page_read" ? "agent_reach_page_text" : coverage.method === "web_research" ? "ai_web_research" : coverage.provider === "self_hosted_browser"
                 ? coverage.screenshotsAvailable ? "rendered_provider" : captures.size ? "partial_visual" : "server_html_only"
                 : captures.size === pages.length && !visualErrors.length
                 ? coverage.provider === "maxun" ? "rendered_provider" : "rendered_desktop_mobile"
@@ -328,6 +415,7 @@ export class IntakeJobs {
             visualErrors,
             newSources: inserted,
             ...(coverage.market ? {market:{...coverage.market,newSources:marketInserted}} : {}),
+            ...(coverage.agent_reach ? {agent_reach:{...coverage.agent_reach,newSources:reachInserted}} : {}),
           }),
         ],
       );
@@ -457,8 +545,8 @@ export class IntakeJobs {
       // Keep archived questionnaires for history, but ground this run only in its submitted snapshot.
       const chunks = (
         await db.query(
-          "SELECT c.id,c.source_id,c.text,c.page,s.website_url,(s.parser_version=$5) AS market FROM app.brand_chunks c JOIN app.brand_sources s ON s.id=c.source_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND CASE WHEN $3::jsonb IS NOT NULL AND s.parser_version=$4 THEN (c.text::jsonb - 'brand_name')=$3::jsonb ELSE true END ORDER BY s.captured_at DESC,c.page,c.anchor,c.id LIMIT 100",
-          [j.organization_id, j.brand_id,researchContext?JSON.stringify(researchContext):null,BUSINESS_RESEARCH_AGENT_VERSION,MARKET_RESEARCH_VERSION],
+          "SELECT c.id,c.source_id,c.text,c.page,s.website_url,(s.parser_version=$5 OR s.coverage->>'origin'='market') AS market,(s.parser_version=$6) AS agent_reach FROM app.brand_chunks c JOIN app.brand_sources s ON s.id=c.source_id WHERE c.organization_id=$1 AND c.brand_id=$2 AND CASE WHEN $3::jsonb IS NOT NULL AND s.parser_version=$4 THEN (c.text::jsonb - 'brand_name')=$3::jsonb ELSE true END ORDER BY s.captured_at DESC,c.page,c.anchor,c.id LIMIT 100",
+          [j.organization_id, j.brand_id,researchContext?JSON.stringify(researchContext):null,BUSINESS_RESEARCH_AGENT_VERSION,MARKET_RESEARCH_VERSION,AGENT_REACH_VERSION],
         )
       ).rows;
       const selected = selectEvidence(chunks);
@@ -468,8 +556,11 @@ export class IntakeJobs {
           [j.organization_id, j.brand_id],
         )
       ).rows;
+      // A guided brief names a website, but no page of it was read: say so instead of failing.
+      const websiteUnread = !!researchContext?.details?.website && !(await db.query("SELECT 1 FROM app.brand_sources WHERE organization_id=$1 AND brand_id=$2 AND kind='website' AND parser_version<>$3 AND coalesce(coverage->>'origin','own')<>'market' LIMIT 1",[j.organization_id,j.brand_id,MARKET_RESEARCH_VERSION])).rowCount;
       const input: AnalysisInput = {
           ...(researchContext ? {guided_brief:researchContext} : {}),
+          ...(websiteUnread ? {website_unread:true} : {}),
           chunks: selected,
           reviewed,
           ...(visuals.length ? { visuals } : {}),
@@ -556,6 +647,7 @@ export class IntakeJobs {
             response.id,
             JSON.stringify({
               ...response.result,
+              ...(prepared.input.website_unread ? { website_unread: true } : {}),
               visual_manifest: visualManifest(prepared.input.visuals ?? []),
               visual_coverage: {
                 document_pages_available: visualEvidence?.documentPageCount ?? 0,
@@ -651,6 +743,7 @@ export class IntakeJobs {
             findings: fresh.length,
             missing: call.result.missing,
             recommendationAvailable: !!call.result.recommendation,
+            ...(call.result.website_unread ? {website_unread:true} : {}),
             visual_guidance: call.result.visual_guidance ?? [],
             visual_manifest: call.result.visual_manifest ?? [],
             ...(followup ? { market_followup: followup } : {}),

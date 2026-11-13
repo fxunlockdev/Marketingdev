@@ -1,3 +1,4 @@
+import {mockServerOrigin} from './agent-reach-sandbox.js';
 import {configuredPostformePlatforms} from './postforme-client.js';
 import {validIngressSecret} from './auth-ingress.js';
 import {mailConfig} from './mail-config.js';
@@ -88,5 +89,17 @@ export function workerConfigFromEnv(env=process.env){
   const video=env.VIDEO_ENABLED==='true'?{mode:mode as 'test'|'development'|'staging',image:required('VIDEO_RUNTIME_IMAGE'),encryptionKey:required('VIDEO_ENCRYPTION_KEY'),credentials:required('RUNWAYML_API_SECRET'),outputPolicy:outputPolicy as 'exact_origins'|'authenticated_provider_result',outputOrigins:outputPolicy==='exact_origins'?required('RUNWAY_OUTPUT_ORIGINS').split(','):[]}:undefined;
   if(video&&(!/^sha256:[a-f0-9]{64}$/.test(video.image)||!/^sha256:[a-f0-9]{64}$/.test(renderImage??'')||!skillImage||(!env.OPENAI_API_KEY&&!env.GEMINI_API_KEY)||!/^[a-f0-9]{64}$/i.test(video.encryptionKey)))throw new Error('Video requires pinned renderers, skills, model credentials and a 32-byte encryption key');
   const videoRenderImage=env.VIDEO_RUNTIME_IMAGE;if(videoRenderImage&&!/^sha256:[a-f0-9]{64}$/.test(videoRenderImage))throw new Error('VIDEO_RUNTIME_IMAGE must be an exact local image digest');
-  return {higgsfieldImages,websiteRenderImage,videoRenderImage,video,storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage};
+  return {agentReach:agentReachFromEnv(env,mode),higgsfieldImages,websiteRenderImage,videoRenderImage,video,storage:storageFromEnv(env),scanner,jobs,documentImage,skillImage,renderImage};
+}
+
+/** Agent Reach research (login-free web search, page reads, YouTube). On by default in development
+ * and test, off unless AGENT_REACH_ENABLED=true in staging. It runs in the pinned sandbox image
+ * (AGENT_REACH_IMAGE) or, in development and test only, against the loopback mock. */
+export function agentReachFromEnv(env:NodeJS.ProcessEnv,mode:string):{enabled:boolean;image?:string;mockOrigin?:string}{
+  const flag=env.AGENT_REACH_ENABLED;
+  if(flag!==undefined&&!['true','false'].includes(flag))throw new Error('AGENT_REACH_ENABLED must be true or false');
+  const enabled=flag===undefined?['development','test'].includes(mode):flag==='true';
+  const image=env.AGENT_REACH_IMAGE;if(image!==undefined&&!/^sha256:[a-f0-9]{64}$/.test(image))throw new Error('AGENT_REACH_IMAGE must be an exact local image digest');
+  const mockOrigin=mockServerOrigin(env.AGENT_REACH_MOCK_URL,mode);
+  return {enabled,...(image?{image}:{}),...(mockOrigin?{mockOrigin}:{})};
 }

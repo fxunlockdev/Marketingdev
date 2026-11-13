@@ -116,8 +116,11 @@ export class GuidedBusiness {
   if(!brief.details?.website)return {website:null};
   let target:string;try{target=websiteURL(brief.details.website).href;}catch{return null;}
   const capture=prefill?(await db.query('SELECT j.id,j.status,j.cancel_requested,r.website_url,r.research_context FROM app.jobs j JOIN app.intake_requests r ON r.job_id=j.id WHERE j.id=$1',[prefill])).rows[0]:null;
-  if(!capture||capture.website_url!==target||capture.cancel_requested||![...ACTIVE,'succeeded'].includes(capture.status))return null;
-  const waiting=capture.status!=='succeeded';
+  if(!capture||capture.website_url!==target||capture.cancel_requested)return null;
+  // A capture that failed never holds the analysis back: it runs on the answers and market notes.
+  const unread=['failed','rejected','canceled'].includes(capture.status);
+  if(!unread&&![...ACTIVE,'succeeded'].includes(capture.status))return null;
+  const waiting=!unread&&capture.status!=='succeeded';
   if(waiting&&(await db.query('SELECT 1 FROM app.intake_dependencies WHERE capture_job_id=$1',[capture.id])).rowCount)return null;
   const covered:string[]=Array.isArray(capture.research_context?.details?.competitors)?capture.research_context.details.competitors:[];
   const competitors=uncoveredCompetitors(brief.details.competitors,covered);

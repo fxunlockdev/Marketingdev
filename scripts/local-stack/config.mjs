@@ -61,7 +61,7 @@ export const databaseUrl=(ports,user,password)=>`postgresql://${user}:${password
  * anything that could redirect a process to another database, storage or provider. */
 function baseEnvironment(){
  const env={...process.env};
- for(const key of Object.keys(env))if(/^(OPENAI_|VECTEEZY_|POSTFORME_|GEMINI_|RUNWAY|HIGGSFIELD|PEXELS_|DESVIO_DEV_|DATABASE_URL|MIGRATION_|PG[A-Z]+$|S3_|AWS_|SMTP_|RESEND_|TEMPORAL_|APP_|API_ORIGIN|AUTH_|MAIL_|POSTIZ_|DOCKER_HOST$|DOCKER_CONTEXT$)/.test(key))delete env[key];
+ for(const key of Object.keys(env))if(/^(OPENAI_|VECTEEZY_|POSTFORME_|GEMINI_|RUNWAY|HIGGSFIELD|PEXELS_|DESVIO_DEV_|DATABASE_URL|MIGRATION_|PG[A-Z]+$|S3_|AWS_|SMTP_|RESEND_|TEMPORAL_|APP_|API_ORIGIN|AUTH_|MAIL_|POSTIZ_|AGENT_REACH_|DOCKER_HOST$|DOCKER_CONTEXT$)/.test(key))delete env[key];
  return {...env,NEXT_TELEMETRY_DISABLED:'1'};
 }
 
@@ -80,7 +80,8 @@ export function providerEnvironment(context,service){
   // With --with-video, video runs against the local mock Runway (scripts/local-stack/mock-runway.mjs).
   const postforme={POSTFORME_ENABLED:'true',POSTFORME_API_KEY:'local-mock-postforme-key',POSTFORME_BASE_URL:`http://127.0.0.1:${ports.mock+1}`};
   const video=context.images?.video?{VIDEO_ENABLED:'true',...(service==='worker'?{RUNWAYML_API_SECRET:'local-mock-runway-key',DESVIO_MOCK_RUNWAY_URL:`http://127.0.0.1:${ports.mockRunway}`,VIDEO_ENCRYPTION_KEY:createHash('sha256').update(`video:${context.secrets.authSecret}`).digest('hex')}:{})}:{};
-  return service==='worker'?{OPENAI_API_KEY:'local-mock-openai-key',OPENAI_BASE_URL:`${mock}/v1`,...postforme,...video}:{...postforme,POSTFORME_PUBLISHING_ENABLED:'true',...video};
+  // Agent Reach answers from the same mock server (/agent-reach/v1/task); nothing leaves this machine.
+  return service==='worker'?{OPENAI_API_KEY:'local-mock-openai-key',OPENAI_BASE_URL:`${mock}/v1`,AGENT_REACH_ENABLED:'true',AGENT_REACH_MOCK_URL:`${mock}/`,...postforme,...video}:{...postforme,POSTFORME_PUBLISHING_ENABLED:'true',...video};
  }
  const env={};
  const pick=(...keys)=>{for(const key of keys)if(liveKeys[key])env[key]=liveKeys[key];};

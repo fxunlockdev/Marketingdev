@@ -66,7 +66,8 @@ test('website failure can explicitly continue from saved answers without bypassi
  await assert.rejects(guided.research(alice,target.id,{revision:1,use_saved_answers:true},randomUUID()),/confirmed website capture failure/);
  const child=(await admin.query('SELECT analysis_job_id FROM app.intake_dependencies WHERE capture_job_id=$1',[capture.id])).rows[0].analysis_job_id;
  await new IntakeJobs(new AssetJobs(worker,null,null),new BrandAnalyzer()).run({organizationId:organization.id,brandId:target.id,jobId:child});
- assert.equal((await admin.query('SELECT status FROM app.jobs WHERE id=$1',[child])).rows[0].status,'canceled');
+ // The failed capture no longer cancels the analysis: it runs on the answers. Here no model is configured, so it stops there.
+ assert.deepEqual((await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[child])).rows[0],{status:'rejected',error_code:'AI_NOT_CONFIGURED'});
  assert.equal((await guided.read(alice,target.id)).can_use_saved_answers,true);
  const key=randomUUID(),analysis=await guided.research(alice,target.id,{revision:1,use_saved_answers:true},key);
  assert.deepEqual(await guided.research(alice,target.id,{revision:1,use_saved_answers:true},key),analysis);
@@ -880,4 +881,184 @@ test('looks picked after the early analysis finished come from the saved brief i
  assert.deepEqual(saved.direction.looks.map(l=>l.id),['formae-05','still-02']);
  assert.deepEqual(saved.direction.palette,LOOK_STYLES['formae-05'].palette);assert.equal(saved.direction.layout_archetype,'type_led_poster');
  assert.equal(saved.direction.voice,researched.voice.slice(0,400));assert.equal(saved.direction.notes,'Quiet and confident');
+});
+
+// ---- Agent Reach research beside the website capture (MOCK Agent Reach, MOCK OpenAI) ----
+const {AgentReachResearch}=await import('../../dist/agent-reach-research.js');
+const {InProcessTransport}=await import('../../dist/agent-reach-sandbox.js');
+const {mockAgentReachEnvelope}=await import('../../dist/agent-reach-mock.js');
+const never=()=>new Promise(()=>{});
+/** own: 'cited' (GPT site research cites pages), 'none' (domain search finds no sources), 'hang' (stalls until aborted). */
+async function reachFixture(name,{own='cited',ownDelay=0,answer=async task=>mockAgentReachEnvelope(task),robots=async()=>true,limits,timing,enabled=true}={}){
+ // Each fixture is a fresh business; earlier tests' calls leave the shared per-minute window.
+ await admin.query("UPDATE app.agent_reach_calls SET created_at=created_at-interval '2 minutes' WHERE created_at>now()-interval '2 minutes'");
+ const account=await workspaces.create(alice,{name:`${name} account`});
+ const target=await workspaces.createBrand(alice,account.id,{name},randomUUID());
+ await admin.query("INSERT INTO app.analysis_grants(organization_id,brand_id,model,expires_at,budget_micros,input_micros_per_token,output_micros_per_token,approved_by,enabled) VALUES($1,$2,'MOCK-model',now()+interval '1 hour',100000000,1,1,'LOCAL TEST ONLY',true)",[account.id,target.id]);
+ const calls={own:0,market:0,inputs:[]};
+ const research=new OpenAIWebsiteResearch(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
+  const request=JSON.parse(init.body);
+  if(request.tools[0].filters){
+   calls.own++;const domain=request.tools[0].filters.allowed_domains[0];
+   if(own==='hang')return new Promise((_,reject)=>init.signal?.addEventListener('abort',()=>reject(Object.assign(new Error('aborted'),{name:'AbortError'}))));
+   if(ownDelay)await new Promise(resolve=>setTimeout(resolve,ownDelay));
+   const text='Reach cafe serves breakfast all day. Source';
+   const annotations=own==='cited'?[{type:'url_citation',url:`https://${domain}/about`,start_index:text.indexOf('Source'),end_index:text.length}]:[];
+   return Response.json({id:'resp_own',object:'response',status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'search',query:domain}},{type:'message',role:'assistant',content:[{type:'output_text',text,annotations}]}],usage:{input_tokens:10,output_tokens:10}});
+  }
+  calls.market++;const input=JSON.parse(request.input);
+  const value={notes:[{section:'audience_pain',subject:'',text:'Parents say weekend tables are hard to find.',source_url:'https://forum.test/thread'}],discovered_competitors:[],audience_suggestions:[]};
+  return Response.json({id:'resp_market',object:'response',status:'completed',output:[{type:'web_search_call',status:'completed',action:{type:'search',query:input.business.name,sources:[{type:'url',url:'https://forum.test/thread'}]}},{type:'message',role:'assistant',content:[{type:'output_text',text:JSON.stringify(value),annotations:[]}]}],usage:{input_tokens:10,output_tokens:10}});
+ }}));
+ const analyzer=new BrandAnalyzer(undefined,new OpenAI({apiKey:'fixture-only',maxRetries:0,fetch:async(_,init)=>{
+  const body=JSON.parse(init.body),context=JSON.parse(body.input);calls.inputs.push({context,instructions:body.instructions});
+  const own=context.chunks.find(c=>!c.origin);
+  const direction={summary:'A family cafe',rationale:'Proposed friendly direction',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#FFFFFF'},{role:'accent',hex:'#FFCC00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Real food in daylight',pillars:['Local stories','Everyday rituals'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A table in daylight.'},{format:'carousel',title:'A ritual',concept:'Arrival, coffee, shared table.'}],essential_questions:[],evidence_ids:[own.id],audience_suggestions:earlyAudiences,competitor_gaps:[]};
+  return Response.json({object:'response',id:'resp_analysis',status:'completed',output:[{type:'message',content:[{type:'output_text',text:JSON.stringify({findings:[],recommendation:null,missing:context.website_status?['Check your opening hours']:[],business_direction:direction}),annotations:[]}]}],usage:{input_tokens:10,output_tokens:10}});
+ }}));
+ const transport=new InProcessTransport(answer);
+ const reach=new AgentReachResearch({enabled,transport,robots:()=>({allowed:robots}),...(limits?{limits}:{})});
+ const runner=new IntakeJobs(new AssetJobs(worker,null,null),analyzer,research,undefined,reach,timing);
+ const run=job=>runner.run({organizationId:account.id,brandId:target.id,jobId:job});
+ const ledger=async()=>(await admin.query('SELECT job_id,channel,action,purpose,target,provider,status,error_code,created_at,completed_at FROM app.agent_reach_calls WHERE brand_id=$1 ORDER BY created_at,id',[target.id])).rows;
+ const sources=async(version='agent-reach-v1')=>(await admin.query('SELECT website_url,coverage FROM app.brand_sources WHERE brand_id=$1 AND parser_version=$2 ORDER BY website_url',[target.id,version])).rows;
+ return {account,target,calls,transport,run,ledger,sources};
+}
+const reachBrief=(website,competitors=['Rival One','rival-two.test'])=>({...brief,details:{...earlyDetails(website,competitors),business_name:'Reach cafe'}});
+
+test('Agent Reach page reads, searches and videos become cited evidence the analysis receives; a later capture reuses them from the 24 h cache (MOCK Agent Reach)',async()=>{
+ const {target,calls,transport,run,ledger,sources}=await reachFixture('Reach evidence cafe');
+ const site='https://reach-cafe.test/',start=await guided.save(alice,target.id,{revision:0,brief:reachBrief(site),step:1});
+ assert.equal(await run(start.prefill_job_id),'succeeded');
+ const rows=await ledger(),count=(c,a)=>rows.filter(r=>r.channel===c&&r.action===a).length;
+ assert.ok(rows.length&&rows.every(r=>r.status==='succeeded'&&r.completed_at),'every call settled');
+ assert.ok(count('web','search')<=3&&count('web','read')<=8&&count('youtube','search')<=2&&count('youtube','subtitle')<=1);
+ assert.deepEqual([...new Set(rows.map(r=>r.provider))].sort(),['exa','jina','yt-dlp']);
+ assert.ok(rows.some(r=>r.purpose==='own_page'&&r.target===site));assert.ok(rows.some(r=>r.purpose==='competitor_page'&&r.target==='https://rival-two.test/'));
+ assert.ok(!rows.some(r=>/instagram\.com/.test(r.target)),'login-walled links are never read');
+ const stored=await sources();
+ const home=stored.find(s=>s.website_url===site);
+ assert.deepEqual([home.coverage.type,home.coverage.origin,home.coverage.channel,home.coverage.provider],['agent_reach_page_text','own','web','jina']);
+ assert.ok(home.coverage.title&&home.coverage.retrieved_at);
+ assert.ok(stored.some(s=>s.coverage.origin==='market'&&s.coverage.channel==='youtube'&&/^https:\/\/www\.youtube\.com\/watch\?v=/.test(s.website_url)));
+ assert.ok(stored.some(s=>s.coverage.origin==='market'&&s.coverage.purpose==='competitor_search'));
+ const result=(await admin.query('SELECT result FROM app.intake_requests WHERE job_id=$1',[start.prefill_job_id])).rows[0].result;
+ assert.equal(result.agent_reach.status,'completed');assert.equal(result.agent_reach.newSources,stored.length);
+ // The early analysis cites them: own-site reads as own evidence, the rest as market evidence.
+ const second=await guided.save(alice,target.id,{revision:1,brief:reachBrief(site),step:2});
+ assert.equal(await run(second.early_analysis_job_id),'succeeded');
+ const chunks=calls.inputs.at(-1).context.chunks;
+ assert.ok(chunks.some(c=>!c.origin&&/Agent Reach web read via jina/.test(c.text)&&c.website_url===site));
+ assert.ok(chunks.some(c=>c.origin==='market'&&/Agent Reach youtube search via yt-dlp/.test(c.text)));
+ assert.match(calls.inputs.at(-1).instructions,/read by Agent Reach/);
+ // A second capture of the same business within 24 hours reads nothing twice.
+ const sent=transport.sent.length,again=await guided.save(alice,target.id,{revision:2,brief:reachBrief('https://reach-cafe.test/menu'),step:2});
+ assert.notEqual(again.prefill_job_id,start.prefill_job_id);assert.equal(await run(again.prefill_job_id),'succeeded');
+ const later=(await ledger()).filter(r=>r.job_id===again.prefill_job_id);
+ assert.ok(later.filter(r=>r.status==='cached').length>=4,'searches and competitor reads come from the cache');
+ assert.equal(transport.sent.length-sent,later.filter(r=>r.status!=='cached').length);
+});
+
+test('the dev2 failure: domain-filtered site search finds no sources, Agent Reach reads the site, so the capture succeeds (MOCK)',async()=>{
+ const {target,calls,run,sources}=await reachFixture('Reach rescue cafe',{own:'none'});
+ const site='https://reach-rescue.test/',start=await guided.save(alice,target.id,{revision:0,brief:reachBrief(site),step:1});
+ assert.equal(await run(start.prefill_job_id),'succeeded');assert.equal(calls.own,1,'one site search attempt');
+ assert.equal((await admin.query('SELECT status FROM app.analysis_calls WHERE job_id=$1',[start.prefill_job_id])).rows[0].status,'rejected');
+ const result=(await admin.query('SELECT result FROM app.intake_requests WHERE job_id=$1',[start.prefill_job_id])).rows[0].result;
+ assert.equal(result.coverage,'agent_reach_page_text');assert.equal(result.primaryError,'AI_RESEARCH_NO_SOURCES');assert.ok(result.newSources>=1);
+ assert.ok((await sources()).some(s=>s.website_url===site&&s.coverage.type==='agent_reach_page_text'));
+ const second=await guided.save(alice,target.id,{revision:1,brief:reachBrief(site),step:2});
+ assert.equal(await run(second.early_analysis_job_id),'succeeded');
+ assert.equal(calls.inputs.at(-1).context.website_status,undefined,'the site was read');
+ assert.ok(calls.inputs.at(-1).context.chunks.some(c=>!c.origin&&c.website_url===site));
+});
+
+test('a stalled site search is cut short once Agent Reach has read the site: one attempt, finished in seconds (MOCK)',async()=>{
+ const {target,calls,run}=await reachFixture('Reach stall cafe',{own:'hang',timing:{deadlineMs:20000,graceMs:300}});
+ const start=await guided.save(alice,target.id,{revision:0,brief:reachBrief('https://reach-stall.test/'),step:1});
+ const at=Date.now();assert.equal(await run(start.prefill_job_id),'succeeded');const took=Date.now()-at;
+ assert.ok(took<5000,`capture finished in ${took} ms`);assert.equal(calls.own,1);
+ assert.equal((await admin.query('SELECT status FROM app.analysis_calls WHERE job_id=$1',[start.prefill_job_id])).rows[0].status,'unknown');
+});
+
+test('the website capture is bounded: a stalled site search ends at the deadline and the analysis still runs (MOCK)',async()=>{
+ const {target,calls,run}=await reachFixture('Reach deadline cafe',{own:'hang',enabled:false,timing:{deadlineMs:800,graceMs:300}});
+ const site='https://reach-deadline.test/',start=await guided.save(alice,target.id,{revision:0,brief:reachBrief(site),step:1});
+ const second=await guided.save(alice,target.id,{revision:1,brief:reachBrief(site),step:2});
+ assert.ok(second.early_analysis_job_id,'the early analysis waits on the capture');
+ const at=Date.now();const outcome=await run(start.prefill_job_id),took=Date.now()-at;
+ assert.ok(['unknown','rejected'].includes(outcome));assert.ok(took<4000,`capture ended in ${took} ms`);assert.equal(calls.own,1);
+ assert.equal(await run(second.early_analysis_job_id),'succeeded');
+ assert.equal(calls.inputs.at(-1).context.website_status,'The business website could not be read for this analysis.');
+});
+
+test('every website source fails: the capture is rejected, its market notes are kept, and the early and final analyses finish with a note (MOCK)',async()=>{
+ const {target,calls,run,sources,ledger}=await reachFixture('Reach unread cafe',{own:'none',answer:async()=>null});
+ const site='https://reach-unread.test/',start=await guided.save(alice,target.id,{revision:0,brief:reachBrief(site),step:1});
+ const second=await guided.save(alice,target.id,{revision:1,brief:reachBrief(site),step:2});
+ assert.equal(await run(start.prefill_job_id),'rejected');
+ assert.ok((await ledger()).every(r=>r.status==='failed'||r.status==='skipped'));
+ assert.equal((await sources('openai-market-research-v1')).length,1,'market notes survive the failed capture');
+ const analysis=await run(second.early_analysis_job_id);
+ const job=(await admin.query('SELECT status,error_code FROM app.jobs WHERE id=$1',[second.early_analysis_job_id])).rows[0];
+ assert.equal(analysis,'succeeded');assert.deepEqual(job,{status:'succeeded',error_code:null},'never canceled with WEBSITE_PREREQUISITE_FAILED');
+ const input=calls.inputs.at(-1);
+ assert.equal(input.context.website_status,'The business website could not be read for this analysis.');assert.match(input.instructions,/could not be read/);
+ assert.ok(input.context.chunks.some(c=>c.origin==='market'));assert.ok(input.context.chunks.some(c=>!c.origin),'the owner answers');
+ const sent=await guided.research(alice,target.id,{revision:2},randomUUID());
+ assert.equal(sent.id,second.early_analysis_job_id,'send adopts the finished analysis');
+ const read=await guided.read(alice,target.id);
+ assert.equal(read.status,'succeeded');assert.equal(read.result.website_unread,true);assert.equal(read.result.business_direction.heading_font,'Lora');
+ assert.deepEqual(read.result.missing,['Check your opening hours']);
+ assert.equal(read.progress.website,'failed');assert.equal(read.progress.analysis,'done');
+});
+
+test('a capture that already failed starts the early analysis at once, and a final send without one still finishes (MOCK)',async()=>{
+ const {target,calls,run}=await reachFixture('Reach late cafe',{own:'none',answer:async()=>null});
+ const site='https://reach-late.test/',start=await guided.save(alice,target.id,{revision:0,brief:reachBrief(site),step:1});
+ assert.equal(await run(start.prefill_job_id),'rejected');
+ const second=await guided.save(alice,target.id,{revision:1,brief:reachBrief(site),step:2});
+ assert.ok(second.early_analysis_job_id);
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.intake_dependencies WHERE analysis_job_id=$1',[second.early_analysis_job_id])).rows[0].n,0,'nothing to wait for');
+ assert.equal(await run(second.early_analysis_job_id),'succeeded');assert.equal(calls.inputs.length,1);
+});
+
+test('Agent Reach that stalls, fails or is refused never fails research or slows the capture; its time limit is enforced (MOCK)',async()=>{
+ // Stalls forever: once the capture and market research are done, Agent Reach gets only its grace period.
+ const stalled=await reachFixture('Reach stalled cafe',{answer:never,limits:{totalMs:60000,graceMs:200}});
+ const a=await guided.save(alice,stalled.target.id,{revision:0,brief:reachBrief('https://reach-stalled.test/'),step:1});
+ let at=Date.now();assert.equal(await stalled.run(a.prefill_job_id),'succeeded');
+ assert.ok(Date.now()-at<3000,`capture with a stalled Agent Reach took ${Date.now()-at} ms`);
+ const abandoned=await stalled.ledger();
+ assert.ok(abandoned.length&&abandoned.every(r=>r.status==='abandoned'&&r.error_code==='AGENT_REACH_TIMEOUT'&&r.completed_at));
+ const summary=(await admin.query('SELECT result FROM app.intake_requests WHERE job_id=$1',[a.prefill_job_id])).rows[0].result.agent_reach;
+ assert.equal(summary.status,'partial');assert.equal(summary.code,'AGENT_REACH_TIMEOUT');
+ // The total limit holds even while the other research is still running.
+ const slow=await reachFixture('Reach slow cafe',{answer:never,ownDelay:2500,limits:{totalMs:700,graceMs:200}});
+ const b=await guided.save(alice,slow.target.id,{revision:0,brief:reachBrief('https://reach-slow.test/'),step:1});
+ assert.equal(await slow.run(b.prefill_job_id),'succeeded');
+ const rows=await slow.ledger(),span=Math.max(...rows.map(r=>r.completed_at))-Math.min(...rows.map(r=>r.created_at));
+ assert.ok(span<2000,`Agent Reach stopped ${span} ms after it started, inside its limit`);
+ // Failed answers and robots refusals only leave fewer pages.
+ const refused=await reachFixture('Reach refused cafe',{answer:async task=>task.channel==='youtube'?{schema_version:1,ok:false,channel:'youtube',action:task.action,backend:null,items:[],meta:{attempts:[{backend:'yt-dlp',result:'PLATFORM_BLOCKED'}]},error:{code:'PLATFORM_BLOCKED',message:'Sign in to confirm you are not a bot'}}:mockAgentReachEnvelope(task),robots:async url=>!url.includes('rival-two.test')});
+ const c=await guided.save(alice,refused.target.id,{revision:0,brief:reachBrief('https://reach-refused.test/',['Rival One','rival-two.test','instagram.com/rival']),step:1});
+ assert.equal(await refused.run(c.prefill_job_id),'succeeded');
+ const trail=await refused.ledger();
+ assert.ok(trail.some(r=>r.target==='https://rival-two.test/'&&r.status==='skipped'&&r.error_code==='ROBOTS_DISALLOWED'&&r.provider==='robots'));
+ assert.ok(!refused.transport.sent.some(t=>t.params.target==='https://rival-two.test/'),'a robots refusal never reaches Agent Reach');
+ assert.ok(!refused.transport.sent.some(t=>/instagram/.test(t.params.target??'')));
+ assert.ok(trail.some(r=>r.channel==='youtube'&&r.status==='failed'&&r.error_code==='PLATFORM_BLOCKED'&&r.provider==='yt-dlp'));
+ // Switched off: no Agent Reach call and no Agent Reach source, research exactly as before.
+ const off=await reachFixture('Reach off cafe',{enabled:false});
+ const d=await guided.save(alice,off.target.id,{revision:0,brief:reachBrief('https://reach-off.test/'),step:1});
+ assert.equal(await off.run(d.prefill_job_id),'succeeded');assert.equal((await off.ledger()).length,0);assert.equal((await off.sources()).length,0);assert.equal(off.transport.sent.length,0);
+ assert.equal((await admin.query('SELECT result FROM app.intake_requests WHERE job_id=$1',[d.prefill_job_id])).rows[0].result.agent_reach,undefined);
+ // Fair use: a business that used its 40 calls this hour gets none until the window passes.
+ const limited=await reachFixture('Reach limited cafe');
+ const e=await guided.save(alice,limited.target.id,{revision:0,brief:reachBrief('https://reach-limited.test/'),step:1});
+ await admin.query("INSERT INTO app.agent_reach_calls(id,job_id,organization_id,brand_id,channel,action,purpose,target,target_sha256,provider,status,completed_at) SELECT gen_random_uuid(),$1,$2,$3,'web','search','business_search','earlier '||g,encode(sha256(('earlier '||g)::bytea),'hex'),'exa','succeeded',now() FROM generate_series(1,40) g",[e.prefill_job_id,limited.account.id,limited.target.id]);
+ assert.equal(await limited.run(e.prefill_job_id),'succeeded');
+ assert.equal(limited.transport.sent.length,0);
+ const capped=(await limited.ledger()).filter(r=>!r.target.startsWith('earlier '));
+ assert.ok(capped.length&&capped.every(r=>r.status==='skipped'&&r.error_code==='AGENT_REACH_RATE_LIMITED'&&r.provider==='limit'));
 });
