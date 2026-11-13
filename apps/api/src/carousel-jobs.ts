@@ -10,6 +10,7 @@ import {canonicalJSON,hash} from './brand-brain.js';
 import {assertLearningCurrent} from './learning-context.js';
 import {packForJob,promptKnowledge,type StoredKnowledge} from './knowledge-production.js';
 import {approvedDirection} from './image-direction.js';
+import {directionForJob,directionAsBoard} from './brand-directions.js';
 const terminal=new Set(['succeeded','rejected','failed','canceled','unknown']);
 export class CarouselJobs {
  constructor(readonly jobs:AssetJobs,readonly creative:CreativeJobs,readonly exporter:ExportJobs){}
@@ -40,8 +41,9 @@ export class CarouselJobs {
     validateCarouselInput(r.input);if(hash(canonicalJSON(r.input))!==r.input_sha256)throw new CreativeError('CAROUSEL_INPUT_CHANGED');await assertLearningCurrent(db,r.memory_context);
     const children=(await db.query('SELECT position,generation_job_id,export_job_id FROM app.carousel_children WHERE parent_job_id=$1 ORDER BY position',[j.id])).rows;if(children.length!==r.input.slide_count||children.some((c,i)=>c.position!==i))throw new CreativeError('CAROUSEL_CHILDREN_INVALID');
     const knowledge=r.plan?undefined:await this.knowledgeContext(db,j,r);
-    // The approved mood board is the creative direction. Only one locked before this request, so replays plan the same.
-    const board=r.plan?null:(await db.query('SELECT m.direction,m.feedback FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC,m.id LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0];
+    // The business's creative direction (else its approved mood board) as it was when this request was made, so replays plan the same.
+    const chosen=r.plan?null:await directionForJob(db,j.organization_id,j.brand_id,j.id);
+    const board=r.plan?null:chosen?directionAsBoard(chosen):(await db.query('SELECT m.direction,m.feedback FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC,m.id LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0];
     const direction=board?approvedDirection(board,String(r.input.prompt??'')):null;
     await db.query("UPDATE app.jobs SET status='running',attempt=attempt+1,updated_at=now() WHERE id=$1",[j.id]);return {...r,children,knowledge,direction};
    });

@@ -232,7 +232,7 @@ async function createBusiness(name) {
   ).toBeVisible();
   const businessId = alice.url().split("/b/")[1].split("/")[0];
   // This suite verifies the retained manual fact-review fallback. The guided
-  // questionnaire and mood board journey have their own end-to-end suite.
+  // questionnaire and creative direction journey have their own end-to-end suite.
   await alice.goto(`${base}/b/${businessId}/onboarding`);
   await expect(alice.getByRole("heading", { name: "Does this feel like you?" })).toBeVisible();
   return businessId;
@@ -1310,7 +1310,7 @@ test('onboarding holds brand review until analysis finishes and hides capture co
  }finally{await alice.unroute(`**/api/v1/businesses/${b.id}/intake`,route);}
 });
 
-test('first-plan confirmation routes new work through the mood board and resumes existing requests (MOCK planner)',async()=>{
+test('first-plan confirmation routes new work through the creative direction and resumes existing requests (MOCK planner)',async()=>{
  await alice.goto(base+'/brands/new');await expect(alice.getByRole('heading',{name:'Your content. Your brand.'})).toBeVisible();await alice.screenshot({path:'work/browser/onboarding-add-business.png',fullPage:true});
  const created=await alice.request.post(base+'/api/v1/businesses',{headers:{origin:base,'idempotency-key':randomUUID()},data:{name:'First plan fixture'}});assert.equal(created.status(),201);const b=await created.json(),root=`/api/v1/businesses/${b.id}`,brain=`/api/v1/workspaces/${b.organization_id}/brands/${b.id}/brain`;
  for(const [field,value] of [['brand_name','First plan fixture'],['offering','Appointment software'],['audience','Dental practices']]){
@@ -1325,9 +1325,9 @@ test('first-plan confirmation routes new work through the mood board and resumes
  await alice.route('**'+root+'/content-plan/generate',generate);await alice.route('**'+root+'/content-plan/jobs',jobs);await alice.route('**'+root+'/content-plans/'+plan,detail);
  try{
  await alice.goto(`${base}/b/${b.id}/onboarding`);
- await alice.getByRole('button',{name:'Continue to my mood board',exact:true}).click();
+ await alice.getByRole('button',{name:'Continue to my creative direction',exact:true}).click();
  await expect(alice).toHaveURL(`${base}/b/${b.id}/guided-onboarding`);
- assert.equal(submissions.length,0,'New customers must approve a mood board before requesting a calendar');
+ assert.equal(submissions.length,0,'New customers confirm their creative direction before requesting a calendar');
  const savedOnboarding=await(await alice.request.get(base+root+'/onboarding')).json();
  assert.equal(savedOnboarding.step,3);
  const savedBusiness=await(await alice.request.get(base+root)).json();
@@ -1382,8 +1382,54 @@ test('first-plan confirmation routes new work through the mood board and resumes
 
  });
 
+test('Brand Kit creative direction: an owner picks looks, fine-tunes, previews and saves a version that guided onboarding shows without making a mood board (real database)',async()=>{
+ const created=await alice.request.post(base+'/api/v1/businesses',{headers:{origin:base,'idempotency-key':randomUUID()},data:{name:'Direction fixture'}});assert.equal(created.status(),201);const b=await created.json();
+ const brainPath=`/api/v1/workspaces/${b.organization_id}/brands/${b.id}/brain`;
+ for(const [field,value] of [['brand_name','Direction fixture'],['offering','Architect-led homes'],['audience','Families moving to the coast']]){
+  const added=await alice.request.post(base+brainPath+'/findings',{headers:{origin:base,'idempotency-key':randomUUID()},data:{field,value}});assert.equal(added.status(),201);const f=await added.json();
+  assert.equal((await alice.request.patch(`${base}${brainPath}/findings/${f.id}`,{headers:{origin:base},data:{revision:f.revision,decision:'correct'}})).status(),200);
+ }
+ const brainState=await(await alice.request.get(base+brainPath)).json();
+ assert.equal((await alice.request.post(base+brainPath+'/approve',{headers:{origin:base},data:{revision:brainState.revision}})).status(),201);
+ await alice.goto(`${base}/b/${b.id}/brand-kit#direction`);
+ await expect(alice.getByRole('heading',{name:'Creative direction',exact:true})).toBeVisible();
+ await expect(alice.getByRole('button',{name:'Save as new version',exact:true})).toBeDisabled();
+ await selectOption(alice.getByLabel('Explore looks',{exact:true}),'property');
+ await alice.getByRole('button',{name:'Polished architectural photography',exact:true}).click();
+ await alice.getByRole('button',{name:'A styled room',exact:true}).click();
+ await expect(alice.getByRole('status').filter({hasText:'Colours and fonts now match your new main look'})).toBeVisible();
+ await expect(alice.getByLabel('Heading font',{exact:true})).toContainText('Lora');
+ await alice.getByLabel('Accent colour',{exact:true}).fill('#123456');
+ await expect(alice.getByRole('figure',{name:'Sample post in your creative direction'})).toBeVisible();
+ await expect(alice.getByText('It applies to posts generated after you save',{exact:false})).toBeVisible();
+ const audit=await new AxeBuilder({page:alice}).include('.brand-kit-content').withTags(['wcag2a','wcag2aa']).analyze();
+ assert.deepEqual(audit.violations.map(v=>({id:v.id,nodes:v.nodes.map(n=>n.target)})),[]);
+ for(const width of [1440,390]){await alice.setViewportSize({width,height:1000});assert.equal(await alice.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await alice.screenshot({path:`work/browser/brand-kit-direction-${width}.png`,fullPage:true});}
+ await alice.setViewportSize({width:1440,height:1000});
+ await alice.getByRole('button',{name:'Save as new version',exact:true}).click();
+ await expect(alice.getByRole('status').filter({hasText:'Version 1 saved. New posts will use it.'})).toBeVisible();
+ const stored=(await admin.query('SELECT version,source,look_ids,direction FROM app.brand_creative_directions WHERE brand_id=$1',[b.id])).rows;
+ assert.equal(stored.length,1);assert.equal(stored[0].source,'brand_kit');assert.deepEqual(stored[0].look_ids,['still-01','formae-03']);assert.equal(stored[0].direction.palette.accent,'#123456');
+ await alice.reload();await expect(alice.getByText(/^Version 1, saved/)).toBeVisible();
+ // Guided onboarding reads the saved direction: a summary and the plan form, never a mood board request.
+ const posts=[];const watch=r=>{if(r.method()==='POST'&&/\/moodboards/.test(new URL(r.url()).pathname))posts.push(r.url());};alice.on('request',watch);
+ const direction={summary:'Coastal homes',rationale:'Fixture',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#ffffff'},{role:'accent',hex:'#ffcc00'}],heading_font:'Lora',body_font:'DM Sans',voice:'Assured and warm',imagery:'Homes in golden light',pillars:['Homes','Coast'],starter_ideas:[{format:'static',title:'A view',concept:'A home at dusk.'},{format:'carousel',title:'A walk',concept:'Three rooms.'}],essential_questions:[],evidence_ids:['fixture']};
+ const fixture=async route=>{if(route.request().method()!=='GET')return route.continue();await route.fulfill({json:{revision:1,step:4,brief:{offering:'Architect-led homes',audience:'Families moving to the coast',market:'',goal:'awareness',visual_direction:'',must_follow:''},research_job_id:b.id,status:'succeeded',result:{business_direction:direction}}});};
+ await alice.route(`**/api/v1/businesses/${b.id}/guided-brief`,fixture);
+ try{
+  await alice.goto(`${base}/b/${b.id}/guided-onboarding`);
+  await expect(alice.getByRole('heading',{name:'Your brand direction',exact:true})).toBeVisible();
+  await expect(alice.getByRole('link',{name:'Edit in Brand Kit',exact:true})).toHaveAttribute('href',`/b/${b.id}/brand-kit#direction`);
+  await expect(alice.getByRole('heading',{name:'Let’s plan your content',exact:true})).toBeVisible();
+  await expect(alice.getByLabel('Business time zone',{exact:true})).toBeVisible();
+  await expect(alice.getByRole('button',{name:'Create my mood board'})).toHaveCount(0);
+  await alice.screenshot({path:'work/browser/onboarding-brand-direction.png',fullPage:true});
+  assert.deepEqual(posts,[]);
+ }finally{await alice.unroute(`**/api/v1/businesses/${b.id}/guided-brief`,fixture);alice.off('request',watch);}
+});
+
 // The free-form campaign builder was replaced by monthly planning: the owner answers the
-// brief, approves a mood board and reviews the calendar before anything is planned or made.
+// brief, confirms the creative direction and reviews the calendar before anything is planned or made.
 // The planner request itself (resume after reload, one submission) is covered with a mock
 // planner in tests/browser/guided-business.test.mjs.
 test('campaign builder reviews the brief before any plan request: old builder links open monthly planning and answers survive reload (real database)',async()=>{

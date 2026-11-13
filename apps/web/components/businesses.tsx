@@ -1,4 +1,5 @@
 "use client";
+import {BrandDirectionSettings} from './brand-direction';
 import {factLabel} from './fact-labels';
 import {GuidedBusinessBrief} from "./guided-business";
 import {CreativeBrief} from "./creative-brief";
@@ -943,12 +944,12 @@ export function BrandOnboarding({ business }: { business: Business }) {
         <section className="v5-panel">
           <h2>Your approved brand profile is saved.</h2>
           <p>
-            Your brand is saved. Review your mood board before planning your content.
+            Your brand is saved. Review your creative direction before planning your content.
           </p>
           <div className="actions"><AppLink className="button" href={`/b/${business.id}/memory`}>
             View brand memory
           </AppLink>
-          <AppLink className="button primary" href={`/b/${business.id}/guided-onboarding`}>Continue to my mood board</AppLink></div>
+          <AppLink className="button primary" href={`/b/${business.id}/guided-onboarding`}>Continue to my creative direction</AppLink></div>
         </section>
       ) : state.step === 2 ? (
         <>
@@ -1096,12 +1097,12 @@ function BrandKit({business}:{business:Business}) {
   try{await api(scopePath(business)+'/brain/approve',{revision:brain.revision});setSaved(brain.revision);window.dispatchEvent(new Event('desvio-workspace-changed'));}
   catch(e){setError(e);}finally{setBusy(false);}
  }
- const tabs=[['media','Media Library'],['style','Brand Style'],['voice','Brand Voice'],['profile','Brand Profile'],['sources','Source Materials']];
- useEffect(()=>{const id=window.location.hash.slice(1);if(['media','style','voice','profile','sources'].includes(id))setTab(id);},[]);
+ const tabs=[['media','Media Library'],['direction','Creative direction'],['style','Brand Style'],['voice','Brand Voice'],['profile','Brand Profile'],['sources','Source Materials']];
+ useEffect(()=>{const id=window.location.hash.slice(1);if(tabs.some(([tabId])=>tabId===id))setTab(id);},[]);
  return <section className="brand-kit-screen"><header className="brand-kit-heading"><p>{business.name}</p><h1>Brand Kit</h1></header>
   <div className="brand-kit-layout"><nav className="brand-kit-navigation" aria-label="Brand Kit sections">{tabs.map(([id,label])=><button key={id} aria-current={tab===id?'page':undefined} disabled={busy||factSaving} onClick={()=>{if(tab!==id&&confirmNavigation()){setTab(id);history.replaceState(history.state,'',`#${id}`);setBrain(undefined);setSaved(undefined);setVisualEditing(false);setError(undefined);}}}>{label}</button>)}</nav>
   <div className="brand-kit-content"><h2>{tabs.find(([id])=>id===tab)?.[1]}</h2>
-  {tab==='media'?<BrandReferences businessId={business.id} writable={writable} uploadWorkspace={org} visualPicker libraryMode/>:tab==='sources'?<><BrandFiles org={org} brandId={business.id}/><BrandReview section="sources" business={business} onChange={setBrain} onVisualEditing={setVisualEditing}/></>:<>
+  {tab==='media'?<BrandReferences businessId={business.id} writable={writable} uploadWorkspace={org} visualPicker libraryMode/>:tab==='direction'?<BrandDirectionSettings business={business}/>:tab==='sources'?<><BrandFiles org={org} brandId={business.id}/><BrandReview section="sources" business={business} onChange={setBrain} onVisualEditing={setVisualEditing}/></>:<>
    <BrandReview key={tab} section={tab as 'profile'|'voice'|'style'} business={business} onChange={setBrain} onVisualEditing={setVisualEditing} onSavingChange={setFactSaving}/><Notice error={error}/>
    {['owner','admin'].includes(business.role)&&<div className="brand-kit-save"><ActionButton className="primary" disabled={!brain||busy||visualEditing||factSaving} onClick={()=>void approve()} label={busy?'Saving…':'Save approved brand'} />{saved===brain?.revision&&<p role="status">Your approved brand is saved.</p>}{visualEditing&&<p>Save or discard your visual edit first.</p>}</div>}
   </>}

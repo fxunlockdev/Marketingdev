@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {chromium,expect} from '@playwright/test';
 const origin=process.env.DESVIO_UI_BASE;
-test('MOCK API: manual brand setup saves before guided mood board and never generates a legacy plan',{skip:!origin,timeout:60000},async()=>{
+test('MOCK API: manual brand setup saves before the guided creative direction and never generates a legacy plan',{skip:!origin,timeout:60000},async()=>{
  const browser=await chromium.launch(),page=await browser.newPage();
  page.on('pageerror',e=>console.error(e.message));
  const id='11111111-1111-4111-8111-111111111111';
@@ -28,7 +28,7 @@ test('MOCK API: manual brand setup saves before guided mood board and never gene
  });
  try{
   await page.goto(`${origin}/b/${id}/onboarding`);
-  const next=page.getByRole('button',{name:'Continue to my mood board',exact:true});
+  const next=page.getByRole('button',{name:'Continue to my creative direction',exact:true});
   await expect(next).toBeEnabled();
   await next.click();
   await expect(page.locator('.notice.error').first()).toBeVisible();

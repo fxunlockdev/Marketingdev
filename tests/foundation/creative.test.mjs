@@ -1217,6 +1217,28 @@ test('the locked mood board reaches the image prompt of later requests only, thr
  await admin.query('DELETE FROM app.guided_moodboards WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
 });
 
+test('the stored creative direction reaches image prompts; a Brand Kit change applies only to requests made after it, through the worker role',async()=>{
+ const {BrandDirections}=await import('../../dist/brand-directions.js');
+ const directions=new BrandDirections(businesses);
+ transport=directedTransport({images:[await coloured(1024,1024,'#101010'),await coloured(1024,1024,'#202020'),await coloured(1024,1024,'#303030')]});
+ const {log}=transport;
+ const first=await directions.save(alice,brand.id,{base_version:0,looks:['pace-05'],palette:{dominant:'#d8ff65',headline:'#1a1c19',accent:'#3a4525',background:'#d8ff65'},heading_font:'Montserrat',heading_weight:900,body_font:'DM Sans',body_weight:500});
+ assert.equal(first.version,1);assert.equal(first.source,'brand_kit');
+ const made=await canvas.submit(alice,brand.id,thread.id,request('Create a post under version one'),randomUUID());
+ // Saved after that request was made: it must not change the request already waiting.
+ const second=await directions.save(alice,brand.id,{base_version:1,looks:['still-01'],palette:{dominant:'#9c7e64',headline:'#f2f6eb',accent:'#c3b5a8',background:'#0b3d2e'},heading_font:'Lora',heading_weight:400,body_font:'DM Sans',body_weight:400});
+ assert.equal(second.version,2);
+ await assert.rejects(directions.save(alice,brand.id,{base_version:1,looks:['still-01'],palette:second.direction.palette,heading_font:'Lora',heading_weight:400,body_font:'DM Sans',body_weight:400}),/changed since you opened it/);
+ assert.equal(await handler.run(scope(made)),'succeeded');
+ assert.match(log.prompts[0],/APPROVED CREATIVE DIRECTION/);assert.match(log.prompts[0],/"brand_direction"/);
+ assert.ok(log.prompts[0].includes('#d8ff65')&&log.prompts[0].includes('Montserrat 900'));assert.ok(!log.prompts[0].includes('#0b3d2e'));
+ const later=await canvas.submit(alice,brand.id,thread.id,request('Create a post under version two'),randomUUID());
+ assert.equal(await handler.run(scope(later)),'succeeded');
+ assert.ok(log.prompts[1].includes('#0b3d2e')&&log.prompts[1].includes('Lora 400'));assert.ok(!log.prompts[1].includes('#d8ff65'));
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE brand_id=$1 AND action='creative_direction.saved'",[brand.id])).rows[0].n,2);
+ await admin.query('DELETE FROM app.brand_creative_directions WHERE organization_id=$1 AND brand_id=$2',[org.id,brand.id]);
+});
+
 test('stock-backed creative that is nearly a copy of its stock photo is regenerated once, then flagged, with the closeness recorded',async()=>{
  const {StockAssets}=await import('../../dist/stock-assets.js'),{ImageQa}=await import('../../dist/image-qa.js');
  await grant(100000000);

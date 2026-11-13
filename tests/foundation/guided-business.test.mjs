@@ -147,7 +147,7 @@ import {Canvas} from '../../dist/canvas.js';
 import {CarouselGeneration} from '../../dist/carousel-generation.js';
 import {GuidedMoodboards,moodboardStatus} from '../../dist/guided-moodboards.js';
 const canvas=new Canvas(businesses,null),boards=new GuidedMoodboards(canvas,new CarouselGeneration(canvas,`sha256:${'0'.repeat(64)}`));
-async function readyBusiness(existingOrg){
+async function readyBusiness(existingOrg,answers=brief){
  const org=existingOrg??await workspaces.create(alice,{name:'Mood board fixture'});
  const brand=await workspaces.createBrand(alice,org.id,{name:'Cafe fixture'},randomUUID());
  const brain=new BrandBrain(database);
@@ -159,7 +159,7 @@ async function readyBusiness(existingOrg){
  assert.equal(prefill.revision,0);assert.equal(prefill.brief.offering,'Fresh coffee');assert.equal(prefill.brief.audience,'Local families');
  await brain.manual(alice,org.id,brand.id,{field:'offering',value:'Unapproved new offering'},randomUUID());
  assert.equal((await guided.read(alice,brand.id)).brief.offering,'Fresh coffee','Unapproved findings cannot replace approved defaults');
- await guided.save(alice,brand.id,{revision:0,brief});
+ await guided.save(alice,brand.id,{revision:0,brief:answers});
  const research=await guided.research(alice,brand.id,{revision:1},randomUUID());
  // Research output fixture only. Preview requests below go through real services and constraints.
  const direction={summary:'Family cafe',rationale:'Friendly',palette:[{role:'primary',hex:'#223344'},{role:'secondary',hex:'#eeeeee'},{role:'accent',hex:'#cc6633'}],heading_font:'Lora',body_font:'DM Sans',voice:'Welcoming',imagery:'Fresh coffee',pillars:['Community','Coffee'],starter_ideas:[{format:'static',title:'A place to meet',concept:'A welcoming cafe table in natural light.'},{format:'carousel',title:'An everyday ritual',concept:'Three scenes: arrival, a coffee close-up, and a shared table.'}],essential_questions:[],evidence_ids:['fixture-evidence']};
@@ -807,4 +807,77 @@ test('monthly plan approval accepts an approved starting frame made by the image
  assert.equal((await withVideos.read(alice,brand.id)).campaigns[0].video_error,null);
  const queued=(await admin.query('SELECT x.export_id,x.approval_id,x.export_sha256 FROM app.video_requests r JOIN app.video_references x ON x.job_id=r.job_id WHERE r.slot_id=$1',[videoSlot])).rows;
  assert.deepEqual(queued,[{export_id:exported,approval_id:approval,export_sha256:pixels}],'The generated frame starts the monthly video');
+});
+
+// ---- Picked looks are the creative direction; no mood board is generated ----
+import {BrandDirections} from '../../dist/brand-directions.js';
+import {LOOK_STYLES} from '../../dist/look-styles.js';
+const lookDetails={business_name:'Cafe fixture',website:'',business_type:'services',industry:'property',cta:'',differentiator:'',timing:'',competitors:[],priority_offers:'',folder_url:'',guidelines:'',references:['still-01','formae-03']};
+test('picked looks become the stored, audited direction at confirmation; the monthly plan follows it and no mood board is generated',async()=>{
+ const {org,brand}=await readyBusiness(undefined,{...brief,details:lookDetails});
+ const directions=new BrandDirections(businesses);
+ await assert.rejects(directions.fromOnboarding(alice,brand.id,{brief_revision:0}),/changed/);
+ const saved=await directions.fromOnboarding(alice,brand.id,{brief_revision:1});
+ assert.equal(saved.version,1);assert.equal(saved.source,'onboarding');
+ assert.deepEqual(saved.direction.looks.map(l=>l.id),['still-01','formae-03']);
+ assert.deepEqual(saved.direction.palette,LOOK_STYLES['still-01'].palette);assert.equal(saved.direction.heading_font,'Lora');
+ assert.equal(saved.direction.voice,'Welcoming','researched voice');assert.deepEqual(saved.direction.pillars,['Community','Coffee']);assert.equal(saved.direction.notes,'Warm daylight');
+ assert.deepEqual(await directions.fromOnboarding(alice,brand.id,{brief_revision:1}),saved,'confirming again keeps the same version');
+ const stored=(await admin.query('SELECT look_ids,source FROM app.brand_creative_directions WHERE brand_id=$1',[brand.id])).rows;
+ assert.deepEqual(stored,[{look_ids:['still-01','formae-03'],source:'onboarding'}]);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE brand_id=$1 AND action='creative_direction.saved' AND resource_id=$2",[brand.id,saved.id])).rows[0].n,1);
+ const view=await directions.read(alice,brand.id);assert.equal(view.current.id,saved.id);assert.equal(view.can_edit,true);assert.equal(view.versions.length,1);
+ const body={direction_id:saved.id,starts_on:'2026-12-01',duration:'month',channels:['instagram'],static_count:4,carousel_count:1,video_count:0,timezone:'UTC'};
+ assert.throws(()=>campaigns.create(alice,brand.id,{...body,moodboard_id:saved.id},randomUUID()),/Choose your creative direction/);
+ const plan=await campaigns.create(alice,brand.id,body,randomUUID());
+ const row=(await admin.query('SELECT g.moodboard_id,g.direction_id,r.input FROM app.guided_campaigns g JOIN app.planning_requests r ON r.job_id=g.planning_job_id WHERE g.id=$1',[plan.id])).rows[0];
+ assert.equal(row.moodboard_id,null);assert.equal(row.direction_id,saved.id);
+ assert.match(row.input.campaign.theme,/#26392d/);assert.match(row.input.campaign.theme,/Polished architectural photography/);
+ for(const item of row.input.content_mix)assert.deepEqual(item.creative_spec.artwork.typography,{headline:{family:'Lora',weight:400},body:{family:'DM Sans',weight:400}});
+ assert.equal((await admin.query('SELECT count(*)::int AS n FROM app.guided_moodboards WHERE brand_id=$1',[brand.id])).rows[0].n,0);
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.jobs WHERE brand_id=$1 AND kind IN ('creative.generate','carousel.generate')",[brand.id])).rows[0].n,0,'no paid preview images');
+});
+
+test('a Brand Kit change is a new version for owners and admins only; analysts read it; the next plan uses it',async()=>{
+ const {org,brand}=await readyBusiness(undefined,{...brief,details:lookDetails});
+ const directions=new BrandDirections(businesses);
+ const first=await directions.fromOnboarding(alice,brand.id,{brief_revision:1});
+ await admin.query("INSERT INTO app.memberships(organization_id,user_id,role,business_scope) VALUES($1,$2,'viewer','selected')",[org.id,bob]);
+ await admin.query("INSERT INTO app.business_memberships(organization_id,brand_id,user_id,role) VALUES($1,$2,$3,'analyst')",[org.id,brand.id,bob]);
+ const analystView=await directions.read(bob,brand.id);assert.equal(analystView.current.id,first.id);assert.equal(analystView.can_edit,false);
+ const edit={base_version:1,looks:['pace-05','style-ink'],palette:{dominant:'#d8ff65',headline:'#1a1c19',accent:'#ff3366',background:'#d8ff65'},heading_font:'Montserrat',heading_weight:900,body_font:'DM Sans',body_weight:500};
+ await assert.rejects(directions.save(bob,brand.id,edit),/owner or admin|Forbidden|denied|access/i);
+ await assert.rejects(directions.fromOnboarding(bob,brand.id,{brief_revision:1}),/access|Forbidden|denied|permission/i);
+ const second=await directions.save(alice,brand.id,edit);
+ assert.equal(second.version,2);assert.equal(second.source,'brand_kit');assert.equal(second.direction.palette.accent,'#ff3366');
+ assert.equal(second.direction.layout_archetype,'type_led_poster');assert.equal(second.direction.voice,'Welcoming','voice carries over');
+ await assert.rejects(directions.save(alice,brand.id,edit),/changed since you opened it/);
+ await assert.rejects(directions.save(alice,brand.id,{...edit,base_version:2,heading_font:'Comic Sans'}),/fonts/);
+ assert.equal((await directions.fromOnboarding(alice,brand.id,{brief_revision:1})).id,second.id,'re-confirming onboarding does not undo a Brand Kit change');
+ const body={starts_on:'2026-12-01',duration:'week',channels:['instagram'],static_count:2,carousel_count:0,video_count:0,timezone:'UTC'};
+ await assert.rejects(campaigns.create(alice,brand.id,{...body,direction_id:first.id},randomUUID()),/creative direction changed/);
+ const plan=await campaigns.create(alice,brand.id,{...body,direction_id:second.id},randomUUID());
+ const input=(await admin.query('SELECT r.input FROM app.guided_campaigns g JOIN app.planning_requests r ON r.job_id=g.planning_job_id WHERE g.id=$1',[plan.id])).rows[0].input;
+ assert.match(input.campaign.theme,/#ff3366/);assert.match(input.campaign.theme,/Montserrat 900/);
+ assert.deepEqual(input.content_mix[0].creative_spec.artwork.typography.headline,{family:'Montserrat',weight:900});
+ assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE brand_id=$1 AND action='creative_direction.saved'",[brand.id])).rows[0].n,2);
+});
+
+test('looks picked after the early analysis finished come from the saved brief in pick order; voice comes from the adopted analysis (MOCK OpenAI)',async()=>{
+ const {target,calls,run}=await earlyFixture('Early looks cafe');
+ const site='https://looks-cafe.test/',start=await guided.save(alice,target.id,{revision:0,brief:earlyBrief(site),step:1});
+ assert.equal(await run(start.prefill_job_id),'succeeded');
+ const analysed=await guided.save(alice,target.id,{revision:1,brief:earlyBrief(site),step:2});
+ assert.equal(await run(analysed.early_analysis_job_id),'succeeded');
+ // The owner picks looks only after the analysis has finished.
+ const picked={...earlyBrief(site),visual_direction:'Quiet and confident',details:{...earlyDetails(site),references:['formae-05','still-02']}};
+ await guided.save(alice,target.id,{revision:2,brief:picked,step:3});
+ const sent=await guided.save(alice,target.id,{revision:3,brief:picked,step:4});
+ const job=await guided.research(alice,target.id,{revision:sent.revision},randomUUID());
+ assert.equal(job.id,analysed.early_analysis_job_id,'send adopts the early analysis');assert.equal(calls.analysis,1);
+ const researched=(await guided.read(alice,target.id)).result.business_direction;
+ const saved=await new BrandDirections(businesses).fromOnboarding(alice,target.id,{brief_revision:sent.revision});
+ assert.deepEqual(saved.direction.looks.map(l=>l.id),['formae-05','still-02']);
+ assert.deepEqual(saved.direction.palette,LOOK_STYLES['formae-05'].palette);assert.equal(saved.direction.layout_archetype,'type_led_poster');
+ assert.equal(saved.direction.voice,researched.voice.slice(0,400));assert.equal(saved.direction.notes,'Quiet and confident');
 });

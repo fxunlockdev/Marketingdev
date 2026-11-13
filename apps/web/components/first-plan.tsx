@@ -26,8 +26,8 @@ export function FirstPlan({businessId,disabled,beforeSubmit}:{businessId:string;
  return <section className="first-plan-setup" aria-label="Your first plan">
  {pending?<div className="brand-preparing"><h2>Building your calendar</h2><p role="status">Your brand is confirmed. We’re preparing your day-by-day content plan.</p><p>You can leave and return; your request is saved.</p><Notice error={error}/>{error!==undefined&&<a href={`/b/${businessId}/content-plan`}>Open Calendar</a>}</div>:job?<div role="alert"><h3>Your calendar needs attention</h3><p>Your brand is saved. We couldn’t finish this plan. Check its status in Calendar before starting another.</p><p>{job.error_code} · {job.id}</p><a href={`/b/${businessId}/content-plan`}>Open Calendar</a></div>:<>
  <h3>Choose your creative direction</h3>
- <p>Next, review your mood board. Once you approve it, choose your monthly content mix and review the calendar before generating assets.</p>
- <Notice error={error}/><button className="primary" disabled={disabled||busy} onClick={()=>void submit()}>{busy?'Saving your brand…':request.current?'Check my saved calendar request':'Continue to my mood board'}</button>
+ <p>Next, review your creative direction, then choose your monthly content mix and review the calendar before generating assets.</p>
+ <Notice error={error}/><button className="primary" disabled={disabled||busy} onClick={()=>void submit()}>{busy?'Saving your brand…':request.current?'Check my saved calendar request':'Continue to my creative direction'}</button>
  </>}
  </section>;
 }
