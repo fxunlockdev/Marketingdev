@@ -102,6 +102,15 @@ function requestKey(
 type CalendarView='day'|'week'|'month'|'list';
 const CALENDAR_VIEWS:readonly string[]=['day','week','month','list'];
 const isCalendarView=(value:unknown):value is CalendarView=>typeof value==='string'&&CALENDAR_VIEWS.includes(value);
+/** The day a calendar opened for one plan (`?plan=`) shows first: its next upcoming post, else its first post, else its
+ * start date. Undefined when the plan cannot be read, so the calendar falls back to the business's next post. */
+async function planDay(root:string,planId:string,timezone:string):Promise<string|undefined>{
+ try{
+  const plan=await api<{starts_on:string;slots:{planned_at:string}[]}>(`${root}/content-plans/${planId}`);
+  const now=Date.now(),post=plan.slots.find(s=>Date.parse(s.planned_at)>=now)??plan.slots[0];
+  return post?localMinute(Date.parse(post.planned_at),timezone).slice(0,10):plan.starts_on;
+ }catch{return undefined;}
+}
 function DateStrip({date,onSelect,counts}:{date:string;onSelect:(date:string)=>void;counts:Record<string,number>}) {
  const selected=useRef<HTMLButtonElement>(null);
  useEffect(()=>{selected.current?.scrollIntoView({block:'nearest',inline:'center',behavior:'instant'});},[date]);
@@ -178,7 +187,7 @@ export function ContentWorkspace({
           const today = localMinute(Date.now(), p.timezone).slice(0, 10);
           const requested=new URLSearchParams(location.search).get('start');
           let initial=requested&&/^\d{4}-\d{2}-\d{2}$/.test(requested)&&Number.isFinite(Date.parse(requested))?requested:today;
-          if(!requested&&!inbox){try{const overview=await api(`${root}/overview`);const next=overview.upcoming_posts?.[0];if(next)initial=localMinute(Date.parse(next.planned_at),p.timezone).slice(0,10);}catch{/* Calendar remains usable if overview is unavailable. */}}
+          if(!requested&&!inbox){const plan=new URLSearchParams(location.search).get('plan');const opened=plan&&/^[a-f0-9-]{36}$/i.test(plan)?await planDay(root,plan,p.timezone):undefined;if(opened)initial=opened;else try{const overview=await api(`${root}/overview`);const next=overview.upcoming_posts?.[0];if(next)initial=localMinute(Date.parse(next.planned_at),p.timezone).slice(0,10);}catch{/* Calendar remains usable if overview is unavailable. */}}
           if(!active)return;setAnchor(initial);
           setStart(today);
           setPrefs(p);
