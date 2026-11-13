@@ -6,6 +6,7 @@ type WebsiteIntake = {capture(jobs:AssetJobs,scope:JobScope,url:string):Promise<
  market?(jobs:AssetJobs,scope:JobScope,url:string,brief?:GuidedBrief|null,competitors?:readonly string[]):Promise<MarketResearch>;
 };
 import {BRAND_RESERVED_SQL,MARKET_RESEARCH_VERSION,type MarketPage,type MarketResearch} from './openai-website-research.js';
+import {settledMicros} from './call-settlement.js';
 import type {GuidedBrief} from './guided-campaign-contracts.js';
 import {exhaustedIntakeOutcome} from "./intake-outcome.js";
 import {BUSINESS_RESEARCH_AGENT_VERSION} from './guided-campaign-contracts.js';
@@ -504,6 +505,8 @@ export class IntakeJobs {
         input,
         model: grant.model,
         maxTokensPerImage: grant.max_tokens_per_image,
+        reserved,
+        rates: { input_micros_per_token: grant.input_micros_per_token, output_micros_per_token: grant.output_micros_per_token },
       };
     });
     if (!prepared) return "finished";
@@ -538,7 +541,7 @@ export class IntakeJobs {
       // Persist valid provider output before applying it to the draft; retrying application never calls the provider again.
       await this.jobs.transaction(scope, async (db, j) => {
         await db.query(
-          "UPDATE app.analysis_calls SET status='succeeded',response_id=$2,result=$3,usage=$4 WHERE job_id=$1",
+          "UPDATE app.analysis_calls SET status='succeeded',response_id=$2,result=$3,usage=$4,settled_micros=$5 WHERE job_id=$1",
           [
             j.id,
             response.id,
@@ -552,6 +555,7 @@ export class IntakeJobs {
               },
             }),
             JSON.stringify(response.usage),
+            settledMicros(response.usage, prepared.rates, prepared.reserved),
           ],
         );
       });

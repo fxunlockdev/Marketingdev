@@ -44,7 +44,7 @@ test('completed research without citations falls back once and persists reusable
   if(sql.startsWith('SELECT * FROM app.analysis_calls'))return {rows:saved?[{status:'succeeded',result:saved}]:[]};
   if(sql.includes('website_capture_calls'))return {rowCount:0,rows:[]};
   if(sql.includes('analysis_grants'))return {rows:[{budget_micros:6000000}]};
-  if(sql.includes('sum(reserved_micros)'))return {rows:[{used:0}]};
+  if(sql.includes('sum(charged)'))return {rows:[{used:0}]};
   if(sql.includes("SET status='succeeded'")){saved=JSON.parse(args[2]);return {rows:[]};}
   return {rows:[{revision:1}],rowCount:1};
  }};
@@ -115,7 +115,7 @@ const marketLedger=({budget=100000000,used=0,monthly=false,kind='website.extract
  const db={query:async(sql,args)=>{
   if(sql.startsWith('SELECT * FROM app.market_research_calls'))return {rows:state.row?[state.row]:[]};
   if(sql.includes('analysis_grants'))return {rows:budget===null?[]:[{budget_micros:budget}]};
-  if(sql.includes('sum(reserved_micros)'))return {rows:[{used}]};
+  if(sql.includes('sum(charged)'))return {rows:[{used}]};
   if(sql.startsWith('INSERT INTO app.market_research_calls')){if(monthly)throw Object.assign(new Error('MONTHLY_GENERATION_BUDGET_EXHAUSTED'),{code:'P0001'});state.inserts++;state.row={status:'submitted',reserved_micros:args[4]};return {rows:[]};}
   if(sql.startsWith('UPDATE app.market_research_calls')){state.row={...state.row,status:sql.includes("'succeeded'")?'succeeded':args[1],result:JSON.parse(sql.includes("'succeeded'")?args[2]:args[2])};return {rows:[]};}
   return {rows:[{revision:1}],rowCount:1};

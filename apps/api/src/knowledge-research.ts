@@ -17,6 +17,7 @@ import OpenAI from 'openai';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {logActivityFailure} from './activity-log.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from './spending-allowance.js';
+import {CHARGED_MICROS,settledMicros} from './call-settlement.js';
 import {reservationRates,MODEL_POLICY} from './model-policy.js';
 import {MARKET_RESEARCH_VERSION} from './openai-website-research.js';
 import {extractionRequest,validateExtraction,EXTRACTION_LIMITS,type ExtractionRequest,type ExtractionSource} from './knowledge-extract.js';
@@ -102,10 +103,11 @@ export class KnowledgeExtractor{
 
 export type ExtractionOutcome='applied'|'recorded'|'skipped'|'failed'|'not_applicable';
 type Prepared={kind:'none'}|{kind:'done';outcome:ExtractionOutcome}|{kind:'apply';mutations:GraphMutations}|{kind:'call';request:ExtractionRequest;built:BuiltSources};
-const RESERVED_SQL=`SELECT COALESCE(sum(reserved_micros),0) AS used FROM (
- SELECT reserved_micros FROM app.analysis_calls WHERE organization_id=$1 AND brand_id=$2
- UNION ALL SELECT reserved_micros FROM app.market_research_calls WHERE organization_id=$1 AND brand_id=$2
- UNION ALL SELECT reserved_micros FROM app.knowledge_extraction_calls WHERE organization_id=$1 AND brand_id=$2) reservations`;
+/** The shared onboarding allowance: a settled call counts its settlement, any other its reservation. */
+const RESERVED_SQL=`SELECT COALESCE(sum(charged),0) AS used FROM (
+ SELECT ${CHARGED_MICROS} AS charged FROM app.analysis_calls WHERE organization_id=$1 AND brand_id=$2
+ UNION ALL SELECT ${CHARGED_MICROS} FROM app.market_research_calls WHERE organization_id=$1 AND brand_id=$2
+ UNION ALL SELECT ${CHARGED_MICROS} FROM app.knowledge_extraction_calls WHERE organization_id=$1 AND brand_id=$2) reservations`;
 // Market rows are tagged by their parser version, or by the coverage note written with them.
 const SOURCES_SQL=`SELECT s.id,s.website_url AS url,(s.parser_version=$3 OR s.coverage->>'origin'='market') AS market,
  left(string_agg(c.text,E'\\n' ORDER BY c.page,c.id),$5) AS text
@@ -157,9 +159,9 @@ export class ResearchKnowledge{
   await this.jobs.transaction(scope,db=>this.insertSkip(db,{id:scope.jobId,organization_id:scope.organizationId,brand_id:scope.brandId},code));
   return {kind:'done',outcome:'skipped'};
  }
- private record(scope:JobScope,status:string,code:string|null,answer?:ExtractionAnswer,result?:GraphMutations):Promise<unknown>{
-  return this.jobs.transaction(scope,db=>db.query('UPDATE app.knowledge_extraction_calls SET status=$2,error_code=$3,response_id=COALESCE($4,response_id),usage=COALESCE($5,usage),result=COALESCE($6,result) WHERE job_id=$1',
-   [scope.jobId,status,code,answer?.id??null,answer?JSON.stringify(answer.usage):null,result?JSON.stringify(result):null]));
+ private record(scope:JobScope,status:string,code:string|null,answer?:ExtractionAnswer,result?:GraphMutations,settled:number|null=null):Promise<unknown>{
+  return this.jobs.transaction(scope,db=>db.query('UPDATE app.knowledge_extraction_calls SET status=$2,error_code=$3,response_id=COALESCE($4,response_id),usage=COALESCE($5,usage),result=COALESCE($6,result),settled_micros=COALESCE($7,settled_micros) WHERE job_id=$1',
+   [scope.jobId,status,code,answer?.id??null,answer?JSON.stringify(answer.usage):null,result?JSON.stringify(result):null,settled]));
  }
  private async call(scope:JobScope,request:ExtractionRequest,built:BuiltSources):Promise<GraphMutations|null>{
   let answer:ExtractionAnswer;
@@ -177,7 +179,9 @@ export class ResearchKnowledge{
    return null;
   }
   // Saved before it is applied: applying again later never calls the provider again.
-  await this.record(scope,'succeeded',null,answer,mutations);
+  // Settled at the extraction model's rates, the same rates its reservation used.
+  const settled=settledMicros(answer.usage,reservationRates('check'),extractionReservation(request).micros);
+  await this.record(scope,'succeeded',null,answer,mutations,settled);
   return mutations;
  }
  private async apply(scope:JobScope,mutations:GraphMutations):Promise<ExtractionOutcome>{

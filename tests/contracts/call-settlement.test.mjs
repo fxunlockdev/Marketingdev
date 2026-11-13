@@ -55,3 +55,13 @@ test('the inputs are not changed and the policy rates settle as expected',()=>{
 test('budget queries count a settled call at its settlement and any other at its reservation',()=>{
  assert.equal(CHARGED_MICROS,'COALESCE(settled_micros,reserved_micros)');
 });
+
+test('a research response settles its tokens plus the per-search allowance its reservation priced',async()=>{
+ const {researchSettlement,MARKET_RESEARCH_RESERVATION_MICROS,RESEARCH_RESERVATION_MICROS}=await import('../../dist/openai-website-research.js');
+ const output=[{type:'web_search_call'},{type:'web_search_call'},{type:'message'}];
+ // Sol research rates: 2.5 micros per input token (with the cache margin), 10 per output token.
+ assert.equal(researchSettlement({output,usage:{input_tokens:20000,output_tokens:1000}},MARKET_RESEARCH_RESERVATION_MICROS),20000*2.5+1000*10+2*25000);
+ assert.equal(researchSettlement({output:[],usage:{input_tokens:1_000_000,output_tokens:4000}},RESEARCH_RESERVATION_MICROS),RESEARCH_RESERVATION_MICROS);
+ assert.equal(researchSettlement({output},MARKET_RESEARCH_RESERVATION_MICROS),null);
+ assert.equal(researchSettlement({usage:{input_tokens:10,output_tokens:10}},1000),125);
+});

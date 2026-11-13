@@ -5,6 +5,7 @@ import {object,uuid} from './workspaces.js';
 import {canonicalJSON,hash} from './brand-brain.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from './spending-allowance.js';
 import {BLOG_LIMITS,validateBlogInput,type BlogFact,type BlogInput} from './blog-contracts.js';
+import {CHARGED_MICROS} from './call-settlement.js';
 function text(v:unknown,max:number,empty=false){if(typeof v!=='string'||v.length>max||(!empty&&!v.trim())||/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(v))throw new BadRequestException('Check your article text');return v.trim();}
 function revision(v:unknown){if(!Number.isSafeInteger(v)||Number(v)<1||Number(v)>=2147483647)throw new BadRequestException('Include the saved article revision');return Number(v);}
 function key(v:unknown){if(typeof v!=='string'||!/^[A-Za-z0-9_.:-]{8,128}$/.test(v))throw new BadRequestException('A request key is required');return v;}
@@ -27,7 +28,7 @@ export class CampaignBlogs{
  const grant=await this.grant(db,b.organization_id,brand);if(!grant)throw new ConflictException('Article generation credits are not enabled');
  const brain=(await db.query('SELECT snapshot,sha256 FROM app.brand_brain_versions WHERE organization_id=$1 AND brand_id=$2 ORDER BY approved_at DESC,id LIMIT 1',[b.organization_id,brand])).rows[0];if(!brain)throw new ConflictException('Confirm your brand before generating');if(hash(canonicalJSON(brain.snapshot))!==brain.sha256||!Array.isArray(brain.snapshot.facts))throw new ConflictException('Brand knowledge could not be verified');
  const current=(await db.query('SELECT title,body FROM app.campaign_blog_versions WHERE id=$1',[blog.latest_version_id])).rows[0];
- const used=Number((await db.query("SELECT COALESCE(sum(reserved_micros),0) AS n FROM (SELECT reserved_micros FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2) q",[b.organization_id,brand])).rows[0].n);if(exceedsAllowance(used+1,grant.budget_micros))throw new ConflictException('Generation credit limit reached');
+ const used=Number((await db.query(`SELECT COALESCE(sum(charged),0) AS n FROM (SELECT ${CHARGED_MICROS} AS charged FROM app.planning_calls WHERE organization_id=$1 AND brand_id=$2 AND provider='openai' UNION ALL SELECT reserved_micros FROM app.campaign_blog_calls WHERE organization_id=$1 AND brand_id=$2) q`,[b.organization_id,brand])).rows[0].n);if(exceedsAllowance(used+1,grant.budget_micros))throw new ConflictException('Generation credit limit reached');
  const input:BlogInput={task:'blog',brand:{facts:blogFacts(brain.snapshot.facts)},topic:blog.brief,context,...(current?{current_article:{title:current.title,body:current.body}}:{})};
  try{validateBlogInput(input);}catch{throw new ConflictException('This article cannot be generated from the saved brief. Edit it and try again.');}
  const job=randomUUID(),call=randomUUID();

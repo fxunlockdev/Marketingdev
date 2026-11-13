@@ -21,9 +21,11 @@ test('uncapped creative calls still reserve usage, replay once and respect later
  let cap=null,record=null,submissions=0,reservations=0;
  const db={query:async(sql,args)=>{
   if(sql.includes('SELECT * FROM app.creative_calls'))return {rows:record?[record]:[]};
-  if(sql.includes('sum(reserved_micros)'))return {rows:[{n:'2000000000'}]};
+  // Budgets count a settled call at its settlement and any other call at its reservation.
+  if(sql.includes('sum(COALESCE(settled_micros,reserved_micros))'))return {rows:[{n:'2000000000'}]};
   if(sql.startsWith('INSERT INTO app.creative_calls')){reservations++;record={provider:'openai',model:'test-image',input_sha256:'hash',status:'submitted'};}
-  if(sql.includes("SET status='succeeded'")){record.status='succeeded';record.result=JSON.parse(args[2]);}
+  // An image call has no per-token image rate in the model policy, so it is never settled.
+  if(sql.includes("SET status='succeeded'")){record.status='succeeded';record.result=JSON.parse(args[2]);assert.equal(args[3],null);}
   return {rows:[],rowCount:0};
  }};
  const jobs={permitted:async()=>true,transaction:async(_scope,fn)=>fn(db,{id:'job',kind:'creative.generate'})};

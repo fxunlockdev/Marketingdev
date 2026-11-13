@@ -5,6 +5,7 @@ import {MODEL_POLICY,reservationRates} from './model-policy.js';
 import {IntakeError,websiteURL} from './safe-web.js';
 import {hash,canonicalJSON,lockReview} from './brand-brain.js';
 import {exceedsAllowance,monthlyBudgetExceeded} from './spending-allowance.js';
+import {CHARGED_MICROS,settledMicros} from './call-settlement.js';
 import type {GuidedBrief} from './guided-campaign-contracts.js';
 import {AssetJobs,type JobScope} from './jobs.js';
 import type {WebsitePage,VisualCapture} from './website-evidence.js';
@@ -13,8 +14,9 @@ export const RESEARCH_VERSION='openai-web-research-v1';
 // Conservative reservation for bounded context/output and <=3 hosted calls,
 // including repeated model turns at audited standard rates. Not an actual charge.
 export const RESEARCH_RESERVATION_MICROS=1000000;
-/** Every onboarding reservation for one business, across both research ledgers. */
-export const BRAND_RESERVED_SQL='SELECT COALESCE(sum(reserved_micros),0) AS used FROM (SELECT reserved_micros FROM app.analysis_calls WHERE organization_id=$1 AND brand_id=$2 UNION ALL SELECT reserved_micros FROM app.market_research_calls WHERE organization_id=$1 AND brand_id=$2) reservations';
+/** Every onboarding charge for one business, across both research ledgers: a settled call at its
+ * settlement, any other call at its full reservation. */
+export const BRAND_RESERVED_SQL=`SELECT COALESCE(sum(charged),0) AS used FROM (SELECT ${CHARGED_MICROS} AS charged FROM app.analysis_calls WHERE organization_id=$1 AND brand_id=$2 UNION ALL SELECT ${CHARGED_MICROS} FROM app.market_research_calls WHERE organization_id=$1 AND brand_id=$2) reservations`;
 export function researchRequest(url:string){
  const target=websiteURL(url),domain=target.hostname.replace(/^www\./,'');
  return {model:RESEARCH_MODEL,store:false,reasoning:{effort:'low' as const},max_output_tokens:4000,max_tool_calls:3,
@@ -72,6 +74,14 @@ const MARKET_TOOL_CALLS=8,MARKET_OUTPUT_TOKENS=8000,MARKET_NOTES=40,MARKET_SOURC
 const MARKET_INPUT_TOKENS=600000;
 /** Allowance for the hosted search tool itself, per call. Not an actual charge. */
 const MARKET_TOOL_CALL_MICROS=25000;
+/** Settled cost of a completed research response: its reported tokens at the research rates the
+ * reservation used, plus the same per-search allowance for each search it ran. Null keeps the
+ * full reservation (no usage report). */
+export function researchSettlement(response:{output?:unknown;usage?:unknown},reservedMicros:number):number|null{
+ const output:unknown[]=Array.isArray(response.output)?response.output:[];
+ const searches=output.filter(item=>typeof item==='object'&&item!==null&&(item as {type?:unknown}).type==='web_search_call').length;
+ return settledMicros(response.usage,reservationRates('research'),reservedMicros,searches*MARKET_TOOL_CALL_MICROS);
+}
 const marketRates=reservationRates('research');
 export const MARKET_RESEARCH_RESERVATION_MICROS=Math.ceil(MARKET_INPUT_TOKENS*marketRates.input_micros_per_token+MARKET_OUTPUT_TOKENS*marketRates.output_micros_per_token+MARKET_TOOL_CALLS*MARKET_TOOL_CALL_MICROS);
 /** Competitors named after early research ran get a smaller, competitor-only request. */
@@ -206,7 +216,7 @@ export class OpenAIWebsiteResearch{
      if(response)await db.query('UPDATE app.analysis_calls SET response_id=$2,usage=$3 WHERE job_id=$1',[j.id,response.id,JSON.stringify(response.usage??{})]);});
     throw new IntakeError(code);
    }
-   await jobs.transaction(scope,async(db,j)=>{await db.query("UPDATE app.analysis_calls SET status='succeeded',response_id=$2,result=$3,usage=$4 WHERE job_id=$1",[j.id,response.id,JSON.stringify({pages}),JSON.stringify(response.usage??{})]);});
+   await jobs.transaction(scope,async(db,j)=>{await db.query("UPDATE app.analysis_calls SET status='succeeded',response_id=$2,result=$3,usage=$4,settled_micros=$5 WHERE job_id=$1",[j.id,response.id,JSON.stringify({pages}),JSON.stringify(response.usage??{}),researchSettlement(response,RESEARCH_RESERVATION_MICROS)]);});
   }
   const captures=new Map<string,{capture:VisualCapture;objects:{key:string;bytes:number;shot:VisualCapture['snapshots'][number]}[]}>(),visualErrors:{url:string;code:string}[]=[];
   if(this.photos){
@@ -262,7 +272,7 @@ export class OpenAIWebsiteResearch{
    await jobs.transaction(scope,async(db,j)=>{await db.query('UPDATE app.market_research_calls SET status=$2,result=$3,response_id=$4,usage=$5 WHERE job_id=$1',[j.id,known?'rejected':'unknown',JSON.stringify({error_code:code}),response?.id??null,JSON.stringify(response?.usage??{})]);});
    return none('unavailable',code);
   }
-  await jobs.transaction(scope,async(db,j)=>{await db.query("UPDATE app.market_research_calls SET status='succeeded',response_id=$2,result=$3,usage=$4 WHERE job_id=$1",[j.id,response.id,JSON.stringify({pages:result.pages,discovered_competitors:result.discovered,audience_suggestions:result.audience}),JSON.stringify(response.usage??{})]);});
+  await jobs.transaction(scope,async(db,j)=>{await db.query("UPDATE app.market_research_calls SET status='succeeded',response_id=$2,result=$3,usage=$4,settled_micros=$5 WHERE job_id=$1",[j.id,response.id,JSON.stringify({pages:result.pages,discovered_competitors:result.discovered,audience_suggestions:result.audience}),JSON.stringify(response.usage??{}),researchSettlement(response,reservation)]);});
   return done(result.pages,result.discovered,result.audience);
  }
 }
