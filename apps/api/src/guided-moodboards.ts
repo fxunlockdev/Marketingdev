@@ -18,7 +18,9 @@ export function moodboardStatus(image:string,carousel:string,approved:boolean){
 }
 const rowsSQL=`SELECT m.*,i.status AS image_status,c.status AS carousel_status,
  ir.output_version_id AS generated_image_version,cr.output_version_id AS generated_carousel_version,
- iv.media_id,iv.design,iv.caption
+ iv.media_id,iv.design,iv.caption,
+ EXISTS(SELECT 1 FROM app.jobs x WHERE (x.id IN (i.id,c.id) OR x.id IN (SELECT generation_job_id FROM app.carousel_children WHERE parent_job_id=c.id))
+  AND x.error_code IN ('CREATIVE_BUDGET_EXHAUSTED','CREATIVE_REQUEST_BUDGET_EXHAUSTED','MONTHLY_GENERATION_BUDGET_EXHAUSTED')) AS budget_exhausted
  FROM app.guided_moodboards m JOIN app.jobs i ON i.id=m.image_job_id JOIN app.jobs c ON c.id=m.carousel_job_id
  JOIN app.creative_requests ir ON ir.job_id=i.id JOIN app.carousel_requests cr ON cr.job_id=c.id
  LEFT JOIN app.creative_versions iv ON iv.id=ir.output_version_id
