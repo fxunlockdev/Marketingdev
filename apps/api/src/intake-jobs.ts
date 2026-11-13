@@ -158,10 +158,19 @@ export class IntakeJobs {
         ).rows[0],
     );
     if(this.websiteIntake){
-      const captured=await this.websiteIntake.capture(this.jobs,scope,input.website_url);
-      // Own-site research is already saved in its ledger. The market step is separate
-      // and best-effort, so its outcome is reported beside the capture, never instead of it.
-      const market=this.websiteIntake.market?await this.websiteIntake.market(this.jobs,scope,input.website_url,input.research_context):undefined;
+      // Own-site and market research are independent provider calls, so they run side by side
+      // instead of one after the other. Each reserves its budget in a transaction that locks
+      // this job's row, so the two reservations still see each other. Both are awaited: the
+      // job never finishes while either call is still writing its ledger.
+      const websiteIntake=this.websiteIntake;
+      const [own,marketOutcome]=await Promise.allSettled([
+        websiteIntake.capture(this.jobs,scope,input.website_url),
+        websiteIntake.market?websiteIntake.market(this.jobs,scope,input.website_url,input.research_context):Promise.resolve(undefined),
+      ]);
+      if(own.status==="rejected")throw own.reason;
+      if(marketOutcome.status==="rejected")throw marketOutcome.reason;
+      const captured=own.value,market=marketOutcome.value;
+      // The market step is best-effort, so its outcome is reported beside the capture, never instead of it.
       return this.persistWebsite(scope,captured.pages,captured.captures,captured.visualErrors,market?{...captured.coverage,market:market.summary}:captured.coverage,market?.pages??[]);
     }
     throw new IntakeError("AI_NOT_CONFIGURED");
