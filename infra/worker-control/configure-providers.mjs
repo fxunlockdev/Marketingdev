@@ -5,9 +5,9 @@ import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {configurationManifest} from '../../scripts/configure-providers.mjs';
+import {workerEnvironment,evidenceFile} from './environment.mjs';
 
-const project='5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12';
-const environment='6a760b10-9ed8-4f01-9c4a-77a25919755a';
+const target=workerEnvironment(),project=target.project,environment=target.environment;
 const database='758bf0c1-56b5-452f-be8d-fe67af927267';
 const root=new URL('../../',import.meta.url);
 const deny=()=>{throw Error('PROVIDER_SETUP_INVALID_INPUT');};
@@ -73,17 +73,17 @@ export function setupCommand(image){
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{
   const {file,approval}=setupArguments(process.argv.slice(2));
-  const host=JSON.parse(await readFile(new URL('work/railway-worker-host.json',root)));
-  const target=setupTarget(host,JSON.parse(await readFile(new URL('docs/evidence/worker-image-inventory.json',root))));
+  const host=JSON.parse(await readFile(new URL(target.statePath,root)));
+  const setup=setupTarget(host,JSON.parse(await readFile(new URL(target.inventoryPath,root))));
   let manifest=null;
   if(file!=='--list'){const raw=await readFile(file);if(raw.length>64000)deny();manifest=JSON.parse(raw);configurationManifest(manifest);}
   const env={...process.env,RAILWAY_CALLER:'skill:use-railway@1.7.0',RAILWAY_AGENT_SESSION:'desvio-provider-setup'};
   const vars=JSON.parse(execFileSync('railway',['variables','--project',project,'--environment',environment,'--service',database,'--json'],{env,encoding:'utf8',timeout:30000,stdio:['ignore','pipe','pipe']}));
   const payload=await setupPayload(vars.DATABASE_URL,manifest,approval);
-  const output=execFileSync('railway',['sandbox','exec','--id',target.sandbox,'--project',project,'--environment',environment,'--timeout','60','--',setupCommand(target.image)],{env,input:JSON.stringify(payload),encoding:'utf8',timeout:70000,maxBuffer:2000000,stdio:['pipe','pipe','pipe']});
+  const output=execFileSync('railway',['sandbox','exec','--id',setup.sandbox,'--project',project,'--environment',environment,'--timeout','60','--',setupCommand(setup.image)],{env,input:JSON.stringify(payload),encoding:'utf8',timeout:70000,maxBuffer:2000000,stdio:['pipe','pipe','pipe']});
   const result=JSON.parse(output);
   if(manifest?!['preview','applied','already_applied'].includes(result.status):!Array.isArray(result.businesses)||!Array.isArray(result.channels))throw Error();
-  await writeFile(new URL('docs/evidence/railway-provider-setup.json',root),JSON.stringify({checked_at:new Date().toISOString(),passed:true,...target,
+  await writeFile(new URL(evidenceFile(target,'railway-provider-setup.json'),root),JSON.stringify({checked_at:new Date().toISOString(),passed:true,...setup,
    operation:manifest?approval?'apply':'preview':'list',result:result.status??'listed',
    business_count:result.businesses?.length,channel_count:result.channels?.length,
    operator_source_sha256:createHash('sha256').update(payload.source).digest('hex'),
