@@ -2,11 +2,12 @@
 import {useEffect,useRef,useState} from 'react';
 import {ActionButton} from './design-system';
 import {api} from './api';
+import {loadPrivateImage} from './load-private-image';
 import {Notice} from './primitives';
 import {keyframeRequest,keyframeReference,type GeneratedVideoReference,type KeyframeAspect} from '../../api/src/reel-keyframe';
 import './video-keyframe.css';
 
-type Frame={versionId:string;sha256:string;revision:number;status:string;mediaId:string;url?:string};
+type Frame={versionId:string;sha256:string;revision:number;status:string;mediaId:string};
 type Stage='idle'|'creating'|'ready'|'approving'|'approved';
 interface VideoKeyframeProps{businessId:string;prompt:string;channel:string;aspect:KeyframeAspect;canApprove:boolean;disabled?:boolean;onSelect:(reference:GeneratedVideoReference&{label:string})=>void}
 const POLL_MS=2500,LIMIT=480;
@@ -26,8 +27,7 @@ export function VideoKeyframe({businessId,prompt,channel,aspect,canApprove,disab
    const run=state.runs.find((r:{id:string})=>r.id===jobId);
    if(run?.status==='succeeded'&&run.output_version_id){
     const project=await api(`${root}/creative-projects/${run.project_id}`),version=project.versions.find((v:{id:string})=>v.id===run.output_version_id);
-    const media=await api(`${root}/creative-media/${version.media_id}`);
-    return {versionId:version.id,sha256:version.sha256,revision:version.review_revision,status:version.status,mediaId:version.media_id,url:media.url};
+    return {versionId:version.id,sha256:version.sha256,revision:version.review_revision,status:version.status,mediaId:version.media_id};
    }
    if(run&&['failed','rejected','canceled','unknown'].includes(run.status))throw new Error(run.status==='unknown'?'The image request is uncertain; check it in Create before trying again.':'The starting frame could not be created. Try again.');
    await wait(POLL_MS);
@@ -77,7 +77,7 @@ export function VideoKeyframe({businessId,prompt,channel,aspect,canApprove,disab
   {stage==='idle'&&<ActionButton type="button" disabled={disabled||!prompt.trim()} onClick={()=>void create()} label="Create a starting frame"/>}
   {stage==='creating'&&<p role="status" className="video-keyframe-status">Creating your starting frame with your brand direction…</p>}
   {frame&&<figure className={`video-keyframe-frame aspect-${aspect}`}>
-   {frame.url?<img src={frame.url} alt="Created starting frame for the video"/>:<span>Preview unavailable</span>}
+   <FramePreview root={root} mediaId={frame.mediaId}/>
    <figcaption>{stage==='approved'?'Approved. This frame opens your video.':'Check the frame. Your video starts from exactly this image.'}</figcaption>
   </figure>}
   {frame&&stage!=='approved'&&<div className="video-keyframe-actions">
@@ -85,4 +85,21 @@ export function VideoKeyframe({businessId,prompt,channel,aspect,canApprove,disab
    <ActionButton type="button" disabled={busy||disabled} onClick={()=>void create()} label="Try another frame"/>
   </div>}
  </section>;
+}
+
+/** The frame exactly as stored, loaded through an authenticated grant into a blob URL. A signed storage URL is
+ * never used as an image source: the page's content security policy allows images from this origin only. */
+function FramePreview({root,mediaId}:{root:string;mediaId:string}){
+ const [url,setUrl]=useState(''),[failed,setFailed]=useState(false),[attempt,setAttempt]=useState(0);
+ useEffect(()=>{
+  const controller=new AbortController();let objectURL='';
+  setUrl('');setFailed(false);
+  loadPrivateImage(`${root}/creative-media/${mediaId}`,controller.signal).then(blob=>{
+   if(controller.signal.aborted)return;
+   objectURL=URL.createObjectURL(blob);setUrl(objectURL);
+  }).catch(()=>{if(!controller.signal.aborted)setFailed(true);});
+  return()=>{controller.abort();if(objectURL)URL.revokeObjectURL(objectURL);};
+ },[root,mediaId,attempt]);
+ if(failed)return <span role="alert">Preview unavailable <button type="button" onClick={()=>setAttempt(n=>n+1)}>Try again</button></span>;
+ return url?<img src={url} alt="Created starting frame for the video"/>:<span role="status">Loading your starting frame…</span>;
 }
