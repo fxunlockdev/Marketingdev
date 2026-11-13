@@ -16,13 +16,18 @@ export async function extractDocumentWorkflow(scope:JobScope){try{return await d
 type IntakeActivities={processIntake(scope:JobScope):Promise<string>;failIntake(scope:JobScope):Promise<string>};
 const intake=proxyActivities<IntakeActivities>({startToCloseTimeout:"15 minutes",heartbeatTimeout:"5 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"10 seconds",maximumAttempts:3}});
 const intakeFinalization=proxyActivities<IntakeActivities>({startToCloseTimeout:"20 seconds",retry:{initialInterval:"2 seconds",maximumInterval:"1 minute"}});
+/** An analysis waiting on its website capture checks every 5 seconds for the first five
+ * minutes (a capture usually finishes within them), then every 30 seconds, so it starts
+ * within seconds of the capture instead of up to half a minute later. The total wait is
+ * never shorter than before (90 minutes). */
 export async function processIntakeWorkflow(scope:JobScope){
  const durable=patched('intake-dependency-v1');
+ const quick=durable&&patched('intake-dependency-quick-poll-v1');
  try{
-  for(let attempt=0;attempt<(durable?180:1);attempt++){
+  for(let attempt=0;attempt<(durable?(quick?240:180):1);attempt++){
    const result=await intake.processIntake(scope);
    if(result!=='waiting'||!durable)return result;
-   await sleep('30 seconds');
+   await sleep(quick&&attempt<60?'5 seconds':'30 seconds');
   }
   return await intakeFinalization.failIntake(scope);
  }catch{return await intakeFinalization.failIntake(scope);}

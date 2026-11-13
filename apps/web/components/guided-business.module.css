@@ -9,3 +9,18 @@
 /* Reserved row for chosen looks, so choosing one never moves the grid under the pointer. */
 .pickedLooks{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:44px;margin-top:16px}
 .pickedLooks p{margin:0;color:var(--brand-muted);font-size:var(--type-sm,14px)}
+
+/* Research stages: one row per stage, state shown in words and by the marker, never colour alone. */
+.stages{list-style:none;margin:20px 0 0;padding:0;display:grid;gap:4px}
+.stages li{display:grid;grid-template-columns:20px 1fr auto;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;background:var(--brand-field);border:1px solid transparent}
+.stages li[data-state=running]{border-color:var(--brand-border);background:white}
+.stages small{font-size:13px;font-variant-numeric:tabular-nums;color:var(--brand-muted)}
+.stages li[data-state=waiting] span:not(.marker),.stages li[data-state=skipped] span:not(.marker){color:var(--brand-muted)}
+.marker{width:12px;height:12px;border-radius:50%;border:2px solid var(--brand-border);justify-self:center}
+.stages li[data-state=done] .marker{background:var(--brand-ink);border-color:var(--brand-ink)}
+.stages li[data-state=running] .marker{border-color:var(--brand-ink);animation:stagePulse 1.2s ease-in-out infinite}
+.stages li[data-state=failed] .marker,.stages li[data-state=unknown] .marker{border-style:dashed;border-color:var(--brand-ink)}
+@keyframes stagePulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.7);opacity:.55}}
+@media(prefers-reduced-motion:reduce){.stages li[data-state=running] .marker{animation:none}}
+.early{margin-top:20px;padding:16px 20px;border:1px solid var(--brand-border);border-radius:12px;background:var(--brand-field)}
+.early p{margin:0}

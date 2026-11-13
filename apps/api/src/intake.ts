@@ -147,9 +147,11 @@ export class Intake {
           if((await db.query("SELECT r.job_id FROM app.intake_recoveries r JOIN app.jobs j ON j.id=r.job_id WHERE r.source_job_id=$1 AND j.status='succeeded'",[sourceId])).rowCount)
             throw new ConflictException("This capture has already been recovered");
         }
+        // An analysis asked to stop (superseded early analysis) never applies its result, so
+        // it does not hold up the analysis that replaces it.
         const active = (
           await db.query(
-            "SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('website.extract','brand.analyze') AND status IN ('queued','running','retrying') AND id IS DISTINCT FROM $3 LIMIT 1",
+            "SELECT id,status FROM app.jobs WHERE organization_id=$1 AND brand_id=$2 AND kind IN ('website.extract','brand.analyze') AND status IN ('queued','running','retrying') AND id IS DISTINCT FROM $3 AND NOT (kind='brand.analyze' AND cancel_requested) LIMIT 1",
             [b.organization_id, id, scoped?.after ?? null],
           )
         ).rows[0];
