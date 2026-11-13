@@ -160,8 +160,26 @@ function chatDecision(body){
  if(/create|make|design|post|image|\bad\b|advert/.test(m))return {...base,reply:'On it. I’m creating your post with your brand direction.',action:'image',prompt:message,size:/portrait|4:5/.test(m)?'1024x1536':/landscape/.test(m)?'1536x1024':'1024x1024'};
  return {...base,reply:'Here is an idea based on your brand.'};
 }
+/** A brand strategy that satisfies validateStrategy: three personas, two pains and two angles each (distinct awareness
+ * levels), one format per angle and three pillars. Claims stay "unproven" unless they cite one of the request's facts. */
+function mockStrategy(task){
+ const facts=task?.brand?.facts??[],cite=facts.length?{fact_ids:[facts[0].id],evidence_ids:[],basis:'proven'}:{fact_ids:[],evidence_ids:[],basis:'unproven'};
+ const open={fact_ids:[],evidence_ids:[],basis:'unproven'};
+ const people=[['First-time buyers','Renting and saving for a first home, short on time to research.','Unsure where to start and worried about overpaying.'],
+  ['Growing families','Outgrowing their current home and weighing school districts.','Juggling timing, budget and a move with children.'],
+  ['Relocating professionals','Moving for work with weeks, not months, to decide.','Choosing a neighbourhood they have never lived in.']];
+ const personas=people.map(([name,life,relation],i)=>({id:`persona_${i+1}`,name,life_situation:life,relationship_to_problem:relation,why_this_brand:'A local team that explains each step plainly.',...(i===0?cite:open)}));
+ const pains=personas.flatMap((p,i)=>[{id:`pain_${i*2+1}`,persona_id:p.id,statement:`${p.name} fear making an expensive mistake.`,anchor:true,...open},{id:`pain_${i*2+2}`,persona_id:p.id,statement:`${p.name} lack time to compare options.`,anchor:false,...open}]);
+ const levels=['problem_aware','solution_aware'];
+ const angles=personas.flatMap((p,i)=>levels.map((awareness,j)=>({id:`angle_${i*2+j+1}`,persona_id:p.id,pain_id:`pain_${i*2+j+1}`,awareness,angle:j?`Show how ${p.name.toLowerCase()} get a clear plan.`:`Name the worry ${p.name.toLowerCase()} feel first.`,...open})));
+ const kinds=['static','carousel','reel'];
+ const formats=angles.map((a,i)=>({id:`format_${i+1}`,angle_id:a.id,format:kinds[i%kinds.length],rationale:'Fits the depth this angle needs.'}));
+ const pillars=[['Plain guidance','Explain each step without jargon.'],['Local knowledge','Show the neighbourhoods and schools.'],['Real moments','Share the people behind each move.']].map(([name,purpose],i)=>({id:`pillar_${i+1}`,name,purpose,persona_ids:[personas[i].id],...open}));
+ return {summary:'Local mock strategy: three customer types, their worries and the angles that answer them.',personas,pains,angles,formats,pillars,warnings:['TEST FIXTURE: local mock strategy']};
+}
 function plannerAnswer(body){
  const format=body.text?.format,task=plannerTask(body);
+ if(!format&&task?.task==='strategy')return JSON.stringify(mockStrategy(task));
  if(!format)return 'Ready.';
  const schema=format.schema;
  if(format.name==='desvio_content_plan'&&schema.properties?.slots)return JSON.stringify(contentPlan(schema,task));
@@ -186,6 +204,7 @@ function imageCheck(body){
  return responseEnvelope(body,[message(text)],text);
 }
 
+export {mockStrategy};
 export function respond(body){
  const format=body.text?.format?.name;
  const search=(body.tools??[]).some(t=>t.type==='web_search');

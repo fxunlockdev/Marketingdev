@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import sharp from 'sharp';
 import {parseArgs} from '../../scripts/local-stack.mjs';
 import {providerEnvironment,apiEnvironment,workerEnvironment,DEFAULT_PORTS} from '../../scripts/local-stack/config.mjs';
-import {respond,placeholderImage} from '../../scripts/local-stack/mock-providers.mjs';
+import {respond,placeholderImage,mockStrategy} from '../../scripts/local-stack/mock-providers.mjs';
+import {validateStrategy} from '../../dist/strategy-contracts.js';
 import {validateBusinessDirection,BUSINESS_DIRECTION_SCHEMA} from '../../dist/business-research-direction.js';
 import {carouselPlanSchema,validateCarouselPlan} from '../../dist/carousel-planning.js';
 import {QA_SCHEMA} from '../../dist/image-qa.js';
@@ -81,4 +82,11 @@ test('mock image check reports exactly the expected lettering; placeholder image
 test('every local service listens on its own port (the Post for Me mock uses mock+1)',()=>{
  const ports=[...Object.values(DEFAULT_PORTS),DEFAULT_PORTS.mock+1];
  assert.equal(new Set(ports).size,ports.length,JSON.stringify(DEFAULT_PORTS));
+});
+
+test('the local mock answers brand strategy requests with a strategy the product accepts',()=>{
+ for(const facts of [[{id:'fact-1',field:'offering',value:'Buyer representation'}],[]]){
+  const input={task:'strategy',brand:{id:'b',sha256:'a'.repeat(64),facts},preferences:{}};
+  assert.doesNotThrow(()=>validateStrategy(mockStrategy(input),input));
+ }
 });
