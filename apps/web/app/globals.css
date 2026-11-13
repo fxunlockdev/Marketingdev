@@ -95,7 +95,8 @@ button:disabled {
   color: white;
   border-color: #a32b2b;
 }
-input,
+/* Text-like fields only: checkboxes and radios keep their native size. :where() keeps this rule's specificity. */
+input:where(:not([type=checkbox], [type=radio])),
 select {
   width: 100%;
   min-height: 46px;

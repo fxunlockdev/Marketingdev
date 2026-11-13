@@ -1,4 +1,5 @@
 "use client";
+import {factLabel} from './fact-labels';
 import {GuidedBusinessBrief} from "./guided-business";
 import {CreativeBrief} from "./creative-brief";
 import dynamic from "next/dynamic";
@@ -892,9 +893,9 @@ export function BrandOnboarding({ business }: { business: Business }) {
     try{
       if(!brain)throw new Error('Your profile is still loading. Please try again.');
       const missing=['brand_name','offering','audience'].filter(field=>!brain.findings.some((f:any)=>f.field===field&&f.status!=='wrong'));
-      if(missing.length)throw new Error(`Complete your ${missing.map(f=>f.replaceAll('_',' ')).join(', ')} before continuing.`);
+      if(missing.length)throw new Error(`Complete your ${missing.map(f=>factLabel(f).toLowerCase()).join(', ')} before continuing.`);
       const repeated=brain.findings.find((f:any)=>f.status!=='wrong'&&brain.findings.filter((other:any)=>other.field===f.field&&other.status!=='wrong').length>1);
-      if(repeated)throw new Error(`Choose one ${repeated.field.replaceAll('_',' ')} description and select Correct before continuing.`);
+      if(repeated)throw new Error(`Choose one ${factLabel(repeated.field).toLowerCase()} description and select Correct before continuing.`);
       const current=await api(path+'/brain');
       if(current.revision!==brain.revision)throw new Error('Your profile changed. Refresh it and review the latest details.');
       for(const fact of brain.findings.filter((f:any)=>f.status==='unreviewed'))await api(`${path}/brain/findings/${fact.id}`,{revision:fact.revision,decision:'correct'},'PATCH');
@@ -1269,7 +1270,7 @@ function BrandReview({
                       "products",
                     ].filter(f=>!section||(section==='voice'?['voice','cta','prohibited_claims'].includes(f):section==='style'?['colors','fonts'].includes(f):['brand_name','offering','audience','positioning','products'].includes(f))).map((f) => (
                       <option key={f} value={f}>
-                        {f.replaceAll("_", " ")}
+                        {factLabel(f)}
                       </option>
                     ))}
                   </DesvioSelect>
@@ -1361,7 +1362,7 @@ function MissingBrandDetail({field,suggested,path,writable,onSaved,onSaving}:{fi
  useEffect(()=>{const previous=previousSuggestion.current;setValue(current=>current===previous?(suggested??''):current);previousSuggestion.current=suggested??'';},[suggested]);
  useUnsavedChanges(value!==(suggested??''));
  async function save(){setBusy(true);onSaving?.(true);setError(undefined);try{const body={field,value:value.trim()},encoded=JSON.stringify(body);if(request.current.body!==encoded)request.current={body:encoded,key:crypto.randomUUID()};await api(path+'/brain/findings',body,'POST',request.current.key);await onSaved();}catch(e){setError(e);}finally{setBusy(false);onSaving?.(false);}}
- return <article className="missing-brand-detail"><h3>{field.replaceAll('_',' ')}</h3><p className="hint">{suggested?'Suggested from your business. Adjust it, then add it to your profile.':'We couldn’t verify this from your website. Add this detail to complete your profile.'}</p><Field label={field==='audience'?'Who are your customers?':`Your ${field.replaceAll('_',' ')}`}>{id=><textarea id={id} value={value} maxLength={4000} disabled={!writable||busy} onChange={e=>setValue(e.target.value)}/>}</Field><Notice error={error}/>{writable&&<ActionButton disabled={busy||!value.trim()} onClick={()=>void save()} label={busy?'Saving…':'Add to my profile'} />}</article>;
+ return <article className="missing-brand-detail"><h3>{factLabel(field)}</h3><p className="hint">{suggested?'Suggested from your business. Adjust it, then add it to your profile.':'We couldn’t verify this from your website. Add this detail to complete your profile.'}</p><Field label={field==='audience'?'Who are your customers?':factLabel(field)}>{id=><textarea id={id} value={value} maxLength={4000} disabled={!writable||busy} onChange={e=>setValue(e.target.value)}/>}</Field><Notice error={error}/>{writable&&<ActionButton disabled={busy||!value.trim()} onClick={()=>void save()} label={busy?'Saving…':'Add to my profile'} />}</article>;
 }
 function preferredFinding(findings:any[]) {
   return [...findings].sort((a,b)=>{
@@ -1375,7 +1376,7 @@ function FindingGroup({findings,path,writable,onSaved,onSaving}:{findings:any[];
   const [selected,setSelected]=useState<string>();
   const chosen=options.find(f=>f.id===selected)??preferredFinding(options);
   return <div className="finding-group">
-    {options.length>1&&<Field label={`Choose your ${chosen.field.replaceAll('_',' ')} description`}>{id=><DesvioSelect id={id} value={chosen.id} onChange={e=>setSelected(e.target.value)} disabled={!writable}>{options.map((f:any,i:number)=><option key={f.id} value={f.id}>Description {i+1}: {f.value.slice(0,90)}</option>)}</DesvioSelect>}</Field>}
+    {options.length>1&&<Field label={`Choose your ${factLabel(chosen.field).toLowerCase()} description`}>{id=><DesvioSelect id={id} value={chosen.id} onChange={e=>setSelected(e.target.value)} disabled={!writable}>{options.map((f:any,i:number)=><option key={f.id} value={f.id}>Description {i+1}: {f.value.slice(0,90)}</option>)}</DesvioSelect>}</Field>}
     <Finding key={chosen.id} finding={chosen} alternatives={active.filter(f=>f.id!==chosen.id)} path={path} writable={writable} onSaved={onSaved} onSaving={onSaving}/>
   </div>;
 }
@@ -1426,7 +1427,7 @@ function Finding({
   return (
     <article className="finding-card">
       <div className="section-heading">
-        <h3>{f.field.replaceAll("_", " ")}</h3>
+        <h3>{factLabel(f.field)}</h3>
         <span className="status neutral" role="status">
           {busy ? "Saving…" : f.status === "unreviewed" ? "Review" : f.status === "wrong" ? "Excluded" : "Confirmed"}
         </span>
@@ -1434,7 +1435,7 @@ function Finding({
       <BrandStylePreview field={f.field} value={editing?value:f.value}/>
       {editing&&f.field==="fonts"&&<BrandFontChoices value={value} onChange={setValue} disabled={busy}/>}
       {editing && f.field!=="fonts" ? (
-        <Field label={`Edit ${f.field.replaceAll("_", " ")}`}>
+        <Field label={`Edit ${factLabel(f.field).toLowerCase()}`}>
           {(id) => (
             <textarea
               id={id}
@@ -1492,7 +1493,7 @@ function Memory({ business }: { business: Business }) {
     {view==='facts'&&(brain?<section className="learning-facts-panel">
       <div className="heading-row"><div><h2>Brand knowledge</h2><p className="hint">{facts.length} confirmed facts{brain.active&&` · Updated ${new Date(brain.active.approved_at).toLocaleDateString()}`}</p></div><AppLink className="button" href={`/b/${business.id}/onboarding`}>Edit brand facts</AppLink></div>
       {brain.active?<><label className="learning-search"><span className="sr-only">Search brand knowledge</span><input type="search" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search your brand knowledge…"/></label>
-      <dl className="memory-facts">{facts.filter((f:any)=>(f.field+' '+f.value).toLowerCase().includes(search.toLowerCase())).map((f:any)=><div key={f.id}><dt>{f.field.replaceAll('_',' ')}</dt><dd><span>{f.value}</span><MemoryEvidence fact={f} path={scopePath(business)}/></dd></div>)}</dl>
+      <dl className="memory-facts">{facts.filter((f:any)=>(f.field+' '+f.value).toLowerCase().includes(search.toLowerCase())).map((f:any)=><div key={f.id}><dt>{factLabel(f.field)}</dt><dd><span>{f.value}</span><MemoryEvidence fact={f} path={scopePath(business)}/></dd></div>)}</dl>
       {!facts.some((f:any)=>(f.field+' '+f.value).toLowerCase().includes(search.toLowerCase()))&&<p className="workspace-empty">No facts match “{search}”.</p>}</>:<p className="workspace-empty">Confirm your brand profile to start building its knowledge.</p>}
     </section>:!error&&<Loading/>)}
     {view==='sources'&&brain&&<MemorySources sources={brain.sources} businessId={business.id}/>}

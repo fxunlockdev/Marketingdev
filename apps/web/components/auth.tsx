@@ -15,7 +15,8 @@ export function AuthScreen({ mode }: { mode: string }) {
     [sent, setSent] = useState(false),
     [token, setToken] = useState(""),
     [invite, setInvite] = useState(""),
-    [challenge,setChallenge]=useState(false);
+    [challenge,setChallenge]=useState(false),
+    [verified,setVerified]=useState(false);
   const signup = mode === "sign-up",
     forgot = mode === "forgot-password",
     reset = mode === "reset-password",
@@ -23,13 +24,19 @@ export function AuthScreen({ mode }: { mode: string }) {
   useEffect(() => {
     const url = new URL(location.href);
     setInvite(new URLSearchParams(url.hash.slice(1)).get("invite") ?? "");
+    // The verification link returns here: confirm it worked, or explain an expired link.
+    if (mode === "sign-in" && (url.searchParams.has("verified") || url.searchParams.has("error"))) {
+      if (url.searchParams.has("error")) setError(new Error("This verification link has expired or was already used. Request a new one below."));
+      else setVerified(true);
+      history.replaceState(null, "", url.pathname + url.hash);
+    }
     if (reset) {
       setToken(url.searchParams.get("token") ?? "");
       history.replaceState(null, "", url.pathname);
       if (url.searchParams.has("error"))
         setError(new Error("This reset link has expired. Request a new one."));
     }
-  }, [reset]);
+  }, [reset, mode]);
   function finishSignIn(){
         if (invite)
           location.assign(
@@ -52,7 +59,7 @@ export function AuthScreen({ mode }: { mode: string }) {
           password,
           callbackURL:
             location.origin +
-            "/sign-in" +
+            "/sign-in?verified=1" +
             (invite ? "#invite=" + encodeURIComponent(invite) : ""),
         });
         setSent(true);
@@ -68,7 +75,7 @@ export function AuthScreen({ mode }: { mode: string }) {
           email,
           callbackURL:
             location.origin +
-            "/sign-in" +
+            "/sign-in?verified=1" +
             (invite ? "#invite=" + encodeURIComponent(invite) : ""),
         });
         setSent(true);
@@ -146,6 +153,9 @@ export function AuthScreen({ mode }: { mode: string }) {
                     ? "Enter your address to request a fresh verification link."
                     : "Sign in to pick up where you left off."}
           </p>
+          {verified && !sent && (
+            <p className="confirmation" role="status">Your email is verified. Sign in to continue.</p>
+          )}
           {sent ? (
             <section className="confirmation" role="status">
               <h2>{reset ? "Password updated" : "Check your inbox"}</h2>

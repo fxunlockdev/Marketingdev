@@ -11,6 +11,9 @@ import {GuidedMoodboard} from './guided-moodboard';
 import styles from './guided-business.module.css';
 import {OnboardingQuestions,OnboardingFiles,onboardingSteps} from './onboarding-questions';
 import type {GuidedBrief,ResearchSuggestions} from '../../api/src/guided-campaign-contracts';
+/** JSON with object keys sorted: the database stores the brief as jsonb, which reorders keys, so plain
+ * JSON.stringify would report a saved brief as changed. */
+function stableJSON(value:unknown):string{return JSON.stringify(value,(_key,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.entries(v as Record<string,unknown>).sort(([a],[b])=>a<b?-1:a>b?1:0)):v);}
 type Brief=GuidedBrief;
 type Direction={summary:string;rationale:string;palette:{role:string;hex:string}[];heading_font:string;body_font:string;voice:string;imagery:string;pillars:string[];essential_questions:string[]};
 type EarlyResearch={prefill_job_id?:string|null;prefill_status?:string|null;prefill_error?:string|null;prefill_website?:string|null};
@@ -21,7 +24,7 @@ export function GuidedBusinessBrief({business,planning=false,accountEmail}:{acco
  const root=`/api/v1/businesses/${business.id}/guided-brief`;
  const [saved,setSaved]=useState<Saved>(),[brief,setBrief]=useState<Brief>(),[step,setStep]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[retry,setRetry]=useState(0);
  const fallbackKey=useRef<string|null>(null);
- const requestKey=useRef<string|null>(null),dirty=!!brief&&!!saved&&JSON.stringify(brief)!==JSON.stringify(saved.brief);
+ const requestKey=useRef<string|null>(null),dirty=!!brief&&!!saved&&stableJSON(brief)!==stableJSON(saved.brief);
  useUnsavedChanges(dirty);
  useEffect(()=>{let live=true;api<Saved>(root).then(value=>{if(live){setSaved(value);setBrief(value.brief);setStep(value.step);}}).catch(e=>{if(live)setError(e);});return()=>{live=false;};},[root,retry]);
  const status=saved?.status==='unknown'?'unknown':saved?.analysis_status??saved?.status;
@@ -33,8 +36,23 @@ export function GuidedBusinessBrief({business,planning=false,accountEmail}:{acco
  const early=saved?.prefill_status,earlyActive=!!early&&['queued','running','retrying'].includes(early);
  useEffect(()=>{if(!earlyActive)return;let live=true;const timer=setInterval(()=>{if(document.hidden)return;api<Saved>(root).then(value=>{if(live)setSaved(s=>s?{...s,prefill_job_id:value.prefill_job_id,prefill_status:value.prefill_status,prefill_error:value.prefill_error,prefill_website:value.prefill_website,suggestions:value.suggestions}:s);}).catch(()=>{/* A missed poll is retried on the next tick; the questionnaire keeps working. */});},5000);return()=>{live=false;clearInterval(timer);};},[earlyActive,root]);
  const change=(key:keyof Brief,value:string)=>setBrief(b=>b?{...b,[key]:value}:b);
- async function save(next?:number,leave=false){if(!brief||!saved)return;setBusy(true);setError(undefined);try{const value=await api<{revision:number;step:number;brief:Brief}&EarlyResearch>(root,{revision:saved.revision,brief,step:next??step},'PATCH');setSaved({...saved,...value,...(dirty?{research_job_id:null,status:undefined,analysis_status:undefined,result:undefined,analysis_result:undefined}:{})});requestKey.current=null;if(next!==undefined)setStep(next);if(leave)router.push(`/b/${business.id}/overview`);}catch(e){setError(e);}finally{setBusy(false);}}
- async function research(useSavedAnswers=false){if(!brief||!saved)return;setBusy(true);setError(undefined);try{const value=await api<{revision:number;step:number;brief:Brief}>(root,{revision:saved.revision,brief,step},'PATCH');setSaved({...saved,...value});const key=useSavedAnswers?fallbackKey:requestKey;key.current??=crypto.randomUUID();await api(`${root}/research`,{revision:value.revision,...(useSavedAnswers?{use_saved_answers:true}:{})},'POST',key.current);setSaved(await api<Saved>(root));key.current=null;}catch(e){setError(e);}finally{setBusy(false);}}
+ // Moving between steps brings the new step's question into view and gives it focus, instead of leaving the
+ // customer at the bottom of the previous step. The first load keeps the page where it is.
+ const shownStep=useRef<number|null>(null);
+ useEffect(()=>{
+  if(!saved)return;
+  if(shownStep.current===null||shownStep.current===step){shownStep.current=step;return;}
+  shownStep.current=step;
+  const heading=document.getElementById('brief-question');if(!heading)return;
+  heading.setAttribute('tabindex','-1');
+  heading.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  heading.focus({preventScroll:true});
+ },[step,saved]);
+ // The server returns the brief as stored (normalised). Keep the page's copy in step with it, unless the customer
+ // edited while the save was in flight, so a saved brief is never reported as "unsaved answers".
+ function adoptSaved(sent:Brief,stored:Brief){setBrief(current=>current===sent?stored:current);}
+ async function save(next?:number,leave=false){if(!brief||!saved)return;const sent=brief;setBusy(true);setError(undefined);try{const value=await api<{revision:number;step:number;brief:Brief}&EarlyResearch>(root,{revision:saved.revision,brief,step:next??step},'PATCH');adoptSaved(sent,value.brief);setSaved({...saved,...value,...(dirty?{research_job_id:null,status:undefined,analysis_status:undefined,result:undefined,analysis_result:undefined}:{})});requestKey.current=null;if(next!==undefined)setStep(next);if(leave)router.push(`/b/${business.id}/overview`);}catch(e){setError(e);}finally{setBusy(false);}}
+ async function research(useSavedAnswers=false){if(!brief||!saved)return;const sent=brief;setBusy(true);setError(undefined);try{const value=await api<{revision:number;step:number;brief:Brief}>(root,{revision:saved.revision,brief,step},'PATCH');adoptSaved(sent,value.brief);setSaved({...saved,...value});const key=useSavedAnswers?fallbackKey:requestKey;key.current??=crypto.randomUUID();await api(`${root}/research`,{revision:value.revision,...(useSavedAnswers?{use_saved_answers:true}:{})},'POST',key.current);setSaved(await api<Saved>(root));key.current=null;}catch(e){setError(e);}finally{setBusy(false);}}
  if(!brief||!saved)return <><Notice error={error}/>{error?<button onClick={()=>setRetry(v=>v+1)}>Try again</button>:<Loading/>}</>;
  const direction=saved.analysis_result?.business_direction??saved.result?.business_direction;
  if(planning&&direction&&!direction.essential_questions.length)return <GuidedMoodboard business={business} revision={saved.revision} brief={saved.brief} planning/>;
