@@ -35,6 +35,7 @@ import { canonicalJSON, hash } from "./brand-brain.js";
 import { digest } from "./object-store.js";
 import { createDesign, reviseDesign } from "./creative-design.js";
 import {approvedDirection} from './image-direction.js';
+import {directionForJob,directionAsBoard} from './brand-directions.js';
 const terminal = new Set([
   "succeeded",
   "failed",
@@ -409,14 +410,16 @@ export class CreativeJobs {
             : null,
         };
         const references=(await db.query(`SELECT ${referenceColumns},c.position FROM app.creative_references c JOIN app.brand_references r ON r.id=c.reference_id ${referenceJoins} WHERE c.job_id=$1 ORDER BY c.position`,[j.id])).rows;
-        // Only a mood board locked before this request was made: the prompt must be identical on replay.
-        const moodboard=(await db.query('SELECT m.direction,m.feedback,m.image_version_id,m.carousel_version_id FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0]??null;
+        // The creative direction (else the mood board) in place before this request was made: the prompt must be identical on replay.
+        // A direction has no preview images, so no mood board style images are attached for it.
+        const chosen=await directionForJob(db,j.organization_id,j.brand_id,j.id);
+        const moodboard=chosen?{...directionAsBoard(chosen),image_version_id:null,carousel_version_id:null}:(await db.query('SELECT m.direction,m.feedback,m.image_version_id,m.carousel_version_id FROM app.guided_moodboards m WHERE m.organization_id=$1 AND m.brand_id=$2 AND m.approved_at IS NOT NULL AND m.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) ORDER BY m.approved_at DESC LIMIT 1',[j.organization_id,j.brand_id,j.id])).rows[0]??null;
         const moodboardMedia=moodboard?await this.moodboardMedia(db,moodboard):[];
         // The approved logo is composited, never redrawn: the one attached, else the business's approved logo.
         const logo=references.some((r:any)=>isLogoLabel(String(r.label)))?null:(await db.query(`SELECT ${referenceColumns} FROM app.brand_references r ${referenceJoins} WHERE r.organization_id=$1 AND r.brand_id=$2 AND r.revoked_at IS NULL AND r.approved_at<=(SELECT created_at FROM app.jobs WHERE id=$3) AND r.label ~* '(\\mlogo|\\mwordmark)' ORDER BY r.approved_at DESC,r.id LIMIT 1`,[j.organization_id,j.brand_id,j.id])).rows[0]??null;
         // The planner sees the approved mood board too: it is the creative direction for the brief.
         const direction=moodboard?approvedDirection(moodboard,request.prompt):null;
-        return { request, grant, parent, input:direction?{...input,brand:{...input.brand,creative_direction:direction}}:input, references, moodboard:moodboard?{direction:moodboard.direction,feedback:moodboard.feedback}:null, moodboardMedia, logo, knowledge, actor: j.requested_by };
+        return { request, grant, parent, input:direction?{...input,brand:{...input.brand,creative_direction:direction}}:input, references, moodboard:moodboard?{direction:moodboard.direction,feedback:moodboard.feedback,...(moodboard.source?{source:moodboard.source}:{})}:null, moodboardMedia, logo, knowledge, actor: j.requested_by };
       });
       if (!prepared) return "finished";
       const { request, grant, input, parent, references, moodboard, moodboardMedia, logo, knowledge } = prepared;

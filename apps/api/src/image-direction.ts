@@ -1,10 +1,12 @@
 import {CAMPAIGN_CREATIVE_PREFIX} from './campaign-design.js';
+import {directionPromptBlock,validateBrandDirection} from './brand-direction.js';
 
 /** The customer-approved creative direction that every image generator must follow:
- * the locked mood board, plus the campaign style saved with a planned post.
+ * the business's creative direction (brand-direction.ts) or, for businesses that predate it, the
+ * locked mood board, plus the campaign style saved with a planned post.
  * Returned as bounded plain data for the image prompt; never treated as instructions. */
-export type ApprovedMoodboard={direction:unknown;feedback:unknown};
-export type ApprovedDirection={moodboard?:Record<string,unknown>;campaign?:Record<string,unknown>};
+export type ApprovedMoodboard={direction:unknown;feedback:unknown;source?:'brand_direction'};
+export type ApprovedDirection={moodboard?:Record<string,unknown>;brand_direction?:Record<string,unknown>;campaign?:Record<string,unknown>};
 
 const text=(value:unknown,max:number):string|undefined=>{
  if(typeof value!=='string')return undefined;
@@ -34,7 +36,13 @@ function campaignDirection(prompt:string):Record<string,unknown>|undefined{
  return Object.keys(result).length?result:undefined;
 }
 
+/** The owner-chosen looks and fine-tuning, as bounded data. Invalid stored data is dropped. */
+function brandDirection(board?:ApprovedMoodboard|null):Record<string,unknown>|undefined{
+ if(board?.source!=='brand_direction')return undefined;
+ try{return directionPromptBlock(validateBrandDirection(board.direction));}catch{return undefined;}
+}
+
 export function approvedDirection(board:ApprovedMoodboard|null|undefined,requestPrompt:string):ApprovedDirection|null{
- const moodboard=moodboardDirection(board),campaign=campaignDirection(requestPrompt);
- return moodboard||campaign?{...(moodboard?{moodboard}:{}),...(campaign?{campaign}:{})}:null;
+ const brand=brandDirection(board),moodboard=board?.source==='brand_direction'?undefined:moodboardDirection(board),campaign=campaignDirection(requestPrompt);
+ return brand||moodboard||campaign?{...(brand?{brand_direction:brand}:{}),...(moodboard?{moodboard}:{}),...(campaign?{campaign}:{})}:null;
 }

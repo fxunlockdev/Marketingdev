@@ -84,3 +84,24 @@ test('prompt block, typography and planning theme carry the direction as bounded
  const theme=directionPlanningTheme(d);
  assert.ok(theme.length<=1200);assert.match(theme,/#fb8743/);assert.match(theme,/Big, playful type/);
 });
+
+test('generators receive the stored direction in place of the mood board, bounded to fit the prompt',async()=>{
+ const {approvedDirection:imageDirection}=await import('../../dist/image-direction.js');
+ const {approvedDirection,directionPromptContext}=await import('../../dist/monthly-plan-approval.js');
+ const {buildImagePrompt}=await import('../../dist/image-prompt.js');
+ const d=directionFromLooks(['still-01','still-02'],research,'Quiet and calm');
+ const image=imageDirection({direction:d,feedback:'',source:'brand_direction'},'Make a post');
+ assert.deepEqual(Object.keys(image),['brand_direction']);
+ assert.deepEqual(image.brand_direction.palette_roles,d.palette);assert.equal(image.brand_direction.heading_font,'Lora 400');
+ assert.equal(imageDirection({direction:{...d,palette:'bad'},feedback:'',source:'brand_direction'},'Make a post'),null,'invalid stored data is dropped');
+ const brief={headline:'Hello',body:'',cta:'',caption:'',image_prompt:'A villa at dusk',palette:['#000000','#ffffff'],fact_ids:['f1'],warnings:[],art_direction:{layout_archetype:'lifestyle_hero',text_mode:'overlay',headline_treatment:'Serif',hierarchy:'Headline first',composition:'Wide',lighting:'Golden hour',palette_roles:{dominant:'#9c7e64',headline:'#f2f6eb',accent:'#c3b5a8'},product_placement:'None',logo_placement:'none'}};
+ const prompt=buildImagePrompt({brief,identity:[{id:'f1',field:'brand_name',value:'Ellis'}],references:[],hasParent:false,textMode:'overlay',approvedDirection:image});
+ assert.match(prompt,/"brand_direction"/);assert.match(prompt,/#26392d/);
+ const seen=[];
+ const db={query:async(sql)=>{seen.push(sql);if(sql.includes('app.brand_creative_directions'))return {rows:[{id:'d1',version:2,source:'brand_kit',direction:d,created_at:'now',created_by:'u'}]};if(sql.includes('app.guided_moodboards'))return {rows:[{direction:{palette:[{role:'primary',hex:'#112233'}],heading_font:'Lora',body_font:'DM Sans',voice:'Old',imagery:'Old',summary:'Old'},feedback:'Old'}]};return {rows:[{creative_brief:{markets:'Mumbai'}}]};}};
+ const found=await approvedDirection(db,'org','brand');
+ assert.equal(found.moodboard,null,'the direction replaces an older mood board');assert.deepEqual(found.brand_direction,d);assert.deepEqual(found.creative_brief,{markets:'Mumbai'});
+ const block=directionPromptContext(found,4000);
+ assert.deepEqual(block.creative_direction.palette_roles,d.palette);assert.equal(block.mood_board,undefined);
+ for(const room of [1200,600,400]){const small=directionPromptContext(found,room);assert.ok(small&&JSON.stringify(small).length<=room,`fits ${room}`);assert.deepEqual(small.creative_direction.palette_roles,d.palette);}
+});

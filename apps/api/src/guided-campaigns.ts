@@ -1,6 +1,8 @@
 import {GuidedVideos} from './guided-videos.js';
 import {currentGeneratedFrame,generatedVideoProofSQL,uploadedVideoProofSQL} from './video-references.js';
 import {directionArtwork} from './business-research-direction.js';
+import {directionPlanningTheme,directionTypography} from './brand-direction.js';
+import {currentDirection} from './brand-directions.js';
 import {BadRequestException,ConflictException,NotFoundException} from '@nestjs/common';
 import {randomUUID} from 'node:crypto';
 import {Planning} from './planning.js';
@@ -24,8 +26,10 @@ export class GuidedCampaigns {
   // Say before approval, with exact counts, when this month's allowance cannot cover a plan.
   return {...data,allowance,video_generation_available:this.videos?.videos.enabled??false,campaigns:data.campaigns.map((c:{generation_started_at:unknown;slots:{format?:string}[]})=>({...c,allowance_shortfall:c.generation_started_at?null:allowanceMessage(allowanceShortfalls(allowance?.items,formatCounts(c.slots??[])))}))};});}
  create(user:string,brand:string,body:unknown,key:unknown){
-  const v=object(body,['moodboard_id','starts_on','duration','channels','static_count','carousel_count','video_count','timezone']);
-  const board=uuid(String(v.moodboard_id));
+  const v=object(body,['moodboard_id','direction_id','starts_on','duration','channels','static_count','carousel_count','video_count','timezone']);
+  // A plan follows the creative direction version the owner saw, or a legacy approved mood board.
+  if((v.moodboard_id===undefined)===(v.direction_id===undefined))throw new BadRequestException('Choose your creative direction before planning');
+  const board=v.moodboard_id===undefined?null:uuid(String(v.moodboard_id)),chosen=v.direction_id===undefined?null:uuid(String(v.direction_id));
   const videos=v.video_count??0;
   if(!Number.isInteger(videos)||Number(videos)<0||Number(videos)>5)throw new BadRequestException('Choose up to five videos');
   const total=Number(v.static_count)+Number(v.carousel_count)+Number(videos);
@@ -43,8 +47,10 @@ export class GuidedCampaigns {
    const prior=(await db.query('SELECT id,request_hash FROM app.guided_campaigns WHERE organization_id=$1 AND brand_id=$2 AND request_key=$3',[b.organization_id,brand,key])).rows[0];
    if(prior){if(prior.request_hash!==fingerprint)throw new ConflictException('That request belongs to another campaign');return {id:prior.id};}
    if((await db.query(`SELECT g.id FROM app.guided_campaigns g JOIN app.jobs j ON j.id=g.planning_job_id WHERE g.organization_id=$1 AND g.brand_id=$2 AND g.generation_started_at IS NULL AND j.status NOT IN ('failed','rejected','canceled') LIMIT 1`,[b.organization_id,brand])).rowCount)throw new ConflictException('Your campaign is already being prepared. Open its saved progress.');
-   const mood=(await db.query('SELECT * FROM app.guided_moodboards WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND approved_at IS NOT NULL',[b.organization_id,brand,board])).rows[0];
-   if(!mood)throw new ConflictException('Approve your mood board first');
+   const mood=board?(await db.query('SELECT * FROM app.guided_moodboards WHERE organization_id=$1 AND brand_id=$2 AND id=$3 AND approved_at IS NOT NULL',[b.organization_id,brand,board])).rows[0]:null;
+   if(board&&!mood)throw new ConflictException('Approve your mood board first');
+   const direction=chosen?await currentDirection(db,b.organization_id,brand):null;
+   if(chosen&&direction?.id!==chosen)throw new ConflictException('Your creative direction changed. Reload to plan with the latest version.');
    const quota=(await db.query('SELECT app.content_allowances($1) AS value',[b.organization_id])).rows[0].value;
    const short=allowanceMessage(allowanceShortfalls(quota.items,{static:Number(v.static_count),carousel:Number(v.carousel_count),video:Number(videos)}));
     if(short)throw new ConflictException(short);
@@ -53,13 +59,21 @@ export class GuidedCampaigns {
     ON CONFLICT(organization_id,brand_id) DO UPDATE SET step=3,goal=EXCLUDED.goal,timezone=EXCLUDED.timezone,channels=EXCLUDED.channels,must_avoid=EXCLUDED.must_avoid,revision=business_onboarding.revision+1,updated_at=now()`,[b.organization_id,brand,brief.goal,v.timezone,JSON.stringify(v.channels),brief.must_follow]);
    const mix:any[]=[];let position=0;
    for(const [format,count] of [['static',v.static_count],['carousel',v.carousel_count],['video',videos]] as const){
-    for(let i=0;i<Number(count);i++){const channel=channels[position++%channels.length];let row=mix.find(r=>r.format===format&&r.channel===channel);if(!row){row={channel,format,count:0,creative_spec:format==='video'?{placement:channel==='linkedin'?'feed':'reel',aspect:channel==='linkedin'?'landscape':'vertical',slide_count:null}:{placement:'feed',aspect:'square',slide_count:format==='carousel'?3:null,artwork:directionArtwork(mood.direction)}};mix.push(row);}row.count++;}
+    for(let i=0;i<Number(count);i++){const channel=channels[position++%channels.length];let row=mix.find(r=>r.format===format&&r.channel===channel);if(!row){row={channel,format,count:0,creative_spec:format==='video'?{placement:channel==='linkedin'?'feed':'reel',aspect:channel==='linkedin'?'landscape':'vertical',slide_count:null}:{placement:'feed',aspect:'square',slide_count:format==='carousel'?3:null,artwork:direction?directionTypography(direction.direction):directionArtwork(mood.direction)}};mix.push(row);}row.count++;}
    }
-   const d=mood.direction;
-   const theme=`Palette: ${d.palette.map((c:any)=>c.hex).join(', ')}. Fonts: ${d.heading_font}, ${d.body_font}. ${mood.feedback?`Customer feedback: ${mood.feedback.slice(0,650)}. `:''}Approved creative direction: ${d.imagery.slice(0,250)}. Voice: ${d.voice.slice(0,100)}. ${d.summary.slice(0,150)}`.slice(0,1200);
-   const planningRequest={starts_on:v.starts_on,duration_days:days,brief:`Create a coherent monthly content plan. Use confirmed brand facts only.${mood.feedback?` Customer feedback on the approved mood board: ${mood.feedback}`:''} Content pillars: ${d.pillars.join('; ').slice(0,500)}`,content_mix:mix,campaign:{name:`${v.duration==='week'?'Weekly':'Monthly'} content`,theme,cta:'',target_url:'',channels:v.channels}};
+   let theme:string,planningBrief:string;
+   if(direction){
+    const d=direction.direction;
+    theme=directionPlanningTheme(d);
+    planningBrief=`Create a coherent monthly content plan. Use confirmed brand facts only. Follow the owner's creative direction for every post: vary layouts across ${d.layout_variety.join(', ').replaceAll('_',' ')}.${d.notes?` Owner's notes on look and tone: ${d.notes.slice(0,300)}`:''}${d.pillars.length?` Content pillars: ${d.pillars.join('; ').slice(0,500)}`:''}`;
+   }else{
+    const d=mood.direction;
+    theme=`Palette: ${d.palette.map((c:any)=>c.hex).join(', ')}. Fonts: ${d.heading_font}, ${d.body_font}. ${mood.feedback?`Customer feedback: ${mood.feedback.slice(0,650)}. `:''}Approved creative direction: ${d.imagery.slice(0,250)}. Voice: ${d.voice.slice(0,100)}. ${d.summary.slice(0,150)}`.slice(0,1200);
+    planningBrief=`Create a coherent monthly content plan. Use confirmed brand facts only.${mood.feedback?` Customer feedback on the approved mood board: ${mood.feedback}`:''} Content pillars: ${d.pillars.join('; ').slice(0,500)}`;
+   }
+   const planningRequest={starts_on:v.starts_on,duration_days:days,brief:planningBrief,content_mix:mix,campaign:{name:`${v.duration==='week'?'Weekly':'Monthly'} content`,theme,cta:'',target_url:'',channels:v.channels}};
    const job=await this.planning.submit(user,brand,planningRequest,`guided:${key}`,{db,b,budgetMicros:0,weeklyIncrease:0,single:true});
-   const id=randomUUID();await db.query('INSERT INTO app.guided_campaigns(id,organization_id,brand_id,moodboard_id,planning_job_id,created_by,request_key,request_hash,planning_request) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',[id,b.organization_id,brand,board,job.id,user,key,fingerprint,JSON.stringify(planningRequest)]);return {id};
+   const id=randomUUID();await db.query('INSERT INTO app.guided_campaigns(id,organization_id,brand_id,moodboard_id,direction_id,planning_job_id,created_by,request_key,request_hash,planning_request) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)',[id,b.organization_id,brand,board,direction?.id??null,job.id,user,key,fingerprint,JSON.stringify(planningRequest)]);return {id};
   });
  }
  approvePlan(user:string,brand:string,id:string,body:unknown){
