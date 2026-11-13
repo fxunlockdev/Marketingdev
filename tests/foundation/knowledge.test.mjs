@@ -353,7 +353,9 @@ test('a succeeded research job extracts suggestions with evidence on its sources
  const edges=(await admin.query('SELECT relation,properties FROM app.knowledge_edges WHERE organization_id=$1 AND brand_id=$2 ORDER BY relation',[a.org,a.brand])).rows;
  assert.deepEqual(edges.map(e=>[e.relation,e.properties.scope??null]),[['differentiates_from','market'],['offers',null]]);
  const ledger=(await admin.query('SELECT status,reserved_micros,source_ids,applied_at FROM app.knowledge_extraction_calls WHERE job_id=$1',[job.jobId])).rows[0];
- assert.equal(ledger.status,'succeeded');assert.ok(Number(ledger.reserved_micros)>0);assert.ok(ledger.applied_at);assert.deepEqual([...ledger.source_ids].sort(),[own,rival].sort());
+ assert.equal(ledger.status,'succeeded');assert.ok(Number(ledger.reserved_micros)>0);assert.ok(ledger.applied_at);
+ // Settled from the MOCK usage (10 in, 10 out) at the Luna rates its reservation used: 10*0.125+10*0.5, rounded up.
+ assert.equal(Number((await admin.query('SELECT settled_micros FROM app.knowledge_extraction_calls WHERE job_id=$1',[job.jobId])).rows[0].settled_micros),7);assert.deepEqual([...ledger.source_ids].sort(),[own,rival].sort());
  // Replays of the same job, and later jobs over the same pages, never call the model again.
  assert.equal(await research.afterSuccess(job),'applied');
  const later=await researched(a,'brand.analyze');
@@ -367,13 +369,13 @@ test('extraction failures are recorded and skipped; the research job keeps its o
  const a=await fixture();await source(a,'Harbour & Pine grooms dogs at the door.');
  const lost=await researched(a),calls=[];
  assert.equal(await new ResearchKnowledge(jobs,extractor(new TypeError('socket hang up'),calls)).afterSuccess(lost),'failed');
- assert.deepEqual((await admin.query('SELECT status,error_code FROM app.knowledge_extraction_calls WHERE job_id=$1',[lost.jobId])).rows[0],{status:'unknown',error_code:'KNOWLEDGE_SUBMISSION_UNKNOWN'});
+ assert.deepEqual((await admin.query('SELECT status,error_code,settled_micros FROM app.knowledge_extraction_calls WHERE job_id=$1',[lost.jobId])).rows[0],{status:'unknown',error_code:'KNOWLEDGE_SUBMISSION_UNKNOWN',settled_micros:null});
  // An uncertain call is never repeated.
  assert.equal(await new ResearchKnowledge(jobs,extractor(graphAnswer,calls)).afterSuccess(lost),'recorded');
  const b=await fixture();await source(b,'Harbour & Pine grooms dogs at the door.');
  const invalid=await researched(b);
  assert.equal(await new ResearchKnowledge(jobs,extractor({entities:[],relations:[],evidence:[],status:'approved'},calls)).afterSuccess(invalid),'failed');
- assert.equal((await admin.query('SELECT error_code FROM app.knowledge_extraction_calls WHERE job_id=$1',[invalid.jobId])).rows[0].error_code,'KNOWLEDGE_EXTRACTION_INVALID');
+ assert.deepEqual((await admin.query('SELECT error_code,settled_micros FROM app.knowledge_extraction_calls WHERE job_id=$1',[invalid.jobId])).rows[0],{error_code:'KNOWLEDGE_EXTRACTION_INVALID',settled_micros:null});
  const c=await fixture();await source(c,'No grant here.');
  const ungranted=await c.job('website.extract');await admin.query("UPDATE app.jobs SET status='succeeded' WHERE id=$1",[ungranted.jobId]);
  assert.equal(await new ResearchKnowledge(jobs,extractor(graphAnswer,calls)).afterSuccess(ungranted),'skipped');
@@ -382,6 +384,30 @@ test('extraction failures are recorded and skipped; the research job keeps its o
  assert.equal(await new ResearchKnowledge(jobs,extractor(graphAnswer,calls)).afterSuccess(running),'not_applicable');
  for(const j of [lost,invalid,ungranted])assert.equal((await admin.query('SELECT status FROM app.jobs WHERE id=$1',[j.jobId])).rows[0].status,'succeeded');
  assert.equal(calls.length,2);
+});
+
+test('the onboarding allowance counts a settled extraction at its settlement, an uncertain one at its reservation',async()=>{
+ const a=await fixture(),first=await researched(a);await source(a,'Harbour & Pine: Doorstep Full Groom from 55 EUR. We come to your door in Riga.');await source(a,'Paws & Co Spa Day Package 1 for 80 EUR at our Riga salons.',{market:true,url:'https://pawsco.example/'});
+ const calls=[],research=new ResearchKnowledge(jobs,extractor(graphAnswer,calls));
+ assert.equal(await research.afterSuccess(first),'applied');
+ const row=async j=>(await admin.query('SELECT status,reserved_micros::int AS reserved,settled_micros::int AS settled FROM app.knowledge_extraction_calls WHERE job_id=$1',[j.jobId])).rows[0];
+ const settled=await row(first);assert.equal(settled.settled,7);
+ // Room for the first extraction's cost plus 1.5 times its reservation. A second extraction of the same size
+ // fits only because the first counts at its settlement.
+ const budget=settled.settled+Math.ceil(settled.reserved*1.5);
+ await admin.query('UPDATE app.analysis_grants SET budget_micros=$3 WHERE organization_id=$1 AND brand_id=$2',[a.org,a.brand,budget]);
+ const second=await researched(a,'brand.analyze');await source(a,'Harbour & Pine: Doorstep Bath and Tidy from 40 EUR. We come to your door in Riga.');await source(a,'Paws & Co Spa Day Package 2 for 80 EUR at our Riga salons.',{market:true,url:'https://pawsco.example/'});
+ assert.equal(await research.afterSuccess(second),'applied');
+ const next=await row(second);assert.equal(next.status,'succeeded');assert.ok(settled.reserved+next.reserved>budget);
+ // An uncertain call keeps its whole reservation: a third extraction no longer fits.
+ const third=await researched(a);await source(a,'Harbour & Pine: Doorstep Nail Trim from 15 EUR. We come to your door in Riga.');await source(a,'Paws & Co Spa Day Package 3 for 80 EUR at our Riga salons.',{market:true,url:'https://pawsco.example/'});
+ await admin.query('UPDATE app.analysis_grants SET budget_micros=1000000000 WHERE organization_id=$1 AND brand_id=$2',[a.org,a.brand]);
+ assert.equal(await new ResearchKnowledge(jobs,extractor(new TypeError('socket hang up'),calls)).afterSuccess(third),'failed');
+ const held=await row(third);assert.equal(held.status,'unknown');assert.equal(held.settled,null);
+ await admin.query('UPDATE app.analysis_grants SET budget_micros=$3 WHERE organization_id=$1 AND brand_id=$2',[a.org,a.brand,settled.settled+next.settled+held.reserved]);
+ const fourth=await researched(a);await source(a,'Harbour & Pine: Doorstep Ear Clean from 10 EUR. We come to your door in Riga.');await source(a,'Paws & Co Spa Day Package 4 for 80 EUR at our Riga salons.',{market:true,url:'https://pawsco.example/'});
+ assert.equal(await research.afterSuccess(fourth),'skipped');
+ assert.equal((await admin.query('SELECT error_code FROM app.knowledge_extraction_calls WHERE job_id=$1',[fourth.jobId])).rows[0].error_code,'KNOWLEDGE_BUDGET_EXHAUSTED');
 });
 
 test('a replayed succeeded intake job catches up on extraction through the intake hook',async()=>{

@@ -163,6 +163,28 @@ test('budget is checked before every model step, and provider rejection does not
  try{assert.equal(await handler.run(scope(rejected,j)),'rejected');assert.equal((await row(j)).error_code,'PLAN_PROVIDER_REJECTED');assert.equal(calls,before+1);}finally{transport=undefined;}
 });
 
+test('a succeeded planning call counts its settled cost in the planning credit; an uncertain call keeps its full reservation',async()=>{
+ const b=await fresh();await grant(b);
+ const ledger=async j=>(await admin.query('SELECT step,status,reserved_micros::int AS reserved,settled_micros::int AS settled FROM app.planning_calls WHERE job_id=$1 ORDER BY step',[j.id])).rows;
+ const first=await submit(b);assert.equal(await handler.run(scope(b,first)),'succeeded');
+ const firstCalls=await ledger(first);assert.ok(firstCalls.length>0);
+ // MOCK usage is 100 input and 100 output tokens at the grant's 0.01 and 0.02 micros per token.
+ for(const c of firstCalls){assert.equal(c.status,'succeeded');assert.equal(c.settled,3);assert.ok(c.reserved>c.settled);}
+ // Room for what the first plan cost plus a second plan at full reservation; counted by
+ // reservations alone, the first plan already used most of it and the second would be refused.
+ const reservedFirst=firstCalls.reduce((n,c)=>n+c.reserved,0),charged=firstCalls.reduce((n,c)=>n+c.settled,0),budget=charged+Math.ceil(reservedFirst*1.01);
+ assert.ok(reservedFirst*2>budget);
+ await grant(b,budget);
+ const second=await submit(b,'Explain our approved offering again');assert.equal(await handler.run(scope(b,second)),'succeeded');
+ assert.ok((await ledger(second)).every(c=>c.settled===3));
+ // An uncertain call is never settled, so it keeps counting its full reservation.
+ await grant(b);const uncertain=await submit(b,'A third plan');
+ transport=async()=>{calls++;throw new TypeError('MOCK lost paid response');};
+ try{assert.equal(await handler.run(scope(b,uncertain)),'unknown');}finally{transport=undefined;}
+ const held=await ledger(uncertain);assert.equal(held.length,1);assert.equal(held[0].status,'unknown');assert.equal(held[0].settled,null);
+ const used=Number((await admin.query('SELECT sum(COALESCE(settled_micros,reserved_micros)) AS n FROM app.planning_calls WHERE brand_id=$1',[b.id])).rows[0].n);
+ assert.equal(used,charged+(await ledger(second)).reduce((n,c)=>n+c.settled,0)+held[0].reserved);
+});
 test('planning job scope, immutable approved input and per-business funding cannot be substituted',async()=>{
  const a=await fresh(),b=await fresh();await grant(a);const ja=await submit(a),jb=await submit(b),before=calls;
  await assert.rejects(jobs.transaction(scope(b,ja),async()=>null),/JOB_SCOPE_DENIED/);
