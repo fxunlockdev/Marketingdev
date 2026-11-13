@@ -21,6 +21,9 @@ export type RunOptions={
  /** Called once, as soon as a page of the business's own site has been read. */
  onOwnPage?:()=>void;
 };
+const bareHost=(host:string)=>host.toLowerCase().replace(/^www\./,'');
+/** Same site: equal hosts, or one a subdomain of the other, ignoring a leading www. */
+const sameSiteHost=(a:string,b:string)=>{const x=bareHost(a),y=bareHost(b);return x===y||x.endsWith('.'+y)||y.endsWith('.'+x);};
 /** robots.txt as the existing crawler reads it: 404/410 allow, 200 is parsed for DesvioBot,
  * anything else (or no answer) refuses. Cached per origin for one run. */
 export type RobotsGate={allowed(url:string):Promise<boolean>};
@@ -30,9 +33,25 @@ export class SafeWebRobots implements RobotsGate{
  async allowed(raw:string):Promise<boolean>{
   const url=websiteURL(raw,true);
   if(!this.rules.has(url.origin))this.rules.set(url.origin,(async()=>{
-   try{const robots=new URL('/robots.txt',url),r=await this.web.fetch(robots,256*1024,'text/plain',4000);
-    if(r.status===404||r.status===410)return null;
-    return r.status===200?robotsParser(robots.href,r.bytes.toString('utf8')):false;}catch{return false;}
+   // Follow up to three same-site redirects (www to apex, http to https): very common, and the
+   // safe fetcher never follows them itself. Each hop is re-validated; another site or a loop refuses.
+   try{let robots=new URL('/robots.txt',url);const seen=new Set<string>();
+    for(let hop=0;hop<=3;hop++){
+     if(seen.has(robots.href))return false;seen.add(robots.href);
+     const r=await this.web.fetch(robots,256*1024,'text/plain',4000);
+     if([301,302,303,307,308].includes(r.status)){
+      const location=r.headers?.location,raw=Array.isArray(location)?location[0]:location;if(!raw)return false;
+      const next=websiteURL(new URL(raw,robots).href,true);
+      if(!sameSiteHost(next.hostname,url.hostname))return false;
+      robots=next;continue;
+     }
+     if(r.status===404||r.status===410)return null;
+     if(r.status!==200)return false;
+     const parser=robotsParser(robots.href,r.bytes.toString('utf8')),origin=robots.origin;
+     // Judge the page on the host that served the rules (after a www/apex redirect).
+     return {isAllowed:(href:string,agent:string)=>{const page=new URL(href);return parser.isAllowed(new URL(page.pathname+page.search,origin).href,agent);}};
+    }
+    return false;}catch{return false;}
   })());
   const rules=await this.rules.get(url.origin)!;
   return rules!==false&&rules?.isAllowed(url.href,'DesvioBot')!==false;
