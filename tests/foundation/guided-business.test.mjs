@@ -862,3 +862,22 @@ test('a Brand Kit change is a new version for owners and admins only; analysts r
  assert.deepEqual(input.content_mix[0].creative_spec.artwork.typography.headline,{family:'Montserrat',weight:900});
  assert.equal((await admin.query("SELECT count(*)::int AS n FROM app.audit_events WHERE brand_id=$1 AND action='creative_direction.saved'",[brand.id])).rows[0].n,2);
 });
+
+test('looks picked after the early analysis finished come from the saved brief in pick order; voice comes from the adopted analysis (MOCK OpenAI)',async()=>{
+ const {target,calls,run}=await earlyFixture('Early looks cafe');
+ const site='https://looks-cafe.test/',start=await guided.save(alice,target.id,{revision:0,brief:earlyBrief(site),step:1});
+ assert.equal(await run(start.prefill_job_id),'succeeded');
+ const analysed=await guided.save(alice,target.id,{revision:1,brief:earlyBrief(site),step:2});
+ assert.equal(await run(analysed.early_analysis_job_id),'succeeded');
+ // The owner picks looks only after the analysis has finished.
+ const picked={...earlyBrief(site),visual_direction:'Quiet and confident',details:{...earlyDetails(site),references:['formae-05','still-02']}};
+ await guided.save(alice,target.id,{revision:2,brief:picked,step:3});
+ const sent=await guided.save(alice,target.id,{revision:3,brief:picked,step:4});
+ const job=await guided.research(alice,target.id,{revision:sent.revision},randomUUID());
+ assert.equal(job.id,analysed.early_analysis_job_id,'send adopts the early analysis');assert.equal(calls.analysis,1);
+ const researched=(await guided.read(alice,target.id)).result.business_direction;
+ const saved=await new BrandDirections(businesses).fromOnboarding(alice,target.id,{brief_revision:sent.revision});
+ assert.deepEqual(saved.direction.looks.map(l=>l.id),['formae-05','still-02']);
+ assert.deepEqual(saved.direction.palette,LOOK_STYLES['formae-05'].palette);assert.equal(saved.direction.layout_archetype,'type_led_poster');
+ assert.equal(saved.direction.voice,researched.voice.slice(0,400));assert.equal(saved.direction.notes,'Quiet and confident');
+});
