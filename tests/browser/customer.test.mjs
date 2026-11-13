@@ -404,9 +404,9 @@ test("real private upload survives refresh and download returns the original byt
 test("failed and stale fact edits preserve entered corrections and require explicit recovery", async () => {
   const card = alice
     .locator(".finding-card")
-    .filter({ has: alice.getByRole("heading", { name: "offering", exact: true }) });
+    .filter({ has: alice.getByRole("heading", { name: "What you offer", exact: true }) });
   await card.getByRole("button", { name: "Edit", exact: true }).click();
-  await card.getByLabel("Edit offering").fill("Refillable soap and hand wash");
+  await card.getByLabel("Edit What you offer").fill("Refillable soap and hand wash");
   await alice.route("**/brain/findings/*", (r) =>
     r.request().method() === "PATCH" ? r.abort() : r.continue(),
   );
@@ -415,7 +415,7 @@ test("failed and stale fact edits preserve entered corrections and require expli
     await expect(card.getByRole("alert")).toContainText(
       "Your entries are still here",
     );
-    await expect(card.getByLabel("Edit offering")).toHaveValue(
+    await expect(card.getByLabel("Edit What you offer")).toHaveValue(
       "Refillable soap and hand wash",
     );
   } finally {
@@ -430,10 +430,10 @@ test("failed and stale fact edits preserve entered corrections and require expli
   const second = await alice.context().newPage();
   await second.goto(brandUrl);
   const secondCard = second.locator(".finding-card").filter({
-    has: second.getByRole("heading", { name: "offering", exact: true }),
+    has: second.getByRole("heading", { name: "What you offer", exact: true }),
   });
   await secondCard.getByRole("button", { name: "Edit", exact: true }).click();
-  await secondCard.getByLabel("Edit offering").fill("Unsaved alternate");
+  await secondCard.getByLabel("Edit What you offer").fill("Unsaved alternate");
   await alice
     .locator(".finding-card")
     .filter({ hasText: "Refillable soap and hand wash" })
@@ -441,7 +441,7 @@ test("failed and stale fact edits preserve entered corrections and require expli
     .click();
   await secondCard.getByRole("button", { name: "Save correction" }).click();
   await expect(secondCard.getByRole("alert")).toContainText("changed");
-  await expect(secondCard.getByLabel("Edit offering")).toHaveValue(
+  await expect(secondCard.getByLabel("Edit What you offer")).toHaveValue(
     "Unsaved alternate",
   );
   await second.close();
