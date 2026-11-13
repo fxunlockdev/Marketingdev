@@ -1,13 +1,16 @@
 {
-  "checked_at": "2026-11-13T15:50:36.747Z",
+  "checked_at": "2026-11-13T16:41:41.412Z",
   "environment_id": "36a03b4f-6f19-4424-8a8e-289cfe220561",
-  "source_commit": "eabed63 (app-fixes)",
+  "source_commit": "a54ca7a (app-fixes)",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
+      "image_id": "sha256:cd06bf29f3bd074a2b6597715de8c0ac3b8a96642cf24b1e64cc589073096d65",
       "architecture": "amd64",
-      "user": "node"
+      "user": "node",
+      "built_on_host_from": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
+      "local_reference_image": "sha256:2d6369e1b62c1b0fd5cfbfddab89cb00fbc0830809a79c94f78313f5c41772a4",
+      "dist_digest": "49cdeeae6a80d7393e614faa12055f83357c0f4964428179241690b18711338c"
     },
     {
       "role": "documents",
@@ -48,8 +51,7 @@
     }
   ],
   "rebuilt": [
-    "trusted_worker",
-    "agent_reach"
+    "trusted_worker"
   ],
   "reused": {
     "documents": "image files identical to apps/ingestion sources",
@@ -58,5 +60,5 @@
     "static_renderer": "no apps/media change since 6410f4d build",
     "video_renderer": "no apps/video change since 6410f4d build"
   },
-  "scope": "Local linux/amd64 builds for the dev2 worker host; activation pending."
+  "scope": "dev2 worker images. a54ca7a worker built on the dev2 host as the eabed63 worker plus the two changed dist files, because the image upload from the Mac stalled; dist matches the local a54ca7a build exactly."
 }

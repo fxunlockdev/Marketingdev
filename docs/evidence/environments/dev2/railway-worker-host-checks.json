@@ -1,12 +1,15 @@
 {
-  "checked_at": "2026-11-13T15:55:48.465Z",
+  "checked_at": "2026-11-13T16:41:44.542Z",
   "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
+      "image_id": "sha256:cd06bf29f3bd074a2b6597715de8c0ac3b8a96642cf24b1e64cc589073096d65",
       "architecture": "amd64",
-      "user": "node"
+      "user": "node",
+      "built_on_host_from": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
+      "local_reference_image": "sha256:2d6369e1b62c1b0fd5cfbfddab89cb00fbc0830809a79c94f78313f5c41772a4",
+      "dist_digest": "49cdeeae6a80d7393e614faa12055f83357c0f4964428179241690b18711338c"
     },
     {
       "role": "documents",
