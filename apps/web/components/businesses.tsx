@@ -893,9 +893,9 @@ export function BrandOnboarding({ business }: { business: Business }) {
     try{
       if(!brain)throw new Error('Your profile is still loading. Please try again.');
       const missing=['brand_name','offering','audience'].filter(field=>!brain.findings.some((f:any)=>f.field===field&&f.status!=='wrong'));
-      if(missing.length)throw new Error(`Complete your ${missing.map(f=>factLabel(f).toLowerCase()).join(', ')} before continuing.`);
+      if(missing.length)throw new Error(`Complete these details before continuing: ${missing.map(f=>factLabel(f)).join(', ')}.`);
       const repeated=brain.findings.find((f:any)=>f.status!=='wrong'&&brain.findings.filter((other:any)=>other.field===f.field&&other.status!=='wrong').length>1);
-      if(repeated)throw new Error(`Choose one ${factLabel(repeated.field).toLowerCase()} description and select Correct before continuing.`);
+      if(repeated)throw new Error(`${factLabel(repeated.field)}: choose one version and select Correct before continuing.`);
       const current=await api(path+'/brain');
       if(current.revision!==brain.revision)throw new Error('Your profile changed. Refresh it and review the latest details.');
       for(const fact of brain.findings.filter((f:any)=>f.status==='unreviewed'))await api(`${path}/brain/findings/${fact.id}`,{revision:fact.revision,decision:'correct'},'PATCH');
@@ -1376,7 +1376,7 @@ function FindingGroup({findings,path,writable,onSaved,onSaving}:{findings:any[];
   const [selected,setSelected]=useState<string>();
   const chosen=options.find(f=>f.id===selected)??preferredFinding(options);
   return <div className="finding-group">
-    {options.length>1&&<Field label={`Choose your ${factLabel(chosen.field).toLowerCase()} description`}>{id=><DesvioSelect id={id} value={chosen.id} onChange={e=>setSelected(e.target.value)} disabled={!writable}>{options.map((f:any,i:number)=><option key={f.id} value={f.id}>Description {i+1}: {f.value.slice(0,90)}</option>)}</DesvioSelect>}</Field>}
+    {options.length>1&&<Field label={`${factLabel(chosen.field)}: choose a version`}>{id=><DesvioSelect id={id} value={chosen.id} onChange={e=>setSelected(e.target.value)} disabled={!writable}>{options.map((f:any,i:number)=><option key={f.id} value={f.id}>Description {i+1}: {f.value.slice(0,90)}</option>)}</DesvioSelect>}</Field>}
     <Finding key={chosen.id} finding={chosen} alternatives={active.filter(f=>f.id!==chosen.id)} path={path} writable={writable} onSaved={onSaved} onSaving={onSaving}/>
   </div>;
 }
@@ -1435,7 +1435,7 @@ function Finding({
       <BrandStylePreview field={f.field} value={editing?value:f.value}/>
       {editing&&f.field==="fonts"&&<BrandFontChoices value={value} onChange={setValue} disabled={busy}/>}
       {editing && f.field!=="fonts" ? (
-        <Field label={`Edit ${factLabel(f.field).toLowerCase()}`}>
+        <Field label={`Edit ${factLabel(f.field)}`}>
           {(id) => (
             <textarea
               id={id}

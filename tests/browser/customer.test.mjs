@@ -237,6 +237,8 @@ async function createBusiness(name) {
   await expect(alice.getByRole("heading", { name: "Does this feel like you?" })).toBeVisible();
   return businessId;
 }
+/** Customer-facing fact labels, as in apps/web/components/fact-labels.ts. */
+const FACT_LABELS={brand_name:'Business name',offering:'What you offer',audience:'Who you serve',voice:'Brand voice',colors:'Brand colours',prohibited_claims:'Claims to avoid',positioning:'What makes you different',cta:'What people should do next',fonts:'Brand fonts',products:'Products or services'};
 async function addFact(field, value) {
   const manual = alice.locator("details").filter({has: alice.getByText("Add a detail the website does not cover", {exact:true})});
   if (!(await manual.evaluate(el => el.open))) await manual.locator("summary").click();
@@ -245,7 +247,7 @@ async function addFact(field, value) {
   await alice
     .getByRole("button", { name: "Add for review", exact: true })
     .click();
-  const choices=alice.getByLabel(`Choose your ${field.replaceAll('_',' ')} description`,{exact:true});
+  const choices=alice.getByLabel(`${FACT_LABELS[field]}: choose a version`,{exact:true});
   // Adding an alternative must not silently replace the currently selected description.
   await expect(async()=>{
     if(await choices.count()){
@@ -312,7 +314,7 @@ test("three-step manual fallback saves evidence, corrections, goals and immutabl
   await expect(products).toHaveCount(1);
   await products.getByRole('button',{name:'Correct',exact:true}).click();
   await expect(products.getByRole('button',{name:'Correct',exact:true})).toHaveAttribute('aria-pressed','true');
-  await expect(alice.getByLabel('Choose your products or services description')).toHaveCount(0);
+  await expect(alice.getByLabel('Products or services: choose a version')).toHaveCount(0);
   const offering=alice.locator('.missing-brand-detail').filter({has:alice.getByRole('heading',{name:'What you offer',exact:true})});
   await expect(offering.getByRole('textbox')).not.toHaveValue('');
   await offering.getByRole('textbox').fill('Refillable botanical soap');
@@ -452,7 +454,7 @@ test('Brand Kit edits persist and approval excludes unsaved drafts',async()=>{
  await alice.getByRole('button',{name:'Brand Profile',exact:true}).click();
  const offering=alice.locator('.finding-card').filter({has:alice.getByRole('heading',{name:'What you offer',exact:true})});
  await offering.getByRole('button',{name:'Edit',exact:true}).click();
- await offering.getByLabel('Edit what you offer').fill('Botanical refill packs for stores');
+ await offering.getByLabel('Edit What you offer').fill('Botanical refill packs for stores');
  await alice.getByRole('button',{name:'Save approved brand',exact:true}).click();
  await expect(alice.getByRole('alert').filter({hasText:'Save or cancel your open edits'})).toBeVisible();
  const delayedCorrection=async route=>{if(route.request().method()==='PATCH'){await setTimeout(500);}await route.continue();};
@@ -480,7 +482,7 @@ test('Brand Kit edits persist and approval excludes unsaved drafts',async()=>{
  await fonts.getByRole('button',{name:'Edit',exact:true}).click();
  await fonts.getByRole('button',{name:'Classic Aa DM Serif Display',exact:true}).click();
  await fonts.getByRole('button',{name:'Save correction',exact:true}).click();
- await expect(fonts.getByLabel('Edit brand fonts',{exact:true})).toHaveCount(0);
+ await expect(fonts.getByLabel('Edit Brand fonts',{exact:true})).toHaveCount(0);
  await alice.getByRole('button',{name:'Save approved brand',exact:true}).click();
  await expect(alice.getByRole('status').filter({hasText:'Your approved brand is saved.'})).toBeVisible();
  await alice.reload();
