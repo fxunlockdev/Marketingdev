@@ -36,9 +36,11 @@ export function CampaignPostScreen({business,selectedSlot,onDismiss}:{business:C
 export function CampaignPostDrawer({business,slotId,onClose}:{business:CampaignBusiness;slotId:string;onClose:()=>void}){
  const dialog=useRef<HTMLDialogElement>(null);
  useEffect(()=>{dialog.current?.showModal();return()=>dialog.current?.close();},[]);
- const requestClose=()=>{if(confirmNavigation())onClose();};
+ // Close the dialog before it unmounts so the browser returns focus to the control that opened it.
+ const finish=()=>{dialog.current?.close();onClose();};
+ const requestClose=()=>{if(confirmNavigation())finish();};
  return <dialog ref={dialog} className="campaign-post-drawer" aria-labelledby="campaign-post-drawer-title" onCancel={event=>{event.preventDefault();requestClose();}} onClick={event=>{if(event.target!==event.currentTarget)return;const box=event.currentTarget.getBoundingClientRect();if(event.clientX<box.left||event.clientX>box.right||event.clientY<box.top||event.clientY>box.bottom)requestClose();}}>
   <header className="campaign-post-drawer-header"><h2 id="campaign-post-drawer-title">Post details</h2><ActionButton type="button" aria-label="Close post" onClick={requestClose} label="×" /></header>
-  <div className="campaign-post-drawer-content"><CampaignPostScreen business={business} selectedSlot={slotId} onDismiss={onClose}/></div>
+  <div className="campaign-post-drawer-content"><CampaignPostScreen business={business} selectedSlot={slotId} onDismiss={finish}/></div>
  </dialog>;
 }
