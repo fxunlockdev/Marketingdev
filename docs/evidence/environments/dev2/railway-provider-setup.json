@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-11-13T14:05:44.786Z",
+  "passed": true,
+  "project": "5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12",
+  "environment": "36a03b4f-6f19-4424-8a8e-289cfe220561",
+  "sandbox": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
+  "image": "sha256:982c399859d7194f9f02042389ac7e34efbfc4ece1ee4e4a0e3d9688636dff32",
+  "operation": "apply",
+  "result": "applied",
+  "operator_source_sha256": "2b0fad94e9f76df0698d64a1e3910ec90fb94fafa693dca7a058cd2a42d267fa",
+  "paid_calls": false,
+  "scope": "One-shot dev administrator transport and checksum-verified configuration only; no model eligibility, pricing, generation, social connectivity or launch readiness proof."
+}

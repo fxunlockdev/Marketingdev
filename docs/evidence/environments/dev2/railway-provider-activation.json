@@ -1,0 +1,7 @@
+{
+  "checked_at": "2026-11-13T14:04:31.990Z",
+  "status": "activated",
+  "preview_sha256": "ae07a03383261c88699bdb4048da5c1be32f79a9756bacfe4bdb99ceadd4e622",
+  "backup_container": null,
+  "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
+}
