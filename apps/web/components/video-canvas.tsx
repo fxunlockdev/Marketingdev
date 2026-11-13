@@ -1,7 +1,7 @@
 "use client";
 import {DesvioSelect} from './desvio-select';
 import {GenerationNotification} from './generation-notification';
-import {ProjectArchiveControl} from './project-archive-control';
+import {ProjectArchiveControl,type ArchiveState} from './project-archive-control';
 import {directedPrompt,type Creativity} from './creative-direction';
 import {useCallback,useEffect,useRef,useState} from 'react';
 import {api} from './api';
@@ -37,18 +37,22 @@ export function CanvasVideos({business,threadId,compact=false,conversational=fal
  const load=useCallback(async()=>{setState(await api(root+'/videos'));setError(undefined);},[root]);
  async function retryScript(id:string,project:string){if(retryLock.current)return;retryLock.current=true;pendingRetry.current={id,project};setRetrying(true);setActionError(undefined);try{await api(`${root}/video-jobs/${id}/retry-script`,{});window.dispatchEvent(new Event('desvio-video-refresh'));}catch(e){setActionError(e);}finally{retryLock.current=false;setRetrying(false);}}
  useEffect(()=>{let alive=true,refreshing=false;let timer:ReturnType<typeof setTimeout>;const refresh=async()=>{if(refreshing)return;refreshing=true;try{const v=await api(root+'/videos');if(alive){setState(v);setError(undefined);const pending=pendingRetry.current,latest=pending?v.runs.find((r:any)=>r.project_id===pending.project):null;if(pending&&latest&&latest.id!==pending.id){pendingRetry.current=null;setActionError(undefined);}}}catch(e){if(alive)setError(e);}finally{refreshing=false;if(alive)timer=setTimeout(()=>void refresh(),3000);}};const changed=()=>{clearTimeout(timer);void refresh();};void refresh();window.addEventListener('desvio-video-refresh',changed);return()=>{alive=false;clearTimeout(timer);window.removeEventListener('desvio-video-refresh',changed);};},[root,threadId]);
- const projects=state?.projects.filter((p:any)=>p.thread_id===threadId&&(!projectId||p.id===projectId))??[];
+ // The list omits archived videos. One archived here stays in place with its confirmation and Restore control.
+ const [archived,setArchived]=useState<Record<string,any>>({});
+ const mine=(p:any)=>p.thread_id===threadId&&(!projectId||p.id===projectId);
+ const projects=[...(state?.projects.filter((p:any)=>mine(p)&&!archived[p.id])??[]),...Object.values(archived).filter(mine)];
+ const archiveChanged=(p:any)=>async(updated:ArchiveState)=>{setArchived(current=>{const {[p.id]:_,...rest}=current;return updated.archived_at?{...rest,[p.id]:{...p,...updated}}:rest;});await load();};
  if(!projects.length&&error===undefined)return null;
  return <section className="studio-projects" aria-label="Videos">{!compact&&<h2>Videos</h2>}{error!==undefined&&<div className="video-recovery"><Notice error={error}/><button type="button" onClick={()=>void load().catch(setError)}>Refresh video status</button></div>}{actionError!==undefined&&<Notice error={actionError}/>}
- {projects.map((p:any)=>{const run=state.runs.find((r:any)=>r.project_id===p.id);return <article key={p.id} className="creative-review">{!compact&&<h3>{p.title}</h3>}
+ {projects.map((p:any)=>{const run=p.archived_at?undefined:state.runs.find((r:any)=>r.project_id===p.id);return <article key={p.id} className="creative-review">{!compact&&<h3>{p.title}</h3>}
  {run?.awaiting_approval&&active(run.status)&&!run.cancel_requested&&<VideoDraft key={run.id+run.draft_revision} business={business} jobId={run.id} onSaved={load} conversational={conversational}/>}
  {run?.status==='rejected'&&run.error_code==='VIDEO_PLAN_OUTPUT_INVALID'&&<div className="video-recovery" role="status"><h3>Let’s prepare your script again</h3><p>The script’s text styling or timing couldn’t be used. Your idea and starting image are saved. Video generation hasn’t started.</p>{['owner','admin','editor'].includes(business.role)&&<button type="button" disabled={retrying} onClick={()=>void retryScript(run.id,p.id)}>{retrying?'Preparing…':'Retry script preparation'}</button>}</div>}
  {run&&run.error_code!=='VIDEO_PLAN_OUTPUT_INVALID'&&!run.awaiting_approval&&!p.latest_version_id&&<p role="status">{run.approved_revision&&active(run.status)?(reelProgressLabel(run)??'Generating your approved video…'):active(run.status)?'Preparing your script and prompt…':run.status==='unknown'?'Generation needs reconciliation before another paid request.':run.error_code==='RUNWAY_INSUFFICIENT_CREDITS'?'Video generation is paused because the service has insufficient generation credits. Your prompt, starting image and calendar are saved. Contact support to restore generation.':`Video ${run.status}. Your saved work is retained.`}</p>}
  {run&&run.status==='unknown'&&!p.latest_version_id&&['owner','admin','editor'].includes(business.role)&&<VideoStopWaiting businessId={business.id} jobId={run.id} onStopped={()=>window.dispatchEvent(new Event('desvio-video-refresh'))}/>}
  {run&&!run.awaiting_approval&&(active(run.status)||state.runs[0]?.id===run.id)&&['owner','admin','editor'].includes(business.role)&&<GenerationNotification businessId={business.id} jobIds={[run.id]}/>}
  {run&&active(run.status)&&['owner','admin','editor'].includes(business.role)&&<button type="button" disabled={run.cancel_requested} onClick={()=>void api(`${root}/video-jobs/${run.id}/cancel`,{}).then(load).catch(setActionError)}>{run.cancel_requested?'Canceling video request…':'Cancel video request'}</button>}
- {p.latest_version_id&&['owner','admin','editor'].includes(business.role)&&<ProjectArchiveControl businessId={business.id} kind="video" project={p} onChanged={load}/>}
- {p.latest_version_id&&<VideoHistory business={business} latest={p.latest_version_id} versions={state.versions.filter((v:any)=>v.project_id===p.id)}/>}</article>;})}</section>;
+ {p.latest_version_id&&['owner','admin','editor'].includes(business.role)&&<ProjectArchiveControl businessId={business.id} kind="video" project={p} onChanged={archiveChanged(p)}/>}
+ {p.latest_version_id&&!p.archived_at&&<VideoHistory business={business} latest={p.latest_version_id} versions={state.versions.filter((v:any)=>v.project_id===p.id)}/>}</article>;})}</section>;
 }
 function VideoDraft({business,jobId,onSaved,conversational=false}:{business:Business;jobId:string;onSaved:()=>Promise<void>;conversational?:boolean}){
  const [draft,setDraft]=useState<any>(),[brief,setBrief]=useState<any>(),[dirty,setDirty]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState<unknown>(),[confirmed,setConfirmed]=useState(false);

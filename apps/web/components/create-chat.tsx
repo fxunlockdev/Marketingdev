@@ -26,6 +26,18 @@ function promptDraft(text:string,base=empty()):Draft{
  const first=mode==='campaign'?'name':'topic';
  return {...base,mode,step:mode==='strategy'?0:1,composer:'',data:mode==='strategy'?{}:{[first]:mode==='campaign'?text.slice(0,140):text},messages:[...base.messages,{role:'user',text},{role:'assistant',text:questions[mode==='strategy'?'template':mode==='campaign'?'theme':'direction']}]};
 }
+/** Starts a guided post's image or carousel once. A carousel is a multi-image request, which the API accepts only
+ * with a credit cap; the cap is exactly this post's quoted credits, so the approval never authorizes more. */
+async function startGuidedVisual(planRoot:string,slotId:string,revision:number,carousel:boolean):Promise<void>{
+ let cap:number|undefined;
+ if(carousel){
+  const status=await api<{quote?:{available:boolean;slots:{id:string;revision:number;credits:number}[]}}>(`${planRoot}/image-batch`);
+  const quoted=status.quote?.available?status.quote.slots.find(q=>q.id===slotId&&q.revision===revision):undefined;
+  if(!quoted)throw new Error('Your post is saved, but carousel generation is not available right now. Open the post in Calendar to create it.');
+  cap=Math.max(1,quoted.credits);
+ }
+ await api(`${planRoot}/generate-images`,{slots:[{id:slotId,revision}],...(cap===undefined?{}:{credit_cap:cap})},'POST',`guided-create:${slotId}`);
+}
 function GuidedCreateChat({business}:{business:{id:string;name:string;role:string;has_approved_brand:boolean}}){
  const router=useRouter(),root=`/api/v1/businesses/${business.id}`;
  const [draft,setDraft]=useState<Draft>(empty),[loaded,setLoaded]=useState(false),[prefs,setPrefs]=useState<any>(),[strategyQuote,setStrategyQuote]=useState<any>(),[plans,setPlans]=useState<any[]>([]),[topics,setTopics]=useState<any[]>([]),[input,setInput]=useState(''),[multi,setMulti]=useState<string[]>([]),[error,setError]=useState<unknown>(),[jobFailed,setJobFailed]=useState(false),[topicRetry,setTopicRetry]=useState(0),[quoteRetry,setQuoteRetry]=useState(0),[busy,setBusy]=useState(false),[saving,setSaving]=useState(false),[confirm,setConfirm]=useState<'leave'|'reset'|null>(null);
@@ -70,7 +82,7 @@ function GuidedCreateChat({business}:{business:{id:string;name:string;role:strin
   if(next.mode==='post'){const slotId=r.id??r.slot_id;const savedPost={...next,request:undefined,data:{...next.data,created_slot:slotId},messages:[...next.messages,{role:'assistant' as const,text:['video','reel'].includes(next.data.format)?'Your post is saved. Choose a starting image and review the video script in the canvas.':'Your post is saved. I’m creating its visuals in the canvas.'}]};await persist(savedPost);setDraft(savedPost);
    // "Approve brief & create visual" is the approval: start the image or carousel now, once. Videos keep their own
    // script approval. The stable key makes a repeated click or a reload replay the same request, never a second one.
-   if(!['video','reel'].includes(next.data.format)&&slotId)await api(`${root}/content-plans/${next.data.campaign}/generate-images`,{slots:[{id:slotId,revision:r.revision??1}]},'POST',`guided-create:${slotId}`);
+   if(!['video','reel'].includes(next.data.format)&&slotId)await startGuidedVisual(`${root}/content-plans/${next.data.campaign}`,slotId,r.revision??1,next.data.format==='carousel');
    return;}
   const destination=next.mode==='strategy'?'strategies':`campaign-post?slot=${encodeURIComponent(r.id??r.slot_id??'')}`;
   await clearDraft({...empty(),result:destination});router.push(`/b/${business.id}/${destination}`);
