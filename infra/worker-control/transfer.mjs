@@ -1,8 +1,8 @@
 // Private temporary object transfer. Signed URL travels over stdin, never command arguments/logs.
 import {execFileSync} from 'node:child_process';
-import {createReadStream} from 'node:fs';
 import {readFile,writeFile} from 'node:fs/promises';
-import {S3Client,PutObjectCommand,GetObjectCommand,DeleteObjectCommand} from '@aws-sdk/client-s3';
+import {S3Client,GetObjectCommand,DeleteObjectCommand} from '@aws-sdk/client-s3';
+import {uploadInParts} from './multipart.mjs';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
 import {workerEnvironment,evidenceFile} from './environment.mjs';
 const quote=s=>"'"+s.replaceAll("'","'\\''")+"'";
@@ -19,7 +19,7 @@ try{
  bucket=c.bucketName;key='deployment-worker-bundle/'+bundle.sha256+'.tar.gz';
  client=new S3Client({endpoint:c.endpoint,region:c.region,forcePathStyle:true,maxAttempts:1,credentials:{accessKeyId:c.accessKeyId,secretAccessKey:c.secretAccessKey},requestChecksumCalculation:'WHEN_REQUIRED',responseChecksumValidation:'WHEN_REQUIRED'});
  uploaded=true;
- await client.send(new PutObjectCommand({Bucket:bucket,Key:key,Body:createReadStream(bundle.archive),ContentLength:bundle.bytes,ContentType:'application/gzip',Metadata:{sha256:bundle.sha256}}),{abortSignal:AbortSignal.timeout(900000)});
+ await uploadInParts(client,{Bucket:bucket,Key:key,path:bundle.archive,bytes:bundle.bytes,metadata:{sha256:bundle.sha256}});
  console.log('Private image archive uploaded; downloading and hashing on the worker host.');
  const url=await getSignedUrl(client,new GetObjectCommand({Bucket:bucket,Key:key}),{expiresIn:900});
  const code=`import sys,hashlib,json,os,urllib.request
