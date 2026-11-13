@@ -6,7 +6,7 @@ export function workerReadiness(spec,observed){
  const matches=prior?.image===spec.image&&prior?.configuration===spec.configurationHash;
  return {status:!prior?'worker_absent':matches?'configuration_matches':'replacement_required',
   running:prior?.running===true,desired_image:spec.image,
-  video_enabled:spec.values.VIDEO_ENABLED==='true',publishing_enabled:spec.values.POSTIZ_PUBLISHING_ENABLED==='true',
+  video_enabled:spec.values.VIDEO_ENABLED==='true',agent_reach_enabled:spec.values.AGENT_REACH_ENABLED==='true',publishing_enabled:spec.values.POSTIZ_PUBLISHING_ENABLED==='true',
   credentials_present:Object.fromEntries(['OPENAI_API_KEY','GEMINI_API_KEY','RUNWAYML_API_SECRET'].map(k=>[k,Boolean(spec.values[k])])),
   changed_services:false,paid_calls:false,
   scope:'Exact local image inventory and desired worker configuration only. Provider access, business allowances, API flags and live acceptance are separate.'};

@@ -1,0 +1,165 @@
+{
+ "checked_at": "2026-11-13T15:58:05.824Z",
+ "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
+ "image": "sha256:d8a72f61fff96d919371f1b0f90fb89175e65210ceadfc116d28cb178f48e683",
+ "network": {
+  "public_https": [
+   {
+    "host": "r.jina.ai",
+    "ok": true,
+    "status": 200,
+    "ms": 114
+   },
+   {
+    "host": "mcp.exa.ai",
+    "ok": true,
+    "status": 405,
+    "ms": 49
+   },
+   {
+    "host": "www.youtube.com",
+    "ok": true,
+    "status": 200,
+    "ms": 170
+   },
+   {
+    "host": "example.com",
+    "ok": true,
+    "status": 200,
+    "ms": 26
+   }
+  ],
+  "bridge_gateway": "172.17.0.1",
+  "private_dns": {
+   "postgres-rh6a.railway.internal": [
+    "10.141.208.129",
+    "fd12:ff03:a9ae:1:d000:115:308d:d081"
+   ],
+   "desvio-dev-scanner.railway.internal": [
+    "10.196.77.139",
+    "fd12:ff03:a9ae:1:d000:24b:36c4:4d8b"
+   ],
+   "desvio-dev-temporal.railway.internal": [
+    "10.198.18.89",
+    "fd12:ff03:a9ae:1:d000:9:5946:1259"
+   ],
+   "desvio-dev-api.railway.internal": [
+    "10.211.173.151",
+    "fd12:ff03:a9ae:1:d000:21c:c8d3:ad97"
+   ]
+  },
+  "private": [
+   {
+    "target": "metadata 169.254.169.254:80",
+    "reachable": false,
+    "result": "timeout"
+   },
+   {
+    "target": "link-local 169.254.0.1:80",
+    "reachable": false,
+    "result": "timeout"
+   },
+   {
+    "target": "bridge gateway :22",
+    "reachable": false,
+    "result": "ConnectionRefusedError:111"
+   },
+   {
+    "target": "bridge gateway :2375",
+    "reachable": false,
+    "result": "ConnectionRefusedError:111"
+   },
+   {
+    "target": "10.0.0.1:80",
+    "reachable": false,
+    "result": "timeout"
+   },
+   {
+    "target": "192.168.0.1:80",
+    "reachable": false,
+    "result": "timeout"
+   },
+   {
+    "target": "172.16.0.1:80",
+    "reachable": false,
+    "result": "timeout"
+   },
+   {
+    "target": "postgres-rh6a.railway.internal:5432",
+    "reachable": true
+   },
+   {
+    "target": "desvio-dev-scanner.railway.internal:3310",
+    "reachable": false,
+    "result": "ConnectionRefusedError:111"
+   },
+   {
+    "target": "desvio-dev-temporal.railway.internal:7233",
+    "reachable": true
+   },
+   {
+    "target": "desvio-dev-api.railway.internal:3100",
+    "reachable": true
+   }
+  ]
+ },
+ "agent_reach_read": {
+  "ready": true,
+  "ok": true,
+  "error": null,
+  "backend": "jina",
+  "has_text": true,
+  "note": "Rechecked 2026-11-13: one item titled Example Domain; the first run checked the wrong envelope field."
+ },
+ "host_firewall": {
+  "iptables": "absent",
+  "iptables-legacy": "absent",
+  "nft": {
+   "rc": 0,
+   "lines": [
+    "table ip docker-bridges {",
+    "\tmap filter-forward-in-jumps {",
+    "\t\ttype ifname : verdict",
+    "\t\telements = { \"docker0\" : jump filter-forward-in__docker0 }",
+    "\t}",
+    "",
+    "\tmap filter-forward-out-jumps {",
+    "\t\ttype ifname : verdict",
+    "\t\telements = { \"docker0\" : jump filter-forward-out__docker0 }",
+    "\t}",
+    "",
+    "\tmap nat-postrouting-in-jumps {",
+    "\t\ttype ifname : verdict",
+    "\t\telements = { \"docker0\" : jump nat-postrouting-in__docker0 }",
+    "\t}",
+    "",
+    "\tmap nat-postrouting-out-jumps {",
+    "\t\ttype ifname : verdict",
+    "\t\telements = { \"docker0\" : jump nat-postrouting-out__docker0 }",
+    "\t}",
+    "",
+    "\tchain filter-FORWARD {",
+    "\t\ttype filter hook forward priority filter; policy accept;",
+    "\t\toifname vmap @filter-forward-in-jumps",
+    "\t\tiifname vmap @filter-forward-out-jumps",
+    "\t}",
+    "",
+    "\tchain nat-OUTPUT {",
+    "\t\ttype nat hook output priority dstnat; policy accept;",
+    "\t\tip daddr != 127.0.0.0/8 fib daddr type local counter packets 0 bytes 0 jump nat-prerouting-and-output",
+    "\t}",
+    "",
+    "\tchain nat-POSTROUTING {",
+    "\t\ttype nat hook postrouting priority srcnat; policy accept;",
+    "\t\tiifname vmap @nat-postrouting-out-jumps",
+    "\t\toifname vmap @nat-postrouting-in-jumps",
+    "\t}",
+    "",
+    "\tchain nat-PREROUTING {",
+    "\t\ttype nat hook prerouting priority dstnat; policy accept;"
+   ]
+  },
+  "docker": "[\"name=seccomp,profile=builtin\",\"name=cgroupns\"] overlayfs"
+ },
+ "scope": "Bridge-network reachability from a throwaway Agent Reach container with production sandbox flags; no credentials."
+}

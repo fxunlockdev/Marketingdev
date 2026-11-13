@@ -1,11 +1,11 @@
 {
-  "checked_at": "2026-11-13T14:59:50.243Z",
+  "checked_at": "2026-11-13T15:50:36.747Z",
   "environment_id": "36a03b4f-6f19-4424-8a8e-289cfe220561",
-  "source_commit": "d2c70be (app-fixes)",
+  "source_commit": "eabed63 (app-fixes)",
   "images": [
     {
       "role": "trusted_worker",
-      "image_id": "sha256:60164f0755742b5a034f5a4b691ff36a7ae4be02384aac2c441af9fa5da3f2f4",
+      "image_id": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
       "architecture": "amd64",
       "user": "node"
     },
@@ -38,10 +38,18 @@
       "image_id": "sha256:4452071e703e04bbf8e9d882cf3c32b3eff057a542d2e3b233983dbe86ce6e89",
       "architecture": "amd64",
       "user": "65534:65534"
+    },
+    {
+      "role": "agent_reach",
+      "image_id": "sha256:d8a72f61fff96d919371f1b0f90fb89175e65210ceadfc116d28cb178f48e683",
+      "architecture": "amd64",
+      "user": "65534:65534",
+      "agent_reach_commit": "c70ae6da5d39bc90e09ad2ae0575ccc89f31e284"
     }
   ],
   "rebuilt": [
-    "trusted_worker"
+    "trusted_worker",
+    "agent_reach"
   ],
   "reused": {
     "documents": "image files identical to apps/ingestion sources",

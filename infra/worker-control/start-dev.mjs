@@ -1,6 +1,7 @@
 import {validateWorkerInventory} from './image-inventory.mjs';
 import {devSocialSettings} from './social-settings.mjs';
 import {providerRuntimeSettings} from './provider-settings.mjs';
+import {agentReachRuntimeSettings} from './agent-reach-settings.mjs';
 import {workerHostSpec} from '../../scripts/start-worker-host.mjs';
 import {workerReadiness,readinessProbe} from './readiness.mjs';
 import {execFileSync} from 'node:child_process';
@@ -23,8 +24,8 @@ export function loadDevWorker(){
  const values={APP_MODE:'staging',WORKER_DATABASE_URL:url('desvio_worker','WORKER_DATABASE_PASSWORD'),DISPATCHER_DATABASE_URL:url('desvio_dispatcher','DISPATCHER_DATABASE_PASSWORD'),TEMPORAL_ADDRESS:'desvio-dev-temporal.railway.internal:7233',TEMPORAL_NAMESPACE:'desvio-dev',TEMPORAL_TASK_QUEUE:'desvio-assets',POSTIZ_PROVISION_TASK_QUEUE:'desvio-provision',S3_ENDPOINT:s3.endpoint,S3_REGION:s3.region,S3_BUCKET:s3.bucketName,S3_ACCESS_KEY_ID:s3.accessKeyId,S3_SECRET_ACCESS_KEY:s3.secretAccessKey,CLAMD_HOST:'desvio-dev-scanner.railway.internal',CLAMD_PORT:'3310',DOCUMENT_PARSER_IMAGE:image('documents'),SKILL_RUNTIME_IMAGE:image('skills'),RENDER_RUNTIME_IMAGE:image('static_renderer'),VIDEO_RUNTIME_IMAGE:image('video_renderer'),DESVIO_WORKER_IMAGE:image('trusted_worker'),VIDEO_ENABLED:'false',POSTIZ_ENABLED:'false',POSTIZ_PUBLISHING_ENABLED:'false'};
  const websiteImage=images.find(i=>i.role==='website_renderer');
  if(websiteImage)values.WEBSITE_RENDER_IMAGE=websiteImage.image_id;
- const providers=providerRuntimeSettings(JSON.parse(call(['variables','--project',state.project_id,'--environment',state.environment_id,'--service','0d25c782-f1bf-4480-b136-b04e231e8279','--json'])));
- Object.assign(values,providers);
+ const settings=JSON.parse(call(['variables','--project',state.project_id,'--environment',state.environment_id,'--service','0d25c782-f1bf-4480-b136-b04e231e8279','--json']));
+ Object.assign(values,providerRuntimeSettings(settings),agentReachRuntimeSettings(settings,images));
  // Optional: Postiz is retired on app-fixes, so most environments have no social secrets file.
  const socialPath=target.socialSecretsPath;
  if(existsSync(socialPath)){
@@ -61,6 +62,6 @@ try{
  const context=loadDevWorker(),check=process.argv.includes('--check');
  const report=check?{checked_at:new Date().toISOString(),sandbox_id:context.state.id,...workerReadiness(context.spec,inspectDevWorker(context))}:startDevWorker(context);
  writeFileSync(evidenceFile(workerEnvironment(),check?'railway-worker-readiness.json':'railway-worker-start.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
-}catch(e){console.error(/^(?:INVALID_(?:PROVIDER|VIDEO)_SETTINGS|WORKER_[A-Z_]+)$/.test(e.message)?e.message:'DEV_WORKER_START_FAILED_RECONCILE');process.exitCode=1;}
+}catch(e){console.error(/^(?:INVALID_(?:PROVIDER|VIDEO|AGENT_REACH)_SETTINGS|WORKER_[A-Z_]+)$/.test(e.message)?e.message:'DEV_WORKER_START_FAILED_RECONCILE');process.exitCode=1;}
 
 }
