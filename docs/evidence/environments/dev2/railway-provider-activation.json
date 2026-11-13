@@ -1,15 +1,15 @@
 {
-  "checked_at": "2026-11-13T15:09:13.819Z",
+  "checked_at": "2026-11-13T15:59:14.102Z",
   "status": "preview",
   "version": 1,
   "worker": {
     "before": {
-      "id": "9616406a1b9f0f9a60ed4229ba524b647199987367d38c3b27de88b5b752e418",
-      "image": "sha256:60164f0755742b5a034f5a4b691ff36a7ae4be02384aac2c441af9fa5da3f2f4",
-      "configuration": "ee01944f6abf3ee7b41db406dc281dcb5d3fca3dbf0c19a9446635ded99bfc6b"
+      "id": "ab5dfcd40fbff9ec289a367df693df8edbfa47ac2a4f9297630a411458a39d48",
+      "image": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
+      "configuration": "98f464e6416887d111274168dcfc0aa673ab7b96361e716c56bba999d3961432"
     },
-    "image": "sha256:60164f0755742b5a034f5a4b691ff36a7ae4be02384aac2c441af9fa5da3f2f4",
-    "configuration": "ee01944f6abf3ee7b41db406dc281dcb5d3fca3dbf0c19a9446635ded99bfc6b",
+    "image": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
+    "configuration": "98f464e6416887d111274168dcfc0aa673ab7b96361e716c56bba999d3961432",
     "replace": false
   },
   "api": {
@@ -33,9 +33,9 @@
       "VIDEO_RUNTIME_IMAGE": "sha256:4f51cb6d02ef3e5d509e6274dfc68975e4f43a3db75744d67dc08622f2cb52c4",
       "RENDER_RUNTIME_IMAGE": "sha256:d9ea83f302e26c6b8c89dda1f9cfdae22a6792630fc3c822577f9eca2997fefc"
     },
-    "deploymentId": "7411d9ff-90ab-4ee7-a20a-379b5a5bea91",
+    "deploymentId": "40d07220-0229-43e6-87fb-117fb43c73ba",
     "update": false
   },
-  "preview_sha256": "fbf71d479ac639204d1db731e07c959186bd24382991f2925603020f5fa881a3",
+  "preview_sha256": "bad87206ce2ae8e23e8328ac9f9777539ce43f8f1336a46e64fab02befb52803",
   "scope": "Dev runtime configuration only. Business spending grants, provider eligibility and live acceptance remain separate."
 }

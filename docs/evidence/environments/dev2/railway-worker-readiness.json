@@ -1,10 +1,11 @@
 {
-  "checked_at": "2026-11-13T15:08:59.216Z",
+  "checked_at": "2026-11-13T15:58:58.021Z",
   "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
   "status": "configuration_matches",
   "running": true,
-  "desired_image": "sha256:60164f0755742b5a034f5a4b691ff36a7ae4be02384aac2c441af9fa5da3f2f4",
+  "desired_image": "sha256:199c25fc239e30836424dfa5436ccd2ffd52d451f57d1d2093947aa8d135ad82",
   "video_enabled": true,
+  "agent_reach_enabled": true,
   "publishing_enabled": false,
   "credentials_present": {
     "OPENAI_API_KEY": true,
