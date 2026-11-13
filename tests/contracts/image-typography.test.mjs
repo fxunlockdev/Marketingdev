@@ -88,3 +88,13 @@ test('designed type is never duplicated as overlay layers; overlay keeps the edi
  const manual={...designed,layers:[{...parent.layers[0],id:'note',text:'Open Sundays'}]};
  assert.deepEqual(reviseDesign(manual,'n',brief(),undefined,undefined,'in_image').layers,manual.layers);
 });
+
+test('in-image prompts end by restating the only words allowed, so a task asking for body copy or disclosures cannot override it',()=>{
+ const task=brief({},{image_prompt:'Warm kitchen. Add supporting copy about our service and a small disclosure: "Illustrative image only."'});
+ const prompt=buildImagePrompt({brief:task,identity,references:[],hasParent:false,textMode:'in_image'});
+ const rule=prompt.slice(prompt.lastIndexOf('FINAL TEXT RULE'));
+ assert.ok(prompt.lastIndexOf('FINAL TEXT RULE')>prompt.indexOf('CREATIVE TASK:'),'the rule comes after the creative task');
+ assert.ok(rule.includes(JSON.stringify('Fresh coats, happy dogs'))&&rule.includes(JSON.stringify('Book now'))&&rule.includes(JSON.stringify('Groomday')));
+ assert.match(rule,/disclaimers|disclosures/);assert.match(rule,/caption/);
+ for(const mode of ['overlay','none'])assert.ok(!buildImagePrompt({brief:task,identity,references:[],hasParent:false,textMode:mode}).includes('FINAL TEXT RULE'));
+});

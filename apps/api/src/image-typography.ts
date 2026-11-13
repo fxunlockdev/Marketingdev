@@ -38,6 +38,15 @@ export function inImageCopy(brief:CreativeBrief):InImageCopy{
  return {headline:brief.headline.trim(),cta:cta.length<=IN_IMAGE_CTA_MAX&&!/[\r\n]/.test(cta)?cta:''};
 }
 
+/** Last paragraph of an in-image prompt. The creative task is written by the planner and sometimes asks for
+ * supporting copy or disclosures; image models follow the latest instruction, so the allowed words are restated
+ * after it. Supporting copy and disclosures belong in the post caption. */
+export function finalTextRule(mode:TextMode,brief:CreativeBrief,brandName=''):string{
+ if(mode!=='in_image')return '';
+ const copy=inImageCopy(brief),words=[`the headline ${JSON.stringify(copy.headline)}`,copy.cta?`the call to action ${JSON.stringify(copy.cta)}`:'',brandName?`the brand name ${JSON.stringify(brandName)} in small type`:''].filter(Boolean);
+ return `FINAL TEXT RULE (this overrides any wording above, including the creative task): the only words in the picture are ${words.join(', ')}. Do not add supporting copy, explanations, disclaimers, disclosures, labels, tags or captions; they belong in the post caption.`;
+}
+
 /** First paragraph of the image prompt: what lettering, if any, belongs in the picture. */
 export function typographyDirection(mode:TextMode,brief:CreativeBrief,artwork?:PostArtwork,brandName=''):string{
  if(mode==='none')return artworkDirection({text:'none'});
