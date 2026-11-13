@@ -98,6 +98,7 @@ class Run{
  private finish(){this.finished();}
  private async stop(){
   if(!this.session||this.closing)return;
+  this.closing=true;
   await this.session.close();
   this.finish();
  }
@@ -117,12 +118,14 @@ class Run{
   }finally{this.planning--;this.maybeEnd();}
  }
  private async start(task:ReachTask){
+  // Nothing new starts once the run is stopping: a late row would never be settled.
+  if(this.closing||Date.now()>=this.deadline)return;
   const robotsOk=task.channel==='web'&&task.action==='read'?await this.robots.allowed(task.params.target!).catch(()=>false):true;
   const outcome=await this.admit(task,robotsOk);
   if(outcome.kind==='refused'){this.counts.refused++;return;}
   if(outcome.kind==='cached'){this.counts.cached++;await this.use(task,outcome.envelope);return;}
   this.rows.set(task.id,outcome.row);this.open.add(task.id);this.counts.calls++;
-  if(Date.now()>=this.deadline)return;
+  if(this.closing||Date.now()>=this.deadline){if(this.closing)await this.abandonOpen();return;}
   this.session!.send(task);
  }
  private admit(task:ReachTask,robotsOk:boolean):Promise<Outcome>{
