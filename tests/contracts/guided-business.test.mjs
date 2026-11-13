@@ -67,7 +67,8 @@ test('reading saved questionnaire never replaces intentionally cleared answers',
   return fn({query:async(sql)=>{queries.push(sql);return {rows:sql.includes('guided_business_briefs')?[saved]:[]};}});
  }}},null);
  // Researched suggestions are offered beside the answers; they never fill or change them.
- assert.deepEqual(await service.read('user','brand'),{...saved,suggestions:{audience:[],competitors:[]},onboarding:{social_profile_limit:1,channels:[]}});
+ // Research progress and the early analysis state are reported beside them, read-only.
+ assert.deepEqual(await service.read('user','brand'),{...saved,early_analysis_current:false,progress:{website:'skipped',market:'skipped',analysis:'waiting'},suggestions:{audience:[],competitors:[]},onboarding:{social_profile_limit:1,channels:[]}});
  assert.equal(queries.filter(sql=>sql.includes('guided_business_briefs')).length,1);
  assert.ok(!queries.some(sql=>sql.includes('brand_brain_versions')),'Existing drafts do not read or merge approved defaults');
 });

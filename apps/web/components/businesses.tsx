@@ -921,7 +921,9 @@ export function BrandOnboarding({ business }: { business: Business }) {
       setState({ ...state, [key]: value });
       setDirty(true);
     };
-  const profileReady=!business.website||['brand_name','offering'].every(field=>brain?.findings?.some((f:any)=>(f.field===field||(field==='offering'&&f.field==='products'))&&f.status!=='wrong'));
+  // The business name is already known from the owner, so research only has to find what the business offers;
+  // a missing name is confirmed on the review step, pre-filled with the name the owner typed.
+  const profileReady=!business.website||brain?.findings?.some((f:any)=>['offering','products'].includes(f.field)&&f.status!=='wrong');
   const preparing=!manualSetup&&(intakeState?.jobs.some((j:any)=>['queued','running','retrying'].includes(j.status))||(!!business.website&&(!profileReady||!intakeState||intakeState.jobs.find((j:any)=>j.kind==='brand.analyze')?.status!=='succeeded')));
   return (
     <div className="brand-onboarding-experience">
@@ -1235,7 +1237,7 @@ function BrandReview({
                   onSaving={saving}
                 />
               ))}
-              {group.fields.filter(field=>['brand_name','offering','audience','voice'].includes(field)&&!brain.findings.some((f:any)=>f.field===field&&f.status!=='wrong')).map(field=><MissingBrandDetail key={field} field={field} suggested={field==='audience'?recommendation?.audience:field==='offering'?preferredFinding(brain.findings.filter((f:any)=>f.field==='products'&&f.status!=='wrong'))?.value:undefined} path={path} writable={writable} onSaved={load} onSaving={saving}/>)}
+              {group.fields.filter(field=>['brand_name','offering','audience','voice'].includes(field)&&!brain.findings.some((f:any)=>f.field===field&&f.status!=='wrong')).map(field=><MissingBrandDetail key={field} field={field} suggested={field==='brand_name'?business.name:field==='audience'?recommendation?.audience:field==='offering'?preferredFinding(brain.findings.filter((f:any)=>f.field==='products'&&f.status!=='wrong'))?.value:undefined} path={path} writable={writable} onSaved={load} onSaving={saving}/>)}
             </div>
             </section>)}
             {!brain.findings.length && (
