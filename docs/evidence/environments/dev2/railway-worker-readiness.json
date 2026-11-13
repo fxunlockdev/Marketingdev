@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-11-13T14:02:08.122Z",
+  "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
+  "status": "configuration_matches",
+  "running": true,
+  "desired_image": "sha256:982c399859d7194f9f02042389ac7e34efbfc4ece1ee4e4a0e3d9688636dff32",
+  "video_enabled": true,
+  "publishing_enabled": false,
+  "credentials_present": {
+    "OPENAI_API_KEY": true,
+    "GEMINI_API_KEY": true,
+    "RUNWAYML_API_SECRET": true
+  },
+  "changed_services": false,
+  "paid_calls": false,
+  "scope": "Exact local image inventory and desired worker configuration only. Provider access, business allowances, API flags and live acceptance are separate."
+}

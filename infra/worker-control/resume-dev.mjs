@@ -3,6 +3,7 @@ import {activationIO} from './activate-dev.mjs';
 import {API_ACTIVATION_FLAGS} from './activation.mjs';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {workerEnvironment} from './environment.mjs';
 
 // Resume only the already-authorized, checkpointed operation. No new pause
 // deployment and no duplicate worker swap are allowed.
@@ -82,4 +83,4 @@ if(j.stage==='verified'){
 }
 
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await resumeCheckpoint(JSON.parse(readFileSync('work/provider-activation-journal.json')));
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await resumeCheckpoint(JSON.parse(readFileSync(workerEnvironment().journalPath)));

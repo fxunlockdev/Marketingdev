@@ -18,7 +18,11 @@ The operator-only `infra/worker-control/` scripts target the existing Desvio dev
 
 `verify-host.mjs` checks imported IDs/architecture/users plus real clean-file acceptance, standard antivirus test rejection and fresh scanner signatures. `start-dev.mjs` reads the ignored mode-600 local role-password recovery file and Railway bucket credentials into memory, passes values through stdin and starts the guarded worker controller. No model keys or live provider grants are enabled. Never checkpoint this host after worker configuration: Docker container metadata contains runtime credentials. `check-registration.mjs` checks the two role logins and actual workflow/activity pollers; it does not imply successful customer jobs or recovery.
 
-Actual host/image/scanner/start/registration evidence is recorded separately under `docs/evidence/railway-worker-*.json`. Full deployed tenant/job/browser acceptance remains required.
+Actual host/image/scanner/start/registration evidence is recorded separately under `docs/evidence/railway-worker-*.json`.
+
+### Other environments
+
+The scripts target dev unless `DESVIO_RAILWAY_ENVIRONMENT` names another known Railway environment (see `infra/worker-control/environment.mjs`). With it set, every script uses that environment's own host state (`work/railway-worker-host-<id>.json`), role-password file (`work/railway-runtime-secrets-<id>.json`, mode 600, its `environment_id` must match), media/transfer bucket, bundle directory, activation journal, image inventory and evidence (`docs/evidence/environments/<name>/`). Dev keeps its original paths. The Postiz secrets file is optional. Order: `host.mjs ensure`, `bundle.mjs`, `transfer.mjs`, `load.mjs`, `verify-host.mjs`, `start-dev.mjs --check`, `start-dev.mjs`, `check-registration.mjs`, `activate-dev.mjs` (preview, then `--apply <sha>`), `configure-providers.mjs`. Full deployed tenant/job/browser acceptance remains required.
 
 ## Hosted component acceptance
 

@@ -1,0 +1,19 @@
+{
+  "checked_at": "2026-11-13T14:06:01.971Z",
+  "sandbox_id": "aa775e7c-5af1-46ba-bc90-11c0df40561d",
+  "queues": [
+    {
+      "type": 1,
+      "pollers": 1
+    },
+    {
+      "type": 2,
+      "pollers": 1
+    }
+  ],
+  "roles": [
+    "desvio_worker",
+    "desvio_dispatcher"
+  ],
+  "scope": "Actual workflow/activity pollers and role logins; durable job execution/recovery not yet accepted"
+}

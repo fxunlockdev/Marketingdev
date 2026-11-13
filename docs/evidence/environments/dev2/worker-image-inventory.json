@@ -1,0 +1,54 @@
+{
+  "checked_at": "2026-11-13T13:53:27.611Z",
+  "environment_id": "36a03b4f-6f19-4424-8a8e-289cfe220561",
+  "source_commit": "6410f4d (app-fixes)",
+  "images": [
+    {
+      "role": "trusted_worker",
+      "image_id": "sha256:982c399859d7194f9f02042389ac7e34efbfc4ece1ee4e4a0e3d9688636dff32",
+      "architecture": "amd64",
+      "user": "node"
+    },
+    {
+      "role": "documents",
+      "image_id": "sha256:1b5a92d5e659ae8a5f47994f3d0705671712bc673c65f1d01bea6ad165fe0a57",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "skills",
+      "image_id": "sha256:52f9387fc4f9523e845e532d2be37d93e87a0560755bf15d6cbc9df53ab62aeb",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "static_renderer",
+      "image_id": "sha256:d9ea83f302e26c6b8c89dda1f9cfdae22a6792630fc3c822577f9eca2997fefc",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "video_renderer",
+      "image_id": "sha256:4f51cb6d02ef3e5d509e6274dfc68975e4f43a3db75744d67dc08622f2cb52c4",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    },
+    {
+      "role": "website_renderer",
+      "image_id": "sha256:4452071e703e04bbf8e9d882cf3c32b3eff057a542d2e3b233983dbe86ce6e89",
+      "architecture": "amd64",
+      "user": "65534:65534"
+    }
+  ],
+  "rebuilt": [
+    "trusted_worker",
+    "static_renderer",
+    "skills",
+    "video_renderer"
+  ],
+  "reused": {
+    "documents": "image files identical to apps/ingestion sources",
+    "website_renderer": "image files identical to apps/website-renderer sources"
+  },
+  "scope": "Local linux/amd64 builds for the dev2 worker host; activation pending."
+}

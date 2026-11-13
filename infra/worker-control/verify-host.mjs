@@ -1,11 +1,13 @@
 // Read-only image checks and harmless scanner acceptance on the exact private dev host.
 import {execFileSync} from 'node:child_process';
 import {readFile,writeFile} from 'node:fs/promises';
+import {workerEnvironment,evidenceFile} from './environment.mjs';
 const quote=s=>"'"+s.replaceAll("'","'\\''")+"'";
 try {
- const state=JSON.parse(await readFile('work/railway-worker-host.json','utf8'));
- const inventory=JSON.parse(await readFile('docs/evidence/worker-image-inventory.json','utf8'));
- if(state.project_id!=='5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12'||state.environment_id!=='6a760b10-9ed8-4f01-9c4a-77a25919755a')throw Error();
+ const target=workerEnvironment();
+ const state=JSON.parse(await readFile(target.statePath,'utf8'));
+ const inventory=JSON.parse(await readFile(target.inventoryPath,'utf8'));
+ if(state.project_id!==target.project||state.environment_id!==target.environment)throw Error();
  const code=`import json,subprocess,socket,struct,datetime
 inventory=json.loads(${JSON.stringify(JSON.stringify(inventory.images))})
 for image in inventory:
@@ -33,5 +35,5 @@ assert command('INSTREAM',eicar).endswith(' FOUND')
 print(json.dumps({'images':inventory,'scanner_version':version,'clean_accepted':True,'antivirus_test_rejected':True,'signatures_fresh':True}))`;
  const out=execFileSync('railway',['sandbox','exec','--id',state.id,'--project',state.project_id,'--environment',state.environment_id,'--timeout','60','--','python3 -c '+quote(code)],{encoding:'utf8',timeout:70000,stdio:['ignore','pipe','pipe']});
  const report={checked_at:new Date().toISOString(),sandbox_id:state.id,...JSON.parse(out),scope:'Actual imported image identity/architecture/user and private scanner acceptance; worker jobs and providers not verified'};
- await writeFile('docs/evidence/railway-worker-host-checks.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
+ await writeFile(evidenceFile(target,'railway-worker-host-checks.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
 }catch{console.error('HOST_ACCEPTANCE_FAILED');process.exitCode=1;}

@@ -2,8 +2,9 @@
 import {execFileSync} from 'node:child_process';
 import {readFile,writeFile,mkdir} from 'node:fs/promises';
 import {resolve,dirname} from 'node:path';
-const project='5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12',environment='6a760b10-9ed8-4f01-9c4a-77a25919755a';
-const statePath=resolve('work/railway-worker-host.json');
+import {workerEnvironment} from './environment.mjs';
+const target=workerEnvironment(),project=target.project,environment=target.environment;
+const statePath=resolve(target.statePath);
 const run=args=>JSON.parse(execFileSync('railway',['sandbox',...args,'--project',project,'--environment',environment,'--json'],{encoding:'utf8',timeout:60000,maxBuffer:1024*1024,stdio:['ignore','pipe','pipe'],env:{...process.env,RAILWAY_CALLER:'skill:use-railway@1.7.0',RAILWAY_AGENT_SESSION:'desvio-worker-transfer-20261023'}}));
 async function save(state){await mkdir(dirname(statePath),{recursive:true});await writeFile(statePath,JSON.stringify(state,null,2)+'\n',{mode:0o600});}
 async function load(){try{return JSON.parse(await readFile(statePath,'utf8'));}catch(e){if(e.code==='ENOENT')return null;throw e;}}

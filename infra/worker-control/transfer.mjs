@@ -4,13 +4,14 @@ import {createReadStream} from 'node:fs';
 import {readFile,writeFile} from 'node:fs/promises';
 import {S3Client,PutObjectCommand,GetObjectCommand,DeleteObjectCommand} from '@aws-sdk/client-s3';
 import {getSignedUrl} from '@aws-sdk/s3-request-presigner';
+import {workerEnvironment,evidenceFile} from './environment.mjs';
 const quote=s=>"'"+s.replaceAll("'","'\\''")+"'";
-const project='5427d9ae-d5d0-4e6f-8dcb-52fc8de67e12',environment='6a760b10-9ed8-4f01-9c4a-77a25919755a',bucketId='9355c904-bbb8-434b-b1b9-7f7a11ff7f32';
+const target=workerEnvironment(),project=target.project,environment=target.environment,bucketId=target.bucket,directory=target.bundleDirectory;
 const env={...process.env,RAILWAY_CALLER:'skill:use-railway@1.7.0',RAILWAY_AGENT_SESSION:'desvio-worker-transfer-20261023'};
 let client,bucket,key,uploaded=false;
 try{
- const state=JSON.parse(await readFile('work/railway-worker-host.json','utf8')),bundle=JSON.parse(await readFile('work/worker-bundle/bundle.json','utf8'));
- if(state.environment_id!==environment||!/^[-a-f0-9]{36}$/.test(state.id)||!/^[a-f0-9]{64}$/.test(bundle.sha256)||bundle.archive!==`work/worker-bundle/${bundle.sha256}.tar.gz`||!Number.isSafeInteger(bundle.bytes)||bundle.bytes<1||bundle.bytes>5_000_000_000)throw new Error('TRANSFER_SCOPE_INVALID');
+ const state=JSON.parse(await readFile(target.statePath,'utf8')),bundle=JSON.parse(await readFile(directory+'/bundle.json','utf8'));
+ if(state.environment_id!==environment||!/^[-a-f0-9]{36}$/.test(state.id)||!/^[a-f0-9]{64}$/.test(bundle.sha256)||bundle.archive!==`${directory}/${bundle.sha256}.tar.gz`||!Number.isSafeInteger(bundle.bytes)||bundle.bytes<1||bundle.bytes>5_000_000_000)throw new Error('TRANSFER_SCOPE_INVALID');
  const prefix=['sandbox','exec','--id',state.id,'--project',project,'--environment',environment];
  const probe=JSON.parse(execFileSync('railway',[...prefix,'--timeout','20','--','python3 -c '+quote('import json,platform,shutil; print(json.dumps({"arch":platform.machine(),"free":shutil.disk_usage("/opt").free}))')],{encoding:'utf8',timeout:30000,env,stdio:['ignore','pipe','pipe']}));
  if(probe.arch!=='x86_64'||probe.free<bundle.bytes*3)throw new Error('TRANSFER_HOST_CAPACITY_INVALID');
@@ -45,6 +46,6 @@ except Exception:
  const result=JSON.parse(out);if(result.sha256!==bundle.sha256||result.bytes!==bundle.bytes||result.verified!==true)throw new Error('TRANSFER_RESULT_MISMATCH');
  await client.send(new DeleteObjectCommand({Bucket:bucket,Key:key}));uploaded=false;
  const report={checked_at:new Date().toISOString(),sandbox_id:state.id,environment_id:environment,...result,temporary_private_object_removed:true,scope:'Exact Docker archive bytes transferred and hashed on private host; image import and worker readiness not yet proven'};
- await writeFile('docs/evidence/railway-worker-transfer.json',JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
+ await writeFile(evidenceFile(target,'railway-worker-transfer.json'),JSON.stringify(report,null,2)+'\n');console.log(JSON.stringify(report));
 }catch(e){console.error(/^TRANSFER_[A-Z_]+$/.test(e.message)?e.message:'TRANSFER_FAILED_CHECK_HOST_BEFORE_RETRY');process.exitCode=1;}
 finally{if(uploaded&&client){try{await client.send(new DeleteObjectCommand({Bucket:bucket,Key:key}));}catch{console.error('TRANSFER_TEMPORARY_OBJECT_CLEANUP_REQUIRED');}}client?.destroy();}
