@@ -24,3 +24,7 @@
 @media(prefers-reduced-motion:reduce){.stages li[data-state=running] .marker{animation:none}}
 .early{margin-top:20px;padding:16px 20px;border:1px solid var(--brand-border);border-radius:12px;background:var(--brand-field)}
 .early p{margin:0}
+
+/* Recovery actions: one primary, the rest step down, with room between them. */
+.recovery{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-top:20px}
+.recovery p{flex-basis:100%;margin:0}

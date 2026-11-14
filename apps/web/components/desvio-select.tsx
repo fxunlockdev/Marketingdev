@@ -24,13 +24,14 @@ function Check(){return <svg width="14" height="14" viewBox="0 0 20 20" fill="no
  * Base UI owns keyboard navigation, typeahead, focus and collision handling.
  * The native select preserves existing form validation, payloads and change handlers.
  */
-export function DesvioSelect({children, id:providedId, className='', style, value, defaultValue, onChange, disabled, multiple=false, placeholder='Select an option', ...props}:SelectHTMLAttributes<HTMLSelectElement>&{placeholder?:string}){
+export function DesvioSelect({children, id:providedId, className='', style, value, defaultValue, onChange, disabled, multiple=false, placeholder='Select an option', anchorSelector, ...props}:SelectHTMLAttributes<HTMLSelectElement>&{placeholder?:string;/** Closest ancestor the menu lines up with and matches in width, when the trigger is only part of a larger control. */anchorSelector?:string}){
  const generated=useId(),id=providedId??generated,native=useRef<HTMLSelectElement>(null),trigger=useRef<HTMLButtonElement>(null),host=useRef<HTMLSpanElement>(null);
  const options=choices(children),[uncontrolled,setUncontrolled]=useState(defaultValue??(multiple?[]:options.find(o=>!o.disabled)?.value??''));
- const [container,setContainer]=useState<HTMLElement|null>(null),[inheritedDisabled,setInheritedDisabled]=useState(false),[open,setOpen]=useState(false),[invalid,setInvalid]=useState(false);
+ const [container,setContainer]=useState<HTMLElement|null>(null),[anchor,setAnchor]=useState<Element|null>(null),[inheritedDisabled,setInheritedDisabled]=useState(false),[open,setOpen]=useState(false),[invalid,setInvalid]=useState(false);
  const raw=value??uncontrolled,selected=multiple?(Array.isArray(raw)?raw.map(String):[]):String(raw),blocked=!!disabled||inheritedDisabled;
  useLayoutEffect(()=>{
   setContainer(host.current?.closest('dialog')??null);
+  setAnchor(anchorSelector?host.current?.closest(anchorSelector)??null:null);
   const fieldsets:HTMLFieldSetElement[]=[];let parent=host.current?.parentElement;
   while(parent){if(parent instanceof HTMLFieldSetElement)fieldsets.push(parent);parent=parent.parentElement;}
   const sync=()=>setInheritedDisabled(native.current?.matches(':disabled')??false);
@@ -53,7 +54,7 @@ export function DesvioSelect({children, id:providedId, className='', style, valu
     <span className="ds-select-value">{display}</span><Select.Icon className="ds-select-chevron"><Chevron/></Select.Icon>
    </Select.Trigger>
    <Select.Portal container={container??undefined}>
-    <Select.Positioner className="ds-select-positioner" sideOffset={6} align="start" alignItemWithTrigger={false} collisionBoundary={container??undefined}>
+    <Select.Positioner className="ds-select-positioner" sideOffset={6} align="start" alignItemWithTrigger={false} anchor={anchor??undefined} collisionBoundary={container??undefined}>
      <Select.Popup className="ds-select-popup" data-multiple={multiple||undefined} onKeyDown={event=>{if(event.key==='Escape')event.stopPropagation();}}>
       <Select.List className="ds-select-list" aria-label={props['aria-label']}>
        {options.map(option=><Select.Item key={option.value} value={option.value} disabled={option.disabled} className="ds-select-option">

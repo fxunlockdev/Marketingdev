@@ -238,6 +238,7 @@ export function BusinessApp({ pathname }: { pathname: string }) {
               <DesvioSelect
                 id={id}
                 aria-label="Business"
+                anchorSelector=".workspace-business"
                 value={business?.id ?? ""}
                 onChange={(e) =>
                   confirmNavigation() && router.push(
