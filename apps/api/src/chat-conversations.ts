@@ -76,7 +76,7 @@ export class ChatConversations {
    const previous=conversation?(await db.query(`SELECT t.message,j.status,r.output,t.action_result FROM app.chat_turns t JOIN app.jobs j ON j.id=t.job_id JOIN app.planning_requests r ON r.job_id=t.job_id WHERE t.conversation_id=$1 ORDER BY t.created_at DESC,t.job_id DESC LIMIT 12`,[conversation])).rows.reverse():[];
    if(conversation&&(await db.query('SELECT count(*)::int AS n FROM app.chat_turns WHERE conversation_id=$1',[conversation])).rows[0].n>=150)throw new ConflictException('Start a new conversation; this one remains in History.');
    const brain=(await db.query('SELECT id,sha256,snapshot FROM app.brand_brain_versions ORDER BY approved_at DESC,id LIMIT 1')).rows[0];
-   if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('Confirm your brand knowledge before creating with chat.');
+   if(!brain||hash(canonicalJSON(brain.snapshot))!==brain.sha256)throw new ConflictException('Approve your brand profile before creating with chat.');
    const prefs=(await db.query('SELECT timezone,channels,creative_brief FROM app.business_onboarding LIMIT 1')).rows[0];
    const grant=(await db.query("SELECT model FROM app.planning_grants WHERE provider='openai' AND enabled AND expires_at>now() LIMIT 1")).rows[0];
    if(!grant)throw new ConflictException('AI conversations are not enabled for this business yet.');
