@@ -4,6 +4,7 @@ import {providerRuntimeSettings} from './provider-settings.mjs';
 import {agentReachRuntimeSettings} from './agent-reach-settings.mjs';
 import {workerHostSpec} from '../../scripts/start-worker-host.mjs';
 import {workerReadiness,readinessProbe} from './readiness.mjs';
+import {applySandboxEgress} from './sandbox-egress.mjs';
 import {execFileSync} from 'node:child_process';
 import {readFileSync,writeFileSync,existsSync} from 'node:fs';
 import {resolve} from 'node:path';
@@ -43,7 +44,9 @@ export function inspectDevWorker({state,spec}){
   const observed=execFileSync('railway',['sandbox','exec','--id',state.id,'--project',state.project_id,'--environment',state.environment_id,'--timeout','30','--','python3 -c '+quote(readinessProbe)],{input:JSON.stringify({images:spec.images}),env:cliEnv,encoding:'utf8',timeout:40000,stdio:['pipe','pipe','pipe']});
  return JSON.parse(observed);
 }
-export function startDevWorker({state,values}){
+export function startDevWorker({state,values},applyEgress=applySandboxEgress){
+ // Agent Reach containers read untrusted pages: fence them off the private network before the worker can launch one.
+ if(values.AGENT_REACH_IMAGE)applyEgress(state);
  const code=`import sys,json,subprocess,os
 values=json.load(sys.stdin)
 env=dict(os.environ,**values)
