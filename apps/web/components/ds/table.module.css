@@ -1,0 +1,174 @@
+/* Table: a solid surface that scrolls sideways when it has to.
+ *
+ * The header row is sticky and uses thin glass, because rows pass under it. It
+ * sticks whenever the container scrolls down, so give the container a
+ * `maxHeight` to get that. Borders are separate (not collapsed) so the sticky
+ * header keeps its divider. Row hover is a tint with no animation.
+ */
+.container {
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  overscroll-behavior-x: contain;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: var(--brand-surface);
+  color: var(--brand-ink);
+  box-shadow: var(--hairline);
+  -webkit-overflow-scrolling: touch;
+}
+.container:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.table {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+  color: inherit;
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  text-align: start;
+}
+
+.thead,
+.tbody,
+.tr {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+/* Header cell. Glass comes from materials; the rules below it are scoped under
+   .table so they win over the glass class whatever the load order. */
+.th {
+  composes: glassThin from './materials.module.css';
+}
+.table .th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  box-sizing: border-box;
+  height: var(--control-height);
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 0;
+  box-shadow: inset 0 -1px 0 var(--ink-a8);
+  color: var(--brand-muted);
+  font: var(--text-micro);
+  letter-spacing: var(--tracking-micro);
+  text-align: start;
+  text-transform: uppercase;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.td {
+  box-sizing: border-box;
+  height: var(--control-height-lg);
+  margin: 0;
+  padding: var(--space-2) var(--space-4);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: start;
+  vertical-align: middle;
+}
+.tr + .tr > .td { border-top: 1px solid var(--ink-a8); }
+
+.table .th:first-child, .td:first-child { padding-left: var(--space-5); }
+.table .th:last-child, .td:last-child { padding-right: var(--space-5); }
+
+.table .th[data-align='center'], .td[data-align='center'] { text-align: center; }
+.table .th[data-align='end'], .td[data-align='end'] { text-align: end; }
+.td[data-numeric] { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (hover: hover) {
+  .tbody > .tr:hover { background: var(--ink-a3); }
+}
+
+.caption {
+  caption-side: bottom;
+  box-sizing: border-box;
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  border-top: 1px solid var(--ink-a8);
+  color: var(--brand-muted);
+  font: var(--text-caption);
+  letter-spacing: var(--tracking-body);
+  text-align: start;
+  text-wrap: pretty;
+}
+
+/* Sort button: fills the header cell's height so the target is 44px tall. Its
+   padding is pulled back by a negative margin so the label stays on the
+   column's edge and the inset focus ring clears the text. */
+.sort {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  margin: 0 calc(var(--space-2) * -1);
+  padding: 0 var(--space-2);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--motion-base) var(--spring-snappy);
+}
+.th[data-align='end'] .sort { flex-direction: row-reverse; }
+.sort:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+.sort[data-direction='ascending'],
+.sort[data-direction='descending'] { color: var(--brand-ink); }
+@media (hover: hover) {
+  .sort:hover { color: var(--brand-ink); }
+  .sort[data-direction='none']:hover .sortIcon { opacity: .5; }
+}
+.sort:active { transform: scale(var(--press-scale)); transition-duration: var(--motion-instant); }
+
+/* The chevron points down for descending and turns over for ascending. */
+.sortIcon {
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+  opacity: 0;
+  transition: transform var(--motion-base) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+}
+.sort[data-direction='ascending'] .sortIcon { opacity: 1; transform: rotate(.5turn); }
+.sort[data-direction='descending'] .sortIcon { opacity: 1; }
+.sort[data-direction='none']:focus-visible .sortIcon { opacity: .5; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sort, .sort:active { transform: none; transition: none; }
+  .sortIcon { transition: none; }
+}
+@media (forced-colors: active) {
+  .container { border: 1px solid CanvasText; }
+  .table .th { border-bottom: 1px solid CanvasText; }
+}

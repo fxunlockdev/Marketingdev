@@ -1,0 +1,74 @@
+/* Skeleton: a quiet placeholder with the shape of the content to come.
+ *
+ * The block is a flat ink tint. The shimmer is a gradient on a pseudo-element
+ * that slides across with transform only, clipped by the block; the background
+ * itself never animates. With reduced motion the block stays still.
+ */
+.skeleton {
+  position: relative;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  height: 1em;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: var(--ink-a8);
+}
+.skeleton[data-radius='xs'] { border-radius: var(--radius-xs); }
+.skeleton[data-radius='md'] { border-radius: var(--radius-md); }
+.skeleton[data-radius='lg'] { border-radius: var(--radius-lg); }
+.skeleton[data-radius='xl'] { border-radius: var(--radius-xl); }
+.skeleton[data-radius='full'] { border-radius: var(--radius-full); }
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--surface-a70), transparent);
+  transform: translateX(-100%);
+  animation: shimmer 1.4s var(--ease-in-out) infinite;
+  pointer-events: none;
+}
+@keyframes shimmer { to { transform: translateX(100%); } }
+
+/* Paragraph: 12px bars on the body text rhythm; the last line ends early. */
+.lines {
+  display: grid;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: var(--space-1) 0;
+}
+.line { height: var(--space-3); }
+.line:last-child:not(:first-child) { width: 62%; }
+
+/* Card placeholder: the title bar, the copy and the action keep a card's spacing.
+   The grid sits inside the Card so nothing here competes with the Card's own class. */
+.cardBody {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+}
+.cardTitle { width: 46%; height: var(--space-5); }
+.cardAction { width: calc(var(--space-12) * 2); height: var(--control-height-sm); margin-top: var(--space-2); }
+
+.group {
+  position: relative;
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { display: none; animation: none; }
+}
+@media (forced-colors: active) {
+  .skeleton { border: 1px solid GrayText; }
+  .skeleton::after { display: none; animation: none; }
+}

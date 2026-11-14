@@ -1,0 +1,157 @@
+/* Button: primary, secondary, ghost, destructive × sm, md, lg.
+ *
+ * Motion uses transform and opacity only. Hover brightens through a tint layer
+ * (::before) and lifts through a shadow layer (::after); both animate opacity.
+ * Press scales the button down with a spring. No colour or shadow is animated.
+ */
+.button {
+  --btn-bg: var(--brand-ink);
+  --btn-fg: var(--brand-paper);
+  --btn-tint: var(--brand-paper);
+  --btn-tint-strength: .14;
+  --btn-edge: 0 0 0 0 transparent;
+  --btn-height: var(--control-height);
+  --btn-pad: var(--space-5);
+
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-height: var(--btn-height);
+  margin: 0;
+  padding: 0 var(--btn-pad);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--btn-bg);
+  color: var(--btn-fg);
+  box-shadow: var(--btn-edge);
+  font: var(--text-callout);
+  font-weight: 600;
+  letter-spacing: var(--tracking-body);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  appearance: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--motion-base) var(--spring-snappy);
+}
+
+.button::before,
+.button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.button::before { z-index: -1; background: var(--btn-tint); }
+.button::after { z-index: -2; box-shadow: var(--elevation-2); }
+
+/* The old global sheets repaint bare `button:hover`; hold our own fill until they are removed. */
+.button:hover, .button:active { background: var(--btn-bg); }
+
+.button:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+@media (hover: hover) {
+  .button:hover:not(:disabled, [aria-disabled='true']) { transform: translateY(var(--lift)); }
+  .button:hover:not(:disabled, [aria-disabled='true'])::before { opacity: var(--btn-tint-strength); }
+  .button:hover:not(:disabled, [aria-disabled='true'])::after { opacity: 1; }
+}
+
+.button:active:not(:disabled, [aria-disabled='true']) {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--motion-instant);
+}
+.button:active:not(:disabled, [aria-disabled='true'])::before { opacity: calc(var(--btn-tint-strength) * 1.6); }
+.button:active:not(:disabled, [aria-disabled='true'])::after { opacity: 0; }
+
+.button:disabled,
+.button[aria-disabled='true'] {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.button[data-loading] { cursor: progress; opacity: .8; }
+
+/* Variants */
+.button[data-variant='secondary'] {
+  --btn-bg: var(--brand-surface);
+  --btn-fg: var(--brand-ink);
+  --btn-tint: var(--brand-ink);
+  --btn-tint-strength: .05;
+  --btn-edge: inset 0 0 0 1px var(--ink-a12);
+}
+.button[data-variant='ghost'] {
+  --btn-bg: transparent;
+  --btn-fg: var(--brand-ink);
+  --btn-tint: var(--brand-ink);
+  --btn-tint-strength: .07;
+}
+.button[data-variant='ghost']::after { display: none; }
+@media (hover: hover) {
+  .button[data-variant='ghost']:hover:not(:disabled, [aria-disabled='true']) { transform: none; }
+}
+.button[data-variant='destructive'] {
+  --btn-bg: var(--status-danger-wash);
+  --btn-fg: var(--status-danger);
+  --btn-tint: var(--status-danger);
+  --btn-tint-strength: .09;
+  --btn-edge: inset 0 0 0 1px var(--status-danger-border);
+}
+/* On ink or dark glass: the accent carries the action and the focus ring. */
+.button[data-on-dark] {
+  --btn-bg: var(--brand-accent);
+  --btn-fg: var(--brand-ink);
+  --btn-tint: var(--brand-surface);
+  --btn-tint-strength: .25;
+}
+.button[data-on-dark][data-variant='secondary'],
+.button[data-on-dark][data-variant='ghost'] {
+  --btn-bg: transparent;
+  --btn-fg: var(--brand-paper);
+  --btn-tint: var(--brand-paper);
+  --btn-tint-strength: .12;
+}
+.button[data-on-dark][data-variant='secondary'] { --btn-edge: inset 0 0 0 1px var(--paper-a20); }
+.button[data-on-dark]:focus-visible { outline-color: var(--focus-color-on-dark); }
+
+/* Sizes. `sm` is 36px tall; .hit extends its touch target to 44px. */
+.button[data-size='sm'] { --btn-height: var(--control-height-sm); --btn-pad: var(--space-4); font: var(--text-caption); font-weight: 600; }
+.button[data-size='lg'] { --btn-height: var(--control-height-lg); --btn-pad: var(--space-8); font: var(--text-body); font-weight: 600; }
+.button[data-block] { display: flex; width: 100%; }
+.button[data-icon-only] { width: var(--btn-height); padding: 0; }
+
+.hit { position: absolute; inset: -4px 0; border-radius: inherit; }
+.label { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.icon { display: inline-grid; place-items: center; flex: none; width: 1.25em; height: 1.25em; }
+.icon > svg { width: 100%; height: 100%; }
+
+.spinner {
+  flex: none;
+  box-sizing: border-box;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 700ms linear infinite;
+}
+@keyframes spin { to { transform: rotate(1turn); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .button:hover:not(:disabled, [aria-disabled='true']),
+  .button:active:not(:disabled, [aria-disabled='true']) { transform: none; transition: none; }
+  .spinner { animation-duration: 1.6s; }
+}
+@media (forced-colors: active) {
+  .button { border: 1px solid ButtonText; }
+}

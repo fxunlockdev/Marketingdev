@@ -1,0 +1,157 @@
+/* Tabs and SegmentedControl: a pill track with one pill that slides to the
+ * active item.
+ *
+ * Only transform moves the pill, on the snappy spring; its width follows the
+ * item at once. Tabs take the position from Base UI's --active-tab-* variables,
+ * SegmentedControl from --pill-x / --pill-width measured in tabs.tsx. Before
+ * either is known (server render, hidden container) the active item paints the
+ * same surface itself, so there is no empty first frame.
+ * `:not(#legacy)` lifts a rule above the old global `button` styles (see
+ * field.module.css).
+ */
+.tabs { display: grid; justify-items: start; gap: var(--space-4); min-width: 0; }
+
+.track {
+  --seg-height: var(--control-height-sm);
+
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  padding: var(--space-1);
+  border-radius: var(--radius-full);
+  background: var(--ink-a5);
+}
+.track[data-size='sm'] { --seg-height: calc(var(--control-height-sm) - var(--space-2)); }
+
+/* Tabs keep their own widths and scroll sideways when they do not fit. */
+.list { composes: track; min-width: 0; overflow-x: auto; scrollbar-width: none; }
+.list::-webkit-scrollbar { display: none; }
+/* Segments share one width, so the pill never changes size. */
+.segmented { composes: track; display: inline-grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+
+.pill {
+  position: absolute;
+  left: 0;
+  z-index: -1;
+  border-radius: var(--radius-full);
+  background: var(--brand-surface);
+  box-shadow: var(--elevation-1);
+  pointer-events: none;
+  transition: transform var(--motion-base) var(--spring-snappy);
+}
+.indicator {
+  composes: pill;
+  top: 0;
+  width: var(--active-tab-width);
+  height: var(--active-tab-height);
+  transform: translate(var(--active-tab-left), var(--active-tab-top));
+}
+.thumb {
+  composes: pill;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  width: var(--pill-width);
+  transform: translateX(var(--pill-x));
+}
+
+/* One item: a tab or a segment. Visually 36px; ::before extends the hit area to 44px. */
+.item:not(#legacy) {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: var(--seg-height);
+  margin: 0;
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--brand-ink);
+  box-shadow: none;
+  opacity: 1;
+  font: var(--text-callout);
+  letter-spacing: var(--tracking-body);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  appearance: none;
+  transform: none;
+  transition: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.item::before {
+  content: '';
+  position: absolute;
+  inset: calc((var(--seg-height) - var(--control-height)) / 2) 0;
+}
+.track[data-size='sm'] .item:not(#legacy) { padding: 0 var(--space-3); font: var(--text-caption); font-weight: 500; }
+
+.item:focus-visible:not(#legacy) {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+.item[data-disabled]:not(#legacy) { cursor: not-allowed; }
+
+/* No pill yet: the active item carries the surface itself. */
+.indicator[hidden] ~ .item[data-active]:not(#legacy),
+.segmented:not([data-ready]) .item[data-checked]:not(#legacy) {
+  background: var(--brand-surface);
+  box-shadow: var(--elevation-1);
+}
+
+/* Inactive labels sit back; they come forward on hover and when chosen. Opacity, not colour, so it can fade. */
+.itemLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  opacity: .7;
+  transition: opacity var(--motion-fast) var(--ease-out), transform var(--motion-base) var(--spring-snappy);
+}
+.item:is([data-active], [data-checked]) .itemLabel { opacity: 1; }
+@media (hover: hover) {
+  .item:hover:not([data-disabled]) .itemLabel { opacity: 1; }
+}
+.item:active:not([data-disabled]) .itemLabel {
+  transform: scale(var(--press-scale));
+  transition-duration: var(--motion-instant);
+}
+.item[data-disabled] .itemLabel { opacity: .35; }
+
+/* Panels fade in. The outgoing panel leaves at once so two never stack. */
+.panel {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border-radius: var(--radius-sm);
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+.panel[data-starting-style] { opacity: 0; }
+.panel[data-ending-style] { display: none; }
+.panel:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill { transition: none; }
+  .itemLabel { transition-property: opacity; }
+  .item:active:not([data-disabled]) .itemLabel { transform: none; }
+}
+
+@media (forced-colors: active) {
+  .track { border: 1px solid CanvasText; }
+  .pill { box-sizing: border-box; border: 2px solid Highlight; }
+  .indicator[hidden] ~ .item[data-active]:not(#legacy),
+  .segmented:not([data-ready]) .item[data-checked]:not(#legacy) { outline: 2px solid Highlight; outline-offset: -2px; }
+}
+
+/* Segments are 36px tall inside a 44px track; this extends each one's touch target to the full track. */
+.item::after { content: ''; position: absolute; inset: calc(var(--space-1) * -1) 0; border-radius: inherit; }

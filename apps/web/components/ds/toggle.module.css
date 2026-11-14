@@ -1,0 +1,178 @@
+/* Switch and Checkbox.
+ *
+ * The row is a <label>: the control plus its text is one 44px hit target.
+ * Colour never animates. The switch's "on" track, the thumb's lime and the
+ * checkbox fill are layers whose opacity fades; the thumb and the tick move
+ * with a spring on transform only.
+ */
+.row {
+  position: relative;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  min-width: var(--control-height);
+  min-height: var(--control-height);
+  margin: 0;
+  padding: 0;
+  color: var(--brand-ink);
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.row[data-bare] { justify-content: center; }
+.row[data-disabled] { opacity: .5; cursor: not-allowed; }
+
+/* One line of text centres on the control; longer text wraps under its first line. */
+.text {
+  align-self: center;
+  min-width: 0;
+  padding-block: calc((var(--control-height) - 1lh) / 2);
+  text-wrap: pretty;
+}
+
+/* Switch: 44 × 26 track, thumb inset by 2px. */
+.track {
+  --switch-width: var(--control-height);
+  --switch-height: calc(var(--space-6) + 2px);
+  --switch-inset: 2px;
+  --switch-tint: var(--brand-ink);
+  --switch-tint-strength: .08;
+
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  display: block;
+  box-sizing: border-box;
+  width: var(--switch-width);
+  height: var(--switch-height);
+  margin-block: calc((var(--control-height) - var(--switch-height)) / 2);
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: var(--ink-a20);
+}
+/* ::before is the "on" fill, ::after the hover tint over the whole control. */
+.track::before,
+.track::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.track::before { z-index: -1; background: var(--brand-ink); }
+.track::after { z-index: 1; background: var(--switch-tint); }
+.track[data-checked] { --switch-tint: var(--brand-paper); --switch-tint-strength: .14; }
+.track[data-checked]::before { opacity: 1; }
+.track:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.thumb {
+  position: absolute;
+  top: var(--switch-inset);
+  left: var(--switch-inset);
+  box-sizing: border-box;
+  width: calc(var(--switch-height) - 2 * var(--switch-inset));
+  height: calc(var(--switch-height) - 2 * var(--switch-inset));
+  border-radius: var(--radius-full);
+  background: var(--brand-surface);
+  box-shadow: var(--elevation-2);
+  transform: translateX(var(--thumb-x, 0)) scaleX(var(--thumb-stretch, 1));
+  transform-origin: var(--thumb-origin, left) center;
+  transition: transform var(--motion-base) var(--spring-bouncy);
+}
+.thumb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--brand-accent);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.track[data-checked] .thumb {
+  --thumb-x: calc(var(--switch-width) - var(--switch-height));
+  --thumb-origin: right;
+}
+.track[data-checked] .thumb::after { opacity: 1; }
+
+/* Checkbox: 20px box. */
+.box {
+  --check-size: var(--space-5);
+
+  position: relative;
+  isolation: isolate;
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--check-size);
+  height: var(--check-size);
+  margin-block: calc((var(--control-height) - var(--check-size)) / 2);
+  border-radius: var(--radius-xs);
+  background: var(--brand-surface);
+  box-shadow: inset 0 0 0 1px var(--ink-a40);
+  color: var(--brand-accent);
+  transition: transform var(--motion-base) var(--spring-snappy);
+}
+/* ::before is the ink fill, ::after the stronger hover edge. */
+.box::before,
+.box::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.box::before { z-index: -1; background: var(--brand-ink); }
+.box::after { box-shadow: inset 0 0 0 1px var(--ink-a40); }
+.box:is([data-checked], [data-indeterminate])::before { opacity: 1; }
+.box:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.mark {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  transition: transform var(--motion-base) var(--spring-bouncy), opacity var(--motion-fast) var(--ease-out);
+}
+.mark > svg { width: 80%; height: 80%; stroke-width: 2; }
+.mark[data-starting-style],
+.mark[data-ending-style] { opacity: 0; transform: scale(.4); }
+
+/* Hover and press, from anywhere on the row. */
+@media (hover: hover) {
+  .row:hover:not([data-disabled]) .track::after { opacity: var(--switch-tint-strength); }
+  .row:hover:not([data-disabled]) .box::after { opacity: 1; }
+}
+.row:active:not([data-disabled]) .thumb { --thumb-stretch: 1.18; }
+.row:active:not([data-disabled]) .box { transform: scale(.9); transition-duration: var(--motion-instant); }
+
+@media (prefers-reduced-motion: reduce) {
+  .thumb, .box { transition: none; }
+  .row:active:not([data-disabled]) .thumb { --thumb-stretch: 1; }
+  .row:active:not([data-disabled]) .box { transform: none; }
+  .mark { transition-property: opacity; }
+  .mark[data-starting-style], .mark[data-ending-style] { transform: none; }
+}
+
+@media (forced-colors: active) {
+  /* The fade layers would repaint in the canvas colour and hide the state. */
+  .track::before, .track::after, .thumb::after, .box::before, .box::after { display: none; }
+  .track, .box { border: 1px solid ButtonText; }
+  .track[data-checked], .box:is([data-checked], [data-indeterminate]) { background: Highlight; border-color: Highlight; }
+  .thumb { background: ButtonText; box-shadow: none; }
+  .track[data-checked] .thumb { background: HighlightText; }
+  .box { color: HighlightText; }
+}

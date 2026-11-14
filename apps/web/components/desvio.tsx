@@ -11,10 +11,14 @@ import {useHistoryEditGuard} from "./unsaved";
 import { AuthScreen } from "./auth";
 import { WorkspaceHome, BrandHome } from "./workspaces";
 import { TeamScreen } from "./team";
+import dynamic from 'next/dynamic';
+// Design review page: loaded on demand so it never weighs on the app bundle.
+const DesignGallery=dynamic(()=>import('./ds/gallery/gallery').then(m=>m.DesignGallery),{ssr:false});
 export function Desvio() {
   useHistoryEditGuard();
   const pathname = usePathname();
   const mode = pathname.split("/")[1];
+  if(pathname==="/design-system")return <DesignGallery/>;
   if(pathname==="/connections/postforme/return")return <PostformeReturn/>;
   if(pathname==="/integrations/social/result")return <SocialCallbackResult/>;
   if (

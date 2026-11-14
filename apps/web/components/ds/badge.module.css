@@ -1,0 +1,77 @@
+/* Badge: a status pill, and CountBadge: a small rounded count.
+ *
+ * Each tone pairs a status wash with its text colour and a 1px inset edge; the
+ * text passes AA on its wash. Neither is interactive, so there is no motion.
+ */
+.badge {
+  --badge-bg: var(--status-neutral-wash);
+  --badge-fg: var(--status-neutral);
+  --badge-edge: var(--status-neutral-border);
+
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  box-sizing: border-box;
+  max-width: 100%;
+  height: var(--space-6);
+  margin: 0;
+  padding: 0 calc(var(--space-2) + var(--space-1) / 2);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--badge-bg);
+  color: var(--badge-fg);
+  box-shadow: inset 0 0 0 1px var(--badge-edge);
+  font: var(--text-caption);
+  font-weight: 600;
+  letter-spacing: var(--tracking-body);
+  text-transform: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.badge[data-dot] { padding-left: var(--space-2); }
+
+.badge[data-tone='info'] { --badge-bg: var(--status-info-wash); --badge-fg: var(--status-info); --badge-edge: var(--status-info-border); }
+.badge[data-tone='positive'] { --badge-bg: var(--status-positive-wash); --badge-fg: var(--status-positive); --badge-edge: var(--status-positive-border); }
+.badge[data-tone='caution'] { --badge-bg: var(--status-caution-wash); --badge-fg: var(--status-caution); --badge-edge: var(--status-caution-border); }
+.badge[data-tone='danger'] { --badge-bg: var(--status-danger-wash); --badge-fg: var(--status-danger); --badge-edge: var(--status-danger-border); }
+.badge[data-tone='accent'] { --badge-bg: var(--brand-accent); --badge-fg: var(--brand-ink); --badge-edge: var(--ink-a12); }
+
+.dot {
+  flex: none;
+  width: .5em;
+  height: .5em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.count {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: var(--space-5);
+  height: var(--space-5);
+  margin: 0;
+  padding: 0 calc(var(--space-1) + 2px);
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--status-neutral-wash);
+  color: var(--status-neutral);
+  box-shadow: inset 0 0 0 1px var(--status-neutral-border);
+  font: var(--text-micro);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-body);
+  text-transform: none;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.count[data-tone='accent'] {
+  background: var(--brand-accent);
+  color: var(--brand-ink);
+  box-shadow: inset 0 0 0 1px var(--ink-a12);
+}
+
+@media (forced-colors: active) {
+  .badge, .count { border: 1px solid CanvasText; }
+}

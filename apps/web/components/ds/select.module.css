@@ -1,0 +1,146 @@
+/* Select: a trigger that looks like Input and a frosted menu that grows from it.
+ *
+ * The trigger composes the field surface, so its fill, edge, hover cross-fade,
+ * invalid and disabled states are the Input's own. The menu is thick glass on
+ * elevation 3; it scales and fades from Base UI's --transform-origin.
+ * `:not(#legacy)` lifts a rule above the old global `button` styles (see
+ * field.module.css).
+ */
+.root { position: relative; display: block; min-width: 0; }
+/* Base UI keeps a hidden form input beside the trigger; stop the old global input sizing reaching it. */
+.root > input:not(#legacy) { min-height: 0; }
+
+.trigger { composes: surface from './field.module.css'; }
+.trigger:not(#legacy) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  min-width: 0;
+  padding: 0 var(--space-3);
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  text-align: start;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  appearance: none;
+  transition: none;
+}
+.trigger:focus-visible:not(#legacy) {
+  outline: var(--focus-width) solid var(--field-ring);
+  outline-offset: var(--focus-offset);
+}
+/* Pressed and open hold the stronger edge that hover fades in. */
+.trigger:is([data-pressed], [data-popup-open]):not([data-disabled])::before { opacity: 0; }
+.trigger:is([data-pressed], [data-popup-open]):not([data-disabled])::after { opacity: 1; }
+
+/* `sm` is 36px tall; .hit extends its touch target to 44px. */
+.trigger[data-size='sm']:not(#legacy) { min-height: var(--control-height-sm); font: var(--text-callout); }
+.hit { position: absolute; inset: calc(-1 * var(--space-1)) 0; border-radius: inherit; }
+
+.value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.value[data-placeholder] { color: var(--brand-muted); }
+
+.chevron {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+  color: var(--brand-muted);
+  transition: transform var(--motion-base) var(--spring-snappy);
+}
+.chevron > svg { width: 100%; height: 100%; }
+.chevron[data-popup-open] { transform: rotate(180deg); }
+
+/* Menu */
+.positioner { z-index: var(--z-overlay); }
+
+.popup {
+  composes: glassThick from './materials.module.css';
+  --glass-shadow: var(--elevation-3);
+  box-sizing: border-box;
+  min-width: var(--anchor-width);
+  max-width: var(--available-width);
+  overflow: hidden;
+  border-radius: var(--radius-lg);
+  color: var(--brand-ink);
+  /* Focus inside the menu is shown on the option that holds it. */
+  outline: var(--focus-width) solid transparent;
+  transform-origin: var(--transform-origin);
+  transition: transform var(--motion-base) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+}
+.popup[data-starting-style],
+.popup[data-ending-style] { opacity: 0; transform: scale(.94); }
+
+.list {
+  box-sizing: border-box;
+  max-height: min(var(--available-height), calc(var(--control-height) * 8));
+  padding: var(--space-1);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: var(--space-1);
+  outline: var(--focus-width) solid transparent;
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  min-height: var(--space-10);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  color: var(--brand-ink);
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  cursor: default;
+  user-select: none;
+  scroll-margin-block: var(--space-1);
+  -webkit-tap-highlight-color: transparent;
+  /* Drawn inside the row so the menu's rounded clip never cuts it. Transparent until the keyboard is in use. */
+  outline: var(--focus-width) solid transparent;
+  outline-offset: calc(-1 * var(--focus-width));
+}
+/* The pointer or keyboard position is a quiet neutral; only the chosen option carries the green. */
+.option[data-highlighted] { background: var(--ink-a5); }
+.option:focus-visible { outline-color: var(--focus-color); }
+.option[data-selected] { background: var(--brand-wash); color: var(--brand-link); font-weight: 600; }
+.option[data-selected][data-highlighted] { box-shadow: inset 0 0 0 1px var(--link-a30); }
+.option[data-disabled] { opacity: .45; cursor: not-allowed; }
+
+.optionLabel { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+/* Always mounted so every row keeps the same width; it springs in on the chosen row. */
+.check {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.25em;
+  height: 1.25em;
+  opacity: 0;
+  transform: scale(.5);
+  transition: transform var(--motion-base) var(--spring-bouncy), opacity var(--motion-fast) var(--ease-out);
+}
+.check > svg { width: 100%; height: 100%; }
+.option[data-selected] .check { opacity: 1; transform: none; }
+
+@media (pointer: coarse) {
+  .trigger:not(#legacy) { font-size: 1rem; }
+  .option { min-height: var(--control-height); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron { transition: none; }
+  .popup, .check { transition-property: opacity; }
+  .popup[data-starting-style], .popup[data-ending-style] { transform: none; }
+  .check { transform: none; }
+}
+
+@media (forced-colors: active) {
+  .option[data-highlighted] { outline-color: Highlight; }
+  .option[data-selected] { outline-color: CanvasText; }
+}

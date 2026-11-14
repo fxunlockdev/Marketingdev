@@ -1,0 +1,38 @@
+/* Tooltip: a small dark-glass label that scales and fades out of its trigger.
+ *
+ * Base UI sets --transform-origin at the trigger. The tooltip is not something
+ * the user touches, so it eases rather than springs, and it is quick.
+ * It sits on the top layer so it also clears toasts.
+ */
+.positioner { z-index: var(--z-toast); }
+
+.popup {
+  composes: glassDark from './materials.module.css';
+  --glass-shadow: var(--elevation-2);
+  --tooltip-width: 260px;
+
+  box-sizing: border-box;
+  max-width: min(var(--tooltip-width), var(--available-width));
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font: var(--text-caption);
+  letter-spacing: var(--tracking-body);
+  text-align: start;
+  text-wrap: pretty;
+  overflow-wrap: anywhere;
+  transform-origin: var(--transform-origin);
+  transition: transform var(--motion-fast) var(--ease-out), opacity var(--motion-fast) var(--ease-out);
+}
+.popup[data-starting-style],
+.popup[data-ending-style] {
+  opacity: 0;
+  transform: scale(.94);
+}
+/* Moving from one tooltip to its neighbour: swap at once, no animation. */
+.popup[data-instant] { transition: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .popup[data-starting-style],
+  .popup[data-ending-style] { transform: none; }
+}

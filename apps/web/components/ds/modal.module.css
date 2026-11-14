@@ -1,0 +1,170 @@
+/* Modal and Drawer: one thick-glass popup over a dimmed, lightly blurred page.
+ *
+ * The modal scales and fades out of the control that opened it: modal.tsx
+ * measures that control and sets --modal-origin-x/y on the popup (centre when
+ * there is none). The drawer slides in from its edge. On phones both become a
+ * bottom sheet. Only transform and opacity are animated; each variant just
+ * re-points --modal-from, the transform the popup enters from and exits to.
+ */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  background: var(--ink-a40);
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+.backdrop[data-starting-style],
+.backdrop[data-ending-style] { opacity: 0; }
+.backdrop[data-ending-style] { transition-duration: var(--motion-fast); }
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .backdrop {
+    -webkit-backdrop-filter: blur(var(--space-1));
+    backdrop-filter: blur(var(--space-1));
+  }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .backdrop { -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* Positions the popup. One definite grid cell, so the popup's max-height resolves. */
+.viewport {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  box-sizing: border-box;
+  padding: var(--space-6);
+  overflow: hidden;
+}
+.viewport[data-variant='drawer'] { place-items: stretch end; padding: var(--space-3); }
+.viewport[data-side='left'] { justify-items: start; }
+
+.popup {
+  composes: glassThick from './materials.module.css';
+  --glass-shadow: var(--elevation-4);
+  --modal-width: 520px;
+  --modal-from: scale(.92);
+  --modal-from-opacity: 0;
+  --modal-enter: var(--spring-snappy);
+  --modal-exit: var(--motion-fast);
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--modal-width);
+  max-height: 100%;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-xl);
+  color: var(--brand-ink);
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  text-align: start;
+  transform-origin: var(--modal-origin-x, 50%) var(--modal-origin-y, 50%);
+  transition: transform var(--motion-slow) var(--modal-enter), opacity var(--motion-base) var(--ease-out);
+}
+.popup:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+.popup[data-size='sm'] { --modal-width: 400px; }
+.popup[data-size='lg'] { --modal-width: 720px; }
+
+/* Drawer: full height, inset from the screen edge by the viewport padding. */
+.popup[data-variant='drawer'] {
+  --modal-width: 440px;
+  --modal-from: translateX(calc(100% + var(--space-3)));
+  --modal-from-opacity: 1;
+  --modal-exit: var(--motion-base);
+  height: 100%;
+}
+.popup[data-side='left'] { --modal-from: translateX(calc(-100% - var(--space-3))); }
+
+.popup[data-starting-style],
+.popup[data-ending-style] {
+  opacity: var(--modal-from-opacity);
+  transform: var(--modal-from);
+}
+.popup[data-ending-style] {
+  transition-duration: var(--modal-exit);
+  transition-timing-function: var(--ease-out);
+}
+
+/* Header and footer stay put; the body scrolls between them. */
+.header {
+  display: flex;
+  flex: none;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-6) var(--space-4);
+}
+.header:last-child { padding-bottom: var(--space-6); }
+.heading { flex: 1; min-width: 0; }
+.title {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font: var(--text-heading);
+  letter-spacing: var(--tracking-heading);
+  text-wrap: balance;
+}
+.description {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  color: var(--brand-muted);
+  font: var(--text-caption);
+  letter-spacing: var(--tracking-body);
+  text-wrap: pretty;
+}
+/* Pulled into the corner so the glyph, not the 36px button box, sits on the padding line. */
+.header .close {
+  flex: none;
+  margin: calc(var(--space-1) * -1) calc(var(--space-2) * -1) 0 0;
+}
+
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: var(--space-1) var(--space-6) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.footer {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-6);
+}
+.body + .footer { box-shadow: inset 0 1px 0 var(--ink-a8); }
+
+/* Phones: modal and drawer are the same bottom sheet. It slides up without
+   overshoot, so no gap opens under it. */
+@media (max-width: 560px) {
+  .viewport[data-variant] { place-items: end stretch; padding: var(--space-10) 0 0; }
+  .popup[data-variant] {
+    --modal-from: translateY(100%);
+    --modal-from-opacity: 1;
+    --modal-enter: var(--spring-gentle);
+    --modal-exit: var(--motion-base);
+    max-width: none;
+    height: auto;
+    padding-bottom: env(safe-area-inset-bottom);
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup[data-variant] {
+    --modal-from: none;
+    --modal-from-opacity: 0;
+    transition: opacity var(--motion-fast) var(--ease-out);
+  }
+}

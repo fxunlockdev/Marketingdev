@@ -1,0 +1,153 @@
+/* Toast: a stack of regular-glass notices, bottom-right (bottom-centre on phones).
+ *
+ * Base UI gives each toast --toast-index (0 is the newest), its measured
+ * --toast-height, its --toast-offset-y in the expanded stack and the live
+ * --toast-swipe-movement-x/y. Collapsed, older toasts sit behind the newest,
+ * each a little higher and smaller; hovering or focusing the stack fans them
+ * out. Everything moves through one transform built from the variables below,
+ * so only transform and opacity are animated. Height is set, never animated.
+ */
+.viewport {
+  --toast-width: 380px;
+
+  position: fixed;
+  top: auto;
+  right: var(--space-6);
+  bottom: var(--space-6);
+  left: auto;
+  z-index: var(--z-toast);
+  box-sizing: border-box;
+  width: min(var(--toast-width), calc(100vw - (var(--space-6) * 2)));
+  margin: 0;
+  padding: 0;
+}
+
+.toast {
+  composes: glassRegular from './materials.module.css';
+  --glass-shadow: var(--elevation-3);
+  --toast-gap: var(--space-3);
+  --toast-peek: var(--space-3);
+  --toast-scale: calc(max(0, 1 - (var(--toast-index) * .06)));
+  --toast-box: var(--toast-frontmost-height, var(--toast-height));
+  /* Collapsed: lift each older toast by one peek, and by what scaling from the bottom edge took off its top. */
+  --toast-y: calc(var(--toast-swipe-movement-y) - (var(--toast-index) * var(--toast-peek)) - ((1 - var(--toast-scale)) * var(--toast-box)));
+  --toast-rise: 0px;
+  --toast-exit-scale: 1;
+
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: calc(1000 - var(--toast-index));
+  box-sizing: border-box;
+  height: var(--toast-box);
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-lg);
+  color: var(--brand-ink);
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  text-align: start;
+  cursor: default;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transform-origin: bottom center;
+  transform:
+    translateX(var(--toast-swipe-movement-x))
+    translateY(calc(var(--toast-y) + var(--toast-rise)))
+    scale(calc(var(--toast-scale) * var(--toast-exit-scale)));
+  transition: transform var(--motion-slow) var(--spring-snappy), opacity var(--motion-base) var(--ease-out);
+}
+/* Bridges the gap between fanned-out toasts so the pointer never leaves the stack. */
+.toast::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 100%;
+  height: calc(var(--toast-gap) + 1px);
+}
+.toast:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.toast[data-expanded] {
+  --toast-scale: 1;
+  --toast-y: calc(var(--toast-swipe-movement-y) - var(--toast-offset-y) - (var(--toast-index) * var(--toast-gap)));
+  height: var(--toast-height);
+}
+.toast[data-limited] { opacity: 0; }
+
+/* Enter: rise and fade in on the spring. Exit: fade and settle back slightly, quickly. */
+.toast[data-starting-style] { opacity: 0; --toast-rise: var(--space-4); }
+.toast[data-ending-style] {
+  opacity: 0;
+  --toast-exit-scale: .94;
+  transition-duration: var(--motion-base);
+  transition-timing-function: var(--ease-out);
+}
+/* Swiped away: keep going the way it was thrown. */
+.toast[data-ending-style][data-swipe-direction='right'] {
+  transform: translateX(calc(var(--toast-swipe-movement-x) + 150%)) translateY(var(--toast-y)) scale(var(--toast-scale));
+}
+.toast[data-ending-style][data-swipe-direction='down'] {
+  transform: translateX(var(--toast-swipe-movement-x)) translateY(calc(var(--toast-y) + 150%)) scale(var(--toast-scale));
+}
+
+.content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  height: 100%;
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  overflow: hidden;
+  border-radius: inherit;
+  transition: opacity var(--motion-base) var(--ease-out);
+}
+.content[data-behind] { opacity: 0; }
+.content[data-expanded] { opacity: 1; }
+
+/* Icon and text share a top edge, so the icon always sits on the title's line. */
+.message { display: flex; flex: 1; align-items: flex-start; gap: var(--space-3); min-width: 0; }
+/* Base UI mirrors the tone on the toast as data-type. */
+.icon { display: inline-grid; place-items: center; flex: none; color: var(--status-neutral); font-size: 1.25rem; line-height: 1; }
+.toast[data-type='positive'] .icon { color: var(--status-positive); }
+.toast[data-type='caution'] .icon { color: var(--status-caution); }
+.toast[data-type='danger'] .icon { color: var(--status-danger); }
+
+.text { flex: 1; min-width: 0; }
+.title {
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font: var(--text-callout);
+  font-weight: 600;
+  letter-spacing: var(--tracking-body);
+  overflow-wrap: anywhere;
+}
+.description {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  color: var(--brand-muted);
+  font: var(--text-caption);
+  letter-spacing: var(--tracking-body);
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+}
+
+@media (max-width: 560px) {
+  .viewport {
+    right: var(--space-4);
+    bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+    left: var(--space-4);
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { transition: opacity var(--motion-fast) var(--ease-out); }
+  .toast[data-starting-style] { --toast-rise: 0px; }
+  .toast[data-ending-style] { --toast-exit-scale: 1; }
+}

@@ -1,0 +1,88 @@
+/* Materials: frosted glass for layers that float, and the ambient light it blurs.
+ *
+ * Glass is only for the sidebar, bars, menus, modals, toasts and the business
+ * switcher. Content cards stay solid so text is easy to read.
+ * Every glass class has a solid fallback (no backdrop-filter support, or the
+ * visitor asked for reduced transparency). Other modules reuse these with
+ * `composes: glassRegular from './materials.module.css'` and may set
+ * `--glass-shadow` to pick an elevation.
+ */
+
+.glassThin,
+.glassRegular,
+.glassThick,
+.glassDark {
+  box-shadow: var(--glass-edge), var(--glass-shadow, var(--elevation-2));
+  isolation: isolate;
+}
+
+.glassThin { background: var(--glass-thin-solid); }
+.glassRegular { background: var(--glass-regular-solid); }
+.glassThick { background: var(--glass-thick-solid); }
+.glassDark {
+  background: var(--glass-dark-solid);
+  color: var(--brand-paper);
+  box-shadow: var(--glass-dark-edge), var(--glass-shadow, var(--elevation-3));
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glassThin {
+    background: var(--glass-thin-fill);
+    -webkit-backdrop-filter: var(--glass-thin-blur);
+    backdrop-filter: var(--glass-thin-blur);
+  }
+  .glassRegular {
+    background: var(--glass-regular-fill);
+    -webkit-backdrop-filter: var(--glass-regular-blur);
+    backdrop-filter: var(--glass-regular-blur);
+  }
+  .glassThick {
+    background: var(--glass-thick-fill);
+    -webkit-backdrop-filter: var(--glass-thick-blur);
+    backdrop-filter: var(--glass-thick-blur);
+  }
+  .glassDark {
+    background: var(--glass-dark-fill);
+    -webkit-backdrop-filter: var(--glass-dark-blur);
+    backdrop-filter: var(--glass-dark-blur);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glassThin { background: var(--glass-thin-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glassRegular { background: var(--glass-regular-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glassThick { background: var(--glass-thick-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .glassDark { background: var(--glass-dark-solid); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+@media (forced-colors: active) {
+  .glassThin, .glassRegular, .glassThick, .glassDark { border: 1px solid CanvasText; }
+}
+
+/* Ambient light: soft lime and green glows on the cream, fixed behind the app.
+   Felt more than seen; it exists so glass has something to blur. One layer,
+   painted once, never animated. */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(52rem 34rem at 88% -8%, var(--accent-a45), transparent 62%),
+    radial-gradient(44rem 40rem at -8% 28%, color-mix(in srgb, var(--brand-wash) 95%, transparent), transparent 64%),
+    radial-gradient(40rem 30rem at 58% 108%, var(--accent-a25), transparent 60%),
+    radial-gradient(36rem 30rem at 108% 62%, color-mix(in srgb, var(--brand-sand) 90%, transparent), transparent 62%),
+    var(--brand-paper);
+}
+
+/* The element that holds the ambient layer must start a stacking context. */
+.stage {
+  position: relative;
+  isolation: isolate;
+  min-height: 100dvh;
+  color: var(--brand-ink);
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

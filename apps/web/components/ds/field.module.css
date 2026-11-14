@@ -1,0 +1,159 @@
+/* Field: label, control, then a hint or an error. Input and Textarea.
+ *
+ * `.surface` is the one look for every text-like control (Select's trigger
+ * composes it): a solid fill with a 1px inset edge. The resting edge is drawn
+ * by ::before and the hover edge by ::after; hover cross-fades their opacity,
+ * so no colour or shadow is ever animated.
+ *
+ * `:not(#legacy)` matches every element and adds an id's worth of specificity.
+ * The old global sheets reach bare `input`, `textarea` and `button` with up to
+ * five classes (redesign.css, product-polish.css); this is how these rules win
+ * without `!important`.
+ */
+.field { display: grid; gap: var(--space-2); min-width: 0; }
+
+.label {
+  display: block;
+  margin: 0;
+  color: var(--brand-ink);
+  font: var(--text-callout);
+  font-weight: 600;
+  letter-spacing: var(--tracking-body);
+}
+.required { margin-inline-start: var(--space-1); color: var(--status-danger); }
+
+.hint,
+.error {
+  margin: 0;
+  font: var(--text-caption);
+  letter-spacing: var(--tracking-body);
+  text-wrap: pretty;
+}
+.hint { display: block; color: var(--brand-muted); }
+.error { display: flex; align-items: flex-start; gap: var(--space-1); color: var(--status-danger); }
+/* Centred on the first line of text: the caption line box is 1.45em tall. */
+.errorIcon { flex: none; width: 1.15em; height: 1.15em; margin-top: .15em; }
+
+/* Surface */
+.surface:not(#legacy) {
+  --field-edge: var(--ink-a12);
+  --field-edge-hover: var(--ink-a20);
+  --field-ring: var(--focus-color);
+
+  position: relative;
+  isolation: isolate;
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  margin: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--brand-surface);
+  color: var(--brand-ink);
+  box-shadow: none;
+  transform: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.surface::before,
+.surface::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+.surface::before { box-shadow: inset 0 0 0 1px var(--field-edge); }
+.surface::after { box-shadow: inset 0 0 0 1px var(--field-edge-hover); opacity: 0; }
+
+@media (hover: hover) {
+  .surface:hover:not([data-disabled], [data-readonly])::before { opacity: 0; }
+  .surface:hover:not([data-disabled], [data-readonly])::after { opacity: 1; }
+}
+
+.surface[data-invalid]:not(#legacy) {
+  --field-edge: var(--status-danger);
+  --field-edge-hover: var(--status-danger);
+  --field-ring: var(--status-danger);
+}
+.surface[data-readonly]:not(#legacy) { background: var(--brand-field); }
+.surface[data-disabled]:not(#legacy) { opacity: .5; cursor: not-allowed; }
+
+/* Control: the surface around an input or textarea and its adornments. */
+.control {
+  composes: surface;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  cursor: text;
+}
+.control[data-multiline] { align-items: stretch; }
+
+/* The ring belongs to the whole control, so adornments sit inside it. Where
+   :has() exists the ring is limited to keyboard-visible focus on the field
+   itself, not on a button placed in `trailing`. */
+.control:focus-within {
+  outline: var(--focus-width) solid var(--field-ring);
+  outline-offset: var(--focus-offset);
+}
+@supports selector(:has(*)) {
+  .control:focus-within:not(:has(.input:focus-visible)) { outline-color: transparent; }
+}
+
+.input:not(#legacy) {
+  flex: 1;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: var(--control-height);
+  margin: 0;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  color: inherit;
+  box-shadow: none;
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  cursor: inherit;
+  appearance: none;
+  /* .control draws the visible ring. This one stays transparent and only shows in forced-colors mode. */
+  outline: var(--focus-width) solid transparent;
+  outline-offset: calc(-1 * var(--focus-width));
+}
+.input::placeholder { color: var(--brand-muted); opacity: 1; }
+.input[data-leading]:not(#legacy) { padding-inline-start: var(--space-2); }
+.input[data-trailing]:not(#legacy) { padding-inline-end: var(--space-2); }
+
+/* Textarea: three lines of body text plus the block padding, resizable downwards only. */
+.input[data-multiline]:not(#legacy) {
+  min-height: calc(4.65em + var(--space-6));
+  padding: var(--space-3);
+  resize: vertical;
+}
+
+.adornment {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: var(--space-1);
+  color: var(--brand-muted);
+  font: var(--text-callout);
+  letter-spacing: var(--tracking-body);
+  white-space: nowrap;
+}
+.adornment[data-side='leading'] { padding-inline-start: var(--space-3); }
+.adornment[data-side='trailing'] { padding-inline-end: var(--space-3); }
+.adornment > svg { flex: none; width: 1.25em; height: 1.25em; }
+
+/* iOS zooms the page when a focused field's text is smaller than 16px. */
+@media (pointer: coarse) {
+  .input:not(#legacy) { font-size: 1rem; }
+}
+
+@media (forced-colors: active) {
+  .surface:not(#legacy) { border: 1px solid CanvasText; }
+  .surface[data-disabled]:not(#legacy) { border-color: GrayText; }
+}

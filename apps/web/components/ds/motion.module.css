@@ -1,0 +1,51 @@
+/* Motion: the three entrance patterns. Opacity and transform only.
+ *
+ * The keyframes name a start and no end, so each element lands on its own
+ * resting style and keeps its hover and press transforms afterwards. Fill is
+ * `backwards`: it holds the start during a delay, and lets go of the element
+ * once the entrance is over. With reduced motion nothing slides.
+ */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(var(--space-2)); }
+}
+@keyframes fade {
+  from { opacity: 0; }
+}
+
+/* Stagger: each direct child waits --i steps. The first nine are numbered
+   below; every later child shares the tenth slot, so the last delay is 9 steps.
+   motion.tsx sets --stagger-step on the container. */
+.stagger {
+  --stagger-step: 40ms;
+}
+.stagger > * {
+  --i: 9;
+  animation: rise var(--motion-base) var(--ease-out) backwards;
+  animation-delay: calc(var(--i) * var(--stagger-step));
+}
+.stagger > :nth-child(1) { --i: 0; }
+.stagger > :nth-child(2) { --i: 1; }
+.stagger > :nth-child(3) { --i: 2; }
+.stagger > :nth-child(4) { --i: 3; }
+.stagger > :nth-child(5) { --i: 4; }
+.stagger > :nth-child(6) { --i: 5; }
+.stagger > :nth-child(7) { --i: 6; }
+.stagger > :nth-child(8) { --i: 7; }
+.stagger > :nth-child(9) { --i: 8; }
+
+/* Page transition: the keyed wrapper replays this each time the route key changes. */
+.page {
+  box-sizing: border-box;
+  min-width: 0;
+  animation: rise var(--motion-base) var(--ease-out) backwards;
+}
+
+.reveal {
+  animation: rise var(--motion-base) var(--ease-out) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stagger > * { animation: none; }
+  .page,
+  .reveal { animation: fade var(--motion-fast) var(--ease-out) backwards; }
+}

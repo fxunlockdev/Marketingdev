@@ -1,0 +1,69 @@
+/* Empty state: icon, headline, one line of help, one action. Always centred,
+ * always in this order. `plain` has no surface; `card` is a muted field with a
+ * dashed edge, for an empty region that stands on its own. Nothing here moves.
+ */
+.empty {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  box-sizing: border-box;
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-12) var(--space-6);
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: center;
+}
+.empty[data-tone='card'] {
+  border: 1px dashed var(--ink-a12);
+  border-radius: var(--radius-xl);
+  background: var(--brand-field);
+  color: var(--brand-ink);
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+  box-sizing: border-box;
+  width: var(--space-12);
+  height: var(--space-12);
+  margin: 0 0 var(--space-2);
+  border-radius: 50%;
+  background: var(--brand-wash);
+  color: var(--brand-link);
+  font-size: var(--space-6);
+  line-height: 1;
+}
+.icon > svg { width: 1em; height: 1em; }
+
+.title {
+  max-width: 28ch;
+  margin: 0;
+  padding: 0;
+  color: inherit;
+  font: var(--text-heading);
+  letter-spacing: var(--tracking-heading);
+  text-transform: none;
+  text-wrap: balance;
+}
+.description {
+  max-width: 44ch;
+  margin: 0;
+  padding: 0;
+  color: var(--brand-muted);
+  font: var(--text-callout);
+  letter-spacing: var(--tracking-body);
+  text-wrap: pretty;
+}
+.action {
+  display: flex;
+  justify-content: center;
+  max-width: 100%;
+  margin: var(--space-3) 0 0;
+}
+
+@media (forced-colors: active) {
+  .icon { border: 1px solid CanvasText; }
+}

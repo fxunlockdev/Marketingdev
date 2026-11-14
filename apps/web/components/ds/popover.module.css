@@ -1,0 +1,136 @@
+/* Popover and Menu: one regular-glass popup anchored to its trigger.
+ *
+ * Base UI positions the popup and sets --transform-origin at the trigger, so
+ * the popup scales and fades out of the control that opened it. Menu rows
+ * highlight through a tint layer (::before) whose opacity changes; no colour
+ * is animated.
+ */
+.positioner { z-index: var(--z-overlay); }
+
+.popup {
+  composes: glassRegular from './materials.module.css';
+  --glass-shadow: var(--elevation-3);
+  --popup-width: 360px;
+
+  box-sizing: border-box;
+  max-width: min(var(--popup-width), var(--available-width));
+  max-height: var(--available-height);
+  margin: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--radius-lg);
+  color: var(--brand-ink);
+  font: var(--text-body);
+  letter-spacing: var(--tracking-body);
+  text-align: start;
+  transform-origin: var(--transform-origin);
+  transition: transform var(--motion-base) var(--spring-snappy), opacity var(--motion-fast) var(--ease-out);
+}
+.popup[data-starting-style],
+.popup[data-ending-style] {
+  opacity: 0;
+  transform: scale(.94);
+}
+.popup[data-ending-style] {
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--ease-out);
+}
+.popup:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: var(--focus-offset);
+}
+
+.title {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  color: inherit;
+  font: var(--text-subheading);
+  letter-spacing: var(--tracking-body);
+  text-wrap: balance;
+}
+
+/* Menu */
+.popup[data-kind='menu'] {
+  --popup-width: 320px;
+  /* At least as wide as the control that opened it, so a menu under a wide trigger lines up with it. */
+  min-width: min(max(12.5rem, var(--anchor-width, 0px)), var(--available-width));
+  padding: var(--space-1);
+}
+
+.item,
+.item:hover {
+  background: transparent;
+  color: var(--brand-ink);
+  text-decoration: none;
+}
+.item {
+  --item-tint: var(--ink-a5);
+  --item-tint-pressed: var(--ink-a8);
+
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: var(--text-callout);
+  letter-spacing: var(--tracking-body);
+  cursor: default;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--item-tint);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--motion-instant) var(--ease-out);
+}
+.item[data-highlighted]::before { opacity: 1; }
+.item:active:not([data-disabled])::before { background: var(--item-tint-pressed); opacity: 1; }
+/* The ring sits inside the row so the popup's scroll box never clips it. */
+.item:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: calc(var(--focus-width) * -1);
+}
+
+.item[data-destructive],
+.item[data-destructive]:hover { color: var(--status-danger); }
+.item[data-destructive] {
+  --item-tint: color-mix(in srgb, var(--status-danger) 8%, transparent);
+  --item-tint-pressed: color-mix(in srgb, var(--status-danger) 14%, transparent);
+}
+.item[data-disabled] { opacity: .45; cursor: not-allowed; }
+
+.itemIcon { display: inline-grid; place-items: center; flex: none; width: 1.25em; height: 1.25em; }
+.itemIcon > svg { width: 100%; height: 100%; }
+.itemLabel { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.separator {
+  height: 1px;
+  margin: var(--space-1) var(--space-2);
+  padding: 0;
+  border: 0;
+  background: var(--ink-a8);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .popup { transition: opacity var(--motion-fast) var(--ease-out); }
+  .popup[data-starting-style],
+  .popup[data-ending-style] { transform: none; }
+  .item::before { transition: none; }
+}
+@media (forced-colors: active) {
+  .item[data-highlighted] { outline: 1px solid Highlight; outline-offset: -1px; }
+  .separator { background: CanvasText; }
+}

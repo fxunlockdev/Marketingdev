@@ -164,3 +164,131 @@
   --ds-panel-radius: var(--radius-container);
   --ds-panel-padding: clamp(20px, 2.2vw, 32px);
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Design system v2 — the one scale for space, radius, type, elevation, glass
+ * and motion. Every value is derived from the brand palette above; no new hue
+ * is introduced. Components in components/ds read only these tokens.
+ * ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* A. Tints: translucent steps of the existing ink, paper, surface and lime. */
+  --ink-a3: color-mix(in srgb, var(--brand-ink) 3%, transparent);
+  --ink-a5: color-mix(in srgb, var(--brand-ink) 5%, transparent);
+  --ink-a8: color-mix(in srgb, var(--brand-ink) 8%, transparent);
+  --ink-a12: color-mix(in srgb, var(--brand-ink) 12%, transparent);
+  --ink-a20: color-mix(in srgb, var(--brand-ink) 20%, transparent);
+  --ink-a40: color-mix(in srgb, var(--brand-ink) 40%, transparent);
+  --paper-a12: color-mix(in srgb, var(--brand-paper) 12%, transparent);
+  --paper-a20: color-mix(in srgb, var(--brand-paper) 20%, transparent);
+  --paper-a70: color-mix(in srgb, var(--brand-paper) 70%, transparent);
+  --surface-a40: color-mix(in srgb, var(--brand-surface) 40%, transparent);
+  --surface-a70: color-mix(in srgb, var(--brand-surface) 70%, transparent);
+  --accent-a25: color-mix(in srgb, var(--brand-accent) 25%, transparent);
+  --accent-a45: color-mix(in srgb, var(--brand-accent) 45%, transparent);
+  --link-a12: color-mix(in srgb, var(--brand-link) 12%, transparent);
+  --link-a30: color-mix(in srgb, var(--brand-link) 30%, transparent);
+
+  /* B. Space: a 4px grid. Layout uses the named steps; nothing sits off-grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-page: clamp(16px, 3.2vw, 40px);
+  --space-section: var(--space-8);
+  --space-card: var(--space-6);
+  --space-card-compact: var(--space-4);
+  --content-max: 1200px;
+  --content-readable: 68ch;
+
+  /* C. Radius: six steps. Nested corners step down one level (outer − padding). */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-2xl: 28px;
+
+  /* D. Type ramp: one display, one page title, section, card title, body,
+        callout (controls), caption, micro (eyebrows). `font` shorthand + tracking. */
+  --text-display: 600 clamp(2.25rem, 1.6rem + 2.4vw, 3.25rem)/1.04 var(--font-family-heading);
+  --text-title: 600 clamp(1.75rem, 1.45rem + 1.1vw, 2.25rem)/1.1 var(--font-family-heading);
+  --text-heading: 600 1.25rem/1.25 var(--font-family-heading);
+  --text-subheading: 600 1rem/1.35 var(--font-family-body);
+  --text-body: 400 .9375rem/1.55 var(--font-family-body);
+  --text-callout: 500 .875rem/1.4 var(--font-family-body);
+  --text-caption: 400 .8125rem/1.45 var(--font-family-body);
+  --text-micro: 600 .6875rem/1.3 var(--font-family-body);
+  --tracking-display: -.035em;
+  --tracking-title: -.028em;
+  --tracking-heading: -.018em;
+  --tracking-body: -.003em;
+  --tracking-micro: .08em;
+
+  /* E. Elevation: four levels of soft, wide, ink-tinted shadow. */
+  --elevation-1: 0 1px 1px var(--ink-a3), 0 2px 6px -2px var(--ink-a5);
+  --elevation-2: 0 1px 2px var(--ink-a5), 0 10px 28px -10px var(--ink-a12);
+  --elevation-3: 0 2px 6px -1px var(--ink-a8), 0 22px 54px -16px var(--ink-a20);
+  --elevation-4: 0 4px 12px -2px var(--ink-a8), 0 44px 96px -24px color-mix(in srgb, var(--brand-ink) 28%, transparent);
+  --hairline: 0 0 0 1px var(--ink-a8);
+
+  /* F. Glass: three light tiers and one dark, each a fill + blur + edge.
+        Used only for layers that float: sidebar, bars, menus, modals, toasts. */
+  --glass-thin-fill: color-mix(in srgb, var(--brand-paper) 58%, transparent);
+  --glass-thin-blur: blur(14px) saturate(160%);
+  --glass-regular-fill: color-mix(in srgb, var(--brand-field) 72%, transparent);
+  --glass-regular-blur: blur(24px) saturate(180%);
+  --glass-thick-fill: color-mix(in srgb, var(--brand-surface) 80%, transparent);
+  --glass-thick-blur: blur(36px) saturate(190%);
+  --glass-dark-fill: color-mix(in srgb, var(--brand-ink) 90%, transparent);
+  --glass-dark-blur: blur(28px) saturate(170%);
+  /* Top-lit inner edge plus an outer hairline, as on real frosted glass. */
+  --glass-edge: inset 0 1px 0 var(--surface-a70), inset 0 0 0 1px var(--surface-a40), 0 0 0 1px var(--ink-a5);
+  --glass-dark-edge: inset 0 1px 0 var(--paper-a20), inset 0 0 0 1px var(--paper-a12), 0 0 0 1px var(--ink-a20);
+  /* Solid stand-ins where blur is unsupported or transparency is reduced. */
+  --glass-thin-solid: var(--brand-paper);
+  --glass-regular-solid: var(--brand-field);
+  --glass-thick-solid: var(--brand-surface);
+  --glass-dark-solid: var(--brand-ink);
+
+  /* G. Motion: four durations, two eases, three springs. Springs are for what
+        the user touches; eases are for everything else. Only transform and
+        opacity (and clip-path for reveals) are ever animated. */
+  --motion-instant: 90ms;
+  --motion-fast: 160ms;
+  --motion-base: 240ms;
+  --motion-slow: 400ms;
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --spring-gentle: var(--ease-out);
+  --spring-snappy: cubic-bezier(.3, 1.3, .5, 1);
+  --spring-bouncy: cubic-bezier(.34, 1.56, .64, 1);
+  --press-scale: .97;
+  --lift: -1px;
+
+  /* H. Focus: one ring everywhere, drawn as an outline so it never fights a shadow. */
+  --focus-width: 2px;
+  --focus-offset: 2px;
+  --focus-color: var(--brand-link);
+  --focus-color-on-dark: var(--brand-accent);
+
+  /* I. Layers. */
+  --z-sticky: 20;
+  --z-overlay: 12000;
+  --z-toast: 12100;
+}
+
+/* Real spring curves where the browser supports linear(); the cubic-bezier
+   values above are the fallback. */
+@supports (transition-timing-function: linear(0, 1)) {
+  :root {
+    --spring-gentle: linear(0, 0.12 6.3%, 0.333 12.5%, 0.532 18.8%, 0.686 25%, 0.796 31.3%, 0.871 37.5%, 0.919 43.8%, 0.95 50%, 0.97 56.3%, 0.982 62.5%, 0.989 68.8%, 0.993 75%, 0.996 81.3%, 0.998 87.5%, 0.999 93.8%, 1);
+    --spring-snappy: linear(0, 0.086 5%, 0.268 10%, 0.468 15%, 0.646 20%, 0.786 25%, 0.886 30%, 0.951 35%, 0.99 40%, 1.011 45%, 1.019 50%, 1.02 55%, 1.017 60%, 1.013 65%, 1.009 70%, 1.006 75%, 1.004 80%, 1.002 85%, 1.001 90%, 1 95%, 1);
+    --spring-bouncy: linear(0, 0.111 3.8%, 0.357 7.7%, 0.631 11.5%, 0.866 15.4%, 1.03 19.2%, 1.12 23.1%, 1.148 26.9%, 1.134 30.8%, 1.098 34.6%, 1.058 38.5%, 1.022 42.3%, 0.997 46.2%, 0.983 50%, 0.978 53.8%, 0.98 57.7%, 0.985 61.5%, 0.991 65.4%, 0.996 69.2%, 1 73.1%, 1.002 76.9%, 1.003 80.8%, 1.003 84.6%, 1.002 88.5%, 1.001 92.3%, 1.001 96.2%, 1);
+  }
+}

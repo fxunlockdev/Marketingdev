@@ -1,0 +1,95 @@
+/* Navigation: rows with one pill that slides to the active item.
+ * The pill is a single element moved with transform; rows never repaint a background.
+ */
+.nav { position: relative; display: grid; gap: var(--space-5); min-width: 0; }
+.section { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.sectionLabel {
+  margin: 0 0 var(--space-1);
+  padding: 0 var(--space-3);
+  font: var(--text-micro);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--brand-muted);
+}
+
+/* The sliding pill. JS sets --pill-y and --pill-h from the active row. */
+.pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--pill-h, var(--control-height));
+  border-radius: var(--radius-md);
+  background: var(--brand-ink);
+  box-shadow: var(--elevation-2);
+  transform: translateY(var(--pill-y, 0px));
+  opacity: 0;
+  pointer-events: none;
+  transition: transform var(--motion-slow) var(--spring-snappy), opacity var(--motion-fast) var(--ease-out);
+}
+.pill[data-ready] { opacity: 1; }
+/* First placement must not slide in from the top. */
+.pill[data-instant] { transition: none; }
+
+.item {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  box-sizing: border-box;
+  min-height: var(--control-height);
+  margin: 0;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--brand-ink);
+  font: var(--text-callout);
+  letter-spacing: var(--tracking-body);
+  text-decoration: none;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--motion-base) var(--spring-snappy);
+}
+.item::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--ink-a8);
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-out);
+}
+@media (hover: hover) {
+  .item:hover:not([aria-current='page'])::before { opacity: .7; }
+}
+.item:active { transform: scale(.98); transition-duration: var(--motion-instant); }
+.item:focus-visible {
+  outline: var(--focus-width) solid var(--focus-color);
+  outline-offset: calc(var(--focus-offset) * -1);
+}
+
+/* The label turns to paper once the pill has mostly arrived: a delayed switch, not a colour animation. */
+.item[aria-current='page'] {
+  color: var(--brand-paper);
+  font-weight: 600;
+  transition: transform var(--motion-base) var(--spring-snappy), color 0s linear 110ms;
+}
+.item[aria-current='page']:focus-visible { outline-color: var(--focus-color-on-dark); outline-offset: var(--focus-offset); }
+
+.icon { display: inline-grid; place-items: center; flex: none; width: 20px; height: 20px; font-size: 20px; opacity: .78; }
+.item[aria-current='page'] .icon { opacity: 1; color: var(--brand-accent); }
+.label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trailing { flex: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pill { transition: opacity var(--motion-fast) linear; }
+  .item, .item:active { transform: none; transition: none; }
+  .item[aria-current='page'] { transition: none; }
+}
+@media (forced-colors: active) {
+  .pill { display: none; }
+  .item[aria-current='page'] { outline: 2px solid Highlight; outline-offset: -2px; }
+}
